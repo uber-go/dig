@@ -30,7 +30,7 @@ import (
 )
 
 var (
-	errParamType     = errors.New("graph injection must be done through a pointer or a function")
+	errParamType     = errors.New("registration must be done through a pointer or a function")
 	errReturnCount   = errors.New("constructor function must one or two values")
 	errReturnKind    = errors.New("constructor return type must be a pointer")
 	errReturnErrKind = errors.New("second return value of constructor must be error")
@@ -39,7 +39,7 @@ var (
 	_typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 )
 
-// New returns a new Dependency Injection Graph
+// New returns a new DI Container
 func New() *Container {
 	return &Container{
 		nodes: make(map[interface{}]graphNode),
@@ -53,7 +53,7 @@ type Container struct {
 	nodes map[interface{}]graphNode
 }
 
-// Register an object in the dependency graph.
+// Register an object in the Container
 //
 // The provided argument must be a function that accepts its dependencies as
 // arguments and returns a single result, which must be a pointer type.
@@ -160,7 +160,7 @@ func (g *Container) MustResolveAll(objs ...interface{}) {
 	}
 }
 
-// RegisterAll registers all the provided args in the dependency graph
+// RegisterAll registers all the provided args in the Container
 func (g *Container) RegisterAll(cs ...interface{}) error {
 	for _, c := range cs {
 		if err := g.Register(c); err != nil {
@@ -185,7 +185,7 @@ func (g *Container) Reset() {
 	g.nodes = make(map[interface{}]graphNode)
 }
 
-// String representation of the entire graph
+// String representation of the entire Container
 func (g *Container) String() string {
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "{nodes:")
@@ -238,9 +238,9 @@ func (g *Container) registerConstructor(c interface{}) error {
 
 	g.nodes[objType] = &n
 
-	// object needs to be part of the graph to properly detect cycles
+	// object needs to be part of the container to properly detect cycles
 	if cycleErr := g.detectCycles(&n); cycleErr != nil {
-		// if the cycle was detected delete from the graph
+		// if the cycle was detected delete from the container
 		delete(g.nodes, objType)
 		return errors.Wrapf(cycleErr, "unable to register %v", objType)
 	}
