@@ -70,20 +70,20 @@ func TestResolve(t *testing.T) {
 	t.Parallel()
 	tts := []struct {
 		name     string
-		register func(g *Graph) error
-		resolve  func(g *Graph) error
+		register func(g *Container) error
+		resolve  func(g *Container) error
 		es       string
 	}{
 		{
 			"non pointer resolve",
-			func(g *Graph) error { return g.Register(NewParent1) },
-			func(g *Graph) error { return g.Resolve(S{}) },
+			func(g *Container) error { return g.Register(NewParent1) },
+			func(g *Container) error { return g.Resolve(S{}) },
 			"can not resolve non-pointer object",
 		},
 		{
 			"missing dependency",
-			func(g *Graph) error { return nil },
-			func(g *Graph) error {
+			func(g *Container) error { return nil },
+			func(g *Container) error {
 				var p1 *Parent1
 				return g.Resolve(p1)
 			},
@@ -342,22 +342,22 @@ func TestMustFunctions(t *testing.T) {
 	t.Parallel()
 	tts := []struct {
 		name          string
-		f             func(g *Graph)
+		f             func(g *Container)
 		panicExpected bool
 	}{
 		{
 			"wrong register type",
-			func(g *Graph) { g.MustRegister(2) },
+			func(g *Container) { g.MustRegister(2) },
 			true,
 		},
 		{
 			"wrong register all types",
-			func(g *Graph) { g.MustRegisterAll("2", "3") },
+			func(g *Container) { g.MustRegisterAll("2", "3") },
 			true,
 		},
 		{
 			"unregistered type",
-			func(g *Graph) {
+			func(g *Container) {
 				var v *Type1
 				g.MustResolve(&v)
 			},
@@ -365,17 +365,17 @@ func TestMustFunctions(t *testing.T) {
 		},
 		{
 			"correct register",
-			func(g *Graph) { g.MustRegister(NewChild1) },
+			func(g *Container) { g.MustRegister(NewChild1) },
 			false,
 		},
 		{
 			"correct register all",
-			func(g *Graph) { g.MustRegisterAll(NewChild1, NewChild2) },
+			func(g *Container) { g.MustRegisterAll(NewChild1, NewChild2) },
 			false,
 		},
 		{
 			"unregistered types",
-			func(g *Graph) {
+			func(g *Container) {
 				var v *Type1
 				var v2 *Type2
 				g.MustResolveAll(&v, &v2)

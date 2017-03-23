@@ -24,7 +24,7 @@ package dig
 var defaultGraph = New()
 
 // DefaultGraph returns the graph used by top-level calls
-func DefaultGraph() *Graph {
+func DefaultGraph() *Container {
 	return defaultGraph
 }
 

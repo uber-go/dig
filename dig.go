@@ -40,14 +40,14 @@ var (
 )
 
 // New returns a new Dependency Injection Graph
-func New() *Graph {
-	return &Graph{
+func New() *Container {
+	return &Container{
 		nodes: make(map[interface{}]graphNode),
 	}
 }
 
-// Graph facilitates automated dependency resolution
-type Graph struct {
+// Container facilitates automated dependency resolution
+type Container struct {
 	sync.Mutex
 
 	nodes map[interface{}]graphNode
@@ -58,7 +58,7 @@ type Graph struct {
 // The provided argument must be a function that accepts its dependencies as
 // arguments and returns a single result, which must be a pointer type.
 // The function may optionally return an error as a second result.
-func (g *Graph) Register(c interface{}) error {
+func (g *Container) Register(c interface{}) error {
 	g.Lock()
 	defer g.Unlock()
 
@@ -89,7 +89,7 @@ func (g *Graph) Register(c interface{}) error {
 }
 
 // MustRegister will attempt to register the object and panic if error is encountered
-func (g *Graph) MustRegister(c interface{}) {
+func (g *Container) MustRegister(c interface{}) {
 	if err := g.Register(c); err != nil {
 		panic(err)
 	}
@@ -100,7 +100,7 @@ func (g *Graph) MustRegister(c interface{}) {
 // Provided object must be a pointer
 // Any dependencies of the object will receive constructor calls, or be initialized (once)
 // Constructor with return value *object will be called
-func (g *Graph) Resolve(obj interface{}) (err error) {
+func (g *Container) Resolve(obj interface{}) (err error) {
 	g.Lock()
 	defer g.Unlock()
 
@@ -136,7 +136,7 @@ func (g *Graph) Resolve(obj interface{}) (err error) {
 }
 
 // MustResolve calls Resolve and panics if an error is encountered
-func (g *Graph) MustResolve(obj interface{}) {
+func (g *Container) MustResolve(obj interface{}) {
 	if err := g.Resolve(obj); err != nil {
 		panic(err)
 	}
@@ -144,7 +144,7 @@ func (g *Graph) MustResolve(obj interface{}) {
 
 // ResolveAll the dependencies of each provided object
 // Returns the first error encountered
-func (g *Graph) ResolveAll(objs ...interface{}) error {
+func (g *Container) ResolveAll(objs ...interface{}) error {
 	for _, o := range objs {
 		if err := g.Resolve(o); err != nil {
 			return err
@@ -154,14 +154,14 @@ func (g *Graph) ResolveAll(objs ...interface{}) error {
 }
 
 // MustResolveAll calls ResolveAll and panics if an error is encountered
-func (g *Graph) MustResolveAll(objs ...interface{}) {
+func (g *Container) MustResolveAll(objs ...interface{}) {
 	if err := g.ResolveAll(objs...); err != nil {
 		panic(err)
 	}
 }
 
 // RegisterAll registers all the provided args in the dependency graph
-func (g *Graph) RegisterAll(cs ...interface{}) error {
+func (g *Container) RegisterAll(cs ...interface{}) error {
 	for _, c := range cs {
 		if err := g.Register(c); err != nil {
 			return err
@@ -171,14 +171,14 @@ func (g *Graph) RegisterAll(cs ...interface{}) error {
 }
 
 // MustRegisterAll calls RegisterAll and panics is an error is encountered
-func (g *Graph) MustRegisterAll(cs ...interface{}) {
+func (g *Container) MustRegisterAll(cs ...interface{}) {
 	if err := g.RegisterAll(cs...); err != nil {
 		panic(err)
 	}
 }
 
 // Reset the graph by removing all the registered nodes
-func (g *Graph) Reset() {
+func (g *Container) Reset() {
 	g.Lock()
 	defer g.Unlock()
 
@@ -186,7 +186,7 @@ func (g *Graph) Reset() {
 }
 
 // String representation of the entire graph
-func (g *Graph) String() string {
+func (g *Container) String() string {
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "{nodes:")
 	for key, reg := range g.nodes {
@@ -196,7 +196,7 @@ func (g *Graph) String() string {
 	return b.String()
 }
 
-func (g *Graph) registerObject(o interface{}, otype reflect.Type) error {
+func (g *Container) registerObject(o interface{}, otype reflect.Type) error {
 	v := reflect.ValueOf(o)
 	if otype.Elem().Kind() == reflect.Interface {
 		otype = otype.Elem()
@@ -215,7 +215,7 @@ func (g *Graph) registerObject(o interface{}, otype reflect.Type) error {
 }
 
 // c must be a function that returns the result type and an error
-func (g *Graph) registerConstructor(c interface{}) error {
+func (g *Container) registerConstructor(c interface{}) error {
 	ctype := reflect.TypeOf(c)
 	objType := ctype.Out(0)
 
@@ -249,13 +249,13 @@ func (g *Graph) registerConstructor(c interface{}) error {
 }
 
 // When a new constructor is being inserted, detect any present cycles
-func (g *Graph) detectCycles(n *funcNode) error {
+func (g *Container) detectCycles(n *funcNode) error {
 	l := []string{}
 	return g.recursiveDetectCycles(n, l)
 }
 
 // DFS and tracking if same node is visited twice
-func (g *Graph) recursiveDetectCycles(n graphNode, l []string) error {
+func (g *Container) recursiveDetectCycles(n graphNode, l []string) error {
 	for _, el := range l {
 		if n.id() == el {
 			b := &bytes.Buffer{}

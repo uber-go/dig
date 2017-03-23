@@ -29,7 +29,7 @@ import (
 
 type graphNode interface {
 	// Return value of the object
-	value(g *Graph) (reflect.Value, error)
+	value(g *Container) (reflect.Value, error)
 
 	// Other things that need to be present before this object can be created
 	dependencies() []interface{}
@@ -63,7 +63,7 @@ type objNode struct {
 }
 
 // Return the earlier provided instance
-func (n *objNode) value(g *Graph) (reflect.Value, error) {
+func (n *objNode) value(g *Container) (reflect.Value, error) {
 	return n.cachedValue, nil
 }
 
@@ -90,7 +90,7 @@ type funcNode struct {
 }
 
 // Call the function and return the result
-func (n *funcNode) value(g *Graph) (reflect.Value, error) {
+func (n *funcNode) value(g *Container) (reflect.Value, error) {
 	if n.cached {
 		return n.cachedValue, nil
 	}
