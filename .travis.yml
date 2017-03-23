@@ -1,0 +1,16 @@
+language: go
+sudo: false
+go:
+  - 1.7
+  - 1.8
+go_import_path: go.uber.org/dig
+cache:
+  directories:
+    - vendor
+install:
+  - make dependencies
+script:
+  - make lint
+  - make test
+after_success:
+  - make coveralls
