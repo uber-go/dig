@@ -3,6 +3,10 @@
 `package dig` provides an opinionated way of resolving object dependencies.
 There are two sides of dig: `Register` and `Resolve`.
 
+## Status
+
+BETA. Expect potential API changes.
+
 ## Register
 
 `Register` adds an object, or a constructor of an object to the graph.
