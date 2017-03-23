@@ -30,7 +30,7 @@ import (
 )
 
 var (
-	errParamType     = errors.New("graph injection must be done through a pointer or a function")
+	errParamType     = errors.New("registration must be done through a pointer or a function")
 	errReturnCount   = errors.New("constructor function must one or two values")
 	errReturnKind    = errors.New("constructor return type must be a pointer")
 	errReturnErrKind = errors.New("second return value of constructor must be error")
@@ -39,30 +39,30 @@ var (
 	_typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 )
 
-// New returns a new Dependency Injection Graph
-func New() *Graph {
-	return &Graph{
+// New returns a new DI Container
+func New() *Container {
+	return &Container{
 		nodes: make(map[interface{}]graphNode),
 	}
 }
 
-// Graph facilitates automated dependency resolution
-type Graph struct {
+// Container facilitates automated dependency resolution
+type Container struct {
 	sync.Mutex
 
 	nodes map[interface{}]graphNode
 }
 
-// Register an object in the dependency graph.
+// Register an object in the Container
 //
 // The provided argument must be a function that accepts its dependencies as
 // arguments and returns a single result, which must be a pointer type.
 // The function may optionally return an error as a second result.
-func (g *Graph) Register(c interface{}) error {
-	g.Lock()
-	defer g.Unlock()
+func (c *Container) Register(t interface{}) error {
+	c.Lock()
+	defer c.Unlock()
 
-	ctype := reflect.TypeOf(c)
+	ctype := reflect.TypeOf(t)
 
 	switch ctype.Kind() {
 	case reflect.Func:
@@ -80,17 +80,17 @@ func (g *Graph) Register(c interface{}) error {
 		default:
 			return errReturnCount
 		}
-		return g.registerConstructor(c)
+		return c.registerConstructor(t)
 	case reflect.Ptr:
-		return g.registerObject(c, ctype)
+		return c.registerObject(t, ctype)
 	default:
 		return errParamType
 	}
 }
 
 // MustRegister will attempt to register the object and panic if error is encountered
-func (g *Graph) MustRegister(c interface{}) {
-	if err := g.Register(c); err != nil {
+func (c *Container) MustRegister(t interface{}) {
+	if err := c.Register(t); err != nil {
 		panic(err)
 	}
 }
@@ -100,9 +100,9 @@ func (g *Graph) MustRegister(c interface{}) {
 // Provided object must be a pointer
 // Any dependencies of the object will receive constructor calls, or be initialized (once)
 // Constructor with return value *object will be called
-func (g *Graph) Resolve(obj interface{}) (err error) {
-	g.Lock()
-	defer g.Unlock()
+func (c *Container) Resolve(obj interface{}) (err error) {
+	c.Lock()
+	defer c.Unlock()
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -119,12 +119,12 @@ func (g *Graph) Resolve(obj interface{}) (err error) {
 	objVal := reflect.ValueOf(obj)
 
 	// check if the type is a registered objNode
-	n, ok := g.nodes[objElemType]
+	n, ok := c.nodes[objElemType]
 	if !ok {
 		return fmt.Errorf("type %v is not registered", objType)
 	}
 
-	v, err := n.value(g)
+	v, err := n.value(c)
 	if err != nil {
 		return errors.Wrapf(err, "unable to resolve %v", objType)
 	}
@@ -136,17 +136,17 @@ func (g *Graph) Resolve(obj interface{}) (err error) {
 }
 
 // MustResolve calls Resolve and panics if an error is encountered
-func (g *Graph) MustResolve(obj interface{}) {
-	if err := g.Resolve(obj); err != nil {
+func (c *Container) MustResolve(obj interface{}) {
+	if err := c.Resolve(obj); err != nil {
 		panic(err)
 	}
 }
 
 // ResolveAll the dependencies of each provided object
 // Returns the first error encountered
-func (g *Graph) ResolveAll(objs ...interface{}) error {
+func (c *Container) ResolveAll(objs ...interface{}) error {
 	for _, o := range objs {
-		if err := g.Resolve(o); err != nil {
+		if err := c.Resolve(o); err != nil {
 			return err
 		}
 	}
@@ -154,16 +154,16 @@ func (g *Graph) ResolveAll(objs ...interface{}) error {
 }
 
 // MustResolveAll calls ResolveAll and panics if an error is encountered
-func (g *Graph) MustResolveAll(objs ...interface{}) {
-	if err := g.ResolveAll(objs...); err != nil {
+func (c *Container) MustResolveAll(objs ...interface{}) {
+	if err := c.ResolveAll(objs...); err != nil {
 		panic(err)
 	}
 }
 
-// RegisterAll registers all the provided args in the dependency graph
-func (g *Graph) RegisterAll(cs ...interface{}) error {
-	for _, c := range cs {
-		if err := g.Register(c); err != nil {
+// RegisterAll registers all the provided args in the Container
+func (c *Container) RegisterAll(types ...interface{}) error {
+	for _, t := range types {
+		if err := c.Register(t); err != nil {
 			return err
 		}
 	}
@@ -171,32 +171,32 @@ func (g *Graph) RegisterAll(cs ...interface{}) error {
 }
 
 // MustRegisterAll calls RegisterAll and panics is an error is encountered
-func (g *Graph) MustRegisterAll(cs ...interface{}) {
-	if err := g.RegisterAll(cs...); err != nil {
+func (c *Container) MustRegisterAll(types ...interface{}) {
+	if err := c.RegisterAll(types...); err != nil {
 		panic(err)
 	}
 }
 
 // Reset the graph by removing all the registered nodes
-func (g *Graph) Reset() {
-	g.Lock()
-	defer g.Unlock()
+func (c *Container) Reset() {
+	c.Lock()
+	defer c.Unlock()
 
-	g.nodes = make(map[interface{}]graphNode)
+	c.nodes = make(map[interface{}]graphNode)
 }
 
-// String representation of the entire graph
-func (g *Graph) String() string {
+// String representation of the entire Container
+func (c *Container) String() string {
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "{nodes:")
-	for key, reg := range g.nodes {
+	for key, reg := range c.nodes {
 		fmt.Fprintln(b, key, "->", reg)
 	}
 	fmt.Fprintln(b, "}")
 	return b.String()
 }
 
-func (g *Graph) registerObject(o interface{}, otype reflect.Type) error {
+func (c *Container) registerObject(o interface{}, otype reflect.Type) error {
 	v := reflect.ValueOf(o)
 	if otype.Elem().Kind() == reflect.Interface {
 		otype = otype.Elem()
@@ -210,19 +210,19 @@ func (g *Graph) registerObject(o interface{}, otype reflect.Type) error {
 		},
 	}
 
-	g.nodes[otype] = &n
+	c.nodes[otype] = &n
 	return nil
 }
 
-// c must be a function that returns the result type and an error
-func (g *Graph) registerConstructor(c interface{}) error {
-	ctype := reflect.TypeOf(c)
+// constr must be a function that returns the result type and an error
+func (c *Container) registerConstructor(constr interface{}) error {
+	ctype := reflect.TypeOf(constr)
 	objType := ctype.Out(0)
 
 	argc := ctype.NumIn()
 	n := funcNode{
 		deps:        make([]interface{}, argc),
-		constructor: c,
+		constructor: constr,
 		node: node{
 			objType: objType,
 		},
@@ -236,12 +236,12 @@ func (g *Graph) registerConstructor(c interface{}) error {
 		n.deps[i] = arg
 	}
 
-	g.nodes[objType] = &n
+	c.nodes[objType] = &n
 
-	// object needs to be part of the graph to properly detect cycles
-	if cycleErr := g.detectCycles(&n); cycleErr != nil {
-		// if the cycle was detected delete from the graph
-		delete(g.nodes, objType)
+	// object needs to be part of the container to properly detect cycles
+	if cycleErr := c.detectCycles(&n); cycleErr != nil {
+		// if the cycle was detected delete from the container
+		delete(c.nodes, objType)
 		return errors.Wrapf(cycleErr, "unable to register %v", objType)
 	}
 
@@ -249,13 +249,13 @@ func (g *Graph) registerConstructor(c interface{}) error {
 }
 
 // When a new constructor is being inserted, detect any present cycles
-func (g *Graph) detectCycles(n *funcNode) error {
+func (c *Container) detectCycles(n *funcNode) error {
 	l := []string{}
-	return g.recursiveDetectCycles(n, l)
+	return c.recursiveDetectCycles(n, l)
 }
 
 // DFS and tracking if same node is visited twice
-func (g *Graph) recursiveDetectCycles(n graphNode, l []string) error {
+func (c *Container) recursiveDetectCycles(n graphNode, l []string) error {
 	for _, el := range l {
 		if n.id() == el {
 			b := &bytes.Buffer{}
@@ -270,8 +270,8 @@ func (g *Graph) recursiveDetectCycles(n graphNode, l []string) error {
 	l = append(l, n.id())
 
 	for _, dep := range n.dependencies() {
-		if node, ok := g.nodes[dep]; ok {
-			if err := g.recursiveDetectCycles(node, l); err != nil {
+		if node, ok := c.nodes[dep]; ok {
+			if err := c.recursiveDetectCycles(node, l); err != nil {
 				return err
 			}
 		}

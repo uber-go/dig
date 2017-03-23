@@ -66,8 +66,8 @@ func TestRegister(t *testing.T) {
 
 	for _, tc := range tts {
 		t.Run(tc.name, func(t *testing.T) {
-			g := New()
-			err := g.Register(tc.param)
+			c := New()
+			err := c.Register(tc.param)
 
 			if tc.err != nil {
 				require.EqualError(t, err, tc.err.Error())
@@ -82,22 +82,22 @@ func TestResolve(t *testing.T) {
 	t.Parallel()
 	tts := []struct {
 		name     string
-		register func(g *Graph) error
-		resolve  func(g *Graph) error
+		register func(c *Container) error
+		resolve  func(c *Container) error
 		es       string
 	}{
 		{
 			"non pointer resolve",
-			func(g *Graph) error { return g.Register(NewParent1) },
-			func(g *Graph) error { return g.Resolve(S{}) },
+			func(c *Container) error { return c.Register(NewParent1) },
+			func(c *Container) error { return c.Resolve(S{}) },
 			"can not resolve non-pointer object",
 		},
 		{
 			"missing dependency",
-			func(g *Graph) error { return nil },
-			func(g *Graph) error {
+			func(c *Container) error { return nil },
+			func(c *Container) error {
 				var p1 *Parent1
-				return g.Resolve(p1)
+				return c.Resolve(p1)
 			},
 			"type *dig.Parent1 is not registered",
 		},
@@ -105,12 +105,12 @@ func TestResolve(t *testing.T) {
 
 	for _, tc := range tts {
 		t.Run(tc.name, func(t *testing.T) {
-			g := New()
+			c := New()
 
-			err := tc.register(g)
+			err := tc.register(c)
 			require.NoError(t, err, "Register part of the test cant have errors")
 
-			err = tc.resolve(g)
+			err = tc.resolve(c)
 			if tc.es != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.es, "Unexpected error message")
@@ -123,23 +123,23 @@ func TestResolve(t *testing.T) {
 
 func TestObjectRegister(t *testing.T) {
 	t.Parallel()
-	g := New()
+	c := New()
 
 	// register a fake struct type into the graph
 	type Fake struct {
 		Name string
 	}
-	err := g.Register(&Fake{Name: "I am a fake registered thing"})
+	err := c.Register(&Fake{Name: "I am a fake registered thing"})
 	require.NoError(t, err)
 
 	// get one pointer resolved
 	var f1 *Fake
-	err = g.Resolve(&f1)
+	err = c.Resolve(&f1)
 	require.NoError(t, err)
 
 	// get second pointer resolved
 	var f2 *Fake
-	err = g.Resolve(&f2)
+	err = c.Resolve(&f2)
 	require.NoError(t, err)
 
 	// make sure they are the same
@@ -149,16 +149,16 @@ func TestObjectRegister(t *testing.T) {
 
 func TestBasicRegisterResolve(t *testing.T) {
 	t.Parallel()
-	g := New()
+	c := New()
 
-	err := g.Register(NewGrandchild1)
+	err := c.Register(NewGrandchild1)
 	require.NoError(t, err)
 
 	var first *Grandchild1
-	require.NoError(t, g.Resolve(&first), "No error expected during first Resolve")
+	require.NoError(t, c.Resolve(&first), "No error expected during first Resolve")
 
 	var second *Grandchild1
-	require.NoError(t, g.Resolve(&second), "No error expected during second Resolve")
+	require.NoError(t, c.Resolve(&second), "No error expected during second Resolve")
 
 	require.NotNil(t, first, "Child1 must have been registered")
 	require.NotNil(t, second, "Child1 must have been registered")
@@ -167,33 +167,33 @@ func TestBasicRegisterResolve(t *testing.T) {
 
 func TestInterfaceRegisterResolve(t *testing.T) {
 	t.Parallel()
-	g := New()
+	c := New()
 
 	var gc1 GrandchildInt1 = NewGrandchild1()
-	err := g.Register(&gc1)
+	err := c.Register(&gc1)
 	require.NoError(t, err)
 
 	var registered1 GrandchildInt1
-	require.NoError(t, g.Resolve(&registered1), "No error expected during Resolve")
+	require.NoError(t, c.Resolve(&registered1), "No error expected during Resolve")
 
 	require.NotNil(t, registered1, "GrandchildInt1 must have been registered")
 	require.True(t, gc1 == registered1, "Must point to the same object")
 
 	var gc2 GrandchildInt2 = &Grandchild2{}
-	err = g.Register(&gc2)
+	err = c.Register(&gc2)
 	require.NoError(t, err)
 
 	var registered2 GrandchildInt2
-	require.NoError(t, g.Resolve(&registered2), "No error expected during Resolve")
+	require.NoError(t, c.Resolve(&registered2), "No error expected during Resolve")
 
 	require.NotNil(t, registered2, "GrandchildInt2 must have been registered")
 	require.True(t, gc2 == registered2, "Must point to the same object")
 
-	err = g.Register(NewChild3)
+	err = c.Register(NewChild3)
 	require.NoError(t, err)
 
 	var c3 *Child3
-	require.NoError(t, g.Resolve(&c3), "No error expected during Resolve")
+	require.NoError(t, c.Resolve(&c3), "No error expected during Resolve")
 
 	require.NotNil(t, c3, "NewChild3 must have been registered")
 	require.True(t, gc1 == c3.gci1, "Child grand childeren point to the same object")
@@ -227,11 +227,11 @@ func TestConstructorErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			g := New()
-			require.NoError(t, g.RegisterAll(tt.registers...))
+			c := New()
+			require.NoError(t, c.RegisterAll(tt.registers...))
 
 			var p1 *FlakyParent
-			err := g.Resolve(&p1)
+			err := c.Resolve(&p1)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 			} else {
@@ -243,9 +243,9 @@ func TestConstructorErrors(t *testing.T) {
 
 func TestRegisterAll(t *testing.T) {
 	t.Parallel()
-	g := New()
+	c := New()
 
-	err := g.RegisterAll(
+	err := c.RegisterAll(
 		NewParent1,
 		NewChild1,
 		NewGrandchild1,
@@ -253,7 +253,7 @@ func TestRegisterAll(t *testing.T) {
 	require.NoError(t, err)
 
 	var p1 *Parent1
-	err = g.Resolve(&p1)
+	err = c.Resolve(&p1)
 
 	require.NoError(t, err, "No error expected during Resolve")
 	require.NotNil(t, p1.c1, "Child1 must have been registered")
@@ -262,21 +262,21 @@ func TestRegisterAll(t *testing.T) {
 
 func TestConcurrentAccess(t *testing.T) {
 	t.Parallel()
-	g := New()
+	c := New()
 
 	for i := 0; i < 10; i++ {
 		go func() {
-			require.NoError(t, g.Register(NewGrandchild1))
+			require.NoError(t, c.Register(NewGrandchild1))
 
 			var gc1 *Grandchild1
-			require.NoError(t, g.Resolve(&gc1))
+			require.NoError(t, c.Resolve(&gc1))
 		}()
 	}
 }
 
 func TestCycles(t *testing.T) {
 	t.Parallel()
-	g := New()
+	c := New()
 
 	//    Type1
 	//    /    \
@@ -291,9 +291,9 @@ func TestCycles(t *testing.T) {
 	c2 := func(t4 Type4) Type2 { return nil }
 	c3 := func(t3 Type1) Type3 { return nil }
 
-	require.NoError(t, g.Register(c1))
-	require.NoError(t, g.Register(c2))
-	err := g.Register(c3)
+	require.NoError(t, c.Register(c1))
+	require.NoError(t, c.Register(c2))
+	err := c.Register(c3)
 
 	require.Contains(t, err.Error(), "unable to register dig.Type3")
 	require.Contains(t, err.Error(), "dig.Type3 -> dig.Type1 -> dig.Type3")
@@ -301,9 +301,9 @@ func TestCycles(t *testing.T) {
 
 func TestResolveAll(t *testing.T) {
 	t.Parallel()
-	g := New()
+	c := New()
 
-	err := g.RegisterAll(
+	err := c.RegisterAll(
 		NewGrandchild1,
 		NewChild1,
 		NewParent1,
@@ -315,7 +315,7 @@ func TestResolveAll(t *testing.T) {
 	var p3 *Parent1
 	var p4 *Parent1
 
-	err = g.ResolveAll(&p1, &p2, &p3, &p4)
+	err = c.ResolveAll(&p1, &p2, &p3, &p4)
 	require.NoError(t, err, "Did not expect error on resolve all")
 	require.Equal(t, p1.name, "Parent1")
 	require.True(t, p1 == p2 && p2 == p3 && p3 == p4, "All pointers must be equal")
@@ -323,29 +323,29 @@ func TestResolveAll(t *testing.T) {
 
 func TestEmptyAfterReset(t *testing.T) {
 	t.Parallel()
-	g := New()
+	c := New()
 
-	require.NoError(t, g.Register(NewGrandchild1))
+	require.NoError(t, c.Register(NewGrandchild1))
 
 	var first *Grandchild1
-	require.NoError(t, g.Resolve(&first), "No error expected during first Resolve")
-	g.Reset()
-	require.Contains(t, g.Resolve(&first).Error(), "not registered")
+	require.NoError(t, c.Resolve(&first), "No error expected during first Resolve")
+	c.Reset()
+	require.Contains(t, c.Resolve(&first).Error(), "not registered")
 }
 
 func TestPanicConstructor(t *testing.T) {
 	t.Parallel()
-	g := New()
+	c := New()
 
 	type Type1 struct{}
-	c := func() *Type1 {
+	ty := func() *Type1 {
 		panic("RUH ROH")
 	}
 
-	require.NoError(t, g.Register(c))
+	require.NoError(t, c.Register(ty))
 
 	var v *Type1
-	err := g.Resolve(&v)
+	err := c.Resolve(&v)
 	require.Contains(t, err.Error(), "panic during Resolve")
 	require.Contains(t, err.Error(), "RUH ROH")
 }
@@ -354,43 +354,43 @@ func TestMustFunctions(t *testing.T) {
 	t.Parallel()
 	tts := []struct {
 		name          string
-		f             func(g *Graph)
+		f             func(c *Container)
 		panicExpected bool
 	}{
 		{
 			"wrong register type",
-			func(g *Graph) { g.MustRegister(2) },
+			func(c *Container) { c.MustRegister(2) },
 			true,
 		},
 		{
 			"wrong register all types",
-			func(g *Graph) { g.MustRegisterAll("2", "3") },
+			func(c *Container) { c.MustRegisterAll("2", "3") },
 			true,
 		},
 		{
 			"unregistered type",
-			func(g *Graph) {
+			func(c *Container) {
 				var v *Type1
-				g.MustResolve(&v)
+				c.MustResolve(&v)
 			},
 			true,
 		},
 		{
 			"correct register",
-			func(g *Graph) { g.MustRegister(NewChild1) },
+			func(c *Container) { c.MustRegister(NewChild1) },
 			false,
 		},
 		{
 			"correct register all",
-			func(g *Graph) { g.MustRegisterAll(NewChild1, NewChild2) },
+			func(c *Container) { c.MustRegisterAll(NewChild1, NewChild2) },
 			false,
 		},
 		{
 			"unregistered types",
-			func(g *Graph) {
+			func(c *Container) {
 				var v *Type1
 				var v2 *Type2
-				g.MustResolveAll(&v, &v2)
+				c.MustResolveAll(&v, &v2)
 			},
 			true,
 		},
@@ -398,9 +398,9 @@ func TestMustFunctions(t *testing.T) {
 
 	for _, tc := range tts {
 		t.Run(tc.name, func(t *testing.T) {
-			g := New()
+			c := New()
 			f := func() {
-				tc.f(g)
+				tc.f(c)
 			}
 
 			if tc.panicExpected {
