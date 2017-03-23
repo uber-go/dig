@@ -1,4 +1,4 @@
-# Dependency Injection Graph
+# dig - A dependency injection framework for Go
 
 `package dig` provides an opinionated way of resolving object dependencies.
 There are two sides of dig: `Register` and `Resolve`.
