@@ -9,7 +9,7 @@ BETA. Expect potential API changes.
 
 ## Register
 
-`Register` adds an object, or a constructor of an object to the graph.
+`Register` adds an object, or a constructor of an object to the container.
 
 There are two ways to register an object:
 
@@ -18,20 +18,20 @@ There are two ways to register an object:
 
 ### Register an object
 
-Injecting an object means it has no dependencies, and will be used as a
-**shared** singleton instance for all resolutions within the graph.
+Registering an object means it has no dependencies, and will be used as a
+**shared** singleton instance for all resolutions within the container.
 
 ```go
 type Fake struct {
     Name string
 }
 
-g := dig.New()
-err := g.Register(&Fake{Name: "I am an injected thing"})
+c := dig.New()
+err := c.Register(&Fake{Name: "I am an thing"})
 require.NoError(t, err)
 
 var f1 *Fake
-err = g.Resolve(&f1)
+err = c.Resolve(&f1)
 require.NoError(t, err)
 
 // f1 is ready to use here...
@@ -44,11 +44,11 @@ function that returns exactly one pointer (or interface) and takes 0-N number of
 arguments. Each one of the arguments is automatically registered as a
 **dependency** and must also be an interface or a pointer.
 
-The following example illustrates injecting a constructor function for type
-`*Object` that requires `*Dep` to be present in the graph
+The following example illustrates registering a constructor function for type
+`*Object` that requires `*Dep` to be present in the container.
 
 ```go
-g := dig.New()
+c := dig.New()
 
 type Dep struct{}
 type Object struct{
@@ -59,28 +59,28 @@ func NewObject(d *Dep) *Object {
   return &Object{Dep: d}
 }
 
-err := g.Register(NewObject)
+err := c.Register(NewObject)
 ```
 
 ## Resolve
 
-`Resolve` retrieves objects from the graph by type.
+`Resolve` retrieves objects from the container by building the object graph.
 
 There are future plans to do named retrievals to support multiple
-objects of the same type in the graph.
+objects of the same type in the container.
 
 ```go
-g := dig.New()
+c := dig.New()
 
 var o *Object
-err := g.Resolve(&o) // notice the pointer to a pointer as param type
+err := c.Resolve(&o) // notice the pointer to a pointer as param type
 if err == nil {
     // o is ready to use
 }
 
 type Do interface{}
 var d Do
-err := g.Resolve(&d) // notice pointer to an interface
+err := c.Resolve(&d) // notice pointer to an interface
 if err == nil {
     // d is ready to use
 }
