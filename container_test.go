@@ -26,6 +26,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type Type1 struct {
+	t int
+}
+
+type Type2 struct {
+	s string
+}
+
+type Type3 struct {
+	f float32
+}
+
 type S struct{}
 
 func noReturn() {}
