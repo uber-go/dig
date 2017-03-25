@@ -53,12 +53,12 @@ type Container struct {
 	nodes map[interface{}]graphNode
 }
 
-// Register an object in the Container
+// Provide an object in the Container
 //
 // The provided argument must be a function that accepts its dependencies as
 // arguments and returns a single result, which must be a pointer type.
 // The function may optionally return an error as a second result.
-func (c *Container) Register(t interface{}) error {
+func (c *Container) Provide(t interface{}) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -88,9 +88,9 @@ func (c *Container) Register(t interface{}) error {
 	}
 }
 
-// MustRegister will attempt to register the object and panic if error is encountered
+// MustRegister will attempt to Provide the object and panic if error is encountered
 func (c *Container) MustRegister(t interface{}) {
-	if err := c.Register(t); err != nil {
+	if err := c.Provide(t); err != nil {
 		panic(err)
 	}
 }
@@ -163,7 +163,7 @@ func (c *Container) MustResolveAll(objs ...interface{}) {
 // RegisterAll registers all the provided args in the Container
 func (c *Container) RegisterAll(types ...interface{}) error {
 	for _, t := range types {
-		if err := c.Register(t); err != nil {
+		if err := c.Provide(t); err != nil {
 			return err
 		}
 	}
@@ -242,7 +242,7 @@ func (c *Container) registerConstructor(constr interface{}) error {
 	if cycleErr := c.detectCycles(&n); cycleErr != nil {
 		// if the cycle was detected delete from the container
 		delete(c.nodes, objType)
-		return errors.Wrapf(cycleErr, "unable to register %v", objType)
+		return errors.Wrapf(cycleErr, "unable to Provide %v", objType)
 	}
 
 	return nil

@@ -61,13 +61,13 @@ func TestRegister(t *testing.T) {
 		{"wrong return count", noReturn, errReturnCount},
 		{"non pointer return", returnNonPointer, errReturnKind},
 		{"wrong parameters type", nonPointerParams, errArgKind},
-		{"pointer register", &struct{}{}, nil},
+		{"pointer Provide", &struct{}{}, nil},
 	}
 
 	for _, tc := range tts {
 		t.Run(tc.name, func(t *testing.T) {
 			c := New()
-			err := c.Register(tc.param)
+			err := c.Provide(tc.param)
 
 			if tc.err != nil {
 				require.EqualError(t, err, tc.err.Error())
@@ -81,14 +81,14 @@ func TestRegister(t *testing.T) {
 func TestResolve(t *testing.T) {
 	t.Parallel()
 	tts := []struct {
-		name     string
-		register func(c *Container) error
-		resolve  func(c *Container) error
-		es       string
+		name    string
+		Provide func(c *Container) error
+		resolve func(c *Container) error
+		es      string
 	}{
 		{
 			"non pointer resolve",
-			func(c *Container) error { return c.Register(NewParent1) },
+			func(c *Container) error { return c.Provide(NewParent1) },
 			func(c *Container) error { return c.Resolve(S{}) },
 			"can not resolve non-pointer object",
 		},
@@ -107,8 +107,8 @@ func TestResolve(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := New()
 
-			err := tc.register(c)
-			require.NoError(t, err, "Register part of the test cant have errors")
+			err := tc.Provide(c)
+			require.NoError(t, err, "Provide part of the test cant have errors")
 
 			err = tc.resolve(c)
 			if tc.es != "" {
@@ -125,11 +125,11 @@ func TestObjectRegister(t *testing.T) {
 	t.Parallel()
 	c := New()
 
-	// register a fake struct type into the graph
+	// Provide a fake struct type into the graph
 	type Fake struct {
 		Name string
 	}
-	err := c.Register(&Fake{Name: "I am a fake registered thing"})
+	err := c.Provide(&Fake{Name: "I am a fake registered thing"})
 	require.NoError(t, err)
 
 	// get one pointer resolved
@@ -151,7 +151,7 @@ func TestBasicRegisterResolve(t *testing.T) {
 	t.Parallel()
 	c := New()
 
-	err := c.Register(NewGrandchild1)
+	err := c.Provide(NewGrandchild1)
 	require.NoError(t, err)
 
 	var first *Grandchild1
@@ -170,7 +170,7 @@ func TestInterfaceRegisterResolve(t *testing.T) {
 	c := New()
 
 	var gc1 GrandchildInt1 = NewGrandchild1()
-	err := c.Register(&gc1)
+	err := c.Provide(&gc1)
 	require.NoError(t, err)
 
 	var registered1 GrandchildInt1
@@ -180,7 +180,7 @@ func TestInterfaceRegisterResolve(t *testing.T) {
 	require.True(t, gc1 == registered1, "Must point to the same object")
 
 	var gc2 GrandchildInt2 = &Grandchild2{}
-	err = c.Register(&gc2)
+	err = c.Provide(&gc2)
 	require.NoError(t, err)
 
 	var registered2 GrandchildInt2
@@ -189,7 +189,7 @@ func TestInterfaceRegisterResolve(t *testing.T) {
 	require.NotNil(t, registered2, "GrandchildInt2 must have been registered")
 	require.True(t, gc2 == registered2, "Must point to the same object")
 
-	err = c.Register(NewChild3)
+	err = c.Provide(NewChild3)
 	require.NoError(t, err)
 
 	var c3 *Child3
@@ -266,7 +266,7 @@ func TestConcurrentAccess(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		go func() {
-			require.NoError(t, c.Register(NewGrandchild1))
+			require.NoError(t, c.Provide(NewGrandchild1))
 
 			var gc1 *Grandchild1
 			require.NoError(t, c.Resolve(&gc1))
@@ -291,11 +291,11 @@ func TestCycles(t *testing.T) {
 	c2 := func(t4 Type4) Type2 { return nil }
 	c3 := func(t3 Type1) Type3 { return nil }
 
-	require.NoError(t, c.Register(c1))
-	require.NoError(t, c.Register(c2))
-	err := c.Register(c3)
+	require.NoError(t, c.Provide(c1))
+	require.NoError(t, c.Provide(c2))
+	err := c.Provide(c3)
 
-	require.Contains(t, err.Error(), "unable to register dig.Type3")
+	require.Contains(t, err.Error(), "unable to Provide dig.Type3")
 	require.Contains(t, err.Error(), "dig.Type3 -> dig.Type1 -> dig.Type3")
 }
 
@@ -325,7 +325,7 @@ func TestEmptyAfterReset(t *testing.T) {
 	t.Parallel()
 	c := New()
 
-	require.NoError(t, c.Register(NewGrandchild1))
+	require.NoError(t, c.Provide(NewGrandchild1))
 
 	var first *Grandchild1
 	require.NoError(t, c.Resolve(&first), "No error expected during first Resolve")
@@ -342,7 +342,7 @@ func TestPanicConstructor(t *testing.T) {
 		panic("RUH ROH")
 	}
 
-	require.NoError(t, c.Register(ty))
+	require.NoError(t, c.Provide(ty))
 
 	var v *Type1
 	err := c.Resolve(&v)
@@ -358,12 +358,12 @@ func TestMustFunctions(t *testing.T) {
 		panicExpected bool
 	}{
 		{
-			"wrong register type",
+			"wrong Provide type",
 			func(c *Container) { c.MustRegister(2) },
 			true,
 		},
 		{
-			"wrong register all types",
+			"wrong Provide all types",
 			func(c *Container) { c.MustRegisterAll("2", "3") },
 			true,
 		},
@@ -376,12 +376,12 @@ func TestMustFunctions(t *testing.T) {
 			true,
 		},
 		{
-			"correct register",
+			"correct Provide",
 			func(c *Container) { c.MustRegister(NewChild1) },
 			false,
 		},
 		{
-			"correct register all",
+			"correct Provide all",
 			func(c *Container) { c.MustRegisterAll(NewChild1, NewChild2) },
 			false,
 		},

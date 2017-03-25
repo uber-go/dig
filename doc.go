@@ -2,23 +2,23 @@
 //
 // package dig provides an opinionated way of resolving object dependencies.
 // There are two sides of dig:
-// Register and Resolve.
+// Provide and Resolve.
 //
 // Status
 //
 // BETA. Expect potential API changes.
 //
-// Register
+// Provide
 //
-// Register adds an object, or a constructor of an object to the container.
+// Provide adds an object, or a constructor of an object to the container.
 //
-// There are two ways to register an object:
+// There are two ways to Provide an object:
 //
-// • Register a pointer to an existing object
+// • Provide a pointer to an existing object
 //
-// • Register a "constructor function" that returns one pointer (or interface)
+// • Provide a "constructor function" that returns one pointer (or interface)
 //
-// Register an object
+// Provide an object
 //
 // Registering an object means it has no dependencies, and will be used as a
 // **shared** singleton instance for all resolutions within the container.
@@ -28,7 +28,7 @@
 //   }
 //
 //   c := dig.New()
-//   err := c.Register(&Fake{Name: "I am an thing"})
+//   err := c.Provide(&Fake{Name: "I am an thing"})
 //   require.NoError(t, err)
 //
 //   var f1 *Fake
@@ -37,7 +37,7 @@
 //
 //   // f1 is ready to use here...
 //
-// Register a constructor
+// Provide a constructor
 //
 // This is a more interesting and widely used scenario. Constructor is defined as a
 // function that returns exactly one pointer (or interface) and takes 0-N number of
@@ -58,7 +58,7 @@
 //     return &Object{Dep: d}
 //   }
 //
-//   err := c.Register(NewObject)
+//   err := c.Provide(NewObject)
 //
 // Resolve
 //
