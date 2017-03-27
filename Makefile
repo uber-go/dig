@@ -22,6 +22,8 @@ dependencies:
 	@echo "Installing test dependencies..."
 	go install ./vendor/github.com/axw/gocov/gocov
 	go install ./vendor/github.com/mattn/goveralls
+	@$(call label,Installing md-to-godoc...)
+	$(ECHO_V)go install ./vendor/github.com/sectioneight/md-to-godoc
 	@echo "Installing uber-license tool..."
 	update-license || go get -u -f go.uber.org/tools/update-license
 ifdef SHOULD_LINT
@@ -47,6 +49,8 @@ ifdef SHOULD_LINT
 	@git grep -i fixme | grep -v -e vendor -e Makefile | tee -a lint.log
 	@echo "Checking for license headers..."
 	@./check_license.sh | tee -a lint.log
+	@echo "Ensuring generated doc.go are up to date"
+	$(ECHO_V)$(MAKE) gendoc
 	@[ ! -s lint.log ]
 else
 	@echo "Skipping linters on" $(GO_VERSION)
@@ -68,3 +72,7 @@ coveralls:
 BENCH ?= .
 bench:
 	@$(foreach pkg,$(PKGS),go test -bench=$(BENCH) -run="^$$" $(BENCH_FLAGS) $(pkg);)
+
+.PHONY: gendoc
+gendoc:
+	$(ECHO_V)find . -name README.md -not -path "./vendor/*" | xargs -I% md-to-godoc -input=%

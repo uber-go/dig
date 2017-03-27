@@ -16,3 +16,5 @@ testImport:
 - package: github.com/axw/gocov
   subpackages:
   - gocov
+- package: github.com/sectioneight/md-to-godoc
+  version: master
