@@ -47,10 +47,10 @@ ifdef SHOULD_LINT
 	@$(foreach dir,$(PKGS),golint $(dir) 2>&1 | tee -a lint.log;)
 	@echo "Checking for unresolved FIXMEs..."
 	@git grep -i fixme | grep -v -e vendor -e Makefile | tee -a lint.log
-	@echo "Checking for license headers..."
-	@./check_license.sh | tee -a lint.log
 	@echo "Ensuring generated doc.go are up to date"
 	$(ECHO_V)$(MAKE) gendoc
+	@echo "Checking for license headers..."
+	@./check_license.sh | tee -a lint.log
 	@[ ! -s lint.log ]
 else
 	@echo "Skipping linters on" $(GO_VERSION)
