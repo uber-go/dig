@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2 (unreleased)
+## v0.2 (27 Mar 2017)
 
 - Rename `Register` to `Provide` for clarity and to recude clash with other
   Register functions.
