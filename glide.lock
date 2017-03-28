@@ -1,5 +1,5 @@
-hash: a6665638251f9052c199eeb03a3ea553aa3d5964b1fb164cfc54349bb81ee1a6
-updated: 2017-03-22T20:21:41.622608962-07:00
+hash: 9d05c9e85847372d04d4d8335d60306c9ff657ee8f1df777b0ef4c3d85839178
+updated: 2017-03-26T18:53:15.197948052-07:00
 imports:
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
@@ -22,6 +22,8 @@ testImports:
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
+- name: github.com/sectioneight/md-to-godoc
+  version: f274e5a4257c85a9eaf60ac820ee813b78cac6ab
 - name: github.com/stretchr/testify
   version: 4d4bfba8f1d1027c4fdbe371823030df51419987
   subpackages:
