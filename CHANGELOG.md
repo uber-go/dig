@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3 (unreleased)
+
+- No changes yet
+
 ## v0.2 (27 Mar 2017)
 
 - Rename `Register` to `Provide` for clarity and to recude clash with other
