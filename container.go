@@ -65,21 +65,21 @@ func (c *Container) Provide(t interface{}) error {
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
 	case reflect.Func:
-		couts := ctype.NumOut()
-		if couts == 0 {
+		count := ctype.NumOut()
+		if count == 0 {
 			return errReturnCount
-		} else if couts == 1 {
+		} else if count == 1 {
 			objType := ctype.Out(0)
 			if objType.Kind() != reflect.Ptr && objType.Kind() != reflect.Interface {
 				return errReturnKind
 			}
 		} else {
 			// last variable must be error
-			if ctype.Out(couts-1) != _typeOfError {
+			if ctype.Out(count-1) != _typeOfError {
 				return errReturnErrKind
 			}
 		}
-		return c.registerConstructor(t, couts)
+		return c.registerConstructor(t, count)
 	case reflect.Ptr:
 		return c.provideObject(t, ctype)
 	default:
@@ -214,15 +214,15 @@ func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 }
 
 // constr must be a function that returns the result type and an error
-func (c *Container) registerConstructor(constr interface{}, couts int) error {
+func (c *Container) registerConstructor(constr interface{}, count int) error {
 	ctype := reflect.TypeOf(constr)
-	objTypes := make([]reflect.Type, couts, couts)
-	for i := 0; i < couts; i++ {
+	objTypes := make([]reflect.Type, count, count)
+	for i := 0; i < count; i++ {
 		objTypes[i] = ctype.Out(i)
 	}
 
-	nodes := make([]node, couts, couts)
-	for i := 0; i < couts; i++ {
+	nodes := make([]node, count, count)
+	for i := 0; i < count; i++ {
 		nodes[i] = node{
 			objType: objTypes[i],
 		}
@@ -241,7 +241,7 @@ func (c *Container) registerConstructor(constr interface{}, couts int) error {
 		n.deps[i] = arg
 	}
 
-	for i := 0; i < couts; i++ {
+	for i := 0; i < count; i++ {
 		c.nodes[objTypes[i]] = &n
 	}
 
