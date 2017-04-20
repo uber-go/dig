@@ -86,13 +86,15 @@ type funcNode struct {
 	constructor interface{}
 	deps        []interface{}
 	nodes       []node
+	cached      bool
+	cachedValue []reflect.Value
 }
 
 // Call the function and return the result
 func (n *funcNode) value(g *Container, objType reflect.Type) (reflect.Value, error) {
-	for _, node := range n.nodes {
-		if node.cached && node.objType == objType {
-			return node.cachedValue, nil
+	for i, node := range n.nodes {
+		if node.objType == objType && n.cached {
+			return n.cachedValue[i], nil
 		}
 	}
 
@@ -126,11 +128,13 @@ func (n *funcNode) value(g *Container, objType reflect.Type) (reflect.Value, err
 	cv := reflect.ValueOf(n.constructor)
 
 	values := cv.Call(args)
+
+	// cache constructed values in the node
 	for _, node := range n.nodes {
 		for _, v := range values {
 			if node.objType == v.Type() {
-				node.cached = true
-				node.cachedValue = v
+				n.cached = true
+				n.cachedValue = append(n.cachedValue, v)
 			}
 		}
 	}

@@ -315,6 +315,7 @@ func TestResolveAll(t *testing.T) {
 	err = c.ResolveAll(&p1, &p2, &p3, &p4)
 	require.NoError(t, err, "Did not expect error on resolve all")
 	require.Equal(t, p1.name, "Parent1")
+	require.True(t, p1 == p2 && p2 == p3 && p3 == p4, "All pointers must be equal")
 }
 
 func TestEmptyAfterReset(t *testing.T) {
