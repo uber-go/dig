@@ -29,7 +29,7 @@ import (
 
 type graphNode interface {
 	// Return value of the object
-	value(g *Container) (reflect.Value, error)
+	value(g *Container, objType reflect.Type) (reflect.Value, error)
 
 	// Other things that need to be present before this object can be created
 	dependencies() []interface{}
@@ -63,7 +63,7 @@ type objNode struct {
 }
 
 // Return the earlier provided instance
-func (n *objNode) value(g *Container) (reflect.Value, error) {
+func (n *objNode) value(g *Container, objType reflect.Type) (reflect.Value, error) {
 	return n.cachedValue, nil
 }
 
@@ -81,18 +81,19 @@ func (n objNode) String() string {
 }
 
 type funcNode struct {
-	node
-
 	// constructor must be a function that returns the result type and an
 	// error
 	constructor interface{}
 	deps        []interface{}
+	nodes       []node
 }
 
 // Call the function and return the result
-func (n *funcNode) value(g *Container) (reflect.Value, error) {
-	if n.cached {
-		return n.cachedValue, nil
+func (n *funcNode) value(g *Container, objType reflect.Type) (reflect.Value, error) {
+	for _, node := range n.nodes {
+		if node.cached && node.objType == objType {
+			return node.cachedValue, nil
+		}
 	}
 
 	ct := reflect.TypeOf(n.constructor)
@@ -114,9 +115,9 @@ func (n *funcNode) value(g *Container) (reflect.Value, error) {
 	for idx := range args {
 		arg := ct.In(idx)
 		if node, ok := g.nodes[arg]; ok {
-			v, err := node.value(g)
+			v, err := node.value(g, arg)
 			if err != nil {
-				return reflect.Zero(n.objType), errors.Wrapf(err, "unable to resolve %v", arg)
+				return reflect.Zero(arg), errors.Wrapf(err, "unable to resolve %v", arg)
 			}
 			args[idx] = v
 		}
@@ -125,26 +126,37 @@ func (n *funcNode) value(g *Container) (reflect.Value, error) {
 	cv := reflect.ValueOf(n.constructor)
 
 	values := cv.Call(args)
-	v := values[0]
-
-	// If the function has two return values, the second one is an error.
-	var err error
-	if len(values) > 1 {
-		err, _ = values[1].Interface().(error)
+	for _, node := range n.nodes {
+		for _, v := range values {
+			if node.objType == v.Type() {
+				node.cached = true
+				node.cachedValue = v
+			}
+		}
 	}
 
-	n.cached = true
-	n.cachedValue = v
-	return v, err
+	// last value must be an error
+	err, _ := values[len(values)-1].Interface().(error)
+
+	for _, v := range values {
+		if objType == v.Type() {
+			return v, err
+		}
+	}
+	return reflect.Zero(objType), err
 }
 
 func (n funcNode) dependencies() []interface{} {
 	return n.deps
 }
 
+func (n funcNode) id() string {
+	return reflect.TypeOf(n.constructor).String()
+}
+
 func (n funcNode) String() string {
 	return fmt.Sprintf(
-		"(function) id: %s, deps: %v, type: %v, constructor: %v, cached: %v, cachedValue: %v",
-		n.id(), n.deps, n.objType, n.constructor, n.cached, n.cachedValue,
+		"(function) id: %s, deps: %v, constructor: %v, nodes: %v",
+		n.id(), n.deps, n.constructor, n.nodes,
 	)
 }

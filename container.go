@@ -63,24 +63,23 @@ func (c *Container) Provide(t interface{}) error {
 	defer c.Unlock()
 
 	ctype := reflect.TypeOf(t)
-
 	switch ctype.Kind() {
 	case reflect.Func:
-		switch ctype.NumOut() {
-		case 2:
-			if ctype.Out(1) != _typeOfError {
-				return errReturnErrKind
-			}
-			fallthrough
-		case 1:
+		couts := ctype.NumOut()
+		if couts == 0 {
+			return errReturnCount
+		} else if couts == 1 {
 			objType := ctype.Out(0)
 			if objType.Kind() != reflect.Ptr && objType.Kind() != reflect.Interface {
 				return errReturnKind
 			}
-		default:
-			return errReturnCount
+		} else {
+			// last variable must be error
+			if ctype.Out(couts-1) != _typeOfError {
+				return errReturnErrKind
+			}
 		}
-		return c.provideConstructor(t)
+		return c.registerConstructor(t, couts)
 	case reflect.Ptr:
 		return c.provideObject(t, ctype)
 	default:
@@ -124,7 +123,7 @@ func (c *Container) Resolve(obj interface{}) (err error) {
 		return fmt.Errorf("type %v is not registered", objType)
 	}
 
-	v, err := n.value(c)
+	v, err := n.value(c, objElemType)
 	if err != nil {
 		return errors.Wrapf(err, "unable to resolve %v", objType)
 	}
@@ -215,34 +214,42 @@ func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 }
 
 // constr must be a function that returns the result type and an error
-func (c *Container) provideConstructor(constr interface{}) error {
+func (c *Container) registerConstructor(constr interface{}, couts int) error {
 	ctype := reflect.TypeOf(constr)
-	objType := ctype.Out(0)
+	objTypes := make([]reflect.Type, couts, couts)
+	for i := 0; i < couts; i++ {
+		objTypes[i] = ctype.Out(i)
+	}
 
+	nodes := make([]node, couts, couts)
+	for i := 0; i < couts; i++ {
+		nodes[i] = node{
+			objType: objTypes[i],
+		}
+	}
 	argc := ctype.NumIn()
 	n := funcNode{
 		deps:        make([]interface{}, argc),
 		constructor: constr,
-		node: node{
-			objType: objType,
-		},
+		nodes:       nodes,
 	}
 	for i := 0; i < argc; i++ {
 		arg := ctype.In(i)
 		if arg.Kind() != reflect.Ptr && arg.Kind() != reflect.Interface {
 			return errArgKind
 		}
-
 		n.deps[i] = arg
 	}
 
-	c.nodes[objType] = &n
+	for i := 0; i < couts; i++ {
+		c.nodes[objTypes[i]] = &n
+	}
 
 	// object needs to be part of the container to properly detect cycles
 	if cycleErr := c.detectCycles(&n); cycleErr != nil {
 		// if the cycle was detected delete from the container
-		delete(c.nodes, objType)
-		return errors.Wrapf(cycleErr, "unable to Provide %v", objType)
+		delete(c.nodes, objTypes[0])
+		return errors.Wrapf(cycleErr, "unable to Provide %v", objTypes[0])
 	}
 
 	return nil

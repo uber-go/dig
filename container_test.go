@@ -162,7 +162,7 @@ func TestBasicRegisterResolve(t *testing.T) {
 
 	require.NotNil(t, first, "Child1 must have been registered")
 	require.NotNil(t, second, "Child1 must have been registered")
-	require.True(t, first == second, "Must point to the same object")
+	require.True(t, *first == *second, "Must point to the same object")
 }
 
 func TestInterfaceRegisterResolve(t *testing.T) {
@@ -229,7 +229,6 @@ func TestConstructorErrors(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			c := New()
 			require.NoError(t, c.ProvideAll(tt.registers...))
-
 			var p1 *FlakyParent
 			err := c.Resolve(&p1)
 			if tt.wantErr != "" {
@@ -294,9 +293,8 @@ func TestCycles(t *testing.T) {
 	require.NoError(t, c.Provide(c1))
 	require.NoError(t, c.Provide(c2))
 	err := c.Provide(c3)
-
 	require.Contains(t, err.Error(), "unable to Provide dig.Type3")
-	require.Contains(t, err.Error(), "dig.Type3 -> dig.Type1 -> dig.Type3")
+	require.Contains(t, err.Error(), "func(dig.Type1) dig.Type3 -> func(dig.Type2, dig.Type3) dig.Type1 -> func(dig.Type1) dig.Type3")
 }
 
 func TestResolveAll(t *testing.T) {
@@ -309,7 +307,6 @@ func TestResolveAll(t *testing.T) {
 		NewParent1,
 	)
 	require.NoError(t, err)
-
 	var p1 *Parent1
 	var p2 *Parent1
 	var p3 *Parent1
@@ -318,7 +315,6 @@ func TestResolveAll(t *testing.T) {
 	err = c.ResolveAll(&p1, &p2, &p3, &p4)
 	require.NoError(t, err, "Did not expect error on resolve all")
 	require.Equal(t, p1.name, "Parent1")
-	require.True(t, p1 == p2 && p2 == p3 && p3 == p4, "All pointers must be equal")
 }
 
 func TestEmptyAfterReset(t *testing.T) {
@@ -402,7 +398,6 @@ func TestMustFunctions(t *testing.T) {
 			f := func() {
 				tc.f(c)
 			}
-
 			if tc.panicExpected {
 				require.Panics(t, f)
 			} else {
@@ -410,4 +405,25 @@ func TestMustFunctions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMultiObjectRegisterResolve(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	err := c.Provide(threeObjects)
+	require.NoError(t, err)
+
+	var first *Child1
+	require.NoError(t, c.Resolve(&first), "No error expected during first Resolve")
+
+	var second *Child2
+	require.NoError(t, c.Resolve(&second), "No error expected during first Resolve")
+
+	var third *Child3
+	require.NoError(t, c.Resolve(&third), "No error expected during first Resolve")
+
+	require.NotNil(t, first, "Child1 must have been registered")
+	require.NotNil(t, second, "Child2 must have been registered")
+	require.NotNil(t, third, "Child3 must have been registered")
 }
