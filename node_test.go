@@ -20,16 +20,28 @@
 
 package dig
 
-// func TestNodeStrings(t *testing.T) {
-// 	n := objNode{}
-// 	require.Contains(t, n.String(), "(object)")
+import (
+	"reflect"
+	"testing"
 
-// 	var nodes []node
-// 	nodes = append(nodes, node{
-// 		objType: reflect.TypeOf(n),
-// 	})
-// 	fn := funcNode{
-// 		nodes: nodes,
-// 	}
-// 	require.Contains(t, fn.String(), "(function)")
-// }
+	"github.com/stretchr/testify/require"
+)
+
+func singleObject() (*Child1, error) {
+	return &Child1{}, nil
+}
+
+func TestNodeStrings(t *testing.T) {
+	n := objNode{}
+	require.Contains(t, n.String(), "(object)")
+
+	var nodes []node
+	nodes = append(nodes, node{
+		objType: reflect.TypeOf(n),
+	})
+	fn := funcNode{
+		constructor: singleObject,
+		nodes:       nodes,
+	}
+	require.Contains(t, fn.String(), "(function)")
+}
