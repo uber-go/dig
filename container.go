@@ -80,9 +80,9 @@ func (c *Container) Provide(t interface{}) error {
 		default:
 			return errReturnCount
 		}
-		return c.registerConstructor(t)
+		return c.provideConstructor(t)
 	case reflect.Ptr:
-		return c.registerObject(t, ctype)
+		return c.provideObject(t, ctype)
 	default:
 		return errParamType
 	}
@@ -160,8 +160,8 @@ func (c *Container) MustResolveAll(objs ...interface{}) {
 	}
 }
 
-// RegisterAll registers all the provided args in the Container
-func (c *Container) RegisterAll(types ...interface{}) error {
+// ProvideAll registers all the provided args in the Container
+func (c *Container) ProvideAll(types ...interface{}) error {
 	for _, t := range types {
 		if err := c.Provide(t); err != nil {
 			return err
@@ -170,9 +170,9 @@ func (c *Container) RegisterAll(types ...interface{}) error {
 	return nil
 }
 
-// MustRegisterAll calls RegisterAll and panics is an error is encountered
-func (c *Container) MustRegisterAll(types ...interface{}) {
-	if err := c.RegisterAll(types...); err != nil {
+// MustProvideAll calls ProvideAll and panics is an error is encountered
+func (c *Container) MustProvideAll(types ...interface{}) {
+	if err := c.ProvideAll(types...); err != nil {
 		panic(err)
 	}
 }
@@ -196,7 +196,7 @@ func (c *Container) String() string {
 	return b.String()
 }
 
-func (c *Container) registerObject(o interface{}, otype reflect.Type) error {
+func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 	v := reflect.ValueOf(o)
 	if otype.Elem().Kind() == reflect.Interface {
 		otype = otype.Elem()
@@ -215,7 +215,7 @@ func (c *Container) registerObject(o interface{}, otype reflect.Type) error {
 }
 
 // constr must be a function that returns the result type and an error
-func (c *Container) registerConstructor(constr interface{}) error {
+func (c *Container) provideConstructor(constr interface{}) error {
 	ctype := reflect.TypeOf(constr)
 	objType := ctype.Out(0)
 

@@ -2,7 +2,8 @@
 
 ## v0.3 (unreleased)
 
-- No changes yet
+- Rename `RegisterAll` and `MustRegisterAll` to `ProvideAll` and
+  `MustProvideAll`.
 
 ## v0.2 (27 Mar 2017)
 

@@ -228,7 +228,7 @@ func TestConstructorErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			c := New()
-			require.NoError(t, c.RegisterAll(tt.registers...))
+			require.NoError(t, c.ProvideAll(tt.registers...))
 
 			var p1 *FlakyParent
 			err := c.Resolve(&p1)
@@ -241,11 +241,11 @@ func TestConstructorErrors(t *testing.T) {
 	}
 }
 
-func TestRegisterAll(t *testing.T) {
+func TestProvideAll(t *testing.T) {
 	t.Parallel()
 	c := New()
 
-	err := c.RegisterAll(
+	err := c.ProvideAll(
 		NewParent1,
 		NewChild1,
 		NewGrandchild1,
@@ -303,7 +303,7 @@ func TestResolveAll(t *testing.T) {
 	t.Parallel()
 	c := New()
 
-	err := c.RegisterAll(
+	err := c.ProvideAll(
 		NewGrandchild1,
 		NewChild1,
 		NewParent1,
@@ -364,7 +364,7 @@ func TestMustFunctions(t *testing.T) {
 		},
 		{
 			"wrong Provide all types",
-			func(c *Container) { c.MustRegisterAll("2", "3") },
+			func(c *Container) { c.MustProvideAll("2", "3") },
 			true,
 		},
 		{
@@ -382,7 +382,7 @@ func TestMustFunctions(t *testing.T) {
 		},
 		{
 			"correct Provide all",
-			func(c *Container) { c.MustRegisterAll(NewChild1, NewChild2) },
+			func(c *Container) { c.MustProvideAll(NewChild1, NewChild2) },
 			false,
 		},
 		{
