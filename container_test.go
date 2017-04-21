@@ -293,7 +293,7 @@ func TestCycles(t *testing.T) {
 	require.NoError(t, c.Provide(c1))
 	require.NoError(t, c.Provide(c2))
 	err := c.Provide(c3)
-	require.Contains(t, err.Error(), "unable to Provide dig.Type3")
+	require.Contains(t, err.Error(), "unable to Provide [dig.Type3]")
 	require.Contains(t, err.Error(), "func(dig.Type1) dig.Type3 -> func(dig.Type2, dig.Type3) dig.Type1 -> func(dig.Type1) dig.Type3")
 }
 

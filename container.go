@@ -74,9 +74,9 @@ func (c *Container) Provide(t interface{}) error {
 				return errReturnKind
 			}
 		} else {
-			// last variable must be error
-			if ctype.Out(count-1) != _typeOfError {
-				return errReturnErrKind
+			// if last variable is an error, we will not add it to the graph
+			if ctype.Out(count-1) == _typeOfError {
+				count--
 			}
 		}
 		return c.registerConstructor(t, count)
@@ -214,6 +214,10 @@ func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 }
 
 // constr must be a function that returns the result type and an error
+// registerConstructor takes two parameters
+// constr - constructor registered for all the return objects
+// count - count of number of objects to be registered from the list of return parameters
+// If last parameter is an error, the count is reduced to igonre the error a
 func (c *Container) registerConstructor(constr interface{}, count int) error {
 	ctype := reflect.TypeOf(constr)
 	objTypes := make([]reflect.Type, count, count)
@@ -248,8 +252,10 @@ func (c *Container) registerConstructor(constr interface{}, count int) error {
 	// object needs to be part of the container to properly detect cycles
 	if cycleErr := c.detectCycles(&n); cycleErr != nil {
 		// if the cycle was detected delete from the container
-		delete(c.nodes, objTypes[0])
-		return errors.Wrapf(cycleErr, "unable to Provide %v", objTypes[0])
+		for objType := range objTypes {
+			delete(c.nodes, objType)
+		}
+		return errors.Wrapf(cycleErr, "unable to Provide %v", objTypes)
 	}
 
 	return nil
