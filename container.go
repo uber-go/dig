@@ -74,7 +74,7 @@ func (c *Container) Provide(t interface{}) error {
 				return errReturnKind
 			}
 		}
-		return c.registerConstructor(t)
+		return c.provideConstructor(t)
 	case reflect.Ptr:
 		return c.provideObject(t, ctype)
 	default:
@@ -209,9 +209,7 @@ func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 }
 
 // constr must be a function that returns the result type and an error
-// registerConstructor takes two parameters
-// constr - constructor registered for all the return objects
-func (c *Container) registerConstructor(constr interface{}) error {
+func (c *Container) provideConstructor(constr interface{}) error {
 	ctype := reflect.TypeOf(constr)
 	// count of number of objects to be registered from the list of return parameters
 	count := ctype.NumOut()
