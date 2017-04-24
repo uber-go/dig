@@ -424,6 +424,10 @@ func TestMultiObjectRegisterResolve(t *testing.T) {
 	var third *Child3
 	require.NoError(t, c.Resolve(&third), "No error expected during first Resolve")
 
+	var errRegistered *error
+	require.Error(t, c.Resolve(&errRegistered), "type *error shouldn't be registered")
+	require.Nil(t, errRegistered)
+
 	require.NotNil(t, first, "Child1 must have been registered")
 	require.NotNil(t, second, "Child2 must have been registered")
 	require.NotNil(t, third, "Child3 must have been registered")

@@ -217,7 +217,7 @@ func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 // registerConstructor takes two parameters
 // constr - constructor registered for all the return objects
 // count - count of number of objects to be registered from the list of return parameters
-// If last parameter is an error, the count is reduced to igonre the error a
+// If last parameter is an error, the count is reduced to igonre the error
 func (c *Container) registerConstructor(constr interface{}, count int) error {
 	ctype := reflect.TypeOf(constr)
 	objTypes := make([]reflect.Type, count, count)
