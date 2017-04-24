@@ -297,6 +297,28 @@ func TestCycles(t *testing.T) {
 	require.Contains(t, err.Error(), "func(dig.Type1) dig.Type3 -> func(dig.Type2, dig.Type3) dig.Type1 -> func(dig.Type1) dig.Type3")
 }
 
+func TestCyclesWithConstructor(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	//    Type1
+	//      |
+	//  func() Type3, Type4
+	//   /       \
+	// Type1    Type2
+	type Type1 interface{}
+	type Type2 interface{}
+	type Type3 interface{}
+	type Type4 interface{}
+	c1 := func(t1 Type1, t2 Type2) (Type3, Type4) { return nil, nil }
+	c2 := func(t4 Type4) Type1 { return nil }
+
+	require.NoError(t, c.Provide(c1))
+	err := c.Provide(c2)
+	require.Contains(t, err.Error(), "unable to Provide [dig.Type1]")
+	require.Contains(t, err.Error(), "unable to Provide [dig.Type1]: detected cycle func(dig.Type4) dig.Type1 -> func(dig.Type1, dig.Type2) (dig.Type3, dig.Type4) -> func(dig.Type4) dig.Type1")
+}
+
 func TestResolveAll(t *testing.T) {
 	t.Parallel()
 	c := New()

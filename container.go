@@ -65,21 +65,16 @@ func (c *Container) Provide(t interface{}) error {
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
 	case reflect.Func:
-		count := ctype.NumOut()
-		if count == 0 {
+		switch ctype.NumOut() {
+		case 0:
 			return errReturnCount
-		} else if count == 1 {
+		case 1:
 			objType := ctype.Out(0)
 			if objType.Kind() != reflect.Ptr && objType.Kind() != reflect.Interface {
 				return errReturnKind
 			}
-		} else {
-			// if last variable is an error, we will not add it to the graph
-			if ctype.Out(count-1) == _typeOfError {
-				count--
-			}
 		}
-		return c.registerConstructor(t, count)
+		return c.registerConstructor(t)
 	case reflect.Ptr:
 		return c.provideObject(t, ctype)
 	default:
@@ -216,10 +211,10 @@ func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 // constr must be a function that returns the result type and an error
 // registerConstructor takes two parameters
 // constr - constructor registered for all the return objects
-// count - count of number of objects to be registered from the list of return parameters
-// If last parameter is an error, the count is reduced to igonre the error
-func (c *Container) registerConstructor(constr interface{}, count int) error {
+func (c *Container) registerConstructor(constr interface{}) error {
 	ctype := reflect.TypeOf(constr)
+	// count of number of objects to be registered from the list of return parameters
+	count := ctype.NumOut()
 	objTypes := make([]reflect.Type, count, count)
 	for i := 0; i < count; i++ {
 		objTypes[i] = ctype.Out(i)
