@@ -53,6 +53,40 @@ type Container struct {
 	nodes map[interface{}]graphNode
 }
 
+// Invoke the function and resolve the dependencies immidiately without providing the
+// constructor to the graph. The Invoke function returns error object which can be
+// occurred during the execution
+func (c *Container) Invoke(t interface{}) error {
+	c.Lock()
+	defer c.Unlock()
+
+	ctype := reflect.TypeOf(t)
+	switch ctype.Kind() {
+	case reflect.Func:
+		// find dependencies from the graph and place them in the args
+		args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
+		for idx := range args {
+			arg := ctype.In(idx)
+			if node, ok := c.nodes[arg]; ok {
+				v, err := node.value(c)
+				if err != nil {
+					return errors.Wrapf(err, "unable to resolve %v", arg)
+				}
+				args[idx] = v
+			} else {
+				return fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
+			}
+		}
+		cv := reflect.ValueOf(t)
+
+		// execute the provided func
+		cv.Call(args)
+	default:
+		return errParamType
+	}
+	return nil
+}
+
 // Provide an object in the Container
 //
 // The provided argument must be a function that accepts its dependencies as

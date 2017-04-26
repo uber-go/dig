@@ -23,6 +23,7 @@ package dig
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -238,6 +239,43 @@ func TestConstructorErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInvokeSuccess(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	err := c.ProvideAll(
+		&Parent1{},
+		&Parent12{},
+	)
+	assert.NoError(t, err)
+	var c1 Child1
+	var c2 Child2
+
+	err = c.Invoke(func(p1 *Parent1, p2 *Parent12) {
+		c1 = Child1{}
+		c2 = Child2{}
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c1)
+	assert.NotNil(t, c2)
+}
+
+func TestInvokeFailureUnresolvedDependencies(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	err := c.ProvideAll(
+		NewParent1,
+	)
+	assert.NoError(t, err)
+
+	err = c.Invoke(func(p1 *Parent1) {})
+	require.Contains(t, err.Error(), "unable to resolve *dig.Parent1")
+
+	err = c.Invoke(func(p12 *Parent12) {})
+	require.Contains(t, err.Error(), "dependency of type *dig.Parent12 is not registered")
 }
 
 func TestProvideAll(t *testing.T) {
