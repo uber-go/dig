@@ -139,7 +139,7 @@ func (n *funcNode) value(g *Container, objType reflect.Type) (reflect.Value, err
 		}
 	}
 
-	// last value must be an error
+	// if last value is an error, it is returned as a separate argument, otherwise nil
 	err, _ := values[len(values)-1].Interface().(error)
 
 	for _, v := range values {
