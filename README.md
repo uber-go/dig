@@ -1,7 +1,8 @@
-# dig - A dependency injection framework for Go
+# dig: Dependency Injection Framework for Go
 
 `package dig` provides an opinionated way of resolving object dependencies.
-There are two sides of dig: `Provide` and `Resolve`.
+
+For runnable examples, see the [examples directory](examples/).
 
 ## Status
 
@@ -16,72 +17,94 @@ There are two ways to Provide an object:
 1. Provide a pointer to an existing object
 1. Provide a "constructor function" that returns one pointer (or interface)
 
-### Provide an object
+### Provide a Constructor
 
-Registering an object means it has no dependencies, and will be used as a
-**shared** singleton instance for all resolutions within the container.
+Constructor is defined as a function that returns one pointer (or
+interface), an optional error, and takes 0-N number of arguments.
+
+Each one of the arguments is automatically registered as a **dependency**
+and must also be an interface or a pointer.
 
 ```go
-type Fake struct {
-    Name string
+type Type1 struct {}
+type Type2 struct {}
+type Type3 struct {}
+
+c := dig.New()
+err := c.Provide(func(*Type1, *Type2) *Type3 {
+	// operate on Type1 and Type2 to make Type3 and return
+})
+// dig container is now able to provide *Type3 to any constructor.
+// However, note that in the current examples *Type1 and *Type2
+// have not been provided. Constructors (or instances) first
+// have to be provided to the dig container before it is able
+// to create a shared singleton instance of *Type3
+```
+
+### Provide an Object
+
+Registering an object directly is a shortcut to register something that
+has no dependencies.
+
+```go
+type Type1 struct {
+	Name string
 }
 
 c := dig.New()
-err := c.Provide(&Fake{Name: "I am an thing"})
-require.NoError(t, err)
-
-var f1 *Fake
-err = c.Resolve(&f1)
-require.NoError(t, err)
-
-// f1 is ready to use here...
+err := c.Provide(&Type1{Name: "I am an thing"})
+// dig container is now able to provide *Type1 as a dependency
+// to other constructors that require it.
 ```
 
-### Provide a constructor
-
-This is a more interesting and widely used scenario. Constructor is defined as a
-function that returns exactly one pointer (or interface) and takes 0-N number of
-arguments. Each one of the arguments is automatically registered as a
-**dependency** and must also be an interface or a pointer.
-
-The following example illustrates registering a constructor function for type
-`*Object` that requires `*Dep` to be present in the container.
-
-```go
-c := dig.New()
-
-type Dep struct{}
-type Object struct{
-  Dep
-}
-
-func NewObject(d *Dep) *Object {
-  return &Object{Dep: d}
-}
-
-err := c.Provide(NewObject)
-```
 
 ## Resolve
 
 `Resolve` retrieves objects from the container by building the object graph.
 
+Object is resolution is based on the type of the variable passed into `Resolve`
+function.
+
+For example, in the current scenario:
+
+```go
+// c := dig.New()
+// c.Provide...
+var cfg config.Provider
+c.Resolve(&cfg) // note pointer to interface
+```
+
+dig will look through the dependency graph and identify if there was a constructor
+registered that is able to return a type of `config.Provider`. It will then check
+if said constructor requires any dependencies (by analyzing the function parameters).
+If it does, it will recursively complete resolutions of the parameters in the graph
+until the constructor for `config.Provider` can be fully satisfied.
+
+If resolution is not possible, for instance one of the required dependencies has
+does not have a constructor and doesn't appear in the graph, an error will be returned.
+
 There are future plans to do named retrievals to support multiple
 objects of the same type in the container.
 
 ```go
+type Type1 struct {
+	Name string
+}
+
 c := dig.New()
-
-var o *Object
-err := c.Resolve(&o) // notice the pointer to a pointer as param type
-if err == nil {
-    // o is ready to use
-}
-
-type Do interface{}
-var d Do
-err := c.Resolve(&d) // notice pointer to an interface
-if err == nil {
-    // d is ready to use
-}
+err := c.Provide(&Type1{Name: "I am an thing"})
+// dig container is now able to provide *Type1 as a dependency
+// to other constructors that require it.
 ```
+
+## Error Handling and Alternatives
+
+`Provide` and `Resolve` (and their `ProvideAll` and `ResolveAll` counterparts)
+return errors, and usages of `dig` should fully utilize the error checking, since
+container creation is done through reflection meaning a lot of the errors surface
+at runtime.
+
+There are, however, `Must*` alternatives of all the methods available. They
+are drawn from some of the patterns in the Go standard library and are there
+to simplify usage in critical scenarios: where not being able to resolve an
+object is not an option and panic is preferred.
