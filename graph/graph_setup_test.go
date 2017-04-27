@@ -18,30 +18,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package dig
+package graph
 
-import (
-	"reflect"
-	"testing"
-
-	"github.com/stretchr/testify/require"
-)
-
-func singleObject() (*Child1, error) {
-	return &Child1{}, nil
+type Parent1 struct {
+	c1 *Child1
 }
 
-func TestNodeStrings(t *testing.T) {
-	n := objNode{}
-	require.Contains(t, n.String(), "(object)")
+type Parent12 struct {
+	c1 *Child1
+	c2 *Child2
+}
 
-	var nodes []node
-	nodes = append(nodes, node{
-		objType: reflect.TypeOf(n),
-	})
-	fn := funcNode{
-		constructor: singleObject,
-		nodes:       nodes,
-	}
-	require.Contains(t, fn.String(), "(function)")
+type Parent123 struct {
+	c1 *Child1
+	c2 *Child2
+	c3 *Child3
+}
+
+type Child1 struct{}
+
+type Child2 struct{}
+
+type Child3 struct{}
+
+func threeObjects() (*Child1, *Child2, *Child3, error) {
+	return &Child1{}, &Child2{}, &Child3{}, nil
 }

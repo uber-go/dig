@@ -99,7 +99,7 @@ func TestResolve(t *testing.T) {
 			func(c *Container) error { return nil },
 			func(c *Container) error {
 				var p1 *Parent1
-				return c.Resolve(p1)
+				return c.Resolve(&p1)
 			},
 			"type *dig.Parent1 is not registered",
 		},
@@ -221,7 +221,7 @@ func TestConstructorErrors(t *testing.T) {
 				NewFlakyParent,
 				NewFlakyChildFailure,
 			},
-			wantErr: "unable to resolve **dig.FlakyParent: " +
+			wantErr: "unable to resolve *dig.FlakyParent: " +
 				"unable to resolve *dig.FlakyChild: " +
 				"great sadness",
 		},
@@ -277,7 +277,10 @@ func TestInvokeAndRegisterSuccess(t *testing.T) {
 		return p1.c1
 	})
 	assert.NoError(t, err)
-	assert.NotNil(t, c.nodes[reflect.TypeOf(child)])
+
+	value, err := c.Graph.Read(reflect.TypeOf(child))
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
 }
 
 func TestInvokeAndRegisterFailure(t *testing.T) {

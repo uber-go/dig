@@ -21,36 +21,30 @@
 package dig
 
 import (
-	"bytes"
 	"fmt"
 	"reflect"
-	"sync"
 
 	"github.com/pkg/errors"
+	"go.uber.org/dig/graph"
 )
 
 var (
-	errParamType     = errors.New("registration must be done through a pointer or a function")
-	errReturnCount   = errors.New("constructor function must one or two values")
-	errReturnKind    = errors.New("constructor return type must be a pointer")
-	errReturnErrKind = errors.New("second return value of constructor must be error")
-	errArgKind       = errors.New("constructor arguments must be pointers")
+	errParamType   = errors.New("registration must be done through a pointer or a function")
+	errReturnCount = errors.New("constructor function must one or two values")
+	errReturnKind  = errors.New("constructor return type must be a pointer")
+	errArgKind     = errors.New("constructor arguments must be pointers")
 
 	_typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 )
 
 // New returns a new DI Container
 func New() *Container {
-	return &Container{
-		nodes: make(map[interface{}]graphNode),
-	}
+	return &Container{graph.NewGraph()}
 }
 
 // Container facilitates automated dependency resolution
 type Container struct {
-	sync.RWMutex
-
-	nodes map[interface{}]graphNode
+	graph.Graph
 }
 
 // Invoke the function and resolve the dependencies immidiately without providing the
@@ -62,9 +56,7 @@ func (c *Container) Invoke(t interface{}) error {
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
 	case reflect.Func:
-		c.RLock()
-		args, err := c.getArguments(ctype)
-		c.RUnlock()
+		args, err := c.Graph.ConstructorArguments(ctype)
 		if err != nil {
 			return err
 		}
@@ -72,14 +64,13 @@ func (c *Container) Invoke(t interface{}) error {
 
 		// execute the provided func
 		values := cv.Call(args)
+
 		if len(values) > 0 {
-			c.Lock()
-			defer c.Unlock()
 			err, _ := values[len(values)-1].Interface().(error)
 			for _, v := range values {
 				switch v.Type().Kind() {
 				case reflect.Ptr:
-					c.insertObjectToGraph(v, v.Type())
+					c.Graph.InsertObject(v, v.Type())
 				default:
 					return errors.Wrapf(errReturnKind, "%v", ctype)
 				}
@@ -98,9 +89,6 @@ func (c *Container) Invoke(t interface{}) error {
 // arguments and returns a single result, which must be a pointer type.
 // The function may optionally return an error as a second result.
 func (c *Container) Provide(t interface{}) error {
-	c.Lock()
-	defer c.Unlock()
-
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
 	case reflect.Func:
@@ -113,9 +101,14 @@ func (c *Container) Provide(t interface{}) error {
 				return errReturnKind
 			}
 		}
-		return c.provideConstructor(t)
+		return c.Graph.InsertConstructor(t)
 	case reflect.Ptr:
-		return c.provideObject(t, ctype)
+		v := reflect.ValueOf(t)
+		if ctype.Elem().Kind() == reflect.Interface {
+			ctype = ctype.Elem()
+			v = v.Elem()
+		}
+		return c.Graph.InsertObject(v, ctype)
 	default:
 		return errParamType
 	}
@@ -148,17 +141,9 @@ func (c *Container) Resolve(obj interface{}) (err error) {
 	objElemType := reflect.TypeOf(obj).Elem()
 	objVal := reflect.ValueOf(obj)
 
-	c.Lock()
-	defer c.Unlock()
-	// check if the type is a registered objNode
-	n, ok := c.nodes[objElemType]
-	if !ok {
-		return fmt.Errorf("type %v is not registered", objType)
-	}
-
-	v, err := n.value(c, objElemType)
+	v, err := c.Graph.Read(objElemType)
 	if err != nil {
-		return errors.Wrapf(err, "unable to resolve %v", objType)
+		return err
 	}
 
 	// set the pointer value of the provided object to the instance pointer
@@ -207,141 +192,4 @@ func (c *Container) MustProvideAll(types ...interface{}) {
 	if err := c.ProvideAll(types...); err != nil {
 		panic(err)
 	}
-}
-
-// Reset the graph by removing all the registered nodes
-func (c *Container) Reset() {
-	c.Lock()
-	defer c.Unlock()
-
-	c.nodes = make(map[interface{}]graphNode)
-}
-
-// String representation of the entire Container
-func (c *Container) String() string {
-	b := &bytes.Buffer{}
-	fmt.Fprintln(b, "{nodes:")
-	for key, reg := range c.nodes {
-		fmt.Fprintln(b, key, "->", reg)
-	}
-	fmt.Fprintln(b, "}")
-	return b.String()
-}
-
-func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
-	v := reflect.ValueOf(o)
-	if otype.Elem().Kind() == reflect.Interface {
-		otype = otype.Elem()
-		v = v.Elem()
-	}
-	c.insertObjectToGraph(v, otype)
-	return nil
-}
-
-func (c *Container) insertObjectToGraph(v reflect.Value, vtype reflect.Type) {
-	n := objNode{
-		node: node{
-			objType:     vtype,
-			cached:      true,
-			cachedValue: v,
-		},
-	}
-	c.nodes[vtype] = &n
-}
-
-func (c *Container) getArguments(ctype reflect.Type) ([]reflect.Value, error) {
-	// find dependencies from the graph and place them in the args
-	args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
-	for idx := range args {
-		arg := ctype.In(idx)
-		node, ok := c.nodes[arg]
-		if ok {
-			v, err := node.value(c, arg)
-			if err != nil {
-				return nil, errors.Wrapf(err, "unable to resolve %v", arg)
-			}
-			args[idx] = v
-		} else {
-			return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
-		}
-	}
-	return args, nil
-}
-
-// constr must be a function that returns the result type and an error
-func (c *Container) provideConstructor(constr interface{}) error {
-	ctype := reflect.TypeOf(constr)
-	// count of number of objects to be registered from the list of return parameters
-	count := ctype.NumOut()
-	objTypes := make([]reflect.Type, count, count)
-	for i := 0; i < count; i++ {
-		objTypes[i] = ctype.Out(i)
-	}
-
-	nodes := make([]node, count, count)
-	for i := 0; i < count; i++ {
-		nodes[i] = node{
-			objType: objTypes[i],
-		}
-	}
-	argc := ctype.NumIn()
-	n := funcNode{
-		deps:        make([]interface{}, argc),
-		constructor: constr,
-		nodes:       nodes,
-	}
-	for i := 0; i < argc; i++ {
-		arg := ctype.In(i)
-		if arg.Kind() != reflect.Ptr && arg.Kind() != reflect.Interface {
-			return errArgKind
-		}
-		n.deps[i] = arg
-	}
-
-	for i := 0; i < count; i++ {
-		c.nodes[objTypes[i]] = &n
-	}
-
-	// object needs to be part of the container to properly detect cycles
-	if cycleErr := c.detectCycles(&n); cycleErr != nil {
-		// if the cycle was detected delete from the container
-		for objType := range objTypes {
-			delete(c.nodes, objType)
-		}
-		return errors.Wrapf(cycleErr, "unable to Provide %v", objTypes)
-	}
-
-	return nil
-}
-
-// When a new constructor is being inserted, detect any present cycles
-func (c *Container) detectCycles(n *funcNode) error {
-	l := []string{}
-	return c.recursiveDetectCycles(n, l)
-}
-
-// DFS and tracking if same node is visited twice
-func (c *Container) recursiveDetectCycles(n graphNode, l []string) error {
-	for _, el := range l {
-		if n.id() == el {
-			b := &bytes.Buffer{}
-			for _, curr := range l {
-				fmt.Fprint(b, curr, " -> ")
-			}
-			fmt.Fprint(b, n.id())
-			return fmt.Errorf("detected cycle %s", b.String())
-		}
-	}
-
-	l = append(l, n.id())
-
-	for _, dep := range n.dependencies() {
-		if node, ok := c.nodes[dep]; ok {
-			if err := c.recursiveDetectCycles(node, l); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
