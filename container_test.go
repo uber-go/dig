@@ -265,22 +265,36 @@ func TestInvokeSuccess(t *testing.T) {
 func TestInvokeAndRegisterSuccess(t *testing.T) {
 	t.Parallel()
 	c := New()
-	testname := "myChild"
+	child := &Child1{}
 	err := c.ProvideAll(
 		&Parent1{
-			name: testname,
+			c1: child,
 		},
 	)
 	assert.NoError(t, err)
-	var name string
-	err = c.Invoke(func(p1 *Parent1) string {
+	err = c.Invoke(func(p1 *Parent1) *Child1 {
 		require.NotNil(t, p1)
-		name = p1.name
-		return p1.name
+		return p1.c1
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, name, "myChild")
-	assert.NotNil(t, c.nodes[reflect.TypeOf(testname)])
+	assert.NotNil(t, c.nodes[reflect.TypeOf(child)])
+}
+
+func TestInvokeAndRegisterFailure(t *testing.T) {
+	t.Parallel()
+	c := New()
+	child := &Child1{}
+	err := c.ProvideAll(
+		&Parent1{
+			c1: child,
+		},
+	)
+	assert.NoError(t, err)
+	err = c.Invoke(func(p1 *Parent1) Child1 {
+		require.NotNil(t, p1)
+		return *p1.c1
+	})
+	require.Contains(t, err.Error(), "constructor return type must be a pointer")
 }
 
 func TestInvokeFailureUnresolvedDependencies(t *testing.T) {

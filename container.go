@@ -86,17 +86,15 @@ func (c *Container) Invoke(t interface{}) error {
 		// execute the provided func
 		values := cv.Call(args)
 		if len(values) > 0 {
-			err, _ := values[len(values)-1].Interface().(error)
 			c.Lock()
+			err, _ := values[len(values)-1].Interface().(error)
 			for _, v := range values {
-				n := objNode{
-					node: node{
-						objType:     v.Type(),
-						cached:      true,
-						cachedValue: v,
-					},
+				switch v.Type().Kind() {
+				case reflect.Ptr:
+					c.insertObjectToGraph(v, v.Type())
+				default:
+					return errors.Wrapf(errReturnKind, "%v", ctype)
 				}
-				c.nodes[v.Type()] = &n
 			}
 			c.Unlock()
 			return err
@@ -249,16 +247,19 @@ func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 		otype = otype.Elem()
 		v = v.Elem()
 	}
+	c.insertObjectToGraph(v, otype)
+	return nil
+}
+
+func (c *Container) insertObjectToGraph(v reflect.Value, vtype reflect.Type) {
 	n := objNode{
 		node: node{
-			objType:     otype,
+			objType:     vtype,
 			cached:      true,
 			cachedValue: v,
 		},
 	}
-
-	c.nodes[otype] = &n
-	return nil
+	c.nodes[vtype] = &n
 }
 
 // constr must be a function that returns the result type and an error
