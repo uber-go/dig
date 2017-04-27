@@ -87,6 +87,7 @@ func (c *Container) Invoke(t interface{}) error {
 		values := cv.Call(args)
 		if len(values) > 0 {
 			c.Lock()
+			defer c.Unlock()
 			err, _ := values[len(values)-1].Interface().(error)
 			for _, v := range values {
 				switch v.Type().Kind() {
@@ -96,7 +97,6 @@ func (c *Container) Invoke(t interface{}) error {
 					return errors.Wrapf(errReturnKind, "%v", ctype)
 				}
 			}
-			c.Unlock()
 			return err
 		}
 	default:
