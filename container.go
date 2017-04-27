@@ -68,7 +68,7 @@ func (c *Container) Invoke(t interface{}) error {
 		for idx := range args {
 			arg := ctype.In(idx)
 			if node, ok := c.nodes[arg]; ok {
-				v, err := node.value(c)
+				v, err := node.value(c, arg)
 				if err != nil {
 					return errors.Wrapf(err, "unable to resolve %v", arg)
 				}
