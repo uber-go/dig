@@ -4,6 +4,10 @@
 
 - Rename `RegisterAll` and `MustRegisterAll` to `ProvideAll` and
   `MustProvideAll`.
+- Add functionality to `Provide` to support constructor with `n` return
+  objects to be resolved into the `dig.Graph`
+- Add `Invoke` function to invoke provided function and insert return
+  objects into the `dig.Graph`
 
 ## v0.2 (27 Mar 2017)
 
