@@ -23,8 +23,6 @@ package dig
 import (
 	"fmt"
 	"reflect"
-
-	"github.com/pkg/errors"
 )
 
 type graphNode interface {
@@ -113,16 +111,9 @@ func (n *funcNode) value(g *Container, objType reflect.Type) (reflect.Value, err
 		}
 	}
 
-	args := make([]reflect.Value, ct.NumIn(), ct.NumIn())
-	for idx := range args {
-		arg := ct.In(idx)
-		if node, ok := g.nodes[arg]; ok {
-			v, err := node.value(g, arg)
-			if err != nil {
-				return reflect.Zero(arg), errors.Wrapf(err, "unable to resolve %v", arg)
-			}
-			args[idx] = v
-		}
+	args, err := g.getArguments(ct)
+	if err != nil {
+		return reflect.Zero(objType), err
 	}
 
 	cv := reflect.ValueOf(n.constructor)
@@ -140,7 +131,7 @@ func (n *funcNode) value(g *Container, objType reflect.Type) (reflect.Value, err
 	}
 
 	// if last value is an error, it is returned as a separate argument, otherwise nil
-	err, _ := values[len(values)-1].Interface().(error)
+	err, _ = values[len(values)-1].Interface().(error)
 
 	for _, v := range values {
 		if objType == v.Type() {

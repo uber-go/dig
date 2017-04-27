@@ -48,9 +48,48 @@ func New() *Container {
 
 // Container facilitates automated dependency resolution
 type Container struct {
-	sync.Mutex
+	sync.RWMutex
 
 	nodes map[interface{}]graphNode
+}
+
+// Invoke the function and resolve the dependencies immidiately without providing the
+// constructor to the graph. The Invoke function returns error object which can be
+// occurred during the execution
+// The return arguments from Invoked function are registered in the graph for later use
+// The last parameter, if it is an error, is returned to the Invoke caller
+func (c *Container) Invoke(t interface{}) error {
+	ctype := reflect.TypeOf(t)
+	switch ctype.Kind() {
+	case reflect.Func:
+		c.RLock()
+		args, err := c.getArguments(ctype)
+		c.RUnlock()
+		if err != nil {
+			return err
+		}
+		cv := reflect.ValueOf(t)
+
+		// execute the provided func
+		values := cv.Call(args)
+		if len(values) > 0 {
+			c.Lock()
+			defer c.Unlock()
+			err, _ := values[len(values)-1].Interface().(error)
+			for _, v := range values {
+				switch v.Type().Kind() {
+				case reflect.Ptr:
+					c.insertObjectToGraph(v, v.Type())
+				default:
+					return errors.Wrapf(errReturnKind, "%v", ctype)
+				}
+			}
+			return err
+		}
+	default:
+		return errParamType
+	}
+	return nil
 }
 
 // Provide an object in the Container
@@ -95,9 +134,6 @@ func (c *Container) MustRegister(t interface{}) {
 // Any dependencies of the object will receive constructor calls, or be initialized (once)
 // Constructor with return value *object will be called
 func (c *Container) Resolve(obj interface{}) (err error) {
-	c.Lock()
-	defer c.Unlock()
-
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic during Resolve %v", r)
@@ -112,6 +148,8 @@ func (c *Container) Resolve(obj interface{}) (err error) {
 	objElemType := reflect.TypeOf(obj).Elem()
 	objVal := reflect.ValueOf(obj)
 
+	c.Lock()
+	defer c.Unlock()
 	// check if the type is a registered objNode
 	n, ok := c.nodes[objElemType]
 	if !ok {
@@ -196,16 +234,38 @@ func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 		otype = otype.Elem()
 		v = v.Elem()
 	}
+	c.insertObjectToGraph(v, otype)
+	return nil
+}
+
+func (c *Container) insertObjectToGraph(v reflect.Value, vtype reflect.Type) {
 	n := objNode{
 		node: node{
-			objType:     otype,
+			objType:     vtype,
 			cached:      true,
 			cachedValue: v,
 		},
 	}
+	c.nodes[vtype] = &n
+}
 
-	c.nodes[otype] = &n
-	return nil
+func (c *Container) getArguments(ctype reflect.Type) ([]reflect.Value, error) {
+	// find dependencies from the graph and place them in the args
+	args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
+	for idx := range args {
+		arg := ctype.In(idx)
+		node, ok := c.nodes[arg]
+		if ok {
+			v, err := node.value(c, arg)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unable to resolve %v", arg)
+			}
+			args[idx] = v
+		} else {
+			return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
+		}
+	}
+	return args, nil
 }
 
 // constr must be a function that returns the result type and an error

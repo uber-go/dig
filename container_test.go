@@ -21,8 +21,10 @@
 package dig
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -238,6 +240,77 @@ func TestConstructorErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInvokeSuccess(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	err := c.ProvideAll(
+		NewParent1,
+		NewChild1,
+		NewGrandchild1,
+	)
+	assert.NoError(t, err)
+	var c1 *Child1
+
+	err = c.Invoke(func(p1 *Parent1) {
+		require.NotNil(t, p1)
+		c1 = p1.c1
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c1)
+}
+
+func TestInvokeAndRegisterSuccess(t *testing.T) {
+	t.Parallel()
+	c := New()
+	child := &Child1{}
+	err := c.ProvideAll(
+		&Parent1{
+			c1: child,
+		},
+	)
+	assert.NoError(t, err)
+	err = c.Invoke(func(p1 *Parent1) *Child1 {
+		require.NotNil(t, p1)
+		return p1.c1
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c.nodes[reflect.TypeOf(child)])
+}
+
+func TestInvokeAndRegisterFailure(t *testing.T) {
+	t.Parallel()
+	c := New()
+	child := &Child1{}
+	err := c.ProvideAll(
+		&Parent1{
+			c1: child,
+		},
+	)
+	assert.NoError(t, err)
+	err = c.Invoke(func(p1 *Parent1) Child1 {
+		require.NotNil(t, p1)
+		return *p1.c1
+	})
+	require.Contains(t, err.Error(), "constructor return type must be a pointer")
+}
+
+func TestInvokeFailureUnresolvedDependencies(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	err := c.ProvideAll(
+		NewParent1,
+	)
+	assert.NoError(t, err)
+
+	err = c.Invoke(func(p1 *Parent1) {})
+	require.Contains(t, err.Error(), "unable to resolve *dig.Parent1")
+
+	err = c.Invoke(func(p12 *Parent12) {})
+	require.Contains(t, err.Error(), "dependency of type *dig.Parent12 is not registered")
 }
 
 func TestProvideAll(t *testing.T) {
