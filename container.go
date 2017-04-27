@@ -62,24 +62,11 @@ func (c *Container) Invoke(t interface{}) error {
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
 	case reflect.Func:
-		// find dependencies from the graph and place them in the args
-		args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
-		for idx := range args {
-			arg := ctype.In(idx)
-			c.RLock()
-			node, ok := c.nodes[arg]
-			c.RUnlock()
-			if ok {
-				c.RLock()
-				v, err := node.value(c, arg)
-				c.RUnlock()
-				if err != nil {
-					return errors.Wrapf(err, "unable to resolve %v", arg)
-				}
-				args[idx] = v
-			} else {
-				return fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
-			}
+		c.RLock()
+		args, err := c.getArguments(ctype)
+		c.RUnlock()
+		if err != nil {
+			return err
 		}
 		cv := reflect.ValueOf(t)
 
@@ -260,6 +247,25 @@ func (c *Container) insertObjectToGraph(v reflect.Value, vtype reflect.Type) {
 		},
 	}
 	c.nodes[vtype] = &n
+}
+
+func (c *Container) getArguments(ctype reflect.Type) ([]reflect.Value, error) {
+	// find dependencies from the graph and place them in the args
+	args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
+	for idx := range args {
+		arg := ctype.In(idx)
+		node, ok := c.nodes[arg]
+		if ok {
+			v, err := node.value(c, arg)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unable to resolve %v", arg)
+			}
+			args[idx] = v
+		} else {
+			return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
+		}
+	}
+	return args, nil
 }
 
 // constr must be a function that returns the result type and an error
