@@ -63,22 +63,16 @@ func (c *Container) Provide(t interface{}) error {
 	defer c.Unlock()
 
 	ctype := reflect.TypeOf(t)
-
 	switch ctype.Kind() {
 	case reflect.Func:
 		switch ctype.NumOut() {
-		case 2:
-			if ctype.Out(1) != _typeOfError {
-				return errReturnErrKind
-			}
-			fallthrough
+		case 0:
+			return errReturnCount
 		case 1:
 			objType := ctype.Out(0)
 			if objType.Kind() != reflect.Ptr && objType.Kind() != reflect.Interface {
 				return errReturnKind
 			}
-		default:
-			return errReturnCount
 		}
 		return c.provideConstructor(t)
 	case reflect.Ptr:
@@ -124,7 +118,7 @@ func (c *Container) Resolve(obj interface{}) (err error) {
 		return fmt.Errorf("type %v is not registered", objType)
 	}
 
-	v, err := n.value(c)
+	v, err := n.value(c, objElemType)
 	if err != nil {
 		return errors.Wrapf(err, "unable to resolve %v", objType)
 	}
@@ -217,32 +211,44 @@ func (c *Container) provideObject(o interface{}, otype reflect.Type) error {
 // constr must be a function that returns the result type and an error
 func (c *Container) provideConstructor(constr interface{}) error {
 	ctype := reflect.TypeOf(constr)
-	objType := ctype.Out(0)
+	// count of number of objects to be registered from the list of return parameters
+	count := ctype.NumOut()
+	objTypes := make([]reflect.Type, count, count)
+	for i := 0; i < count; i++ {
+		objTypes[i] = ctype.Out(i)
+	}
 
+	nodes := make([]node, count, count)
+	for i := 0; i < count; i++ {
+		nodes[i] = node{
+			objType: objTypes[i],
+		}
+	}
 	argc := ctype.NumIn()
 	n := funcNode{
 		deps:        make([]interface{}, argc),
 		constructor: constr,
-		node: node{
-			objType: objType,
-		},
+		nodes:       nodes,
 	}
 	for i := 0; i < argc; i++ {
 		arg := ctype.In(i)
 		if arg.Kind() != reflect.Ptr && arg.Kind() != reflect.Interface {
 			return errArgKind
 		}
-
 		n.deps[i] = arg
 	}
 
-	c.nodes[objType] = &n
+	for i := 0; i < count; i++ {
+		c.nodes[objTypes[i]] = &n
+	}
 
 	// object needs to be part of the container to properly detect cycles
 	if cycleErr := c.detectCycles(&n); cycleErr != nil {
 		// if the cycle was detected delete from the container
-		delete(c.nodes, objType)
-		return errors.Wrapf(cycleErr, "unable to Provide %v", objType)
+		for objType := range objTypes {
+			delete(c.nodes, objType)
+		}
+		return errors.Wrapf(cycleErr, "unable to Provide %v", objTypes)
 	}
 
 	return nil
