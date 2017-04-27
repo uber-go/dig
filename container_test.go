@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -259,6 +260,27 @@ func TestInvokeSuccess(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c1)
+}
+
+func TestInvokeAndRegisterSuccess(t *testing.T) {
+	t.Parallel()
+	c := New()
+	testname := "myChild"
+	err := c.ProvideAll(
+		&Parent1{
+			name: testname,
+		},
+	)
+	assert.NoError(t, err)
+	var name string
+	err = c.Invoke(func(p1 *Parent1) string {
+		require.NotNil(t, p1)
+		name = p1.name
+		return p1.name
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, name, "myChild")
+	assert.NotNil(t, c.nodes[reflect.TypeOf(testname)])
 }
 
 func TestInvokeFailureUnresolvedDependencies(t *testing.T) {

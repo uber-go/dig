@@ -56,6 +56,8 @@ type Container struct {
 // Invoke the function and resolve the dependencies immidiately without providing the
 // constructor to the graph. The Invoke function returns error object which can be
 // occurred during the execution
+// The return arguments from Invoked function are registered in the graph for later use
+// The last parameter, if it is an error, is returned to the Invoke caller
 func (c *Container) Invoke(t interface{}) error {
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
@@ -82,7 +84,23 @@ func (c *Container) Invoke(t interface{}) error {
 		cv := reflect.ValueOf(t)
 
 		// execute the provided func
-		cv.Call(args)
+		values := cv.Call(args)
+		if len(values) > 0 {
+			err, _ := values[len(values)-1].Interface().(error)
+			c.Lock()
+			for _, v := range values {
+				n := objNode{
+					node: node{
+						objType:     v.Type(),
+						cached:      true,
+						cachedValue: v,
+					},
+				}
+				c.nodes[v.Type()] = &n
+			}
+			c.Unlock()
+			return err
+		}
 	default:
 		return errParamType
 	}
