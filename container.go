@@ -48,7 +48,7 @@ func New() *Container {
 
 // Container facilitates automated dependency resolution
 type Container struct {
-	sync.Mutex
+	sync.RWMutex
 
 	nodes map[interface{}]graphNode
 }
@@ -57,9 +57,6 @@ type Container struct {
 // constructor to the graph. The Invoke function returns error object which can be
 // occurred during the execution
 func (c *Container) Invoke(t interface{}) error {
-	c.Lock()
-	defer c.Unlock()
-
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
 	case reflect.Func:
@@ -67,8 +64,13 @@ func (c *Container) Invoke(t interface{}) error {
 		args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
 		for idx := range args {
 			arg := ctype.In(idx)
-			if node, ok := c.nodes[arg]; ok {
+			c.RLock()
+			node, ok := c.nodes[arg]
+			c.RUnlock()
+			if ok {
+				c.RLock()
 				v, err := node.value(c, arg)
+				c.RUnlock()
 				if err != nil {
 					return errors.Wrapf(err, "unable to resolve %v", arg)
 				}
@@ -129,9 +131,6 @@ func (c *Container) MustRegister(t interface{}) {
 // Any dependencies of the object will receive constructor calls, or be initialized (once)
 // Constructor with return value *object will be called
 func (c *Container) Resolve(obj interface{}) (err error) {
-	c.Lock()
-	defer c.Unlock()
-
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic during Resolve %v", r)
@@ -146,6 +145,8 @@ func (c *Container) Resolve(obj interface{}) (err error) {
 	objElemType := reflect.TypeOf(obj).Elem()
 	objVal := reflect.ValueOf(obj)
 
+	c.Lock()
+	defer c.Unlock()
 	// check if the type is a registered objNode
 	n, ok := c.nodes[objElemType]
 	if !ok {
