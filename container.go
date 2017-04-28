@@ -25,7 +25,7 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"go.uber.org/dig/graph"
+	"go.uber.org/dig/internal/graph"
 )
 
 var (
