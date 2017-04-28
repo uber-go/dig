@@ -101,14 +101,8 @@ func (n *funcNode) value(g *Graph, objType reflect.Type) (reflect.Value, error) 
 	// check that all the dependencies have nodes present in the graph
 	// doesn't mean everything will go smoothly during resolve, but it
 	// drastically increases the chances that we're not missing something
-	for _, node := range g.nodes {
-		for _, dep := range node.dependencies() {
-			// check that the dependency is a registered objNode
-			if _, ok := g.nodes[dep]; !ok {
-				err := fmt.Errorf("%v dependency of type %v is not registered", ct, dep)
-				return reflect.Zero(ct), err
-			}
-		}
+	if v, err := g.validateGraph(ct); err != nil {
+		return v, err
 	}
 
 	args, err := g.ConstructorArguments(ct)
