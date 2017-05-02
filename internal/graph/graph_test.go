@@ -59,7 +59,7 @@ func TestInsertObject(t *testing.T) {
 	p1 := &Parent1{
 		c1: &Child1{},
 	}
-	err := g.InsertObject(reflect.ValueOf(p1), reflect.TypeOf(p1))
+	err := g.InsertObject(reflect.ValueOf(p1))
 	require.NoError(t, err)
 
 	var first *Parent1
@@ -81,10 +81,10 @@ func TestResolvedArguments(t *testing.T) {
 	p12 := &Parent12{
 		c1: &Child1{},
 	}
-	err := g.InsertObject(reflect.ValueOf(p1), reflect.TypeOf(p1))
+	err := g.InsertObject(reflect.ValueOf(p1))
 	require.NoError(t, err)
 
-	err = g.InsertObject(reflect.ValueOf(p12), reflect.TypeOf(p12))
+	err = g.InsertObject(reflect.ValueOf(p12))
 	require.NoError(t, err)
 
 	values, err := g.ConstructorArguments(reflect.TypeOf(constructor))
@@ -102,9 +102,9 @@ func TestGraphString(t *testing.T) {
 	p12 := &Parent12{
 		c1: &Child1{},
 	}
-	err := g.InsertObject(reflect.ValueOf(p1), reflect.TypeOf(p1))
+	err := g.InsertObject(reflect.ValueOf(p1))
 	require.NoError(t, err)
-	err = g.InsertObject(reflect.ValueOf(p12), reflect.TypeOf(p12))
+	err = g.InsertObject(reflect.ValueOf(p12))
 	require.NoError(t, err)
 
 	require.Contains(t, g.String(), "*graph.Parent1 -> (object) obj: *graph.Parent1")

@@ -117,7 +117,7 @@ func (n *funcNode) value(g *Graph, objType reflect.Type) (reflect.Value, error) 
 	// cache constructed values in the node
 
 	for _, v := range values {
-		g.InsertObject(v, v.Type())
+		g.InsertObject(v)
 	}
 
 	// if last value is an error, it is returned as a separate argument, otherwise nil

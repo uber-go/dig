@@ -73,17 +73,17 @@ func (g *Graph) Read(objType reflect.Type) (reflect.Value, error) {
 }
 
 // InsertObject the Graph with the provided value
-func (g *Graph) InsertObject(v reflect.Value, vtype reflect.Type) error {
+func (g *Graph) InsertObject(v reflect.Value) error {
 	g.Lock()
 	defer g.Unlock()
 	onode := objNode{
 		node: node{
-			objType:     vtype,
+			objType:     v.Type(),
 			cached:      true,
 			cachedValue: v,
 		},
 	}
-	g.nodes[vtype] = &onode
+	g.nodes[v.Type()] = &onode
 	return nil
 }
 

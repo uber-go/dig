@@ -70,7 +70,7 @@ func (c *Container) Invoke(t interface{}) error {
 			for _, v := range values {
 				switch v.Type().Kind() {
 				case reflect.Ptr:
-					c.Graph.InsertObject(v, v.Type())
+					c.Graph.InsertObject(v)
 				default:
 					return errors.Wrapf(errReturnKind, "%v", ctype)
 				}
@@ -108,7 +108,7 @@ func (c *Container) Provide(t interface{}) error {
 			ctype = ctype.Elem()
 			v = v.Elem()
 		}
-		return c.Graph.InsertObject(v, ctype)
+		return c.Graph.InsertObject(v)
 	default:
 		return errParamType
 	}
