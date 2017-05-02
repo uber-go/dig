@@ -88,8 +88,8 @@ func (g *Graph) InsertObject(v reflect.Value) error {
 }
 
 // InsertConstructor adds the constructor to the Graph
-func (g *Graph) InsertConstructor(constr interface{}) error {
-	ctype := reflect.TypeOf(constr)
+func (g *Graph) InsertConstructor(ctor interface{}) error {
+	ctype := reflect.TypeOf(ctor)
 	// count of number of objects to be registered from the list of return parameters
 	count := ctype.NumOut()
 	objTypes := make([]reflect.Type, count, count)
@@ -106,7 +106,7 @@ func (g *Graph) InsertConstructor(constr interface{}) error {
 	argc := ctype.NumIn()
 	n := funcNode{
 		deps:        make([]interface{}, argc),
-		constructor: constr,
+		constructor: ctor,
 		nodes:       nodes,
 	}
 	for i := 0; i < argc; i++ {
@@ -124,7 +124,7 @@ func (g *Graph) InsertConstructor(constr interface{}) error {
 	}
 
 	// object needs to be part of the container to properly detect cycles
-	if cycleErr := g.detectCycles(&n); cycleErr != nil {
+	if cycleErr := g.recursiveDetectCycles(&n, nil); cycleErr != nil {
 		// if the cycle was detected delete from the container
 		for objType := range objTypes {
 			delete(g.nodes, objType)
@@ -133,12 +133,6 @@ func (g *Graph) InsertConstructor(constr interface{}) error {
 	}
 
 	return nil
-}
-
-// When a new constructor is being inserted, detect any present cycles
-func (g *Graph) detectCycles(n *funcNode) error {
-	l := []string{}
-	return g.recursiveDetectCycles(n, l)
 }
 
 // DFS and tracking if same node is visited twice
