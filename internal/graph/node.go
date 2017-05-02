@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package dig
+package graph
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ import (
 
 type graphNode interface {
 	// Return value of the object
-	value(g *Container, objType reflect.Type) (reflect.Value, error)
+	value(s *Graph, objType reflect.Type) (reflect.Value, error)
 
 	// Other things that need to be present before this object can be created
 	dependencies() []interface{}
@@ -61,7 +61,7 @@ type objNode struct {
 }
 
 // Return the earlier provided instance
-func (n *objNode) value(g *Container, objType reflect.Type) (reflect.Value, error) {
+func (n *objNode) value(s *Graph, objType reflect.Type) (reflect.Value, error) {
 	return n.cachedValue, nil
 }
 
@@ -89,7 +89,7 @@ type funcNode struct {
 }
 
 // Call the function and return the result
-func (n *funcNode) value(g *Container, objType reflect.Type) (reflect.Value, error) {
+func (n *funcNode) value(g *Graph, objType reflect.Type) (reflect.Value, error) {
 	for i, node := range n.nodes {
 		if node.objType == objType && n.cached {
 			return n.cachedValue[i], nil
@@ -101,17 +101,11 @@ func (n *funcNode) value(g *Container, objType reflect.Type) (reflect.Value, err
 	// check that all the dependencies have nodes present in the graph
 	// doesn't mean everything will go smoothly during resolve, but it
 	// drastically increases the chances that we're not missing something
-	for _, node := range g.nodes {
-		for _, dep := range node.dependencies() {
-			// check that the dependency is a registered objNode
-			if _, ok := g.nodes[dep]; !ok {
-				err := fmt.Errorf("%v dependency of type %v is not registered", ct, dep)
-				return reflect.Zero(ct), err
-			}
-		}
+	if v, err := g.validateGraph(ct); err != nil {
+		return v, err
 	}
 
-	args, err := g.getArguments(ct)
+	args, err := g.ConstructorArguments(ct)
 	if err != nil {
 		return reflect.Zero(objType), err
 	}
@@ -121,13 +115,9 @@ func (n *funcNode) value(g *Container, objType reflect.Type) (reflect.Value, err
 	values := cv.Call(args)
 
 	// cache constructed values in the node
-	for _, node := range n.nodes {
-		for _, v := range values {
-			if node.objType == v.Type() {
-				n.cached = true
-				n.cachedValue = append(n.cachedValue, v)
-			}
-		}
+
+	for _, v := range values {
+		g.InsertObject(v)
 	}
 
 	// if last value is an error, it is returned as a separate argument, otherwise nil
