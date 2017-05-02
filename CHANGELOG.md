@@ -1,6 +1,9 @@
 # Changelog
 
-## v0.3 (unreleased)
+
+## v0.4 (unreleased)
+
+## v0.3 (2 May 2017)
 
 - Rename `RegisterAll` and `MustRegisterAll` to `ProvideAll` and
   `MustProvideAll`.
