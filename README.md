@@ -102,18 +102,6 @@ err := c.Provide(&Type1{Name: "I am an thing"})
 // to other constructors that require it.
 ```
 
-## Error Handling and Alternatives
-
-`Provide` and `Resolve` (and their `ProvideAll` and `ResolveAll` counterparts)
-return errors, and usages of `dig` should fully utilize the error checking, since
-container creation is done through reflection meaning a lot of the errors surface
-at runtime.
-
-There are, however, `Must*` alternatives of all the methods available. They
-are drawn from some of the patterns in the Go standard library and are there
-to simplify usage in critical scenarios: where not being able to resolve an
-object is not an option and panic is preferred.
-
 [doc]: https://godoc.org/go.uber.org/dig
 [doc-img]: https://godoc.org/go.uber.org/dig?status.svg
 [cov]: https://coveralls.io/github/uber-go/dig?branch=master
