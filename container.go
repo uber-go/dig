@@ -102,13 +102,7 @@ func (c *Container) Provide(t interface{}) error {
 			}
 		}
 		return c.Graph.InsertConstructor(t)
-	case reflect.Slice:
-		fallthrough
-	case reflect.Array:
-		fallthrough
-	case reflect.Map:
-		fallthrough
-	case reflect.Ptr:
+	case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr:
 		v := reflect.ValueOf(t)
 		if ctype.Elem().Kind() == reflect.Interface {
 			ctype = ctype.Elem()

@@ -112,9 +112,7 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 	for i := 0; i < argc; i++ {
 		arg := ctype.In(i)
 		switch arg.Kind() {
-		case reflect.Interface, reflect.Ptr:
-			fallthrough
-		case reflect.Map, reflect.Array, reflect.Slice:
+		case reflect.Interface, reflect.Ptr, reflect.Map, reflect.Array, reflect.Slice:
 			break
 		default:
 			return errArgKind
