@@ -123,6 +123,69 @@ func TestResolve(t *testing.T) {
 	}
 }
 
+func TestComplexType(t *testing.T) {
+	t.Parallel()
+	tts := []struct {
+		name    string
+		Provide func(c *Container) error
+		resolve func(c *Container) error
+		es      string
+	}{
+		{
+			"test map",
+			func(c *Container) error { return c.Provide(testmap) },
+			func(c *Container) error { return c.Resolve(&resolvemap) },
+			"",
+		},
+		{
+			"test slice",
+			func(c *Container) error { return c.Provide(testslice) },
+			func(c *Container) error { return c.Resolve(&resolveslice) },
+			"",
+		},
+		{
+			"test array",
+			func(c *Container) error { return c.Provide(testarray) },
+			func(c *Container) error { return c.Resolve(&resolvearray) },
+			"",
+		},
+		{
+			"test ctor",
+			func(c *Container) error { return c.ProvideAll(testslice, testmap, testarray, ctorWithMapsAndSlices) },
+			func(c *Container) error { return c.Resolve(&resolveTestResult) },
+			"",
+		},
+		{
+			"test invoke",
+			func(c *Container) error { return c.ProvideAll(testslice, testmap, testarray) },
+			func(c *Container) error {
+				if err := c.Invoke(ctorWithMapsAndSlices); err != nil {
+					return err
+				}
+				return c.Resolve(&resolveTestResult)
+			},
+			"",
+		},
+	}
+
+	for _, tc := range tts {
+		t.Run(tc.name, func(t *testing.T) {
+			c := New()
+
+			err := tc.Provide(c)
+			require.NoError(t, err, "Provide part of the test cant have errors")
+
+			err = tc.resolve(c)
+			if tc.es != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.es, "Unexpected error message")
+			} else {
+				require.NoError(t, err, "Did not expect a resolve error")
+			}
+		})
+	}
+}
+
 func TestObjectRegister(t *testing.T) {
 	t.Parallel()
 	c := New()
