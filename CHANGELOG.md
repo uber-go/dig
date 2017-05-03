@@ -2,6 +2,7 @@
 
 
 ## v0.4 (unreleased)
+- Add support form `map`, `slice` and `array` to dig
 
 ## v0.3 (2 May 2017)
 

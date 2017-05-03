@@ -86,8 +86,8 @@ func (c *Container) Invoke(t interface{}) error {
 // Provide an object in the Container
 //
 // The provided argument must be a function that accepts its dependencies as
-// arguments and returns a single result, which must be a pointer type.
-// The function may optionally return an error as a second result.
+// arguments and returns one or more results, which must be a pointer type, map, slice or an array.
+// The function may optionally return an error as the last argument.
 func (c *Container) Provide(t interface{}) error {
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
@@ -123,7 +123,7 @@ func (c *Container) MustRegister(t interface{}) {
 
 // Resolve all of the dependencies of the provided class
 //
-// Provided object must be a pointer
+// Provided object must be a pointer, map, slice or an array
 // Any dependencies of the object will receive constructor calls, or be initialized (once)
 // Constructor with return value *object will be called
 func (c *Container) Resolve(obj interface{}) (err error) {
