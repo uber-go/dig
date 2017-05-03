@@ -128,40 +128,61 @@ func TestComplexType(t *testing.T) {
 	tts := []struct {
 		name    string
 		Provide func(c *Container) error
-		resolve func(c *Container) error
+		resolve func(t *testing.T, c *Container) error
 		es      string
 	}{
 		{
 			"test map",
 			func(c *Container) error { return c.Provide(testmap) },
-			func(c *Container) error { return c.Resolve(&resolvemap) },
+			func(t *testing.T, c *Container) error {
+				err := c.Resolve(&resolvemap)
+				assert.Equal(t, resolvemap["one"], 1)
+				return err
+			},
 			"",
 		},
 		{
 			"test slice",
 			func(c *Container) error { return c.Provide(testslice) },
-			func(c *Container) error { return c.Resolve(&resolveslice) },
+			func(t *testing.T, c *Container) error {
+				err := c.Resolve(&resolveslice)
+				assert.Equal(t, resolveslice[0], 1)
+				return err
+			},
 			"",
 		},
 		{
 			"test array",
 			func(c *Container) error { return c.Provide(testarray) },
-			func(c *Container) error { return c.Resolve(&resolvearray) },
+			func(t *testing.T, c *Container) error {
+				err := c.Resolve(&resolvearray)
+				assert.Equal(t, resolvearray[0], "one")
+				return err
+			},
 			"",
 		},
 		{
 			"test ctor",
 			func(c *Container) error { return c.ProvideAll(testslice, testmap, testarray, ctorWithMapsAndSlices) },
-			func(c *Container) error { return c.Resolve(&resolveTestResult) },
+			func(t *testing.T, c *Container) error {
+				err := c.Resolve(&resolveTestResult)
+				assert.Equal(t, resolveTestResult.testarray[0], "one")
+				assert.Equal(t, resolveTestResult.testmap["one"], 1)
+				assert.Equal(t, resolveTestResult.testslice[0], 1)
+				return err
+			},
 			"",
 		},
 		{
 			"test invoke",
 			func(c *Container) error { return c.ProvideAll(testslice, testmap, testarray) },
-			func(c *Container) error {
+			func(t *testing.T, c *Container) error {
 				if err := c.Invoke(ctorWithMapsAndSlices); err != nil {
 					return err
 				}
+				assert.Equal(t, resolveTestResult.testarray[0], "one")
+				assert.Equal(t, resolveTestResult.testmap["one"], 1)
+				assert.Equal(t, resolveTestResult.testslice[0], 1)
 				return c.Resolve(&resolveTestResult)
 			},
 			"",
@@ -175,7 +196,7 @@ func TestComplexType(t *testing.T) {
 			err := tc.Provide(c)
 			require.NoError(t, err, "Provide part of the test cant have errors")
 
-			err = tc.resolve(c)
+			err = tc.resolve(t, c)
 			if tc.es != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.es, "Unexpected error message")
