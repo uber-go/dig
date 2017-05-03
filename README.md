@@ -20,6 +20,7 @@ BETA. Expect potential API changes.
 There are two ways to Provide an object:
 
 1. Provide a pointer to an existing object
+1. Provide a slice, map, array
 1. Provide a "constructor function" that returns one pointer (or interface)
 
 ### Provide a Constructor
@@ -62,6 +63,28 @@ err := c.Provide(&Type1{Name: "I am an thing"})
 // to other constructors that require it.
 ```
 
+
+### Provide an Maps, slices or arrays
+
+Dig also support maps, slices and arrays as objects to
+resolve, or provided as a dependency to the constructor.
+
+```go
+c := dig.New()
+var (
+	typemap = map[string]int{}
+	typeslice = []int{1, 2, 3}
+	typearray = [2]string{"one", "two"}
+)
+err := c.ProvideAll(typemap, typeslice, typearray)
+
+var resolveslice []int
+err := c.Resolve(&resolveslice)
+
+c.Invoke(func(map map[string]int, slice []int, array [2]string) {
+	// do something
+})
+```
 
 ## Resolve
 

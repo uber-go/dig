@@ -2,6 +2,7 @@
 
 
 ## v0.4 (unreleased)
+- Add support form `map`, `slice` and `array` to dig
 
 - Remove `Must*` funcs to greatly reduce API surface area.
 

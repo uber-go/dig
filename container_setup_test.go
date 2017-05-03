@@ -169,3 +169,32 @@ func NewFlakyChildFailure() (*FlakyChild, error) {
 func threeObjects() (*Child1, *Child2, *Child3, error) {
 	return &Child1{}, &Child2{}, &Child3{}, nil
 }
+
+var (
+	testmap = map[string]int{
+		"one":   1,
+		"two":   2,
+		"three": 3,
+	}
+	testslice = []int{1, 2, 3}
+	testarray = [2]string{"one", "two"}
+
+	resolvemap        map[string]int
+	resolveslice      []int
+	resolvearray      [2]string
+	resolveTestResult *testresult
+)
+
+type testresult struct {
+	testmap   map[string]int
+	testslice []int
+	testarray [2]string
+}
+
+func ctorWithMapsAndSlices(testmap map[string]int, testslice []int, testarray [2]string) *testresult {
+	return &testresult{
+		testmap:   testmap,
+		testslice: testslice,
+		testarray: testarray,
+	}
+}
