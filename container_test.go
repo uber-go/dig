@@ -445,67 +445,6 @@ func TestPanicConstructor(t *testing.T) {
 	require.Contains(t, err.Error(), "RUH ROH")
 }
 
-func TestMustFunctions(t *testing.T) {
-	t.Parallel()
-	tts := []struct {
-		name          string
-		f             func(c *Container)
-		panicExpected bool
-	}{
-		{
-			"wrong Provide type",
-			func(c *Container) { c.MustRegister(2) },
-			true,
-		},
-		{
-			"wrong Provide all types",
-			func(c *Container) { c.MustProvideAll("2", "3") },
-			true,
-		},
-		{
-			"unregistered type",
-			func(c *Container) {
-				var v *Type1
-				c.MustResolve(&v)
-			},
-			true,
-		},
-		{
-			"correct Provide",
-			func(c *Container) { c.MustRegister(NewChild1) },
-			false,
-		},
-		{
-			"correct Provide all",
-			func(c *Container) { c.MustProvideAll(NewChild1, NewChild2) },
-			false,
-		},
-		{
-			"unregistered types",
-			func(c *Container) {
-				var v *Type1
-				var v2 *Type2
-				c.MustResolveAll(&v, &v2)
-			},
-			true,
-		},
-	}
-
-	for _, tc := range tts {
-		t.Run(tc.name, func(t *testing.T) {
-			c := New()
-			f := func() {
-				tc.f(c)
-			}
-			if tc.panicExpected {
-				require.Panics(t, f)
-			} else {
-				require.NotPanics(t, f)
-			}
-		})
-	}
-}
-
 func TestMultiObjectRegisterResolve(t *testing.T) {
 	t.Parallel()
 	c := New()

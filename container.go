@@ -114,13 +114,6 @@ func (c *Container) Provide(t interface{}) error {
 	}
 }
 
-// MustRegister will attempt to Provide the object and panic if error is encountered
-func (c *Container) MustRegister(t interface{}) {
-	if err := c.Provide(t); err != nil {
-		panic(err)
-	}
-}
-
 // Resolve all of the dependencies of the provided class
 //
 // Provided object must be a pointer
@@ -152,13 +145,6 @@ func (c *Container) Resolve(obj interface{}) (err error) {
 	return nil
 }
 
-// MustResolve calls Resolve and panics if an error is encountered
-func (c *Container) MustResolve(obj interface{}) {
-	if err := c.Resolve(obj); err != nil {
-		panic(err)
-	}
-}
-
 // ResolveAll the dependencies of each provided object
 // Returns the first error encountered
 func (c *Container) ResolveAll(objs ...interface{}) error {
@@ -170,13 +156,6 @@ func (c *Container) ResolveAll(objs ...interface{}) error {
 	return nil
 }
 
-// MustResolveAll calls ResolveAll and panics if an error is encountered
-func (c *Container) MustResolveAll(objs ...interface{}) {
-	if err := c.ResolveAll(objs...); err != nil {
-		panic(err)
-	}
-}
-
 // ProvideAll registers all the provided args in the Container
 func (c *Container) ProvideAll(types ...interface{}) error {
 	for _, t := range types {
@@ -185,11 +164,4 @@ func (c *Container) ProvideAll(types ...interface{}) error {
 		}
 	}
 	return nil
-}
-
-// MustProvideAll calls ProvideAll and panics is an error is encountered
-func (c *Container) MustProvideAll(types ...interface{}) {
-	if err := c.ProvideAll(types...); err != nil {
-		panic(err)
-	}
 }

@@ -3,6 +3,8 @@
 
 ## v0.4 (unreleased)
 
+- Remove `Must*` funcs to greatly reduce API surface area.
+
 ## v0.3 (2 May 2017)
 
 - Rename `RegisterAll` and `MustRegisterAll` to `ProvideAll` and
