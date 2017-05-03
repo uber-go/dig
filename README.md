@@ -66,7 +66,7 @@ err := c.Provide(&Type1{Name: "I am an thing"})
 
 ### Provide an Maps, slices or arrays
 
-Dig is now able to support maps, slices and arrays as objects to
+Dig also support maps, slices and arrays as objects to
 resolve, or provided as a dependency to the constructor.
 
 ```go
