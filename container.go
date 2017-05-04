@@ -66,8 +66,7 @@ func (c *Container) Invoke(t interface{}) error {
 		values := cv.Call(args)
 
 		if len(values) > 0 {
-			err, _ := values[len(values)-1].Interface().(error)
-			if err != nil {
+			if err, _ := values[len(values)-1].Interface().(error); err != nil {
 				return errors.Wrapf(err, "Error executing the function %v", ctype)
 			}
 			for _, v := range values {
