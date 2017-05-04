@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -382,6 +383,15 @@ func TestInvokeAndRegisterFailure(t *testing.T) {
 		return *p1.c1
 	})
 	require.Contains(t, err.Error(), "constructor return type must be a pointer")
+}
+
+func TestInvokeReturnedError(t *testing.T) {
+	t.Parallel()
+	c := New()
+	err := c.Invoke(func() error {
+		return errors.New("oops")
+	})
+	require.Contains(t, err.Error(), "Error executing the function func() error: oops")
 }
 
 func TestInvokeFailureUnresolvedDependencies(t *testing.T) {

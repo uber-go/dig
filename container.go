@@ -67,6 +67,9 @@ func (c *Container) Invoke(t interface{}) error {
 
 		if len(values) > 0 {
 			err, _ := values[len(values)-1].Interface().(error)
+			if err != nil {
+				return errors.Wrapf(err, "Error executing the function %v", ctype)
+			}
 			for _, v := range values {
 				switch v.Type().Kind() {
 				case reflect.Ptr:
@@ -75,7 +78,6 @@ func (c *Container) Invoke(t interface{}) error {
 					return errors.Wrapf(errReturnKind, "%v", ctype)
 				}
 			}
-			return err
 		}
 	default:
 		return errParamType
