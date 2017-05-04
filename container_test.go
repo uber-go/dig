@@ -58,13 +58,13 @@ func TestRegister(t *testing.T) {
 	tts := []struct {
 		name  string
 		param interface{}
-		err   error
+		err   string
 	}{
-		{"non function", struct{}{}, errParamType},
-		{"wrong return count", noReturn, errReturnCount},
-		{"non pointer return", returnNonPointer, errReturnKind},
-		{"wrong parameters type", nonPointerParams, errArgKind},
-		{"pointer Provide", &struct{}{}, nil},
+		{"non function", struct{}{}, "for constructor struct {}: " + errParamType.Error()},
+		{"wrong return count", noReturn, "for constructor func(): " + errReturnCount.Error()},
+		{"non pointer return", returnNonPointer, "for constructor func() dig.S: " + errReturnKind.Error()},
+		{"wrong parameters type", nonPointerParams, errArgKind.Error()},
+		{"pointer Provide", &struct{}{}, ""},
 	}
 
 	for _, tc := range tts {
@@ -72,8 +72,8 @@ func TestRegister(t *testing.T) {
 			c := New()
 			err := c.Provide(tc.param)
 
-			if tc.err != nil {
-				require.Contains(t, err.Error(), tc.err.Error())
+			if len(tc.err) > 0 {
+				require.Equal(t, err.Error(), tc.err)
 			} else {
 				require.NoError(t, err)
 			}

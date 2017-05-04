@@ -117,7 +117,7 @@ func (c *Container) Provide(types ...interface{}) error {
 				return err
 			}
 		default:
-			return errors.Wrapf(errParamType, " for constructor %v", ctype)
+			return errors.Wrapf(errParamType, "for constructor %v", ctype)
 		}
 	}
 	return nil
