@@ -392,6 +392,11 @@ func TestInvokeReturnedError(t *testing.T) {
 		return errors.New("oops")
 	})
 	require.Contains(t, err.Error(), "Error executing the function func() error: oops")
+
+	err = c.Invoke(func() (*Child1, error) {
+		return &Child1{}, nil
+	})
+	assert.NoError(t, err)
 }
 
 func TestInvokeFailureUnresolvedDependencies(t *testing.T) {

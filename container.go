@@ -72,7 +72,7 @@ func (c *Container) Invoke(t interface{}) error {
 			}
 			for _, v := range values {
 				switch v.Type().Kind() {
-				case reflect.Ptr:
+				case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
 					c.Graph.InsertObject(v)
 				default:
 					return errors.Wrapf(errReturnKind, "%v", ctype)
@@ -104,7 +104,7 @@ func (c *Container) Provide(t interface{}) error {
 			}
 		}
 		return c.Graph.InsertConstructor(t)
-	case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr:
+	case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
 		v := reflect.ValueOf(t)
 		if ctype.Elem().Kind() == reflect.Interface {
 			ctype = ctype.Elem()
