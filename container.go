@@ -66,16 +66,17 @@ func (c *Container) Invoke(t interface{}) error {
 		values := cv.Call(args)
 
 		if len(values) > 0 {
-			err, _ := values[len(values)-1].Interface().(error)
+			if err, _ := values[len(values)-1].Interface().(error); err != nil {
+				return errors.Wrapf(err, "Error executing the function %v", ctype)
+			}
 			for _, v := range values {
 				switch v.Type().Kind() {
-				case reflect.Ptr:
+				case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
 					c.Graph.InsertObject(v)
 				default:
 					return errors.Wrapf(errReturnKind, "%v", ctype)
 				}
 			}
-			return err
 		}
 	default:
 		return errParamType
@@ -102,7 +103,7 @@ func (c *Container) Provide(t interface{}) error {
 			}
 		}
 		return c.Graph.InsertConstructor(t)
-	case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr:
+	case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
 		v := reflect.ValueOf(t)
 		if ctype.Elem().Kind() == reflect.Interface {
 			ctype = ctype.Elem()
