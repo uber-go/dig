@@ -36,6 +36,8 @@
 //
 // • Provide a pointer to an existing object
 //
+// • Provide a slice, map, array
+//
 // • Provide a "constructor function" that returns one pointer (or interface)
 //
 // Provide a Constructor
@@ -76,6 +78,27 @@
 //   // dig container is now able to provide *Type1 as a dependency
 //   // to other constructors that require it.
 //
+// Provide an Maps, slices or arrays
+//
+// Dig also support maps, slices and arrays as objects to
+// resolve, or provided as a dependency to the constructor.
+//
+//
+//   c := dig.New()
+//   var (
+//   	typemap = map[string]int{}
+//   	typeslice = []int{1, 2, 3}
+//   	typearray = [2]string{"one", "two"}
+//   )
+//   err := c.Provide(typemap, typeslice, typearray)
+//
+//   var resolveslice []int
+//   err := c.Resolve(&resolveslice)
+//
+//   c.Invoke(func(map map[string]int, slice []int, array [2]string) {
+//   	// do something
+//   })
+//
 // Resolve
 //
 // Resolve retrieves objects from the container by building the object graph.
@@ -114,21 +137,6 @@
 //   err := c.Provide(&Type1{Name: "I am an thing"})
 //   // dig container is now able to provide *Type1 as a dependency
 //   // to other constructors that require it.
-//
-// Error Handling and Alternatives
-//
-// Provide and Resolve (and their ProvideAll and ResolveAll counterparts)
-// return errors, and usages of
-// dig should fully utilize the error checking, since
-// container creation is done through reflection meaning a lot of the errors surface
-// at runtime.
-//
-//
-// There are, however, Must* alternatives of all the methods available. They
-// are drawn from some of the patterns in the Go standard library and are there
-// to simplify usage in critical scenarios: where not being able to resolve an
-// object is not an option and panic is preferred.
-//
 //
 //
 package dig

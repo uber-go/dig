@@ -76,7 +76,7 @@ var (
 	typeslice = []int{1, 2, 3}
 	typearray = [2]string{"one", "two"}
 )
-err := c.ProvideAll(typemap, typeslice, typearray)
+err := c.Provide(typemap, typeslice, typearray)
 
 var resolveslice []int
 err := c.Resolve(&resolveslice)
