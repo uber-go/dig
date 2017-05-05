@@ -114,19 +114,19 @@ func (n *funcNode) value(g *Graph, objType reflect.Type) (reflect.Value, error) 
 
 	values := cv.Call(args)
 
-	rc := len(values)
-	if rc > 0 {
+	count := len(values)
+	if count > 0 {
 		// check if last argument is an error
-		if values[len(values)-1].Type() == _typeOfError {
-			err, _ = values[rc-1].Interface().(error)
-			rc--
+		if values[count-1].Type() == _typeOfError {
+			err, _ = values[count-1].Interface().(error)
+			count--
 		}
 		// cache constructed values in the node
-		for i := 0; i < rc; i++ {
+		for i := 0; i < count; i++ {
 			g.InsertObject(values[i])
 		}
 		// return value for the requested object type
-		for i := 0; i < rc; i++ {
+		for i := 0; i < count; i++ {
 			if objType == values[i].Type() {
 				return values[i], err
 			}

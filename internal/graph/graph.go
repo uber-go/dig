@@ -92,6 +92,13 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 	ctype := reflect.TypeOf(ctor)
 	// count of number of objects to be registered from the list of return parameters
 	count := ctype.NumOut()
+	if count > 0 {
+		// if last parameter is an error, we will not include it in the graph
+		if ctype.Out(count-1) == _typeOfError {
+			count--
+		}
+	}
+
 	objTypes := make([]reflect.Type, count, count)
 	for i := 0; i < count; i++ {
 		objTypes[i] = ctype.Out(i)

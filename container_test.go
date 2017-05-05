@@ -319,6 +319,8 @@ func TestConstructorErrors(t *testing.T) {
 			var p1 *FlakyParent
 			err := c.Resolve(&p1)
 			if tt.wantErr != "" {
+				var registeredError error
+				require.Error(t, c.Resolve(&registeredError))
 				require.EqualError(t, err, tt.wantErr)
 			} else {
 				require.NoError(t, err)
