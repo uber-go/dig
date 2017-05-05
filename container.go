@@ -71,14 +71,12 @@ func (c *Container) Invoke(t interface{}) error {
 			}
 			count--
 		}
-		if count > 0 {
-			for i := 0; i < count; i++ {
-				switch values[i].Type().Kind() {
-				case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
-					c.Graph.InsertObject(values[i])
-				default:
-					return errors.Wrapf(errReturnKind, "%v", ctype)
-				}
+		for i := 0; i < count; i++ {
+			switch values[i].Type().Kind() {
+			case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
+				c.Graph.InsertObject(values[i])
+			default:
+				return errors.Wrapf(errReturnKind, "%v", ctype)
 			}
 		}
 	default:
