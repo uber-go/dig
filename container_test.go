@@ -319,6 +319,8 @@ func TestConstructorErrors(t *testing.T) {
 			var p1 *FlakyParent
 			err := c.Resolve(&p1)
 			if tt.wantErr != "" {
+				var registeredError *error
+				require.Error(t, c.Resolve(&registeredError), "type *error is not registered")
 				require.EqualError(t, err, tt.wantErr)
 			} else {
 				require.NoError(t, err)
@@ -391,7 +393,9 @@ func TestInvokeReturnedError(t *testing.T) {
 	err := c.Invoke(func() error {
 		return errors.New("oops")
 	})
-	require.Contains(t, err.Error(), "Error executing the function func() error: oops")
+	var registeredError *error
+	require.Error(t, c.Resolve(&registeredError), "type *error is not registered")
+	require.Contains(t, err.Error(), "error executing the function func() error: oops")
 
 	err = c.Invoke(func() (*Child1, error) {
 		return &Child1{}, nil
