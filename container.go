@@ -64,15 +64,20 @@ func (c *Container) Invoke(t interface{}) error {
 
 		// execute the provided func
 		values := cv.Call(args)
-
-		if len(values) > 0 {
-			if err, _ := values[len(values)-1].Interface().(error); err != nil {
-				return errors.Wrapf(err, "Error executing the function %v", ctype)
+		rc := len(values)
+		if rc > 0 {
+			if values[len(values)-1].Type() == _typeOfError {
+				if err, _ := values[rc-1].Interface().(error); err != nil {
+					return errors.Wrapf(err, "Error executing the function %v", ctype)
+				}
+				rc--
 			}
-			for _, v := range values {
-				switch v.Type().Kind() {
+		}
+		if rc > 0 {
+			for i := 0; i < rc; i++ {
+				switch values[i].Type().Kind() {
 				case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
-					c.Graph.InsertObject(v)
+					c.Graph.InsertObject(values[i])
 				default:
 					return errors.Wrapf(errReturnKind, "%v", ctype)
 				}
