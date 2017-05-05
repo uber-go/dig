@@ -164,7 +164,7 @@ func TestComplexType(t *testing.T) {
 		},
 		{
 			"test ctor",
-			func(c *Container) error { return c.ProvideAll(testslice, testmap, testarray, ctorWithMapsAndSlices) },
+			func(c *Container) error { return c.Provide(testslice, testmap, testarray, ctorWithMapsAndSlices) },
 			func(t *testing.T, c *Container) error {
 				err := c.Resolve(&resolveTestResult)
 				assert.Equal(t, resolveTestResult.testarray[0], "one")
@@ -176,7 +176,7 @@ func TestComplexType(t *testing.T) {
 		},
 		{
 			"test invoke",
-			func(c *Container) error { return c.ProvideAll(testslice, testmap, testarray) },
+			func(c *Container) error { return c.Provide(testslice, testmap, testarray) },
 			func(t *testing.T, c *Container) error {
 				if err := c.Invoke(ctorWithMapsAndSlices); err != nil {
 					return err
@@ -315,7 +315,7 @@ func TestConstructorErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			c := New()
-			require.NoError(t, c.ProvideAll(tt.registers...))
+			require.NoError(t, c.Provide(tt.registers...))
 			var p1 *FlakyParent
 			err := c.Resolve(&p1)
 			if tt.wantErr != "" {
@@ -331,7 +331,7 @@ func TestInvokeSuccess(t *testing.T) {
 	t.Parallel()
 	c := New()
 
-	err := c.ProvideAll(
+	err := c.Provide(
 		NewParent1,
 		NewChild1,
 		NewGrandchild1,
@@ -351,7 +351,7 @@ func TestInvokeAndRegisterSuccess(t *testing.T) {
 	t.Parallel()
 	c := New()
 	child := &Child1{}
-	err := c.ProvideAll(
+	err := c.Provide(
 		&Parent1{
 			c1: child,
 		},
@@ -372,7 +372,7 @@ func TestInvokeAndRegisterFailure(t *testing.T) {
 	t.Parallel()
 	c := New()
 	child := &Child1{}
-	err := c.ProvideAll(
+	err := c.Provide(
 		&Parent1{
 			c1: child,
 		},
@@ -403,7 +403,7 @@ func TestInvokeFailureUnresolvedDependencies(t *testing.T) {
 	t.Parallel()
 	c := New()
 
-	err := c.ProvideAll(
+	err := c.Provide(
 		NewParent1,
 	)
 	assert.NoError(t, err)
@@ -415,11 +415,11 @@ func TestInvokeFailureUnresolvedDependencies(t *testing.T) {
 	require.Contains(t, err.Error(), "dependency of type *dig.Parent12 is not registered")
 }
 
-func TestProvideAll(t *testing.T) {
+func TestProvide(t *testing.T) {
 	t.Parallel()
 	c := New()
 
-	err := c.ProvideAll(
+	err := c.Provide(
 		NewParent1,
 		NewChild1,
 		NewGrandchild1,
@@ -498,7 +498,7 @@ func TestResolveAll(t *testing.T) {
 	t.Parallel()
 	c := New()
 
-	err := c.ProvideAll(
+	err := c.Provide(
 		NewGrandchild1,
 		NewChild1,
 		NewParent1,
@@ -509,7 +509,7 @@ func TestResolveAll(t *testing.T) {
 	var p3 *Parent1
 	var p4 *Parent1
 
-	err = c.ResolveAll(&p1, &p2, &p3, &p4)
+	err = c.Resolve(&p1, &p2, &p3, &p4)
 	require.NoError(t, err, "Did not expect error on resolve all")
 	require.Equal(t, p1.name, "Parent1")
 	require.True(t, p1 == p2 && p2 == p3 && p3 == p4, "All pointers must be equal")

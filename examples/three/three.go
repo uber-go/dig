@@ -55,7 +55,7 @@ func main() {
 	//
 	// At this point no functions are called and no objects are created.
 	// dig is merely constructing a directional graph of dependencies.
-	err := c.ProvideAll(newOne, newTwo, newThree)
+	err := c.Provide(newOne, newTwo, newThree)
 	if err != nil {
 		panic(err)
 	}

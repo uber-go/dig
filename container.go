@@ -84,35 +84,42 @@ func (c *Container) Invoke(t interface{}) error {
 	return nil
 }
 
-// Provide an object in the Container
+// Provide registers all the provided args in the Container
 //
 // The provided argument must be a function that accepts its dependencies as
 // arguments and returns one or more results, which must be a pointer type, map, slice or an array.
 // The function may optionally return an error as the last argument.
-func (c *Container) Provide(t interface{}) error {
-	ctype := reflect.TypeOf(t)
-	switch ctype.Kind() {
-	case reflect.Func:
-		switch ctype.NumOut() {
-		case 0:
-			return errReturnCount
-		case 1:
-			objType := ctype.Out(0)
-			if objType.Kind() != reflect.Ptr && objType.Kind() != reflect.Interface {
-				return errReturnKind
+func (c *Container) Provide(types ...interface{}) error {
+	for _, t := range types {
+		ctype := reflect.TypeOf(t)
+		switch ctype.Kind() {
+		case reflect.Func:
+			switch ctype.NumOut() {
+			case 0:
+				return errReturnCount
+			case 1:
+				objType := ctype.Out(0)
+				if objType.Kind() != reflect.Ptr && objType.Kind() != reflect.Interface {
+					return errReturnKind
+				}
 			}
+			if err := c.Graph.InsertConstructor(t); err != nil {
+				return err
+			}
+		case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr:
+			v := reflect.ValueOf(t)
+			if ctype.Elem().Kind() == reflect.Interface {
+				ctype = ctype.Elem()
+				v = v.Elem()
+			}
+			if err := c.Graph.InsertObject(v); err != nil {
+				return err
+			}
+		default:
+			return errParamType
 		}
-		return c.Graph.InsertConstructor(t)
-	case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
-		v := reflect.ValueOf(t)
-		if ctype.Elem().Kind() == reflect.Interface {
-			ctype = ctype.Elem()
-			v = v.Elem()
-		}
-		return c.Graph.InsertObject(v)
-	default:
-		return errParamType
 	}
+	return nil
 }
 
 // Resolve all of the dependencies of the provided class
@@ -120,49 +127,29 @@ func (c *Container) Provide(t interface{}) error {
 // Provided object must be a pointer, map, slice or an array
 // Any dependencies of the object will receive constructor calls, or be initialized (once)
 // Constructor with return value *object will be called
-func (c *Container) Resolve(obj interface{}) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic during Resolve %v", r)
+func (c *Container) Resolve(objs ...interface{}) (err error) {
+	for _, obj := range objs {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic during Resolve %v", r)
+			}
+		}()
+
+		objType := reflect.TypeOf(obj)
+		if objType.Kind() != reflect.Ptr {
+			return fmt.Errorf("can not resolve non-pointer object of type %v", objType)
 		}
-	}()
 
-	objType := reflect.TypeOf(obj)
-	if objType.Kind() != reflect.Ptr {
-		return fmt.Errorf("can not resolve non-pointer object of type %v", objType)
-	}
+		objElemType := reflect.TypeOf(obj).Elem()
+		objVal := reflect.ValueOf(obj)
 
-	objElemType := reflect.TypeOf(obj).Elem()
-	objVal := reflect.ValueOf(obj)
-
-	v, err := c.Graph.Read(objElemType)
-	if err != nil {
-		return err
-	}
-
-	// set the pointer value of the provided object to the instance pointer
-	objVal.Elem().Set(v)
-
-	return nil
-}
-
-// ResolveAll the dependencies of each provided object
-// Returns the first error encountered
-func (c *Container) ResolveAll(objs ...interface{}) error {
-	for _, o := range objs {
-		if err := c.Resolve(o); err != nil {
+		v, err := c.Graph.Read(objElemType)
+		if err != nil {
 			return err
 		}
-	}
-	return nil
-}
 
-// ProvideAll registers all the provided args in the Container
-func (c *Container) ProvideAll(types ...interface{}) error {
-	for _, t := range types {
-		if err := c.Provide(t); err != nil {
-			return err
-		}
+		// set the pointer value of the provided object to the instance pointer
+		objVal.Elem().Set(v)
 	}
 	return nil
 }

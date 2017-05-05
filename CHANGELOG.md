@@ -3,8 +3,9 @@
 
 ## v0.4 (unreleased)
 - Add support form `map`, `slice` and `array` to dig
-
 - Remove `Must*` funcs to greatly reduce API surface area.
+- Remove `*All` funcs to reduce API surface area. Available methods on
+container are `Provide`, `Resolve` and `Invoke`
 
 ## v0.3 (2 May 2017)
 
