@@ -395,7 +395,7 @@ func TestInvokeReturnedError(t *testing.T) {
 	})
 	var registeredError *error
 	require.Error(t, c.Resolve(&registeredError), "type *error is not registered")
-	require.Contains(t, err.Error(), "error executing the function func() error: oops")
+	require.Contains(t, err.Error(), "error invoking the function func() error: oops")
 
 	err = c.Invoke(func() (*Child1, error) {
 		return &Child1{}, nil
