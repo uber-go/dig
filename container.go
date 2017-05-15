@@ -58,7 +58,7 @@ func (c *Container) Invoke(t interface{}) error {
 	case reflect.Func:
 		args, err := c.Graph.ConstructorArguments(ctype)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error invoking function %v", t)
 		}
 		cv := reflect.ValueOf(t)
 
@@ -76,11 +76,11 @@ func (c *Container) Invoke(t interface{}) error {
 			case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
 				c.Graph.InsertObject(values[i])
 			default:
-				return errors.Wrapf(errReturnKind, "%v", ctype)
+				return errors.Wrapf(errReturnKind, "error invoking function %v", ctype)
 			}
 		}
 	default:
-		return errParamType
+		return errors.Wrapf(errParamType, "error invoking function %v", ctype)
 	}
 	return nil
 }
@@ -97,11 +97,11 @@ func (c *Container) Provide(types ...interface{}) error {
 		case reflect.Func:
 			switch ctype.NumOut() {
 			case 0:
-				return errReturnCount
+				return errors.Wrapf(errReturnCount, "for constructor %v", ctype)
 			case 1:
 				objType := ctype.Out(0)
 				if objType.Kind() != reflect.Ptr && objType.Kind() != reflect.Interface {
-					return errReturnKind
+					return errors.Wrapf(errReturnKind, "for constructor %v", ctype)
 				}
 			}
 			if err := c.Graph.InsertConstructor(t); err != nil {
@@ -117,7 +117,7 @@ func (c *Container) Provide(types ...interface{}) error {
 				return err
 			}
 		default:
-			return errParamType
+			return errors.Wrapf(errParamType, " for constructor %v", ctype)
 		}
 	}
 	return nil

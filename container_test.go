@@ -73,7 +73,7 @@ func TestRegister(t *testing.T) {
 			err := c.Provide(tc.param)
 
 			if tc.err != nil {
-				require.EqualError(t, err, tc.err.Error())
+				require.Contains(t, err.Error(), tc.err.Error())
 			} else {
 				require.NoError(t, err)
 			}
