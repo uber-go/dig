@@ -35,6 +35,9 @@ var (
 	errArgKind     = errors.New("constructor arguments must be pointers")
 
 	_typeOfError = reflect.TypeOf((*error)(nil)).Elem()
+
+	_forCtor   = "for constructor %v"
+	_invokeErr = "error invoking the function %v"
 )
 
 // New returns a new DI Container
@@ -58,7 +61,7 @@ func (c *Container) Invoke(t interface{}) error {
 	case reflect.Func:
 		args, err := c.Graph.ConstructorArguments(ctype)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, _invokeErr, t)
 		}
 		cv := reflect.ValueOf(t)
 
@@ -67,7 +70,7 @@ func (c *Container) Invoke(t interface{}) error {
 		count := len(values)
 		if count > 0 && values[count-1].Type() == _typeOfError {
 			if err, _ := values[count-1].Interface().(error); err != nil {
-				return errors.Wrapf(err, "error executing the function %v", ctype)
+				return errors.Wrapf(err, _invokeErr, ctype)
 			}
 			count--
 		}
@@ -76,11 +79,11 @@ func (c *Container) Invoke(t interface{}) error {
 			case reflect.Slice, reflect.Array, reflect.Map, reflect.Ptr, reflect.Interface:
 				c.Graph.InsertObject(values[i])
 			default:
-				return errors.Wrapf(errReturnKind, "%v", ctype)
+				return errors.Wrapf(errReturnKind, _invokeErr, ctype)
 			}
 		}
 	default:
-		return errParamType
+		return errors.Wrapf(errParamType, _invokeErr, ctype)
 	}
 	return nil
 }
@@ -97,11 +100,11 @@ func (c *Container) Provide(types ...interface{}) error {
 		case reflect.Func:
 			switch ctype.NumOut() {
 			case 0:
-				return errReturnCount
+				return errors.Wrapf(errReturnCount, _forCtor, ctype)
 			case 1:
 				objType := ctype.Out(0)
 				if objType.Kind() != reflect.Ptr && objType.Kind() != reflect.Interface {
-					return errReturnKind
+					return errors.Wrapf(errReturnKind, _forCtor, ctype)
 				}
 			}
 			if err := c.Graph.InsertConstructor(t); err != nil {
@@ -117,7 +120,7 @@ func (c *Container) Provide(types ...interface{}) error {
 				return err
 			}
 		default:
-			return errParamType
+			return errors.Wrapf(errParamType, _forCtor, ctype)
 		}
 	}
 	return nil

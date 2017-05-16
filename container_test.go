@@ -58,13 +58,13 @@ func TestRegister(t *testing.T) {
 	tts := []struct {
 		name  string
 		param interface{}
-		err   error
+		err   string
 	}{
-		{"non function", struct{}{}, errParamType},
-		{"wrong return count", noReturn, errReturnCount},
-		{"non pointer return", returnNonPointer, errReturnKind},
-		{"wrong parameters type", nonPointerParams, errArgKind},
-		{"pointer Provide", &struct{}{}, nil},
+		{"non function", struct{}{}, "for constructor struct {}: " + errParamType.Error()},
+		{"wrong return count", noReturn, "for constructor func(): " + errReturnCount.Error()},
+		{"non pointer return", returnNonPointer, "for constructor func() dig.S: " + errReturnKind.Error()},
+		{"wrong parameters type", nonPointerParams, errArgKind.Error()},
+		{"pointer Provide", &struct{}{}, ""},
 	}
 
 	for _, tc := range tts {
@@ -72,8 +72,8 @@ func TestRegister(t *testing.T) {
 			c := New()
 			err := c.Provide(tc.param)
 
-			if tc.err != nil {
-				require.EqualError(t, err, tc.err.Error())
+			if len(tc.err) > 0 {
+				require.Equal(t, err.Error(), tc.err)
 			} else {
 				require.NoError(t, err)
 			}
@@ -395,7 +395,7 @@ func TestInvokeReturnedError(t *testing.T) {
 	})
 	var registeredError *error
 	require.Error(t, c.Resolve(&registeredError), "type *error is not registered")
-	require.Contains(t, err.Error(), "error executing the function func() error: oops")
+	require.Contains(t, err.Error(), "error invoking the function func() error: oops")
 
 	err = c.Invoke(func() (*Child1, error) {
 		return &Child1{}, nil
