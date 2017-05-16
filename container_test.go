@@ -438,20 +438,6 @@ func TestProvide(t *testing.T) {
 	require.NotNil(t, p1.c1.gc1, "Grandchild1 must have been registered")
 }
 
-func TestConcurrentAccess(t *testing.T) {
-	t.Parallel()
-	c := New()
-
-	for i := 0; i < 10; i++ {
-		go func() {
-			require.NoError(t, c.Provide(NewGrandchild1))
-
-			var gc1 *Grandchild1
-			require.NoError(t, c.Resolve(&gc1))
-		}()
-	}
-}
-
 func TestCycles(t *testing.T) {
 	t.Parallel()
 	c := New()

@@ -30,8 +30,8 @@ import (
 )
 
 var (
-	errArgKind = errors.New("constructor arguments must be pointers")
-
+	errArgKind   = errors.New("constructor arguments must be pointers")
+	errRetNode   = errors.New("node already exist for the constructor")
 	_typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 )
 
@@ -102,6 +102,10 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 		objTypes[i] = ctype.Out(i)
 	}
 
+	if err := g.ValidateReturnTypes(ctype); err != nil {
+		return err
+	}
+
 	nodes := make([]node, count, count)
 	for i := 0; i < count; i++ {
 		nodes[i] = node{
@@ -140,6 +144,18 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 		return errors.Wrapf(cycleErr, "unable to Provide %v", objTypes)
 	}
 
+	return nil
+}
+
+// ValidateReturnTypes validates if ctor's return type is already insterted in the graph
+func (g *Graph) ValidateReturnTypes(ctype reflect.Type) error {
+	g.RLock()
+	defer g.RUnlock()
+	for i := 0; i < ctype.NumOut(); i++ {
+		if _, ok := g.nodes[ctype.Out(i)]; ok {
+			return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, ctype.Out(i))
+		}
+	}
 	return nil
 }
 
