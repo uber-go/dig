@@ -6,6 +6,7 @@
 - Remove `Must*` funcs to greatly reduce API surface area.
 - Remove `*All` funcs to reduce API surface area. Available methods on
 container are `Provide`, `Resolve` and `Invoke`
+- Providing constructors with common returned types results in an error.
 
 ## v0.3 (2 May 2017)
 

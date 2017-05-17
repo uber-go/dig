@@ -111,6 +111,23 @@ func TestGraphString(t *testing.T) {
 	require.Contains(t, g.String(), "*graph.Parent12 -> (object) obj: *graph.Parent12")
 }
 
+func TestCtorConflicts(t *testing.T) {
+	t.Parallel()
+	g := NewGraph()
+
+	err := g.InsertConstructor(threeObjects)
+	require.NoError(t, err)
+
+	err = g.InsertConstructor(oneObject)
+	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, error), object type: *graph.Child1: node already exist for the constructor")
+
+	g.Reset()
+	err = g.InsertConstructor(func() (*Child1, *Child1, error) {
+		return &Child1{}, &Child1{}, nil
+	})
+	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, *graph.Child1, error), object type: *graph.Child1: node already exist for the constructor")
+}
+
 func TestMultiObjectRegisterResolve(t *testing.T) {
 	t.Parallel()
 	g := NewGraph()

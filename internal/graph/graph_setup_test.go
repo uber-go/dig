@@ -41,6 +41,9 @@ type Child2 struct{}
 
 type Child3 struct{}
 
+func oneObject() (*Child1, error) {
+	return &Child1{}, nil
+}
 func threeObjects() (*Child1, *Child2, *Child3, error) {
 	return &Child1{}, &Child2{}, &Child3{}, nil
 }
