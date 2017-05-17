@@ -24,7 +24,6 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
-	"sync"
 
 	"github.com/pkg/errors"
 )
@@ -38,8 +37,6 @@ var (
 
 // Graph contains all Graph for current graph
 type Graph struct {
-	sync.RWMutex
-
 	nodes map[interface{}]graphNode
 }
 
@@ -52,17 +49,13 @@ func NewGraph() Graph {
 
 // Reset the graph
 func (g *Graph) Reset() {
-	g.Lock()
-	defer g.Unlock()
 	g.nodes = make(map[interface{}]graphNode)
 }
 
 // Read reads value from the Graph
 func (g *Graph) Read(objType reflect.Type) (reflect.Value, error) {
 	// check if the type is a registered objNode
-	g.RLock()
 	n, ok := g.nodes[objType]
-	g.RUnlock()
 	if !ok {
 		return reflect.Zero(objType), fmt.Errorf("type %v is not registered", objType)
 	}
@@ -75,8 +68,6 @@ func (g *Graph) Read(objType reflect.Type) (reflect.Value, error) {
 
 // InsertObject the Graph with the provided value
 func (g *Graph) InsertObject(v reflect.Value) error {
-	g.Lock()
-	defer g.Unlock()
 	onode := objNode{
 		node: node{
 			objType:     v.Type(),
@@ -130,8 +121,6 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 		n.deps[i] = arg
 	}
 
-	g.Lock()
-	defer g.Unlock()
 	for i := 0; i < count; i++ {
 		g.nodes[objTypes[i]] = &n
 	}
@@ -150,8 +139,6 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 
 // ValidateReturnTypes validates if ctor's return type is already insterted in the graph
 func (g *Graph) ValidateReturnTypes(ctype reflect.Type) error {
-	g.RLock()
-	defer g.RUnlock()
 	objMap := make(map[reflect.Type]bool, ctype.NumOut())
 	for i := 0; i < ctype.NumOut(); i++ {
 		objType := ctype.Out(i)
@@ -192,9 +179,6 @@ func (g *Graph) recursiveDetectCycles(n graphNode, l []string) error {
 }
 
 func (g *Graph) validateGraph(ct reflect.Type) (reflect.Value, error) {
-	g.Lock()
-	defer g.Unlock()
-
 	for _, node := range g.nodes {
 		for _, dep := range node.dependencies() {
 			// check that the dependency is a registered objNode
@@ -212,9 +196,7 @@ func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error
 	args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
 	for idx := range args {
 		arg := ctype.In(idx)
-		g.RLock()
 		node, ok := g.nodes[arg]
-		g.RUnlock()
 		if ok {
 			v, err := node.value(g, arg)
 			if err != nil {
