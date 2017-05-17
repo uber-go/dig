@@ -145,7 +145,7 @@ func (g *Graph) ValidateReturnTypes(ctype reflect.Type, checkCachedObjects bool)
 		objType := ctype.Out(i)
 		if _, ok := g.nodes[objType]; ok {
 			if checkCachedObjects {
-				if g.checkCachedObjects(objType) {
+				if obj, ok := g.nodes[objType].(*objNode); ok && obj.cached {
 					return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
 				}
 			} else {
@@ -158,11 +158,6 @@ func (g *Graph) ValidateReturnTypes(ctype reflect.Type, checkCachedObjects bool)
 		objMap[objType] = true
 	}
 	return nil
-}
-
-func (g *Graph) checkCachedObjects(objType reflect.Type) bool {
-	obj, ok := g.nodes[objType].(*objNode)
-	return ok && obj.cached
 }
 
 // DFS and tracking if same node is visited twice
