@@ -115,16 +115,17 @@ func TestCtorConflicts(t *testing.T) {
 	t.Parallel()
 	g := NewGraph()
 
-	err := g.InsertConstructor(func() (*Child1, *Child1, *Child3, error) {
-		return &Child1{}, &Child1{}, &Child3{}, nil
-	})
+	err := g.InsertConstructor(threeObjects)
 	require.NoError(t, err)
 
 	err = g.InsertConstructor(oneObject)
 	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, error), object type: *graph.Child1: node already exist for the constructor")
 
-	err = g.InsertConstructor(threeObjects)
-	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, *graph.Child2, *graph.Child3, error), object type: *graph.Child1: node already exist for the constructor")
+	g.Reset()
+	err = g.InsertConstructor(func() (*Child1, *Child1, error) {
+		return &Child1{}, &Child1{}, nil
+	})
+	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, *graph.Child1, error), object type: *graph.Child1: constructor return types must be distinct")
 }
 
 func TestMultiObjectRegisterResolve(t *testing.T) {
