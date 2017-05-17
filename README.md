@@ -13,9 +13,32 @@ For runnable examples, see the [examples directory](examples/).
 
 BETA. Expect potential API changes.
 
+## Conatiner
+
+`package dig` exposes `type Container` as an object capable of resolving a
+directional dependency graph.
+
+To create one:
+```go
+import "go.uber.org/dig"
+
+func main() {
+	c := dig.New()
+	// dig container `c` is ready to use!
+}
+```
+
+Objects in the container are identified by their `reflect.Type` and **everything
+is treated as a singleton**, meaning there can be only one object in the graph
+of a given type.
+
+For more advanced usecases, consider using a factory pattern. That is to say,
+have one object shared as a singleton, capable of creating many instances
+of the same type on demand.
+
 ## Provide
 
-`Provide` adds an object, or a constructor of an object to the container.
+`Provide` adds an object, or a constructor of an object, to the container.
 
 There are two ways to Provide an object:
 
