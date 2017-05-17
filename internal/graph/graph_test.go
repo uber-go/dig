@@ -125,7 +125,7 @@ func TestCtorConflicts(t *testing.T) {
 	err = g.InsertConstructor(func() (*Child1, *Child1, error) {
 		return &Child1{}, &Child1{}, nil
 	})
-	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, *graph.Child1, error), object type: *graph.Child1: constructor return types must be distinct")
+	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, *graph.Child1, error), object type: *graph.Child1: node already exist for the constructor")
 }
 
 func TestMultiObjectRegisterResolve(t *testing.T) {

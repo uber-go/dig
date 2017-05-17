@@ -152,7 +152,7 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 func (g *Graph) ValidateReturnTypes(ctype reflect.Type) error {
 	g.RLock()
 	defer g.RUnlock()
-	objMap := make(map[reflect.Type]bool)
+	objMap := make(map[reflect.Type]bool, ctype.NumOut())
 	for i := 0; i < ctype.NumOut(); i++ {
 		objType := ctype.Out(i)
 		if _, ok := g.nodes[objType]; ok {
