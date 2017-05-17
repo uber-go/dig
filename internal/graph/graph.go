@@ -30,10 +30,10 @@ import (
 )
 
 var (
-	errArgKind     = errors.New("constructor arguments must be pointers")
-	errRetNode     = errors.New("node already exist for the constructor")
-	errCtorRetNode = errors.New("constructor return types must be distinct")
-	_typeOfError   = reflect.TypeOf((*error)(nil)).Elem()
+	errArgKind = errors.New("constructor arguments must be pointers")
+	errRetNode = errors.New("node already exist for the constructor")
+
+	_typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 )
 
 // Graph contains all Graph for current graph
@@ -159,7 +159,7 @@ func (g *Graph) ValidateReturnTypes(ctype reflect.Type) error {
 			return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, ctype.Out(i))
 		}
 		if objMap[objType] {
-			return errors.Wrapf(errCtorRetNode, "ctor: %v, object type: %v", ctype, ctype.Out(i))
+			return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, ctype.Out(i))
 		}
 		objMap[objType] = true
 	}
