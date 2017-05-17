@@ -94,7 +94,7 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 		objTypes[i] = ctype.Out(i)
 	}
 
-	if err := g.ValidateReturnTypes(ctype); err != nil {
+	if err := g.ValidateReturnTypes(ctype, false); err != nil {
 		return err
 	}
 
@@ -137,20 +137,32 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 	return nil
 }
 
-// ValidateReturnTypes validates if ctor's return type is already insterted in the graph
-func (g *Graph) ValidateReturnTypes(ctype reflect.Type) error {
+// ValidateReturnTypes validates if Invoke func's return type is Provided to the graph
+// checkCachedObjects=true additionally checks if objects are resolved and cached in the graph
+func (g *Graph) ValidateReturnTypes(ctype reflect.Type, checkCachedObjects bool) error {
 	objMap := make(map[reflect.Type]bool, ctype.NumOut())
 	for i := 0; i < ctype.NumOut(); i++ {
 		objType := ctype.Out(i)
 		if _, ok := g.nodes[objType]; ok {
-			return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, ctype.Out(i))
+			if checkCachedObjects {
+				if g.checkCachedObjects(objType) {
+					return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
+				}
+			} else {
+				return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
+			}
 		}
 		if objMap[objType] {
-			return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, ctype.Out(i))
+			return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
 		}
 		objMap[objType] = true
 	}
 	return nil
+}
+
+func (g *Graph) checkCachedObjects(objType reflect.Type) bool {
+	obj, ok := g.nodes[objType].(*objNode)
+	return ok && obj.cached
 }
 
 // DFS and tracking if same node is visited twice
