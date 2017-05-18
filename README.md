@@ -32,7 +32,7 @@ Objects in the container are identified by their `reflect.Type` and **everything
 is treated as a singleton**, meaning there can be only one object in the graph
 of a given type.
 
-For more advanced usecases, consider using a factory pattern. That is to say,
+For more advanced use cases, consider using a factory pattern. That is to say,
 have one object shared as a singleton, capable of creating many instances
 of the same type on demand.
 
