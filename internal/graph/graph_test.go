@@ -128,7 +128,7 @@ func TestCtorConflicts(t *testing.T) {
 	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, *graph.Child1, error), object type: *graph.Child1: node already exist for the constructor")
 }
 
-func TestValidateReturnTypes(t *testing.T) {
+func TestConstructorOverrideReturnsError(t *testing.T) {
 	t.Parallel()
 	g := NewGraph()
 

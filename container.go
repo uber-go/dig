@@ -53,7 +53,7 @@ type Container struct {
 	graph.Graph
 }
 
-// InvokeOnce only allows function invokation once to register the
+// InvokeOnce only allows function invocation once to register the
 // return types. If return types are already registered, specific error
 // is returned to the caller
 func (c *Container) InvokeOnce(t interface{}) error {

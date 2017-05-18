@@ -138,12 +138,16 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 }
 
 // ValidateReturnTypes validates if Invoke func's return type is Provided to the graph
-// checkCachedObjects=true additionally checks if objects are resolved and cached in the graph
+// checkCachedObjects=true ensures to throw an error only when the node is already
+// resolved and cached.
+//
 func (g *Graph) ValidateReturnTypes(ctype reflect.Type, checkCachedObjects bool) error {
 	objMap := make(map[reflect.Type]bool, ctype.NumOut())
 	for i := 0; i < ctype.NumOut(); i++ {
 		objType := ctype.Out(i)
 		if _, ok := g.nodes[objType]; ok {
+			// for Invoke validation, graphNode may not be resolved (still in the form of funcNode).
+			// checkCachedObjects ensures to throw an error only when the node is resolved and cached.
 			if checkCachedObjects {
 				if obj, ok := g.nodes[objType].(*objNode); ok && obj.cached {
 					return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
