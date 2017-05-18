@@ -373,6 +373,10 @@ func TestInvokeOnce(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c1)
+
+	type empty struct{}
+	require.NoError(t, c.InvokeOnce(func() *empty { return &empty{} }))
+	assert.Equal(t, c.InvokeOnce(func() *empty { return &empty{} }), ErrInvokeOnce)
 }
 
 func TestInvokeAndRegisterSuccess(t *testing.T) {
