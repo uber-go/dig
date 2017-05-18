@@ -379,6 +379,13 @@ func TestInvokeOnce(t *testing.T) {
 	assert.Equal(t, c.InvokeOnce(func() *empty { return &empty{} }), ErrInvokeOnce)
 }
 
+func TestInvokeOnceFailOnResolvedTypes(t *testing.T) {
+	c := New()
+	c.Provide(newT1, newT2, newT3)
+	require.NoError(t, c.InvokeOnce(newT1))
+	assert.Equal(t, c.InvokeOnce(newT2), ErrInvokeOnce)
+}
+
 func TestInvokeAndRegisterSuccess(t *testing.T) {
 	t.Parallel()
 	c := New()
