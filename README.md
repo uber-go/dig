@@ -13,9 +13,32 @@ For runnable examples, see the [examples directory](examples/).
 
 BETA. Expect potential API changes.
 
+## Conatiner
+
+`package dig` exposes `type Container` as an object capable of resolving a
+directional dependency graph.
+
+To create one:
+```go
+import "go.uber.org/dig"
+
+func main() {
+	c := dig.New()
+	// dig container `c` is ready to use!
+}
+```
+
+Objects in the container are identified by their `reflect.Type` and **everything
+is treated as a singleton**, meaning there can be only one object in the graph
+of a given type.
+
+For more advanced use cases, consider using a factory pattern. That is to say,
+have one object shared as a singleton, capable of creating many instances
+of the same type on demand.
+
 ## Provide
 
-`Provide` adds an object, or a constructor of an object to the container.
+`Provide` adds an object, or a constructor of an object, to the container.
 
 There are two ways to Provide an object:
 
@@ -58,13 +81,13 @@ type Type1 struct {
 }
 
 c := dig.New()
-err := c.Provide(&Type1{Name: "I am an thing"})
+err := c.Provide(&Type1{Name: "I am a thing"})
 // dig container is now able to provide *Type1 as a dependency
 // to other constructors that require it.
 ```
 
 
-### Provide an Maps, slices or arrays
+### Providing Maps and Slices
 
 Dig also support maps, slices and arrays as objects to
 resolve, or provided as a dependency to the constructor.
@@ -110,20 +133,6 @@ until the constructor for `config.Provider` can be fully satisfied.
 
 If resolution is not possible, for instance one of the required dependencies has
 does not have a constructor and doesn't appear in the graph, an error will be returned.
-
-There are future plans to do named retrievals to support multiple
-objects of the same type in the container.
-
-```go
-type Type1 struct {
-	Name string
-}
-
-c := dig.New()
-err := c.Provide(&Type1{Name: "I am an thing"})
-// dig container is now able to provide *Type1 as a dependency
-// to other constructors that require it.
-```
 
 [doc]: https://godoc.org/go.uber.org/dig
 [doc-img]: https://godoc.org/go.uber.org/dig?status.svg
