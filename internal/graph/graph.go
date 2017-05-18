@@ -94,7 +94,7 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 		objTypes[i] = ctype.Out(i)
 	}
 
-	if err := g.ValidateReturnTypes(ctype, false); err != nil {
+	if err := g.validateCtorReturnTypes(ctype); err != nil {
 		return err
 	}
 
@@ -137,25 +137,42 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 	return nil
 }
 
-// ValidateReturnTypes validates if Invoke func's return type is Provided to the graph
-// checkCachedObjects=true ensures to throw an error only when the node is already
-// resolved and cached.
-//
-func (g *Graph) ValidateReturnTypes(ctype reflect.Type, checkCachedObjects bool) error {
-	objMap := make(map[reflect.Type]bool, ctype.NumOut())
+// ValidateInvokeReturnTypes validates Invoke return types and returns an error
+// if the grah node of return type is resolved and cached.
+func (g *Graph) ValidateInvokeReturnTypes(ctype reflect.Type) error {
+	if err := g.checkDuplicateReturns(ctype); err != nil {
+		return err
+	}
 	for i := 0; i < ctype.NumOut(); i++ {
 		objType := ctype.Out(i)
 		if _, ok := g.nodes[objType]; ok {
-			// for Invoke validation, graphNode may not be resolved (still in the form of funcNode).
-			// checkCachedObjects ensures to throw an error only when the node is resolved and cached.
-			if checkCachedObjects {
-				if obj, ok := g.nodes[objType].(*objNode); ok && obj.cached {
-					return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
-				}
-			} else {
+			if obj, ok := g.nodes[objType].(*objNode); ok && obj.cached {
 				return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
 			}
 		}
+	}
+	return nil
+}
+
+// validateCtorReturnTypes validates provided constructor and returns error
+// when graph node for ctor return type is not already provided
+func (g *Graph) validateCtorReturnTypes(ctype reflect.Type) error {
+	if err := g.checkDuplicateReturns(ctype); err != nil {
+		return err
+	}
+	for i := 0; i < ctype.NumOut(); i++ {
+		objType := ctype.Out(i)
+		if _, ok := g.nodes[objType]; ok {
+			return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
+		}
+	}
+	return nil
+}
+
+func (g *Graph) checkDuplicateReturns(ctype reflect.Type) error {
+	objMap := make(map[reflect.Type]bool, ctype.NumOut())
+	for i := 0; i < ctype.NumOut(); i++ {
+		objType := ctype.Out(i)
 		if objMap[objType] {
 			return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
 		}

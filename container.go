@@ -61,7 +61,7 @@ func (c *Container) InvokeOnce(t interface{}) error {
 	if ctype.Kind() != reflect.Func {
 		return errors.Wrapf(errParamType, _invokeErr, ctype)
 	}
-	if err := c.ValidateReturnTypes(ctype, true); err != nil {
+	if err := c.ValidateInvokeReturnTypes(ctype); err != nil {
 		return ErrInvokeOnce
 	}
 	return c.Invoke(t)

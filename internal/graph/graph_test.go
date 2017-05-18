@@ -128,17 +128,22 @@ func TestCtorConflicts(t *testing.T) {
 	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, *graph.Child1, error), object type: *graph.Child1: node already exist for the constructor")
 }
 
-func TestConstructorOverrideReturnsError(t *testing.T) {
+func TestCtorOverrideReturnsError(t *testing.T) {
 	t.Parallel()
 	g := NewGraph()
 
 	err := g.InsertConstructor(threeObjects)
 	require.NoError(t, err)
-	err = g.ValidateReturnTypes(reflect.TypeOf(oneObject), false)
+	err = g.validateCtorReturnTypes(reflect.TypeOf(oneObject))
 	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, error), object type: *graph.Child1: node already exist for the constructor")
+}
+
+func TestInvokeOverrideReturnsError(t *testing.T) {
+	t.Parallel()
+	g := NewGraph()
 
 	g.InsertObject(reflect.ValueOf(&Child1{}))
-	err = g.ValidateReturnTypes(reflect.TypeOf(oneObject), true)
+	err := g.ValidateInvokeReturnTypes(reflect.TypeOf(oneObject))
 	require.Contains(t, err.Error(), "ctor: func() (*graph.Child1, error), object type: *graph.Child1: node already exist for the constructor")
 }
 
