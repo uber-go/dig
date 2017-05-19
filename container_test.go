@@ -380,6 +380,7 @@ func TestInvokeOnce(t *testing.T) {
 }
 
 func TestInvokeOnceFailOnResolvedTypes(t *testing.T) {
+	t.Parallel()
 	c := New()
 	c.Provide(newT1, newT2, newT3)
 	require.NoError(t, c.InvokeOnce(newT1))

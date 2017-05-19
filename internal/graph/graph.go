@@ -138,15 +138,15 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 }
 
 // ValidateInvokeReturnTypes validates Invoke return types and returns an error
-// if the grah node of return type is resolved and cached.
+// if the graph node of return type is resolved and cached.
 func (g *Graph) ValidateInvokeReturnTypes(ctype reflect.Type) error {
 	if err := g.checkDuplicateReturns(ctype); err != nil {
 		return err
 	}
 	for i := 0; i < ctype.NumOut(); i++ {
 		objType := ctype.Out(i)
-		if _, ok := g.nodes[objType]; ok {
-			if obj, ok := g.nodes[objType].(*objNode); ok && obj.cached {
+		if node, ok := g.nodes[objType]; ok {
+			if obj, ok := node.(*objNode); ok && obj.cached {
 				return errors.Wrapf(errRetNode, "ctor: %v, object type: %v", ctype, objType)
 			}
 		}

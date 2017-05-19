@@ -7,7 +7,7 @@
 - Remove `*All` funcs to reduce API surface area. Available methods on
 container are `Provide`, `Resolve` and `Invoke`
 - Providing constructors with common returned types results in an error.
-- Add `InvokOnce` functionality to invoke only once on unresolved return types
+- Add `InvokeOnce` functionality to invoke only once on unresolved return types
   of the provided function
 
 ## v0.3 (2 May 2017)
