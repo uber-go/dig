@@ -134,6 +134,15 @@ until the constructor for `config.Provider` can be fully satisfied.
 If resolution is not possible, for instance one of the required dependencies has
 does not have a constructor and doesn't appear in the graph, an error will be returned.
 
+## Benchmarks
+Benchmark_CtorInvoke-8                          	 1000000	      2137 ns/op	     304 B/op	      10 allocs/op
+Benchmark_CtorInvokeWithObjects-8               	 1000000	      1497 ns/op	     200 B/op	       6 allocs/op
+Benchmark_InvokeCtorWithMapsSlicesAndArrays-8   	  500000	      2571 ns/op	     440 B/op	       9 allocs/op
+Benchmark_CtorProvideAndResolve-8               	 1000000	      2183 ns/op	     320 B/op	      11 allocs/op
+Benchmark_CtorResolve-8                         	 1000000	      1903 ns/op	     216 B/op	       7 allocs/op
+Benchmark_ResolveCtors-8                        	  500000	      2252 ns/op	     344 B/op	      14 allocs/op
+
+
 [doc]: https://godoc.org/go.uber.org/dig
 [doc-img]: https://godoc.org/go.uber.org/dig?status.svg
 [cov]: https://coveralls.io/github/uber-go/dig?branch=master
