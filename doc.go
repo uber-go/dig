@@ -28,9 +28,35 @@
 //
 // BETA. Expect potential API changes.
 //
+// Conatiner
+//
+// package dig exposes type Container as an object capable of resolving a
+// directional dependency graph.
+//
+//
+// To create one:
+//
+//   import "go.uber.org/dig"
+//
+//   func main() {
+//   	c := dig.New()
+//   	// dig container `c` is ready to use!
+//   }
+//
+// Objects in the container are identified by their reflect.Type and **everything
+// is treated as a singleton
+// **, meaning there can be only one object in the graph
+// of a given type.
+//
+//
+// For more advanced use cases, consider using a factory pattern. That is to say,
+// have one object shared as a singleton, capable of creating many instances
+// of the same type on demand.
+//
+//
 // Provide
 //
-// Provide adds an object, or a constructor of an object to the container.
+// Provide adds an object, or a constructor of an object, to the container.
 //
 // There are two ways to Provide an object:
 //
@@ -74,11 +100,11 @@
 //   }
 //
 //   c := dig.New()
-//   err := c.Provide(&Type1{Name: "I am an thing"})
+//   err := c.Provide(&Type1{Name: "I am a thing"})
 //   // dig container is now able to provide *Type1 as a dependency
 //   // to other constructors that require it.
 //
-// Provide an Maps, slices or arrays
+// Providing Maps and Slices
 //
 // Dig also support maps, slices and arrays as objects to
 // resolve, or provided as a dependency to the constructor.
@@ -125,18 +151,15 @@
 // does not have a constructor and doesn't appear in the graph, an error will be returned.
 //
 //
-// There are future plans to do named retrievals to support multiple
-// objects of the same type in the container.
+// Benchmarks
 //
+// Benchmark_CtorInvoke-8                               1000000          2137 ns/op         304 B/op         10 allocs/op
+// Benchmark_CtorInvokeWithObjects-8                    1000000          1497 ns/op         200 B/op          6 allocs/op
+// Benchmark_InvokeCtorWithMapsSlicesAndArrays-8         500000          2571 ns/op         440 B/op          9 allocs/op
+// Benchmark_CtorProvideAndResolve-8                    1000000          2183 ns/op         320 B/op         11 allocs/op
+// Benchmark_CtorResolve-8                              1000000          1903 ns/op         216 B/op          7 allocs/op
+// Benchmark_ResolveCtors-8                              500000          2252 ns/op         344 B/op         14 allocs/op
 //
-//   type Type1 struct {
-//   	Name string
-//   }
-//
-//   c := dig.New()
-//   err := c.Provide(&Type1{Name: "I am an thing"})
-//   // dig container is now able to provide *Type1 as a dependency
-//   // to other constructors that require it.
 //
 //
 package dig
