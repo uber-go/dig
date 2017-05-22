@@ -31,83 +31,91 @@ func benchInvokeFunc(g1 *Grandchild1) (*Parent1, error) {
 }
 
 func Benchmark_CtorInvoke(b *testing.B) {
-	c := New()
-	c.Provide(
-		NewGrandchild1,
-	)
-
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		c := New()
+		c.Provide(
+			NewGrandchild1,
+		)
+		b.StartTimer()
 		c.Invoke(benchInvokeFunc)
 	}
 }
 
 func Benchmark_CtorInvokeWithObjects(b *testing.B) {
-	c := New()
-	c.Provide(
-		&Grandchild1{},
-	)
-
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		c := New()
+		c.Provide(
+			&Grandchild1{},
+		)
+		b.StartTimer()
 		c.Invoke(benchInvokeFunc)
 	}
 }
 
-func Benchmark_InvokeCtorWithMapsAndSlices(b *testing.B) {
-	c := New()
-	c.Provide(
-		testslice,
-		testarray,
-		testmap,
-		threeObjects,
-	)
-
+func Benchmark_InvokeCtorWithMapsSlicesAndArrays(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		c := New()
+		c.Provide(
+			testslice,
+			testarray,
+			testmap,
+			threeObjects,
+		)
+		b.StartTimer()
 		c.Invoke(func(t1 []int, t2 [2]string, t3 map[string]int, c1 *Child1) {})
 	}
 }
 
 func Benchmark_CtorProvideAndResolve(b *testing.B) {
-	c := New()
-	c.Provide(
-		NewGrandchild1,
-		benchInvokeFunc,
-	)
-	var p1 *Parent1
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		c := New()
+		c.Provide(
+			NewGrandchild1,
+			benchInvokeFunc,
+		)
+		var p1 *Parent1
+		b.StartTimer()
 		c.Resolve(&p1)
 	}
 }
 
 func Benchmark_CtorResolve(b *testing.B) {
-	c := New()
-	c.Provide(
-		&Grandchild1{},
-		benchInvokeFunc,
-	)
-	var p1 *Parent1
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		c := New()
+		c.Provide(
+			&Grandchild1{},
+			benchInvokeFunc,
+		)
+		var p1 *Parent1
+		b.StartTimer()
 		c.Resolve(&p1)
 	}
 }
 
 func Benchmark_ResolveCtors(b *testing.B) {
-	c := New()
-	c.Provide(
-		NewParent1,
-		NewChild1,
-		NewGrandchild1,
-	)
-	var p1 Parent1
-	var c1 Child1
-	var g1 Grandchild1
-
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		c := New()
+		c.Provide(
+			NewParent1,
+			NewChild1,
+			NewGrandchild1,
+		)
+		b.StartTimer()
+		var p1 Parent1
+		var c1 Child1
+		var g1 Grandchild1
 		c.Resolve(&p1)
 		c.Resolve(&c1)
 		c.Resolve(&g1)
