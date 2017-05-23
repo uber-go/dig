@@ -415,8 +415,14 @@ func TestInvokeFailureUnresolvedDependencies(t *testing.T) {
 	err = c.Invoke(func(p1 *Parent1) {})
 	require.Contains(t, err.Error(), "unable to resolve *dig.Parent1")
 
-	err = c.Invoke(func(p12 *Parent12) {})
-	require.Contains(t, err.Error(), "dependency of type *dig.Parent12 is not registered")
+	var zeroP12 *Parent12
+	err = c.Invoke(func(p12 *Parent12) {
+		zeroP12 = p12
+	})
+	require.NoError(t, err)
+	newZeroP12, ok := reflect.Zero(reflect.TypeOf(zeroP12)).Interface().(*Parent12)
+	require.True(t, ok)
+	assert.Equal(t, zeroP12, newZeroP12)
 }
 
 func TestProvide(t *testing.T) {
