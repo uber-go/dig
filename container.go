@@ -33,6 +33,7 @@ var (
 	errReturnCount = errors.New("constructor function must one or two values")
 	errReturnKind  = errors.New("constructor return type must be a pointer")
 	errArgKind     = errors.New("constructor arguments must be pointers")
+	errZeroVal     = errors.New("Object is a zero value")
 
 	_typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 
@@ -154,6 +155,18 @@ func (c *Container) Resolve(objs ...interface{}) (err error) {
 
 		// set the pointer value of the provided object to the instance pointer
 		objVal.Elem().Set(v)
+	}
+	return nil
+}
+
+// Validate accepts objects to be validated from constructor and returns an error
+// if any of the provided object is a zero value object
+func Validate(values ...interface{}) error {
+	for _, val := range values {
+		v := reflect.ValueOf(val)
+		if v == reflect.Zero(v.Type()) {
+			return errors.Wrapf(errZeroVal, "%v", v.Type())
+		}
 	}
 	return nil
 }
