@@ -32,24 +32,24 @@ Objects in the container are identified by their `reflect.Type` and **everything
 is treated as a singleton**, meaning there can be only one object in the graph
 of a given type.
 
-For more advanced use cases, consider using a factory pattern. That is to say,
+For more advanced use cases, consider using a factory pattern. That is,
 have one object shared as a singleton, capable of creating many instances
 of the same type on demand.
 
 ## Provide
 
-`Provide` adds an object, or a constructor of an object, to the container.
+The `Provide` method adds an object, or a constructor of an object, to the container.
 
-There are two ways to Provide an object:
+There are several ways to `Provide` an object:
 
+1. Provide a constructor function that returns one pointer (or interface)
 1. Provide a pointer to an existing object
-1. Provide a slice, map, array
-1. Provide a "constructor function" that returns one pointer (or interface)
+1. Provide a slice, map, or array
 
 ### Provide a Constructor
 
-Constructor is defined as a function that returns one pointer (or
-interface), an optional error, and takes 0-N number of arguments.
+A constructor is defined as a function that returns one pointer (or
+interface), returns an optional error, and takes 0-N number of arguments.
 
 Each one of the arguments is automatically registered as a **dependency**
 and must also be an interface or a pointer.
@@ -70,10 +70,9 @@ err := c.Provide(func(*Type1, *Type2) *Type3 {
 // to create a shared singleton instance of *Type3
 ```
 
-### Provide an Object
+### Provide an object
 
-Registering an object directly is a shortcut to register something that
-has no dependencies.
+As a shortcut for objects without dependencies, register it directly.
 
 ```go
 type Type1 struct {
@@ -86,11 +85,10 @@ err := c.Provide(&Type1{Name: "I am a thing"})
 // to other constructors that require it.
 ```
 
+### Provide slices, maps, and arrays
 
-### Providing Maps and Slices
-
-Dig also support maps, slices and arrays as objects to
-resolve, or provided as a dependency to the constructor.
+With `dig`, you can also use slices, maps, and arrays as objects
+to resolve, or you can `Provide` them as dependencies to the constructor.
 
 ```go
 c := dig.New()
@@ -125,14 +123,14 @@ var cfg config.Provider
 c.Resolve(&cfg) // note pointer to interface
 ```
 
-dig will look through the dependency graph and identify if there was a constructor
-registered that is able to return a type of `config.Provider`. It will then check
+`dig` looks through the dependency graph and identifies whether a constructor was
+registered that is able to return a type of `config.Provider`. It then checks
 if said constructor requires any dependencies (by analyzing the function parameters).
-If it does, it will recursively complete resolutions of the parameters in the graph
+If it does, `dig` recursively completes resolutions of the parameters in the graph
 until the constructor for `config.Provider` can be fully satisfied.
 
-If resolution is not possible, for instance one of the required dependencies has
-does not have a constructor and doesn't appear in the graph, an error will be returned.
+If resolution is not possible (for instance, if one of the required dependencies
+lacks a constructor and doesn't appear in the graph), `dig` returns an error.
 
 ## Benchmarks
 Benchmark_CtorInvoke-8                          	 1000000	      2137 ns/op	     304 B/op	      10 allocs/op
