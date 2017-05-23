@@ -42,46 +42,9 @@ The `Provide` method adds an object, or a constructor of an object, to the conta
 
 There are several ways to `Provide` an object:
 
+1. Provide a constructor function that returns one pointer (or interface)
 1. Provide a pointer to an existing object
 1. Provide a slice, map, or array
-1. Provide a constructor function that returns one pointer (or interface)
-
-### Provide an object
-
-As a shortcut for objects without dependencies, register it directly.
-
-```go
-type Type1 struct {
-	Name string
-}
-
-c := dig.New()
-err := c.Provide(&Type1{Name: "I am a thing"})
-// dig container is now able to provide *Type1 as a dependency
-// to other constructors that require it.
-```
-
-### Providing slices, maps, and arrays
-
-With `dig`, you can also use slices, maps, and arrays as objects
-to resolve, or you can `Provide` them as dependencies to the constructor.
-
-```go
-c := dig.New()
-var (
-	typemap = map[string]int{}
-	typeslice = []int{1, 2, 3}
-	typearray = [2]string{"one", "two"}
-)
-err := c.Provide(typemap, typeslice, typearray)
-
-var resolveslice []int
-err := c.Resolve(&resolveslice)
-
-c.Invoke(func(map map[string]int, slice []int, array [2]string) {
-	// do something
-})
-```
 
 ### Provide a Constructor
 
@@ -105,6 +68,43 @@ err := c.Provide(func(*Type1, *Type2) *Type3 {
 // have not been provided. Constructors (or instances) first
 // have to be provided to the dig container before it is able
 // to create a shared singleton instance of *Type3
+```
+
+### Provide an object
+
+As a shortcut for objects without dependencies, register it directly.
+
+```go
+type Type1 struct {
+	Name string
+}
+
+c := dig.New()
+err := c.Provide(&Type1{Name: "I am a thing"})
+// dig container is now able to provide *Type1 as a dependency
+// to other constructors that require it.
+```
+
+### Provide slices, maps, and arrays
+
+With `dig`, you can also use slices, maps, and arrays as objects
+to resolve, or you can `Provide` them as dependencies to the constructor.
+
+```go
+c := dig.New()
+var (
+	typemap = map[string]int{}
+	typeslice = []int{1, 2, 3}
+	typearray = [2]string{"one", "two"}
+)
+err := c.Provide(typemap, typeslice, typearray)
+
+var resolveslice []int
+err := c.Resolve(&resolveslice)
+
+c.Invoke(func(map map[string]int, slice []int, array [2]string) {
+	// do something
+})
 ```
 
 ## Resolve
