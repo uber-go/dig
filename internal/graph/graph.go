@@ -190,12 +190,24 @@ func (g *Graph) validateGraph(ct reflect.Type) (reflect.Value, error) {
 	return reflect.Zero(ct), nil
 }
 
+// DigOptional signals that the parameter will not necessarily be populated by dig
+// Can be implemented by an object directly, or dig.Optional can be embedded
+type DigOptional interface {
+	DigOptional() bool
+}
+
 // ConstructorArguments returns arguments in the provided constructor
 func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error) {
 	// find dependencies from the graph and place them in the args
 	args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
 	for idx := range args {
 		arg := ctype.In(idx)
+
+		// Object conforms to the optional interface
+		// If no nodes are present, zero value will be provided
+		to := reflect.TypeOf((*DigOptional)(nil)).Elem()
+		optional := arg.Implements(to)
+
 		node, ok := g.nodes[arg]
 		if ok {
 			v, err := node.value(g, arg)
@@ -204,7 +216,11 @@ func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error
 			}
 			args[idx] = v
 		} else {
-			return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
+			if optional {
+				args[idx] = reflect.Zero(arg)
+			} else {
+				return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
+			}
 		}
 	}
 	return args, nil
