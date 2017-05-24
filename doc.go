@@ -152,25 +152,24 @@
 //
 // Invoke
 //
-// Invoke API executes the provided function and stores return results in the dig container.
+// The Invoke API executes the provided function and stores returned results in the dig container.
 //
 // Invoke looks through the dig graph and resolves all the constructor parameters for execution.
-// The return results, except the
-// error object is inserted into the graph for further use.
-// To utilize
-// Invoke, function needs following form -
+// Once the method is invoked,
+// Invoke inserts returned results, except the error object, into the
+// graph for further use.
+// To use
+// Invoke, make sure your function meets the following criteria:
 //
-// • function arguments are pointers, maps, slice or arrays
+// • Arguments must be pointers, maps, slices, or arrays
 //
-// • function arguments must be provided to dig
+// • Arguments must be provided to dig
 //
-// • function return parameters are optional
-//
-// • provided function can be anonymous
+// • (Optional) Function has return parameters
 //
 // For example, Invoke scenarios:
 //
-// Invoke anonymous function:
+// How Invoke works with an anonymous function:
 //
 //    // c := dig.New()
 //   // c.Provide... config.Provider, zap.Logger, etc
@@ -179,7 +178,7 @@
 //   	return nil
 //   })
 //
-// Invoke recursively resolve dependencies:
+// How Invoke recursively resolves all the dependencies:
 //
 //   type Foo struct{}
 //
