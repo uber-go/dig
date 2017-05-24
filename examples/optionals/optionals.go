@@ -26,8 +26,10 @@ import (
 	"go.uber.org/dig"
 )
 
+// Type1 type
 type Type1 struct{}
 
+// Type2 type
 type Type2 struct{}
 
 func main() {
