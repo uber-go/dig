@@ -19,7 +19,7 @@ func main() {
 	c.Provide(&type1{})
 	if err := c.Invoke(func(t1 *type1, t2 *type2) {
 		fmt.Println("t1", t1) // will get actual instance of type1
-		fmt.Println("t2", t2) // note nil, yet dig doesn't not error
+		fmt.Println("t2", t2) // note nil and dig doesn't error out, just provides zero value
 	}); err != nil {
 		panic(err)
 	}
