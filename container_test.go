@@ -22,6 +22,7 @@ package dig
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -557,4 +558,13 @@ func TestMultiObjectRegisterResolve(t *testing.T) {
 	require.NotNil(t, first, "Child1 must have been registered")
 	require.NotNil(t, second, "Child2 must have been registered")
 	require.NotNil(t, third, "Child3 must have been registered")
+}
+
+func Test_OptionalsSuccess(t *testing.T) {
+	t.Parallel()
+	c := New()
+	var first *Child1
+	c.Optionals(first)
+	c.Optionals(&Parent1{})
+	fmt.Println(c.String())
 }

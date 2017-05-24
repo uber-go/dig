@@ -157,3 +157,16 @@ func (c *Container) Resolve(objs ...interface{}) (err error) {
 	}
 	return nil
 }
+
+// Optionals method is used to provide optional parameters to dig during
+// constructor invocation or resolve
+func (c *Container) Optionals(optionals ...interface{}) error {
+	if err := c.Invoke(func(o graph.Optionals) {
+		for _, opts := range optionals {
+			o.Types[reflect.TypeOf(opts)] = struct{}{}
+		}
+	}); err != nil {
+		return err
+	}
+	return nil
+}
