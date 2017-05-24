@@ -198,3 +198,17 @@ func ctorWithMapsAndSlices(testmap map[string]int, testslice []int, testarray [2
 		testarray: testarray,
 	}
 }
+
+type type1 struct{}
+type type2 struct{}
+type type3 struct{}
+
+func newT1(*type2, *type3) *type1 {
+	return &type1{}
+}
+func newT2() *type2 {
+	return &type2{}
+}
+func newT3() *type3 {
+	return &type3{}
+}

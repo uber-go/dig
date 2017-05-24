@@ -349,6 +349,49 @@ func TestInvokeSuccess(t *testing.T) {
 	assert.NotNil(t, c1)
 }
 
+func TestInvokeOnce(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	err := c.Provide(
+		NewParent1,
+		NewChild1,
+		NewGrandchild1,
+	)
+	assert.NoError(t, err)
+	var c1 *Child1
+
+	err = c.InvokeOnce(NewParent1)
+	assert.NoError(t, err)
+
+	err = c.InvokeOnce(NewParent1)
+	assert.Equal(t, ErrInvokeOnce, err)
+
+	err = c.InvokeOnce(func(p1 *Parent1) {
+		require.NotNil(t, p1)
+		c1 = p1.c1
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c1)
+
+	type empty struct{}
+	require.NoError(t, c.InvokeOnce(func() *empty { return &empty{} }))
+	assert.Equal(t, c.InvokeOnce(func() *empty { return &empty{} }), ErrInvokeOnce)
+}
+
+func TestInvokeOnceFailOnResolvedTypes(t *testing.T) {
+	t.Parallel()
+	c := New()
+	c.Provide(newT1, newT2, newT3)
+	require.NoError(t, c.InvokeOnce(newT1))
+	assert.Equal(t, c.InvokeOnce(newT2), ErrInvokeOnce)
+
+	c.Reset()
+	c.Provide(newT1, newT2, newT3)
+	require.NoError(t, c.InvokeOnce(newT2))
+	require.NoError(t, c.InvokeOnce(newT1))
+}
+
 func TestInvokeAndRegisterSuccess(t *testing.T) {
 	t.Parallel()
 	c := New()

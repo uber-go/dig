@@ -34,6 +34,9 @@ var (
 	errReturnKind  = errors.New("constructor return type must be a pointer")
 	errArgKind     = errors.New("constructor arguments must be pointers")
 
+	// ErrInvokeOnce is returned if function is already invoked
+	ErrInvokeOnce = errors.New("function is already invoked")
+
 	_typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 
 	_forCtor   = "for constructor %v"
@@ -48,6 +51,20 @@ func New() *Container {
 // Container facilitates automated dependency resolution
 type Container struct {
 	graph.Graph
+}
+
+// InvokeOnce only allows function invocation once to register the
+// return types. If return types are already registered, specific error
+// is returned to the caller
+func (c *Container) InvokeOnce(t interface{}) error {
+	ctype := reflect.TypeOf(t)
+	if ctype.Kind() != reflect.Func {
+		return errors.Wrapf(errParamType, _invokeErr, ctype)
+	}
+	if err := c.ValidateInvokeReturnTypes(ctype); err != nil {
+		return ErrInvokeOnce
+	}
+	return c.Invoke(t)
 }
 
 // Invoke the function and resolve the dependencies immidiately without providing the
