@@ -132,6 +132,50 @@ until the constructor for `config.Provider` can be fully satisfied.
 If resolution is not possible (for instance, if one of the required dependencies
 lacks a constructor and doesn't appear in the graph), `dig` returns an error.
 
+## Invoke
+
+`Invoke` API executes the provided function and stores return results in the dig container.
+
+`Invoke` looks through the dig graph and resolves all the constructor parameters for execution.
+The return results, except the `error` object is inserted into the graph for further use.
+To utilize `Invoke`, function needs following form -
+
+1. function arguments are pointers, maps, slice or arrays
+2. function arguments must be provided to dig
+3. function return parameters are optional
+4. provided function can be anonymous
+
+For example, `Invoke` scenarios:
+
+Invoke anonymous function:
+```go
+ // c := dig.New()
+// c.Provide... config.Provider, zap.Logger, etc
+err := c.Invoke(func(cfg *config.Provider, l *zap.Logger) error {
+  // function body
+	return nil
+})
+```
+
+Invoke recursively resolve dependencies:
+```go
+type Foo struct{}
+
+func invokeMe(cfg *config.Provider, l *zap.Logger) (*Foo, error) {
+  // function body
+	return &Foo{}, nil
+}
+
+// c := dig.New()
+// c.Provide... config.Provider, zap.Logger, etc
+err := c.Invoke(invokeMe)
+err := c.Invoke(func(foo *Foo) error {
+	// foo is resolved from previous invokeMe call
+	return nil
+})
+//
+```
+
 ## Benchmarks
 Benchmark_CtorInvoke-8                          	 1000000	      2137 ns/op	     304 B/op	      10 allocs/op
 Benchmark_CtorInvokeWithObjects-8               	 1000000	      1497 ns/op	     200 B/op	       6 allocs/op
@@ -139,7 +183,6 @@ Benchmark_InvokeCtorWithMapsSlicesAndArrays-8   	  500000	      2571 ns/op	     
 Benchmark_CtorProvideAndResolve-8               	 1000000	      2183 ns/op	     320 B/op	      11 allocs/op
 Benchmark_CtorResolve-8                         	 1000000	      1903 ns/op	     216 B/op	       7 allocs/op
 Benchmark_ResolveCtors-8                        	  500000	      2252 ns/op	     344 B/op	      14 allocs/op
-
 
 [doc]: https://godoc.org/go.uber.org/dig
 [doc-img]: https://godoc.org/go.uber.org/dig?status.svg
