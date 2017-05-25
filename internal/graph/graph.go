@@ -23,7 +23,6 @@ package graph
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -205,7 +204,6 @@ func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error
 			}
 			args[idx] = v
 		} else {
-			log.Printf("Assigning zero value for arguments in %v. Dependency of type %v is not yet registered", ctype, arg)
 			args[idx] = reflect.Zero(arg)
 		}
 	}

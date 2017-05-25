@@ -25,6 +25,8 @@ import (
 	"reflect"
 	"testing"
 
+	"go.uber.org/dig/examples/vallie"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -571,7 +573,7 @@ func Test_ZeroValueObjectValidationSuccess(t *testing.T) {
 
 	c.Provide(&Parent1{})
 	err := c.Invoke(func(p1 *Parent1) {
-		er := Validate(p1)
+		er := vallie.Validate(p1)
 		require.NoError(t, er)
 	})
 	require.Nil(t, err)
@@ -583,9 +585,9 @@ func Test_ZeroValueObjectValidationError(t *testing.T) {
 
 	var zeroP12 *Parent12
 	err := c.Invoke(func(p12 *Parent12) {
-		er := Validate(p12)
+		er := vallie.Validate(p12)
 		require.Error(t, er)
-		require.Contains(t, er.Error(), errZeroVal.Error())
+		require.Contains(t, er.Error(), "zero value")
 		zeroP12 = p12
 	})
 	require.Nil(t, err)
