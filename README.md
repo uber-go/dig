@@ -149,10 +149,10 @@ For example, `Invoke` scenarios:
 
 How `Invoke` works with an anonymous function:
 ```go
- // c := dig.New()
+// c := dig.New()
 // c.Provide... config.Provider, zap.Logger, etc
 err := c.Invoke(func(cfg *config.Provider, l *zap.Logger) error {
-  // function body
+	// function body
 	return nil
 })
 ```
@@ -162,7 +162,7 @@ How `Invoke` recursively resolves all the dependencies:
 type Foo struct{}
 
 func invokeMe(cfg *config.Provider, l *zap.Logger) (*Foo, error) {
-  // function body
+	// function body
 	return &Foo{}, nil
 }
 
@@ -173,7 +173,6 @@ err := c.Invoke(func(foo *Foo) error {
 	// foo is resolved from previous invokeMe call
 	return nil
 })
-//
 ```
 
 ## Benchmarks
