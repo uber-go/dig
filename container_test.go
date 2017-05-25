@@ -25,7 +25,7 @@ import (
 	"reflect"
 	"testing"
 
-	"go.uber.org/dig/examples/vallie"
+	"go.uber.org/dig/vallie"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
