@@ -403,28 +403,6 @@ func TestInvokeReturnedError(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestInvokeFailureUnresolvedDependencies(t *testing.T) {
-	t.Parallel()
-	c := New()
-
-	err := c.Provide(
-		NewParent1,
-	)
-	assert.NoError(t, err)
-
-	err = c.Invoke(func(p1 *Parent1) {})
-	require.Contains(t, err.Error(), "unable to resolve *dig.Parent1")
-
-	var zeroP12 *Parent12
-	err = c.Invoke(func(p12 *Parent12) {
-		zeroP12 = p12
-	})
-	require.NoError(t, err)
-	newZeroP12, ok := reflect.Zero(reflect.TypeOf(zeroP12)).Interface().(*Parent12)
-	require.True(t, ok)
-	assert.Equal(t, zeroP12, newZeroP12)
-}
-
 func TestProvide(t *testing.T) {
 	t.Parallel()
 	c := New()

@@ -178,18 +178,6 @@ func (g *Graph) recursiveDetectCycles(n graphNode, l []string) error {
 	return nil
 }
 
-func (g *Graph) validateGraph(ct reflect.Type) (reflect.Value, error) {
-	for _, node := range g.nodes {
-		for _, dep := range node.dependencies() {
-			// check that the dependency is a registered objNode
-			if _, ok := g.nodes[dep]; !ok {
-				return reflect.Zero(ct), nil
-			}
-		}
-	}
-	return reflect.Zero(ct), nil
-}
-
 // ConstructorArguments returns arguments in the provided constructor
 func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error) {
 	// find dependencies from the graph and place them in the args
