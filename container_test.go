@@ -593,3 +593,42 @@ func Test_ZeroValueObjectValidationError(t *testing.T) {
 	})
 	require.Nil(t, err)
 }
+
+func TestZeroValueOnInvoke(t *testing.T) {
+	type missing struct{}
+	type present struct{}
+
+	t.Parallel()
+	c := New()
+	c.Provide(func() *present {
+		return &present{}
+	})
+
+	var called int
+	assert.NoError(t, c.Invoke(func(m *missing) {
+		assert.Nil(t, m, "expected zero value for missing deps")
+		called++
+	}), "unexpected failure invoking with missing deps")
+
+	assert.NoError(t, c.Invoke(func(p *present, m *missing) {
+		assert.Nil(t, m, "expected zero value for missing dep")
+		assert.NotNil(t, p, "expected non-zero value for present dep")
+		called++
+	}), "unexpected failure invoking with a mix of present and missing deps")
+
+	assert.Equal(t, 2, called, "didn't run invokes")
+}
+
+func TestZeroValueOnProvide(t *testing.T) {
+	type missing struct{}
+	type provided struct{}
+
+	c := New()
+	assert.NoError(t, c.Provide(func(m *missing) (*provided, error) {
+		assert.Nil(t, m, "expected zero value for missing dep")
+		return &provided{}, nil
+	}), "unexpected failure providing with missing deps")
+
+	var p *provided
+	assert.NoError(t, c.Resolve(&p), "unexpected error resolving provided type")
+}

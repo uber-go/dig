@@ -183,7 +183,7 @@ func (g *Graph) validateGraph(ct reflect.Type) (reflect.Value, error) {
 		for _, dep := range node.dependencies() {
 			// check that the dependency is a registered objNode
 			if _, ok := g.nodes[dep]; !ok {
-				return reflect.Zero(ct), fmt.Errorf("%v dependency of type %v is not registered", ct, dep)
+				return reflect.Zero(ct), nil
 			}
 		}
 	}
