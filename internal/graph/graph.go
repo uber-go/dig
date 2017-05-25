@@ -23,7 +23,6 @@ package graph
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -203,7 +202,7 @@ func (g *Graph) validateGraph(ct reflect.Type) (reflect.Value, error) {
 }
 
 // ConstructorArguments returns arguments in the provided constructor
-func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error) {
+func (g *Graph) ConstructorArguments(ctype reflect.Type, optionals ...reflect.Type) ([]reflect.Value, error) {
 	// find dependencies from the graph and place them in the args
 	args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
 	for idx := range args {
@@ -216,27 +215,23 @@ func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error
 			}
 			args[idx] = v
 		} else {
-			if g.isOptional(arg) != nil {
+			if !g.isOptional(arg, optionals) {
 				return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
 			}
-			log.Printf("Assigning zero value for arguments in %v. Dependency of type %v is not yet registered", ctype, arg)
+			// log.Printf("Assigning zero value for arguments in %v. Dependency of type %v is not yet registered", ctype, arg)
 			args[idx] = reflect.Zero(arg)
 		}
 	}
 	return args, nil
 }
 
-func (g *Graph) isOptional(t reflect.Type) error {
-	if optional, err := g.Read(reflect.TypeOf(Optionals{})); err == nil {
-		if o, ok := optional.Interface().(Optionals); ok {
-			if _, ok := o.Types[t]; !ok {
-				return errors.Wrapf(errOptional, "%v", t)
-			}
+func (g *Graph) isOptional(t reflect.Type, optionals []reflect.Type) bool {
+	for _, opts := range optionals {
+		if opts == t {
+			return true
 		}
-	} else {
-		return err
 	}
-	return nil
+	return false
 }
 
 // String representation of the entire Container

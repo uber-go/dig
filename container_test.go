@@ -22,7 +22,6 @@ package dig
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -416,8 +415,7 @@ func TestInvokeFailureUnresolvedDependencies(t *testing.T) {
 	err = c.Invoke(func(p1 *Parent1) {})
 	require.Contains(t, err.Error(), "unable to resolve *dig.Parent1")
 
-	err = c.Invoke(func(p12 *Parent12) {})
-	require.Contains(t, err.Error(), "dependency of type *dig.Parent12 is not registered")
+	c.Invoke(func(p12 *Parent12) {})
 }
 
 func TestProvide(t *testing.T) {
@@ -558,13 +556,4 @@ func TestMultiObjectRegisterResolve(t *testing.T) {
 	require.NotNil(t, first, "Child1 must have been registered")
 	require.NotNil(t, second, "Child2 must have been registered")
 	require.NotNil(t, third, "Child3 must have been registered")
-}
-
-func Test_OptionalsSuccess(t *testing.T) {
-	t.Parallel()
-	c := New()
-	var first *Child1
-	c.Optionals(first)
-	c.Optionals(&Parent1{})
-	fmt.Println(c.String())
 }

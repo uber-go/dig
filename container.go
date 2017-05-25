@@ -55,11 +55,11 @@ type Container struct {
 // occurred during the execution
 // The return arguments from Invoked function are registered in the graph for later use
 // The last parameter, if it is an error, is returned to the Invoke caller
-func (c *Container) Invoke(t interface{}) error {
+func (c *Container) Invoke(t interface{}, optionals ...reflect.Type) error {
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
 	case reflect.Func:
-		args, err := c.Graph.ConstructorArguments(ctype)
+		args, err := c.Graph.ConstructorArguments(ctype, optionals...)
 		if err != nil {
 			return errors.Wrapf(err, _invokeErr, t)
 		}
@@ -154,19 +154,6 @@ func (c *Container) Resolve(objs ...interface{}) (err error) {
 
 		// set the pointer value of the provided object to the instance pointer
 		objVal.Elem().Set(v)
-	}
-	return nil
-}
-
-// Optionals method is used to provide optional parameters to dig during
-// constructor invocation or resolve
-func (c *Container) Optionals(optionals ...interface{}) error {
-	if err := c.Invoke(func(o graph.Optionals) {
-		for _, opts := range optionals {
-			o.Types[reflect.TypeOf(opts)] = struct{}{}
-		}
-	}); err != nil {
-		return err
 	}
 	return nil
 }
