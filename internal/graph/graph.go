@@ -57,7 +57,7 @@ func (g *Graph) Read(objType reflect.Type) (reflect.Value, error) {
 	// check if the type is a registered objNode
 	n, ok := g.nodes[objType]
 	if !ok {
-		return reflect.Zero(objType), fmt.Errorf("type %v is not registered", objType)
+		return reflect.Zero(objType), nil
 	}
 	v, err := n.value(g, objType)
 	if err != nil {

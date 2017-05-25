@@ -166,6 +166,6 @@ func TestMultiObjectRegisterResolve(t *testing.T) {
 
 	var errRegistered *error
 	v, err = g.Read(reflect.TypeOf(errRegistered))
-	require.Error(t, err, "type *error shouldn't be registered")
+	require.NoError(t, err, "shouldn't get errors resolving unknown types")
 	require.Nil(t, v.Interface())
 }
