@@ -97,14 +97,6 @@ func (n *funcNode) value(g *Graph, objType reflect.Type) (reflect.Value, error) 
 	}
 
 	ct := reflect.TypeOf(n.constructor)
-
-	// check that all the dependencies have nodes present in the graph
-	// doesn't mean everything will go smoothly during resolve, but it
-	// drastically increases the chances that we're not missing something
-	if v, err := g.validateGraph(ct); err != nil {
-		return v, err
-	}
-
 	args, err := g.ConstructorArguments(ct)
 	if err != nil {
 		return reflect.Zero(objType), err

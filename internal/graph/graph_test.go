@@ -94,6 +94,20 @@ func TestResolvedArguments(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(values[1].Interface()).String(), "*graph.Parent12")
 }
 
+func Test_UnprovidedConstructorArguments(t *testing.T) {
+	t.Parallel()
+	g := NewGraph()
+
+	values, err := g.ConstructorArguments(reflect.TypeOf(constructor))
+	require.NoError(t, err)
+
+	assert.Equal(t, reflect.TypeOf(values[0].Interface()).String(), "*graph.Parent1")
+	assert.Equal(t, reflect.TypeOf(values[1].Interface()).String(), "*graph.Parent12")
+
+	assert.Equal(t, values[0], reflect.Zero(reflect.TypeOf(values[0].Interface())))
+	assert.Equal(t, values[1], reflect.Zero(reflect.TypeOf(values[1].Interface())))
+}
+
 func TestGraphString(t *testing.T) {
 	g := NewGraph()
 	p1 := &Parent1{
@@ -152,6 +166,6 @@ func TestMultiObjectRegisterResolve(t *testing.T) {
 
 	var errRegistered *error
 	v, err = g.Read(reflect.TypeOf(errRegistered))
-	require.Error(t, err, "type *error shouldn't be registered")
+	require.NoError(t, err, "shouldn't get errors resolving unknown types")
 	require.Nil(t, v.Interface())
 }

@@ -102,7 +102,7 @@ func TestResolve(t *testing.T) {
 				var p1 *Parent1
 				return c.Resolve(&p1)
 			},
-			"type *dig.Parent1 is not registered",
+			"",
 		},
 	}
 
@@ -319,8 +319,6 @@ func TestConstructorErrors(t *testing.T) {
 			var p1 *FlakyParent
 			err := c.Resolve(&p1)
 			if tt.wantErr != "" {
-				var registeredError *error
-				require.Error(t, c.Resolve(&registeredError), "type *error is not registered")
 				require.EqualError(t, err, tt.wantErr)
 			} else {
 				require.NoError(t, err)
@@ -394,29 +392,13 @@ func TestInvokeReturnedError(t *testing.T) {
 		return errors.New("oops")
 	})
 	var registeredError *error
-	require.Error(t, c.Resolve(&registeredError), "type *error is not registered")
+	require.NoError(t, c.Resolve(&registeredError), "unexpected error resolving unknown type")
 	require.Contains(t, err.Error(), "error invoking the function func() error: oops")
 
 	err = c.Invoke(func() (*Child1, error) {
 		return &Child1{}, nil
 	})
 	assert.NoError(t, err)
-}
-
-func TestInvokeFailureUnresolvedDependencies(t *testing.T) {
-	t.Parallel()
-	c := New()
-
-	err := c.Provide(
-		NewParent1,
-	)
-	assert.NoError(t, err)
-
-	err = c.Invoke(func(p1 *Parent1) {})
-	require.Contains(t, err.Error(), "unable to resolve *dig.Parent1")
-
-	err = c.Invoke(func(p12 *Parent12) {})
-	require.Contains(t, err.Error(), "dependency of type *dig.Parent12 is not registered")
 }
 
 func TestProvide(t *testing.T) {
@@ -514,7 +496,10 @@ func TestEmptyAfterReset(t *testing.T) {
 	var first *Grandchild1
 	require.NoError(t, c.Resolve(&first), "No error expected during first Resolve")
 	c.Reset()
-	require.Contains(t, c.Resolve(&first).Error(), "not registered")
+
+	first = nil
+	assert.NoError(t, c.Resolve(&first), "unexpected error resolving unknown type")
+	assert.Nil(t, first, "expected zero value after resolving unknown type")
 }
 
 func TestPanicConstructor(t *testing.T) {
@@ -551,10 +536,53 @@ func TestMultiObjectRegisterResolve(t *testing.T) {
 	require.NoError(t, c.Resolve(&third), "No error expected during first Resolve")
 
 	var errRegistered *error
-	require.Error(t, c.Resolve(&errRegistered), "type *error shouldn't be registered")
+	require.NoError(t, c.Resolve(&errRegistered), "unexpected error resolving unknown type")
 	require.Nil(t, errRegistered)
 
 	require.NotNil(t, first, "Child1 must have been registered")
 	require.NotNil(t, second, "Child2 must have been registered")
 	require.NotNil(t, third, "Child3 must have been registered")
+}
+
+func TestZeroValueOnInvoke(t *testing.T) {
+	t.Parallel()
+
+	type missing struct{}
+	type present struct{}
+
+	c := New()
+	c.Provide(func() *present {
+		return &present{}
+	})
+
+	var called int
+	assert.NoError(t, c.Invoke(func(m *missing) {
+		assert.Nil(t, m, "expected zero value for missing deps")
+		called++
+	}), "unexpected failure invoking with missing deps")
+
+	assert.NoError(t, c.Invoke(func(p *present, m *missing) {
+		assert.Nil(t, m, "expected zero value for missing dep")
+		assert.NotNil(t, p, "expected non-zero value for present dep")
+		called++
+	}), "unexpected failure invoking with a mix of present and missing deps")
+
+	assert.Equal(t, 2, called, "didn't run invokes")
+}
+
+func TestZeroValueOnProvide(t *testing.T) {
+	t.Parallel()
+
+	type missing struct{}
+	type provided struct{}
+
+	c := New()
+	assert.NoError(t, c.Provide(func(m *missing) (*provided, error) {
+		assert.Nil(t, m, "expected zero value for missing dep")
+		return &provided{}, nil
+	}), "unexpected failure providing with missing deps")
+
+	var p *provided
+	assert.NoError(t, c.Resolve(&p), "unexpected error resolving provided type")
+	assert.NotNil(t, p, "expected constructor to provide non-nil instance")
 }

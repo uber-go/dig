@@ -57,7 +57,7 @@ func (g *Graph) Read(objType reflect.Type) (reflect.Value, error) {
 	// check if the type is a registered objNode
 	n, ok := g.nodes[objType]
 	if !ok {
-		return reflect.Zero(objType), fmt.Errorf("type %v is not registered", objType)
+		return reflect.Zero(objType), nil
 	}
 	v, err := n.value(g, objType)
 	if err != nil {
@@ -178,18 +178,6 @@ func (g *Graph) recursiveDetectCycles(n graphNode, l []string) error {
 	return nil
 }
 
-func (g *Graph) validateGraph(ct reflect.Type) (reflect.Value, error) {
-	for _, node := range g.nodes {
-		for _, dep := range node.dependencies() {
-			// check that the dependency is a registered objNode
-			if _, ok := g.nodes[dep]; !ok {
-				return reflect.Zero(ct), fmt.Errorf("%v dependency of type %v is not registered", ct, dep)
-			}
-		}
-	}
-	return reflect.Zero(ct), nil
-}
-
 // ConstructorArguments returns arguments in the provided constructor
 func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error) {
 	// find dependencies from the graph and place them in the args
@@ -204,7 +192,7 @@ func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error
 			}
 			args[idx] = v
 		} else {
-			return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
+			args[idx] = reflect.Zero(arg)
 		}
 	}
 	return args, nil
