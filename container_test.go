@@ -545,10 +545,11 @@ func TestMultiObjectRegisterResolve(t *testing.T) {
 }
 
 func TestZeroValueOnInvoke(t *testing.T) {
+	t.Parallel()
+
 	type missing struct{}
 	type present struct{}
 
-	t.Parallel()
 	c := New()
 	c.Provide(func() *present {
 		return &present{}
@@ -570,6 +571,8 @@ func TestZeroValueOnInvoke(t *testing.T) {
 }
 
 func TestZeroValueOnProvide(t *testing.T) {
+	t.Parallel()
+
 	type missing struct{}
 	type provided struct{}
 
