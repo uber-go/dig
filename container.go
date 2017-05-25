@@ -50,6 +50,13 @@ type Container struct {
 	graph.Graph
 }
 
+// Optional struct implementing the DigOptional interface
+// Signaling to dig that it's ok to pass zero value into this parameter
+type Optional struct{}
+
+// DigOptional implementaiton of the interace
+func (Optional) DigOptional() bool { return true }
+
 // Invoke the function and resolve the dependencies immidiately without providing the
 // constructor to the graph. The Invoke function returns error object which can be
 // occurred during the execution
