@@ -581,4 +581,5 @@ func TestZeroValueOnProvide(t *testing.T) {
 
 	var p *provided
 	assert.NoError(t, c.Resolve(&p), "unexpected error resolving provided type")
+	assert.NotNil(t, p, "expected constructor to provide non-nil instance")
 }
