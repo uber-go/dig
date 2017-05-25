@@ -25,8 +25,6 @@ import (
 	"reflect"
 	"testing"
 
-	"go.uber.org/dig/vallie"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -544,32 +542,6 @@ func TestMultiObjectRegisterResolve(t *testing.T) {
 	require.NotNil(t, first, "Child1 must have been registered")
 	require.NotNil(t, second, "Child2 must have been registered")
 	require.NotNil(t, third, "Child3 must have been registered")
-}
-
-func Test_ZeroValueObjectValidationSuccess(t *testing.T) {
-	t.Parallel()
-	c := New()
-
-	c.Provide(&Parent1{})
-	err := c.Invoke(func(p1 *Parent1) {
-		er := vallie.Validate(p1)
-		require.NoError(t, er)
-	})
-	require.Nil(t, err)
-}
-
-func Test_ZeroValueObjectValidationError(t *testing.T) {
-	t.Parallel()
-	c := New()
-
-	var zeroP12 *Parent12
-	err := c.Invoke(func(p12 *Parent12) {
-		er := vallie.Validate(p12)
-		require.Error(t, er)
-		require.Contains(t, er.Error(), "zero value")
-		zeroP12 = p12
-	})
-	require.Nil(t, err)
 }
 
 func TestZeroValueOnInvoke(t *testing.T) {
