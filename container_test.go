@@ -102,7 +102,7 @@ func TestResolve(t *testing.T) {
 				var p1 *Parent1
 				return c.Resolve(&p1)
 			},
-			"type *dig.Parent1 is not registered",
+			"",
 		},
 	}
 
@@ -319,8 +319,6 @@ func TestConstructorErrors(t *testing.T) {
 			var p1 *FlakyParent
 			err := c.Resolve(&p1)
 			if tt.wantErr != "" {
-				var registeredError *error
-				require.Error(t, c.Resolve(&registeredError), "type *error is not registered")
 				require.EqualError(t, err, tt.wantErr)
 			} else {
 				require.NoError(t, err)
@@ -394,7 +392,7 @@ func TestInvokeReturnedError(t *testing.T) {
 		return errors.New("oops")
 	})
 	var registeredError *error
-	require.Error(t, c.Resolve(&registeredError), "type *error is not registered")
+	require.NoError(t, c.Resolve(&registeredError), "unexpected error resolving unknown type")
 	require.Contains(t, err.Error(), "error invoking the function func() error: oops")
 
 	err = c.Invoke(func() (*Child1, error) {
@@ -514,7 +512,10 @@ func TestEmptyAfterReset(t *testing.T) {
 	var first *Grandchild1
 	require.NoError(t, c.Resolve(&first), "No error expected during first Resolve")
 	c.Reset()
-	require.Contains(t, c.Resolve(&first).Error(), "not registered")
+
+	first = nil
+	assert.NoError(t, c.Resolve(&first), "unexpected error resolving unknown type")
+	assert.Nil(t, first, "expected zero value after resolving unknown type")
 }
 
 func TestPanicConstructor(t *testing.T) {
@@ -551,7 +552,7 @@ func TestMultiObjectRegisterResolve(t *testing.T) {
 	require.NoError(t, c.Resolve(&third), "No error expected during first Resolve")
 
 	var errRegistered *error
-	require.Error(t, c.Resolve(&errRegistered), "type *error shouldn't be registered")
+	require.NoError(t, c.Resolve(&errRegistered), "unexpected error resolving unknown type")
 	require.Nil(t, errRegistered)
 
 	require.NotNil(t, first, "Child1 must have been registered")
