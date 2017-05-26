@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -213,6 +214,78 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "invoke failed")
 	})
 
+	t.Run("param", func(t *testing.T) {
+		c := New()
+
+		type contents string
+
+		type Args struct {
+			Param
+
+			privateContents contents
+			Contents        contents
+		}
+
+		require.NoError(t,
+			c.Provide(func(args Args) *bytes.Buffer {
+				// testify's Empty doesn't work on string aliases for some
+				// reason
+				require.Len(t, args.privateContents, 0, "private contents must be empty")
+
+				require.NotEmpty(t, args.Contents, "contents must not be empty")
+				return bytes.NewBufferString(string(args.Contents))
+			}), "provide constructor failed")
+
+		require.NoError(t,
+			c.Provide(contents("hello world")),
+			"provide value failed")
+
+		require.NoError(t, c.Invoke(func(buff *bytes.Buffer) {
+			out, err := ioutil.ReadAll(buff)
+			require.NoError(t, err, "read from buffer failed")
+			require.Equal(t, "hello world", string(out), "contents don't match")
+		}))
+	})
+
+	t.Run("param pointer", func(t *testing.T) {
+		c := New()
+
+		require.NoError(t, c.Provide(func() io.Writer {
+			return new(bytes.Buffer)
+		}), "provide failed")
+
+		type Args struct {
+			Param
+
+			Writer io.Writer
+		}
+
+		require.NoError(t, c.Invoke(func(args *Args) {
+			require.NotNil(t, args, "args must not be nil")
+			require.NotNil(t, args.Writer, "writer must not be nil")
+		}), "invoke failed")
+	})
+
+	t.Run("invoke param", func(t *testing.T) {
+		c := New()
+		require.NoError(t, c.Provide(func() *bytes.Buffer {
+			return new(bytes.Buffer)
+		}), "provide failed")
+
+		type Args struct {
+			Param
+
+			privateBuffer *bytes.Buffer
+
+			*bytes.Buffer
+		}
+
+		require.NoError(t, c.Invoke(func(args Args) {
+			require.Nil(t, args.privateBuffer, "private buffer must be nil")
+			require.NotNil(t, args.Buffer, "invoke got nil buffer")
+		}))
+	})
+
 	t.Run("multiple-type constructor", func(t *testing.T) {
 		c := New()
 		constructor := func() (*bytes.Buffer, []int, error) {
@@ -290,6 +363,36 @@ func TestProvideConstructorErrors(t *testing.T) {
 	})
 }
 
+func TestParamsDontRecurse(t *testing.T) {
+	t.Parallel()
+
+	t.Run("param field", func(t *testing.T) {
+
+		type anotherParam struct {
+			Param
+
+			Reader io.Reader
+		}
+
+		type someParam struct {
+			Param
+
+			Writer  io.Writer
+			Another anotherParam
+		}
+
+		c := New()
+		err := c.Provide(func(a someParam) *bytes.Buffer {
+			panic("constructor must not be called")
+		})
+		require.Error(t, err, "provide must fail")
+		require.Contains(t, err.Error(),
+			"parameter objects may not be used as fields of other parameter objects")
+		require.Contains(t, err.Error(),
+			"field Another (type dig.anotherParam) of dig.someParam is a parameter object")
+	})
+}
+
 func TestProvideRespectsConstructorErrors(t *testing.T) {
 	t.Run("constructor succeeds", func(t *testing.T) {
 		c := New()
@@ -358,6 +461,50 @@ func TestCanProvideErrorLikeType(t *testing.T) {
 				}), "invoke must not fail")
 		})
 	}
+}
+
+func TestCantProvideParameterObjects(t *testing.T) {
+	t.Parallel()
+
+	t.Run("instance", func(t *testing.T) {
+		type Args struct{ Param }
+
+		c := New()
+		err := c.Provide(Args{})
+		require.Error(t, err, "provide should fail")
+		require.Contains(t, err.Error(), "can't provide parameter objects")
+	})
+
+	t.Run("pointer", func(t *testing.T) {
+		type Args struct{ Param }
+
+		c := New()
+		err := c.Provide(&Args{})
+		require.Error(t, err, "provide should fail")
+		require.Contains(t, err.Error(), "can't provide parameter objects")
+	})
+
+	t.Run("constructor", func(t *testing.T) {
+		type Args struct{ Param }
+
+		c := New()
+		err := c.Provide(func() (Args, error) {
+			panic("great sadness")
+		})
+		require.Error(t, err, "provide should fail")
+		require.Contains(t, err.Error(), "can't provide parameter objects")
+	})
+
+	t.Run("constructor pointer", func(t *testing.T) {
+		type Args struct{ Param }
+
+		c := New()
+		err := c.Provide(func() (*Args, error) {
+			panic("great sadness")
+		})
+		require.Error(t, err, "provide should fail")
+		require.Contains(t, err.Error(), "can't provide parameter objects")
+	})
 }
 
 func TestProvideKnownTypesFails(t *testing.T) {
