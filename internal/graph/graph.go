@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"strings"
+
 	"github.com/pkg/errors"
 )
 
@@ -202,7 +204,7 @@ func (g *Graph) validateGraph(ct reflect.Type) (reflect.Value, error) {
 }
 
 // ConstructorArguments returns arguments in the provided constructor
-func (g *Graph) ConstructorArguments(ctype reflect.Type, optionals ...reflect.Type) ([]reflect.Value, error) {
+func (g *Graph) ConstructorArguments(ctype reflect.Type, optionals ...string) ([]reflect.Value, error) {
 	// find dependencies from the graph and place them in the args
 	args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
 	for idx := range args {
@@ -215,7 +217,7 @@ func (g *Graph) ConstructorArguments(ctype reflect.Type, optionals ...reflect.Ty
 			}
 			args[idx] = v
 		} else {
-			if !g.isOptional(arg, optionals) {
+			if !g.isOptional(arg.String(), optionals) {
 				return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
 			}
 			// log.Printf("Assigning zero value for arguments in %v. Dependency of type %v is not yet registered", ctype, arg)
@@ -225,9 +227,9 @@ func (g *Graph) ConstructorArguments(ctype reflect.Type, optionals ...reflect.Ty
 	return args, nil
 }
 
-func (g *Graph) isOptional(t reflect.Type, optionals []reflect.Type) bool {
+func (g *Graph) isOptional(t string, optionals []string) bool {
 	for _, opts := range optionals {
-		if opts == t {
+		if strings.Contains(t, opts) {
 			return true
 		}
 	}

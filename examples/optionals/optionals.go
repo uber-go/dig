@@ -23,8 +23,6 @@ package main
 import (
 	"fmt"
 
-	"reflect"
-
 	"go.uber.org/dig"
 )
 
@@ -38,9 +36,7 @@ func main() {
 	c := dig.New()
 	c.Provide(&Type2{})
 	if err := c.Invoke(func(t1 *Type1, t2 *Type2) {
-		fmt.Println("t1", t1)
-		fmt.Println("t1", t2)
-	}, reflect.TypeOf(&Type1{})); err != nil {
+	}, "Type1"); err != nil {
 		panic(err)
 	}
 	fmt.Println(c.String())
