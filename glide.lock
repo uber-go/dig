@@ -1,11 +1,9 @@
-hash: 9d05c9e85847372d04d4d8335d60306c9ff657ee8f1df777b0ef4c3d85839178
-updated: 2017-03-26T18:53:15.197948052-07:00
-imports:
-- name: github.com/pkg/errors
-  version: 645ef00459ed84a119197bfb8d8205042c6df63d
+hash: 040b4e5fb0f016390f1ef861c7a74a1a7570d7163101d7535780938ecfcd0650
+updated: 2017-05-26T14:47:24.698824964-07:00
+imports: []
 testImports:
 - name: github.com/axw/gocov
-  version: c77561ca0c0cb1ed5d4ce4a912a75f5532566422
+  version: 3a69a0d2a4ef1f263e2d92b041a69593d6964fe8
   subpackages:
   - gocov
 - name: github.com/davecgh/go-spew
@@ -13,23 +11,23 @@ testImports:
   subpackages:
   - spew
 - name: github.com/golang/lint
-  version: cb00e5669539f047b2f4c53a421a01b0c8e172c6
+  version: a5f4a247366d8fc436941822e14fc3eac7727015
   subpackages:
   - golint
 - name: github.com/mattn/goveralls
-  version: a99c5ee06aeeca2a2befc7e90b99061b1180850c
+  version: a2cbbd7cdce4f5e051016fedf639c64bb05ef031
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
 - name: github.com/sectioneight/md-to-godoc
-  version: f274e5a4257c85a9eaf60ac820ee813b78cac6ab
+  version: 79157ff08f1acd5c5b1d13d71c0adb7908dbb8a2
 - name: github.com/stretchr/testify
-  version: 4d4bfba8f1d1027c4fdbe371823030df51419987
+  version: eb84487caee2d64c96bb5c6afb60fd4f631eb0f0
   subpackages:
   - assert
   - require
 - name: golang.org/x/tools
-  version: 2946dd1f77e693e136d9ed202ba093bb4a3ea761
+  version: bf4b54dc687c73b6ef63de8b8abf0ad3951e3edc
   subpackages:
   - cover
