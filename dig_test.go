@@ -63,7 +63,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("struct", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		c := New()
 		buf := &bytes.Buffer{}
 		buf.WriteString("foo")
@@ -75,7 +74,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("struct constructor", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		c := New()
 		buf := &bytes.Buffer{}
 		buf.WriteString("foo")
@@ -143,7 +141,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("channel", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		c := New()
 		ch := make(chan int)
 		require.NoError(t, c.Provide(ch), "provide failed")
@@ -153,7 +150,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("channel constructor", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		c := New()
 		require.NoError(t, c.Provide(func() chan int {
 			return make(chan int)
@@ -164,7 +160,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("func constructor", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		// Functions passed directly to Provide are treated as constructors,
 		// but we can still put functions into the container with constructors.
 		// This makes injecting builders simple.
@@ -252,7 +247,6 @@ func TestProvideRespectsConstructorErrors(t *testing.T) {
 }
 
 func TestCantProvideUntypedNil(t *testing.T) {
-	t.Fatalf("Calling Container.Provide(nil) crashes the main testing thread. Failing early.")
 	t.Parallel()
 	c := New()
 	assert.Error(t, c.Provide(nil))
