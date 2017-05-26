@@ -66,7 +66,7 @@
 //
 // • Provide a slice, map, or array
 //
-// Provide a Constructor
+// Provide a constructor
 //
 // A constructor is defined as a function that returns one pointer (or
 // interface), returns an optional error, and takes 0-N number of arguments.
@@ -87,11 +87,11 @@
 //   // However, note that in the current examples *Type1 and *Type2
 //   // have not been provided. Constructors (or instances) first
 //   // have to be provided to the dig container before it is able
-//   // to create a shared singleton instance of *Type3
+//   // to create a shared singleton instance of *Type3.
 //
 // Provide an object
 //
-// As a shortcut for objects without dependencies, register it directly.
+// As a shortcut for any object without dependencies, register it directly.
 //
 //   type Type1 struct {
 //   	Name string
@@ -127,7 +127,7 @@
 //
 // Resolve retrieves objects from the container by building the object graph.
 //
-// Object is resolution is based on the type of the variable passed into Resolvefunction.
+// Object resolution is based on the type of the variable passed into the Resolvefunction.
 //
 //
 // For example, in the current scenario:

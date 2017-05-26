@@ -25,12 +25,15 @@ import (
 	"fmt"
 	"reflect"
 
+	"strings"
+
 	"github.com/pkg/errors"
 )
 
 var (
-	errArgKind = errors.New("constructor arguments must be pointers")
-	errRetNode = errors.New("node already exist for the constructor")
+	errArgKind  = errors.New("constructor arguments must be pointers")
+	errRetNode  = errors.New("node already exist for the constructor")
+	errOptional = errors.New("Object is not registered as optional")
 
 	_typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 )
@@ -40,11 +43,21 @@ type Graph struct {
 	nodes map[interface{}]graphNode
 }
 
+// Optionals is a struct that keeps all the object types that are
+// optional in a constructor signature
+type Optionals struct {
+	Types map[reflect.Type]struct{}
+}
+
 // NewGraph creates new data Graph for dig
 func NewGraph() Graph {
-	return Graph{
+	g := Graph{
 		nodes: make(map[interface{}]graphNode),
 	}
+	g.InsertObject(reflect.ValueOf(Optionals{
+		Types: make(map[reflect.Type]struct{}),
+	}))
+	return g
 }
 
 // Reset the graph
@@ -191,7 +204,7 @@ func (g *Graph) validateGraph(ct reflect.Type) (reflect.Value, error) {
 }
 
 // ConstructorArguments returns arguments in the provided constructor
-func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error) {
+func (g *Graph) ConstructorArguments(ctype reflect.Type, optionals ...string) ([]reflect.Value, error) {
 	// find dependencies from the graph and place them in the args
 	args := make([]reflect.Value, ctype.NumIn(), ctype.NumIn())
 	for idx := range args {
@@ -204,10 +217,23 @@ func (g *Graph) ConstructorArguments(ctype reflect.Type) ([]reflect.Value, error
 			}
 			args[idx] = v
 		} else {
-			return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
+			if !g.isOptional(arg.String(), optionals) {
+				return nil, fmt.Errorf("%v dependency of type %v is not registered", ctype, arg)
+			}
+			// log.Printf("Assigning zero value for arguments in %v. Dependency of type %v is not yet registered", ctype, arg)
+			args[idx] = reflect.Zero(arg)
 		}
 	}
 	return args, nil
+}
+
+func (g *Graph) isOptional(t string, optionals []string) bool {
+	for _, opts := range optionals {
+		if strings.Contains(t, opts) {
+			return true
+		}
+	}
+	return false
 }
 
 // String representation of the entire Container

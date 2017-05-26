@@ -55,11 +55,11 @@ type Container struct {
 // occurred during the execution
 // The return arguments from Invoked function are registered in the graph for later use
 // The last parameter, if it is an error, is returned to the Invoke caller
-func (c *Container) Invoke(t interface{}) error {
+func (c *Container) Invoke(t interface{}, optionals ...string) error {
 	ctype := reflect.TypeOf(t)
 	switch ctype.Kind() {
 	case reflect.Func:
-		args, err := c.Graph.ConstructorArguments(ctype)
+		args, err := c.Graph.ConstructorArguments(ctype, optionals...)
 		if err != nil {
 			return errors.Wrapf(err, _invokeErr, t)
 		}
