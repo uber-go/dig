@@ -31,7 +31,6 @@ var (
 	_noValue             reflect.Value
 	_errType             = reflect.TypeOf((*error)(nil)).Elem()
 	_parameterObjectType = reflect.TypeOf((*parameterObject)(nil)).Elem()
-	_paramType           = reflect.TypeOf(Param{})
 )
 
 const _optionalTag = "optional"
@@ -342,20 +341,15 @@ func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
 			continue // skip private fields
 		}
 
-		// Skip the embedded Param type.
-		if f.Anonymous && f.Type == _paramType {
-			continue
-		}
-
-		// The user added a parameter object as a dependency. We don't recurse
-		// /yet/ so let's try to give an informative error message.
 		if f.Type.Implements(_parameterObjectType) {
-			return nil, fmt.Errorf(
-				"dig parameter objects may not be used as fields of other parameter objects: "+
-					"field %v (type %v) of %v is a parameter object", f.Name, f.Type, t)
+			newDeps, err := getParameterDependencies(f.Type)
+			if err != nil {
+				return nil, err
+			}
+			deps = append(deps, newDeps...)
+		} else {
+			deps = append(deps, f.Type)
 		}
-
-		deps = append(deps, f.Type)
 	}
 	return deps, nil
 }
@@ -375,12 +369,16 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 			continue // skip private fields
 		}
 
-		// Skip the embedded Param type.
-		if f.Anonymous && f.Type == _paramType {
-			continue
+		var (
+			v   reflect.Value
+			err error
+		)
+		if f.Type.Implements(_parameterObjectType) {
+			v, err = c.getParameterObject(f.Type)
+		} else {
+			v, err = c.get(f.Type)
 		}
 
-		v, err := c.get(f.Type)
 		if err != nil {
 			switch f.Tag.Get(_optionalTag) {
 			case "true", "yes":
