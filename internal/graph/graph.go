@@ -128,7 +128,7 @@ func (g *Graph) InsertConstructor(ctor interface{}) error {
 	// object needs to be part of the container to properly detect cycles
 	if cycleErr := g.recursiveDetectCycles(&n, nil); cycleErr != nil {
 		// if the cycle was detected delete from the container
-		for objType := range objTypes {
+		for _, objType := range objTypes {
 			delete(g.nodes, objType)
 		}
 		return errors.Wrapf(cycleErr, "unable to Provide %v", objTypes)
