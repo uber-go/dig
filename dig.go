@@ -159,8 +159,7 @@ func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) err
 }
 
 func (c *Container) isAcyclic(n node) error {
-	// TODO: use a map along with this for more speed
-	return detectCycles(n, c.nodes, nil)
+	return detectCycles(n, c.nodes, nil, make(map[reflect.Type]struct{}))
 }
 
 func (c *Container) get(t reflect.Type) (reflect.Value, error) {
@@ -263,19 +262,18 @@ func cycleError(cycle []reflect.Type, last reflect.Type) error {
 	return errors.New(b.String())
 }
 
-func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) error {
-	for _, seen := range path {
-		if n.provides == seen {
-			return cycleError(path, n.provides)
-		}
+func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type, seen map[reflect.Type]struct{}) error {
+	if _, ok := seen[n.provides]; ok {
+		return cycleError(path, n.provides)
 	}
 	path = append(path, n.provides)
+	seen[n.provides] = struct{}{}
 	for _, depType := range n.deps {
 		depNode, ok := graph[depType]
 		if !ok {
 			continue
 		}
-		if err := detectCycles(depNode, graph, path); err != nil {
+		if err := detectCycles(depNode, graph, path, seen); err != nil {
 			return err
 		}
 	}
