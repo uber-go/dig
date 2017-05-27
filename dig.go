@@ -88,6 +88,9 @@ func (c *Container) Provide(constructor interface{}) error {
 // immediately.
 func (c *Container) Invoke(function interface{}) error {
 	ftype := reflect.TypeOf(function)
+	if ftype == nil {
+		return errors.New("can't invoke an untyped nil")
+	}
 	if ftype.Kind() != reflect.Func {
 		return fmt.Errorf("can't invoke non-function %v (type %v)", function, ftype)
 	}

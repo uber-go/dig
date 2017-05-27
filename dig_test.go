@@ -400,6 +400,11 @@ func TestInvokesUseCachedObjects(t *testing.T) {
 func TestInvokeFailures(t *testing.T) {
 	t.Parallel()
 
+	t.Run("untyped nil", func(t *testing.T) {
+		c := New()
+		assert.Error(t, c.Invoke(nil))
+	})
+
 	t.Run("unmet dependency", func(t *testing.T) {
 		c := New()
 		assert.Error(t, c.Invoke(func(*bytes.Buffer) {}))
