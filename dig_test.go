@@ -212,6 +212,27 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Invoke(consumer), "invoke failed")
 	})
 
+	t.Run("multiple-type constructor is called once", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type B struct{}
+		count := 0
+		constructor := func() (*A, *B, error) {
+			count++
+			return &A{}, &B{}, nil
+		}
+		getA := func(a *A) {
+			assert.NotNil(t, a, "got nil A")
+		}
+		getB := func(b *B) {
+			assert.NotNil(t, b, "got nil B")
+		}
+		require.NoError(t, c.Provide(constructor), "provide failed")
+		require.NoError(t, c.Invoke(getA), "A invoke failed")
+		require.NoError(t, c.Invoke(getB), "B invoke failed")
+		require.Equal(t, 1, count, "Constructor must be called once")
+	})
+
 	t.Run("collections and instances of same type", func(t *testing.T) {
 		c := New()
 		require.NoError(t, c.Provide(func() []*bytes.Buffer {
