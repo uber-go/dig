@@ -287,9 +287,9 @@ func TestProvideCycleFails(t *testing.T) {
 	type A struct{}
 	type B struct{}
 	type C struct{}
-	newA := func(C) A { return A{} }
-	newB := func(A) B { return B{} }
-	newC := func(B) C { return C{} }
+	newA := func(*C) *A { return &A{} }
+	newB := func(*A) *B { return &B{} }
+	newC := func(*B) *C { return &C{} }
 
 	c := New()
 	assert.NoError(t, c.Provide(newA))
@@ -307,13 +307,13 @@ func TestIncompleteGraphIsOkay(t *testing.T) {
 	type A struct{}
 	type B struct{}
 	type C struct{}
-	newA := func() A { return A{} }
-	newC := func(B) C { return C{} }
+	newA := func() *A { return &A{} }
+	newC := func(*B) *C { return &C{} }
 
 	c := New()
 	assert.NoError(t, c.Provide(newA), "provide failed")
 	assert.NoError(t, c.Provide(newC), "provide failed")
-	assert.NoError(t, c.Invoke(func(A) {}), "invoke failed")
+	assert.NoError(t, c.Invoke(func(*A) {}), "invoke failed")
 }
 
 func TestProvideFuncsWithoutReturnsFails(t *testing.T) {
