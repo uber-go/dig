@@ -188,18 +188,14 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 		return _noValue, fmt.Errorf("constructor %v for type %v failed: %v", n.ctype, t, err.Interface())
 	}
 
-	var ret reflect.Value
 	for _, con := range constructed {
 		ct := con.Type()
 		if ct == _errType {
 			continue
 		}
 		c.cache[ct] = con
-		if ct == t {
-			ret = con
-		}
 	}
-	return ret, nil
+	return c.cache[t], nil
 }
 
 func (c *Container) contains(types []reflect.Type) error {
