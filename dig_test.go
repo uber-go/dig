@@ -230,6 +230,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Provide(constructor), "provide failed")
 		require.NoError(t, c.Invoke(getA), "A invoke failed")
 		require.NoError(t, c.Invoke(getB), "B invoke failed")
+		require.NoError(t, c.Invoke(func(a *A, b *B) {}), "AB invoke failed")
 		require.Equal(t, 1, count, "Constructor must be called once")
 	})
 
