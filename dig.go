@@ -345,7 +345,7 @@ func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
 			continue
 		}
 
-		// THe user added a parameter object as a dependency. We don't recurse
+		// The user added a parameter object as a dependency. We don't recurse
 		// /yet/ so let's try to give an informative error message.
 		if f.Type.Implements(_parameterObjectType) {
 			return nil, fmt.Errorf(
