@@ -380,8 +380,15 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 
 		v, err := c.get(f.Type)
 		if err != nil {
-			return result, fmt.Errorf(
-				"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
+			// TODO: once other tags are avilabled (named=foo),
+			// probably should serialize the tags better, or at least scan the string
+			tag := f.Tag.Get("dig")
+			if tag == "optional" {
+				v = reflect.Zero(f.Type)
+			} else {
+				return result, fmt.Errorf(
+					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
+			}
 		}
 
 		dest.Field(i).Set(v)
