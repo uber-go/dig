@@ -399,7 +399,7 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 func containsString(source []string, s string) bool {
 	res := false
 	for _, v := range source {
-		if v == s {
+		if strings.TrimSpace(v) == s {
 			return true
 		}
 	}
