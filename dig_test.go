@@ -23,6 +23,7 @@ package dig
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 
@@ -286,9 +287,24 @@ func TestCantProvideErrors(t *testing.T) {
 
 func TestProvideKnownTypesFails(t *testing.T) {
 	t.Parallel()
-	c := New()
-	assert.NoError(t, c.Provide(func() *bytes.Buffer { return nil }))
-	assert.Error(t, c.Provide(func() *bytes.Buffer { return nil }))
+
+	provideArgs := []interface{}{
+		func() *bytes.Buffer { return nil },
+		func() (*bytes.Buffer, error) { return nil, nil },
+		&bytes.Buffer{},
+	}
+
+	for _, first := range provideArgs {
+		t.Run(fmt.Sprintf("%T", first), func(t *testing.T) {
+			c := New()
+			require.NoError(t, c.Provide(first), "first provide must not fail")
+
+			for _, second := range provideArgs {
+				assert.Error(t, c.Provide(second), "second provide must fail")
+			}
+
+		})
+	}
 }
 
 func TestProvideCycleFails(t *testing.T) {
