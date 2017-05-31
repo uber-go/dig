@@ -247,14 +247,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Invoke(func(a *A, b *B) {}), "AB invoke failed")
 		require.Equal(t, 1, count, "Constructor must be called once")
 	})
-	t.Run("multiple-type constructor returns multiple objects of same type", func(t *testing.T) {
-		c := New()
-		type A struct{}
-		constructor := func() (*A, *A, error) {
-			return &A{}, &A{}, nil
-		}
-		require.Error(t, c.Provide(constructor), "provide failed")
-	})
 	t.Run("method invocation inside Invoke", func(t *testing.T) {
 		c := New()
 		type A struct{}
@@ -284,6 +276,17 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
 			return &bytes.Buffer{}
 		}), "providing pointer failed")
+	})
+}
+
+func TestProvideConstructorErrors(t *testing.T) {
+	t.Run("multiple-type constructor returns multiple objects of same type", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		constructor := func() (*A, *A, error) {
+			return &A{}, &A{}, nil
+		}
+		require.Error(t, c.Provide(constructor), "provide failed")
 	})
 }
 
