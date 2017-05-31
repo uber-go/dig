@@ -340,13 +340,20 @@ func TestInvokesUseCachedObjects(t *testing.T) {
 	t.Parallel()
 
 	c := New()
-	calls := 0
-	buf := &bytes.Buffer{}
-	require.NoError(t, c.Provide(func() *bytes.Buffer { return buf }))
 
+	constructorCalls := 0
+	buf := &bytes.Buffer{}
+	require.NoError(t, c.Provide(func() *bytes.Buffer {
+		assert.Equal(t, 0, constructorCalls, "constructor must not have been called before")
+		constructorCalls++
+		return buf
+	}))
+
+	calls := 0
 	for i := 0; i < 3; i++ {
 		assert.NoError(t, c.Invoke(func(b *bytes.Buffer) {
 			calls++
+			require.Equal(t, 1, constructorCalls, "constructor must be called exactly once")
 			require.Equal(t, buf, b, "invoke got different buffer pointer")
 		}), "invoke %d failed", i)
 		require.Equal(t, i+1, calls, "invoked function not called")
