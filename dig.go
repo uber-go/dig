@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 )
 
 var (
@@ -381,8 +380,7 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 
 		v, err := c.get(f.Type)
 		if err != nil {
-			tags := strings.Split(f.Tag.Get("dig"), ",")
-			if containsString(tags, "optional") {
+			if f.Tag.Get("optional") == "true" {
 				v = reflect.Zero(f.Type)
 			} else {
 				return result, fmt.Errorf(
@@ -394,14 +392,4 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 	}
 
 	return result, nil
-}
-
-func containsString(source []string, s string) bool {
-	res := false
-	for _, v := range source {
-		if strings.TrimSpace(v) == s {
-			return true
-		}
-	}
-	return res
 }
