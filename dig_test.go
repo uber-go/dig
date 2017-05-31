@@ -93,20 +93,28 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("slice", func(t *testing.T) {
 		c := New()
-		bufs := []*bytes.Buffer{{}, {}}
+		b1 := &bytes.Buffer{}
+		b2 := &bytes.Buffer{}
+		bufs := []*bytes.Buffer{b1, b2}
 		require.NoError(t, c.Provide(bufs), "provide failed")
 		require.NoError(t, c.Invoke(func(bs []*bytes.Buffer) {
 			require.Equal(t, 2, len(bs), "invoke got unexpected number of buffers")
+			require.True(t, b1 == bs[0], "first item did not match")
+			require.True(t, b2 == bs[1], "second item did not match")
 		}), "invoke failed")
 	})
 
 	t.Run("slice constructor", func(t *testing.T) {
 		c := New()
+		b1 := &bytes.Buffer{}
+		b2 := &bytes.Buffer{}
 		require.NoError(t, c.Provide(func() []*bytes.Buffer {
-			return []*bytes.Buffer{{}, {}}
+			return []*bytes.Buffer{b1, b2}
 		}), "provide failed")
 		require.NoError(t, c.Invoke(func(bs []*bytes.Buffer) {
 			require.Equal(t, 2, len(bs), "invoke got unexpected number of buffers")
+			require.True(t, b1 == bs[0], "first item did not match")
+			require.True(t, b2 == bs[1], "second item did not match")
 		}), "invoke failed")
 	})
 
