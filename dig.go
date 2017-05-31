@@ -238,7 +238,7 @@ func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error)
 
 		t := ctype.In(i)
 		if t.Implements(_parameterObjectType) {
-			arg, err = getParameterObject(c, t)
+			arg, err = c.getParameterObject(t)
 		} else {
 			arg, err = c.get(t)
 		}
@@ -358,7 +358,7 @@ func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
 	return deps, nil
 }
 
-func getParameterObject(c *Container, t reflect.Type) (reflect.Value, error) {
+func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 	dest := reflect.New(t).Elem()
 	result := dest
 	for t.Kind() == reflect.Ptr {
