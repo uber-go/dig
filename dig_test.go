@@ -23,6 +23,7 @@ package dig
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 
@@ -35,9 +36,11 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("pointer", func(t *testing.T) {
 		c := New()
-		require.NoError(t, c.Provide(&bytes.Buffer{}), "provide failed")
-		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
-			require.NotNil(t, b, "invoke got nil buffer")
+		b := &bytes.Buffer{}
+		require.NoError(t, c.Provide(b), "provide failed")
+		require.NoError(t, c.Invoke(func(got *bytes.Buffer) {
+			require.NotNil(t, got, "invoke got nil buffer")
+			require.True(t, got == b, "invoke got wrong buffer")
 		}), "invoke failed")
 	})
 
@@ -54,19 +57,22 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("pointer constructor", func(t *testing.T) {
 		c := New()
+		var b *bytes.Buffer
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
-			return &bytes.Buffer{}
+			b = &bytes.Buffer{}
+			return b
 		}), "provide failed")
-		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
-			require.NotNil(t, b, "invoke got nil buffer")
+		require.NoError(t, c.Invoke(func(got *bytes.Buffer) {
+			require.NotNil(t, got, "invoke got nil buffer")
+			require.True(t, got == b, "invoke got wrong buffer")
 		}), "invoke failed")
 	})
 
 	t.Run("struct", func(t *testing.T) {
 		c := New()
-		buf := &bytes.Buffer{}
+		var buf bytes.Buffer
 		buf.WriteString("foo")
-		require.NoError(t, c.Provide(*buf), "provide failed")
+		require.NoError(t, c.Provide(buf), "provide failed")
 		require.NoError(t, c.Invoke(func(b bytes.Buffer) {
 			// ensure we're getting back the buffer we put in
 			require.Equal(t, "foo", buf.String(), "invoke got new buffer")
@@ -75,9 +81,9 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("struct constructor", func(t *testing.T) {
 		c := New()
-		buf := &bytes.Buffer{}
+		var buf bytes.Buffer
 		buf.WriteString("foo")
-		require.NoError(t, c.Provide(*buf), "provide failed")
+		require.NoError(t, c.Provide(buf), "provide failed")
 		require.NoError(t, c.Invoke(func(b bytes.Buffer) {
 			// ensure we're getting back the buffer we put in
 			require.Equal(t, "foo", buf.String(), "invoke got new buffer")
@@ -86,20 +92,28 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("slice", func(t *testing.T) {
 		c := New()
-		bufs := []*bytes.Buffer{{}, {}}
+		b1 := &bytes.Buffer{}
+		b2 := &bytes.Buffer{}
+		bufs := []*bytes.Buffer{b1, b2}
 		require.NoError(t, c.Provide(bufs), "provide failed")
 		require.NoError(t, c.Invoke(func(bs []*bytes.Buffer) {
 			require.Equal(t, 2, len(bs), "invoke got unexpected number of buffers")
+			require.True(t, b1 == bs[0], "first item did not match")
+			require.True(t, b2 == bs[1], "second item did not match")
 		}), "invoke failed")
 	})
 
 	t.Run("slice constructor", func(t *testing.T) {
 		c := New()
+		b1 := &bytes.Buffer{}
+		b2 := &bytes.Buffer{}
 		require.NoError(t, c.Provide(func() []*bytes.Buffer {
-			return []*bytes.Buffer{{}, {}}
+			return []*bytes.Buffer{b1, b2}
 		}), "provide failed")
 		require.NoError(t, c.Invoke(func(bs []*bytes.Buffer) {
 			require.Equal(t, 2, len(bs), "invoke got unexpected number of buffers")
+			require.True(t, b1 == bs[0], "first item did not match")
+			require.True(t, b2 == bs[1], "second item did not match")
 		}), "invoke failed")
 	})
 
@@ -287,11 +301,54 @@ func TestCantProvideErrors(t *testing.T) {
 	assert.NoError(t, c.Provide(errors.New("foo")))
 }
 
+type someError struct{}
+
+var _ error = (*someError)(nil)
+
+func (*someError) Error() string { return "foo" }
+
+func TestCanProvideErrorLikeType(t *testing.T) {
+	t.Parallel()
+
+	tests := []interface{}{
+		func() *someError { return &someError{} },
+		func() (*someError, error) { return &someError{}, nil },
+		&someError{},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%T", tt), func(t *testing.T) {
+			c := New()
+			require.NoError(t, c.Provide(tt), "provide must not fail")
+
+			require.NoError(t, c.Invoke(
+				func(err *someError) {
+					assert.NotNil(t, err, "invoke received nil")
+				}), "invoke must not fail")
+		})
+	}
+}
+
 func TestProvideKnownTypesFails(t *testing.T) {
 	t.Parallel()
-	c := New()
-	assert.NoError(t, c.Provide(func() *bytes.Buffer { return nil }))
-	assert.Error(t, c.Provide(func() *bytes.Buffer { return nil }))
+
+	provideArgs := []interface{}{
+		func() *bytes.Buffer { return nil },
+		func() (*bytes.Buffer, error) { return nil, nil },
+		&bytes.Buffer{},
+	}
+
+	for _, first := range provideArgs {
+		t.Run(fmt.Sprintf("%T", first), func(t *testing.T) {
+			c := New()
+			require.NoError(t, c.Provide(first), "first provide must not fail")
+
+			for _, second := range provideArgs {
+				assert.Error(t, c.Provide(second), "second provide must fail")
+			}
+
+		})
+	}
 }
 
 func TestProvideCycleFails(t *testing.T) {
@@ -343,13 +400,20 @@ func TestInvokesUseCachedObjects(t *testing.T) {
 	t.Parallel()
 
 	c := New()
-	calls := 0
-	buf := &bytes.Buffer{}
-	require.NoError(t, c.Provide(func() *bytes.Buffer { return buf }))
 
+	constructorCalls := 0
+	buf := &bytes.Buffer{}
+	require.NoError(t, c.Provide(func() *bytes.Buffer {
+		assert.Equal(t, 0, constructorCalls, "constructor must not have been called before")
+		constructorCalls++
+		return buf
+	}))
+
+	calls := 0
 	for i := 0; i < 3; i++ {
 		assert.NoError(t, c.Invoke(func(b *bytes.Buffer) {
 			calls++
+			require.Equal(t, 1, constructorCalls, "constructor must be called exactly once")
 			require.Equal(t, buf, b, "invoke got different buffer pointer")
 		}), "invoke %d failed", i)
 		require.Equal(t, i+1, calls, "invoked function not called")
