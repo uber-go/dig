@@ -70,9 +70,9 @@ func TestEndToEndSuccess(t *testing.T) {
 	t.Run("struct", func(t *testing.T) {
 		t.Skip("Not yet supported.")
 		c := New()
-		buf := &bytes.Buffer{}
+		var buf bytes.Buffer
 		buf.WriteString("foo")
-		require.NoError(t, c.Provide(*buf), "provide failed")
+		require.NoError(t, c.Provide(buf), "provide failed")
 		require.NoError(t, c.Invoke(func(b bytes.Buffer) {
 			// ensure we're getting back the buffer we put in
 			require.Equal(t, "foo", buf.String(), "invoke got new buffer")
@@ -82,9 +82,9 @@ func TestEndToEndSuccess(t *testing.T) {
 	t.Run("struct constructor", func(t *testing.T) {
 		t.Skip("Not yet supported.")
 		c := New()
-		buf := &bytes.Buffer{}
+		var buf bytes.Buffer
 		buf.WriteString("foo")
-		require.NoError(t, c.Provide(*buf), "provide failed")
+		require.NoError(t, c.Provide(buf), "provide failed")
 		require.NoError(t, c.Invoke(func(b bytes.Buffer) {
 			// ensure we're getting back the buffer we put in
 			require.Equal(t, "foo", buf.String(), "invoke got new buffer")
