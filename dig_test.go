@@ -365,7 +365,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			Param
 
 			T1 *type1 // regular 'ol type
-			T2 *type2 `dig:"optional"`               // optional type NOT in the graph
+			T2 *type2 `dig:"optional,useless_tag"`   // optional type NOT in the graph
 			T3 *type3 `unrelated:"foo=42, optional"` // type in the graph with unrelated tag
 			T4 *type4 `dig:"optional"`               // optional type present in the graph
 		}

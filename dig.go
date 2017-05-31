@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 var (
@@ -380,10 +381,8 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 
 		v, err := c.get(f.Type)
 		if err != nil {
-			// TODO: once other tags are avilabled (named=foo),
-			// probably should serialize the tags better, or at least scan the string
-			tag := f.Tag.Get("dig")
-			if tag == "optional" {
+			tags := strings.Split(f.Tag.Get("dig"), ",")
+			if containsString(tags, "optional") {
 				v = reflect.Zero(f.Type)
 			} else {
 				return result, fmt.Errorf(
@@ -395,4 +394,14 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 	}
 
 	return result, nil
+}
+
+func containsString(source []string, s string) bool {
+	res := false
+	for _, v := range source {
+		if v == s {
+			return true
+		}
+	}
+	return res
 }
