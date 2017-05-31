@@ -35,9 +35,11 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("pointer", func(t *testing.T) {
 		c := New()
-		require.NoError(t, c.Provide(&bytes.Buffer{}), "provide failed")
-		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
-			require.NotNil(t, b, "invoke got nil buffer")
+		b := &bytes.Buffer{}
+		require.NoError(t, c.Provide(b), "provide failed")
+		require.NoError(t, c.Invoke(func(got *bytes.Buffer) {
+			require.NotNil(t, got, "invoke got nil buffer")
+			require.True(t, got == b, "invoke got wrong buffer")
 		}), "invoke failed")
 	})
 
@@ -54,11 +56,14 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("pointer constructor", func(t *testing.T) {
 		c := New()
+		var b *bytes.Buffer
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
-			return &bytes.Buffer{}
+			b = &bytes.Buffer{}
+			return b
 		}), "provide failed")
-		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
-			require.NotNil(t, b, "invoke got nil buffer")
+		require.NoError(t, c.Invoke(func(got *bytes.Buffer) {
+			require.NotNil(t, got, "invoke got nil buffer")
+			require.True(t, got == b, "invoke got wrong buffer")
 		}), "invoke failed")
 	})
 
