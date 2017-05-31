@@ -330,7 +330,6 @@ func TestProvideKnownTypesFails(t *testing.T) {
 			for _, second := range provideArgs {
 				assert.Error(t, c.Provide(second), "second provide must fail")
 			}
-
 		})
 	}
 }
