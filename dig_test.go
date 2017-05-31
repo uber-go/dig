@@ -285,6 +285,34 @@ func TestCantProvideErrors(t *testing.T) {
 	assert.NoError(t, c.Provide(errors.New("foo")))
 }
 
+type someError struct{}
+
+var _ error = (*someError)(nil)
+
+func (*someError) Error() string { return "foo" }
+
+func TestCanProvideErrorLikeType(t *testing.T) {
+	t.Parallel()
+
+	tests := []interface{}{
+		func() *someError { return &someError{} },
+		func() (*someError, error) { return &someError{}, nil },
+		&someError{},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%T", tt), func(t *testing.T) {
+			c := New()
+			require.NoError(t, c.Provide(tt), "provide must not fail")
+
+			require.NoError(t, c.Invoke(
+				func(err *someError) {
+					assert.NotNil(t, err, "invoke received nil")
+				}), "invoke must not fail")
+		})
+	}
+}
+
 func TestProvideKnownTypesFails(t *testing.T) {
 	t.Parallel()
 
