@@ -180,6 +180,11 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 		return v, nil
 	}
 
+	if t.Implements(_parameterObjectType) {
+		// No caching
+		return c.createParamObject(t)
+	}
+
 	n, ok := c.nodes[t]
 	if !ok {
 		return _noValue, fmt.Errorf("type %v isn't in the container", t)
@@ -233,18 +238,7 @@ func (c *Container) remove(nodes []node) {
 func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error) {
 	args := make([]reflect.Value, 0, ctype.NumIn())
 	for i := 0; i < ctype.NumIn(); i++ {
-		var (
-			arg reflect.Value
-			err error
-		)
-
-		t := ctype.In(i)
-		if t.Implements(_parameterObjectType) {
-			arg, err = c.createParamObject(t)
-		} else {
-			arg, err = c.get(t)
-		}
-
+		arg, err := c.get(ctype.In(i))
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get arguments for constructor %v: %v", ctype, err)
 		}
@@ -372,16 +366,7 @@ func (c *Container) createParamObject(t reflect.Type) (reflect.Value, error) {
 			continue // skip private fields
 		}
 
-		var (
-			v   reflect.Value
-			err error
-		)
-		if f.Type.Implements(_parameterObjectType) {
-			v, err = c.createParamObject(f.Type)
-		} else {
-			v, err = c.get(f.Type)
-		}
-
+		v, err := c.get(f.Type)
 		if err != nil {
 			switch f.Tag.Get(_optionalTag) {
 			case "true", "yes":
@@ -394,6 +379,5 @@ func (c *Container) createParamObject(t reflect.Type) (reflect.Value, error) {
 
 		dest.Field(i).Set(v)
 	}
-
 	return result, nil
 }
