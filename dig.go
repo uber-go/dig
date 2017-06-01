@@ -257,7 +257,7 @@ type node struct {
 func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
 	deps := make([]reflect.Type, 0, ctype.NumIn())
 	for i := 0; i < ctype.NumIn(); i++ {
-		deps = append(deps, getCtorParamDependencies(ctype.In(i))...)
+		deps = append(deps, getConstructorDependencies(ctype.In(i))...)
 	}
 
 	return node{
@@ -269,23 +269,20 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 }
 
 // Retrives the dependencies for the parameter of a constructor.
-func getCtorParamDependencies(t reflect.Type) (deps []reflect.Type) {
+func getConstructorDependencies(t reflect.Type) []reflect.Type {
 	if !t.Implements(_parameterObjectType) {
-		deps = append(deps, t)
-		return
+		return []reflect.Type{t}
 	}
 
-	deps = make([]reflect.Type, 0, t.NumField())
+	deps := make([]reflect.Type, 0, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		if f.PkgPath != "" {
 			continue // skip private fields
 		}
-
-		deps = append(deps, getCtorParamDependencies(f.Type)...)
+		deps = append(deps, getConstructorDependencies(f.Type)...)
 	}
-
-	return
+	return deps
 }
 
 func cycleError(cycle []reflect.Type, last reflect.Type) error {
