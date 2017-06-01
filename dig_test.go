@@ -326,10 +326,10 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		require.NoError(t, c.Invoke(func(p *someParam) {
 			require.NotNil(t, p, "someParam must not be nil")
-			require.NotNil(t, p.Buffer, "someParam must not be nil")
-			require.NotNil(t, p.Another, "someParam must not be nil")
-			require.NotNil(t, p.Another.Buffer, "someParam must not be nil")
-			require.True(t, p.Buffer == p.Another.Buffer, "buffer must be the same")
+			require.NotNil(t, p.Buffer, "someParam.Buffer must not be nil")
+			require.NotNil(t, p.Another, "anotherParam must not be nil")
+			require.NotNil(t, p.Another.Buffer, "anotherParam.Buffer must not be nil")
+			require.True(t, p.Buffer == p.Another.Buffer, "buffers must be the same")
 		}), "invoke must not fail")
 	})
 
