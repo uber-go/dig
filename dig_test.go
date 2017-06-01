@@ -287,9 +287,17 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("param wrapper", func(t *testing.T) {
+		var (
+			buff   *bytes.Buffer
+			called bool
+		)
+
 		c := New()
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
-			return new(bytes.Buffer)
+			require.False(t, called, "constructor must be called exactly once")
+			called = true
+			buff = new(bytes.Buffer)
+			return buff
 		}), "provide failed")
 
 		type MyParam struct{ Param }
@@ -301,7 +309,9 @@ func TestEndToEndSuccess(t *testing.T) {
 		}
 
 		require.NoError(t, c.Invoke(func(args Args) {
+			require.True(t, called, "constructor must be called first")
 			require.NotNil(t, args.Buffer, "invoke got nil buffer")
+			require.True(t, args.Buffer == buff, "buffer must match constructor's return value")
 		}))
 	})
 
@@ -319,17 +329,29 @@ func TestEndToEndSuccess(t *testing.T) {
 			Another *anotherParam
 		}
 
+		var (
+			buff   *bytes.Buffer
+			called bool
+		)
+
 		c := New()
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
-			return new(bytes.Buffer)
+			require.False(t, called, "constructor must be called exactly once")
+			called = true
+			buff = new(bytes.Buffer)
+			return buff
 		}), "provide must not fail")
 
 		require.NoError(t, c.Invoke(func(p *someParam) {
+			require.True(t, called, "constructor must be called first")
+
 			require.NotNil(t, p, "someParam must not be nil")
 			require.NotNil(t, p.Buffer, "someParam.Buffer must not be nil")
 			require.NotNil(t, p.Another, "anotherParam must not be nil")
 			require.NotNil(t, p.Another.Buffer, "anotherParam.Buffer must not be nil")
-			require.True(t, p.Buffer == p.Another.Buffer, "buffers must be the same")
+
+			require.True(t, p.Buffer == p.Another.Buffer, "buffers fields must match")
+			require.True(t, p.Buffer == buff, "buffer must match constructor's return value")
 		}), "invoke must not fail")
 	})
 
