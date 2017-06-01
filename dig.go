@@ -174,6 +174,7 @@ func (c *Container) isAcyclic(n node) error {
 	return detectCycles(n, c.nodes, nil, make(map[reflect.Type]struct{}))
 }
 
+// Retrieve a type from the container
 func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	if v, ok := c.cache[t]; ok {
 		return v, nil
@@ -239,7 +240,7 @@ func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error)
 
 		t := ctype.In(i)
 		if t.Implements(_parameterObjectType) {
-			arg, err = c.getParameterObject(t)
+			arg, err = c.createParamObject(t)
 		} else {
 			arg, err = c.get(t)
 		}
@@ -356,7 +357,7 @@ func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
 
 // Returns a new Param parent object with all the dependency fields
 // populated from the dig container.
-func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
+func (c *Container) createParamObject(t reflect.Type) (reflect.Value, error) {
 	dest := reflect.New(t).Elem()
 	result := dest
 	for t.Kind() == reflect.Ptr {
@@ -376,7 +377,7 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 			err error
 		)
 		if f.Type.Implements(_parameterObjectType) {
-			v, err = c.getParameterObject(f.Type)
+			v, err = c.createParamObject(f.Type)
 		} else {
 			v, err = c.get(f.Type)
 		}
