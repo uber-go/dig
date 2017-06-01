@@ -21,16 +21,16 @@ func TestInvokeWithParams(t *testing.T) {
 
 	assert.NoError(c.Provide(func() *hero { return &hero{name: "superman"} }))
 	err := InvokeWithParams(
-			c,
-			func(h *hero, ct *cartoon) {
-				assert.Equal("superman", h.name)
-				assert.Equal("Snafuperman", ct.title)
-			},
-			Param{
-				Type:     reflect.TypeOf(&cartoon{}),
-				Optional: true,
-				Value:    &cartoon{title: "Snafuperman"},
-			})
+		c,
+		func(h *hero, ct *cartoon) {
+			assert.Equal("superman", h.name)
+			assert.Equal("Snafuperman", ct.title)
+		},
+		Param{
+			Type:     reflect.TypeOf(&cartoon{}),
+			Optional: true,
+			Value:    &cartoon{title: "Snafuperman"},
+		})
 
 	assert.NoError(err)
 }
