@@ -483,10 +483,9 @@ func TestCanProvideErrorLikeType(t *testing.T) {
 			c := New()
 			require.NoError(t, c.Provide(tt), "provide must not fail")
 
-			require.NoError(t, c.Invoke(
-				func(err *someError) {
-					assert.NotNil(t, err, "invoke received nil")
-				}), "invoke must not fail")
+			require.NoError(t, c.Invoke(func(err *someError) {
+				assert.NotNil(t, err, "invoke received nil")
+			}), "invoke must not fail")
 		})
 	}
 }
@@ -510,10 +509,9 @@ func TestCantProvideParameterObjects(t *testing.T) {
 
 		c := New()
 		require.NoError(t, c.Provide(args), "provide failed")
-		require.NoError(t, c.Invoke(
-			func(a *Args) {
-				require.True(t, args == a, "args must match")
-			}), "invoke failed")
+		require.NoError(t, c.Invoke(func(a *Args) {
+			require.True(t, args == a, "args must match")
+		}), "invoke failed")
 	})
 
 	t.Run("constructor", func(t *testing.T) {
@@ -536,10 +534,9 @@ func TestCantProvideParameterObjects(t *testing.T) {
 		require.NoError(t, c.Provide(func() (*Args, error) {
 			return args, nil
 		}), "provide failed")
-		require.NoError(t, c.Invoke(
-			func(a *Args) {
-				require.True(t, args == a, "args must match")
-			}), "invoke failed")
+		require.NoError(t, c.Invoke(func(a *Args) {
+			require.True(t, args == a, "args must match")
+		}), "invoke failed")
 	})
 }
 
