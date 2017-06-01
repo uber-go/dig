@@ -34,6 +34,8 @@ var (
 	_paramType           = reflect.TypeOf(Param{})
 )
 
+const _optionalTag = "optional"
+
 // A Container is a directed, acyclic graph of dependencies. Dependencies are
 // constructed on-demand and returned from a cache thereafter, so they're
 // effectively singletons.
@@ -380,9 +382,10 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 
 		v, err := c.get(f.Type)
 		if err != nil {
-			if f.Tag.Get("optional") == "true" {
+			switch f.Tag.Get(_optionalTag) {
+			case "true", "yes":
 				v = reflect.Zero(f.Type)
-			} else {
+			default:
 				return result, fmt.Errorf(
 					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
 			}
