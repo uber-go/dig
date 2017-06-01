@@ -247,25 +247,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
-	t.Run("param pointer", func(t *testing.T) {
-		c := New()
-
-		require.NoError(t, c.Provide(func() io.Writer {
-			return new(bytes.Buffer)
-		}), "provide failed")
-
-		type Args struct {
-			Param
-
-			Writer io.Writer
-		}
-
-		require.NoError(t, c.Invoke(func(args *Args) {
-			require.NotNil(t, args, "args must not be nil")
-			require.NotNil(t, args.Writer, "writer must not be nil")
-		}), "invoke failed")
-	})
-
 	t.Run("invoke param", func(t *testing.T) {
 		c := New()
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
@@ -316,7 +297,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			Param
 
 			Buffer  *bytes.Buffer
-			Another *anotherParam
+			Another anotherParam
 		}
 
 		c := New()
@@ -324,7 +305,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			return new(bytes.Buffer)
 		}), "provide must not fail")
 
-		require.NoError(t, c.Invoke(func(p *someParam) {
+		require.NoError(t, c.Invoke(func(p someParam) {
 			require.NotNil(t, p, "someParam must not be nil")
 			require.NotNil(t, p.Buffer, "someParam must not be nil")
 			require.NotNil(t, p.Another, "someParam must not be nil")
@@ -525,10 +506,14 @@ func TestCantProvideParameterObjects(t *testing.T) {
 	t.Run("pointer", func(t *testing.T) {
 		type Args struct{ Param }
 
+		args := &Args{}
+
 		c := New()
-		err := c.Provide(&Args{})
-		require.Error(t, err, "provide should fail")
-		require.Contains(t, err.Error(), "can't provide parameter objects")
+		require.NoError(t, c.Provide(args), "provide failed")
+		require.NoError(t, c.Invoke(
+			func(a *Args) {
+				require.True(t, args == a, "args must match")
+			}), "invoke failed")
 	})
 
 	t.Run("constructor", func(t *testing.T) {
@@ -542,15 +527,19 @@ func TestCantProvideParameterObjects(t *testing.T) {
 		require.Contains(t, err.Error(), "can't provide parameter objects")
 	})
 
-	t.Run("constructor pointer", func(t *testing.T) {
+	t.Run("pointer from constructor", func(t *testing.T) {
 		type Args struct{ Param }
 
+		args := &Args{}
+
 		c := New()
-		err := c.Provide(func() (*Args, error) {
-			panic("great sadness")
-		})
-		require.Error(t, err, "provide should fail")
-		require.Contains(t, err.Error(), "can't provide parameter objects")
+		require.NoError(t, c.Provide(func() (*Args, error) {
+			return args, nil
+		}), "provide failed")
+		require.NoError(t, c.Invoke(
+			func(a *Args) {
+				require.True(t, args == a, "args must match")
+			}), "invoke failed")
 	})
 }
 
@@ -684,7 +673,7 @@ func TestInvokeFailures(t *testing.T) {
 		}
 
 		c := New()
-		err := c.Invoke(func(a *args) {
+		err := c.Invoke(func(a args) {
 			t.Fatal("function must not be called")
 		})
 
