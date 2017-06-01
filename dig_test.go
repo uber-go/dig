@@ -356,6 +356,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		type type2 struct{}
 		type type3 struct{}
 		type type4 struct{}
+		type type5 struct{}
 		constructor := func() (*type1, *type3, *type4) {
 			return &type1{}, &type3{}, &type4{}
 		}
@@ -368,13 +369,15 @@ func TestEndToEndSuccess(t *testing.T) {
 			T2 *type2 `optional:"true" useless_tag:"false"` // optional type NOT in the graph
 			T3 *type3 `unrelated:"foo=42, optional"`        // type in the graph with unrelated tag
 			T4 *type4 `optional:"true"`                     // optional type present in the graph
+			T5 *type5 `optional:"yes"`                      // optional type NOT in the graph with "yes"
 		}
 		require.NoError(t, c.Provide(constructor))
 		require.NoError(t, c.Invoke(func(p param) {
 			require.NotNil(t, p.T1, "whole param struct should not be nil")
-			assert.Nil(t, p.T2, "optional type not in the grap should return nil")
+			assert.Nil(t, p.T2, "optional type not in the graph should return nil")
 			assert.NotNil(t, p.T3, "required type with unrelated tag not in the graph")
 			assert.NotNil(t, p.T4, "optional type in the graph should not return nil")
+			assert.Nil(t, p.T5, "optional type not in the graph should return nil")
 		}))
 	})
 }
