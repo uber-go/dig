@@ -257,16 +257,7 @@ type node struct {
 func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
 	deps := make([]reflect.Type, 0, ctype.NumIn())
 	for i := 0; i < ctype.NumIn(); i++ {
-		t := ctype.In(i)
-		if t.Implements(_parameterObjectType) {
-			pdeps, err := getParameterDependencies(t)
-			if err != nil {
-				return node{}, err
-			}
-			deps = append(deps, pdeps...)
-		} else {
-			deps = append(deps, t)
-		}
+		deps = append(deps, getCtorParamDependencies(ctype.In(i))...)
 	}
 
 	return node{
@@ -275,6 +266,26 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 		ctype:    ctype,
 		deps:     deps,
 	}, nil
+}
+
+// Retrives the dependencies for the parameter of a constructor.
+func getCtorParamDependencies(t reflect.Type) (deps []reflect.Type) {
+	if !t.Implements(_parameterObjectType) {
+		deps = append(deps, t)
+		return
+	}
+
+	deps = make([]reflect.Type, 0, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		deps = append(deps, getCtorParamDependencies(f.Type)...)
+	}
+
+	return
 }
 
 func cycleError(cycle []reflect.Type, last reflect.Type) error {
@@ -306,9 +317,9 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type, seen
 
 // Param is embedded inside structs to opt those structs in as Dig parameter
 // objects.
-//
-// TODO usage docs
 type Param struct{}
+
+// TODO usage docs for param
 
 var _ parameterObject = Param{}
 
@@ -321,32 +332,6 @@ func (Param) parameterObject() {}
 // something embeds Param without iterating through all its fields.
 type parameterObject interface {
 	parameterObject()
-}
-
-// Returns dependencies introduced by a parameter object.
-func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	var deps []reflect.Type
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		if f.PkgPath != "" {
-			continue // skip private fields
-		}
-
-		if f.Type.Implements(_parameterObjectType) {
-			newDeps, err := getParameterDependencies(f.Type)
-			if err != nil {
-				return nil, err
-			}
-			deps = append(deps, newDeps...)
-		} else {
-			deps = append(deps, f.Type)
-		}
-	}
-	return deps, nil
 }
 
 // Returns a new Param parent object with all the dependency fields
