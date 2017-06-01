@@ -354,6 +354,8 @@ func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
 	return deps, nil
 }
 
+// Returns a new Param parent object with all the dependency fields
+// populated from the dig container.
 func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 	dest := reflect.New(t).Elem()
 	result := dest
