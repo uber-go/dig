@@ -286,6 +286,75 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
+	t.Run("param wrapper", func(t *testing.T) {
+		var (
+			buff   *bytes.Buffer
+			called bool
+		)
+
+		c := New()
+		require.NoError(t, c.Provide(func() *bytes.Buffer {
+			require.False(t, called, "constructor must be called exactly once")
+			called = true
+			buff = new(bytes.Buffer)
+			return buff
+		}), "provide failed")
+
+		type MyParam struct{ Param }
+
+		type Args struct {
+			MyParam
+
+			Buffer *bytes.Buffer
+		}
+
+		require.NoError(t, c.Invoke(func(args Args) {
+			require.True(t, called, "constructor must be called first")
+			require.NotNil(t, args.Buffer, "invoke got nil buffer")
+			require.True(t, args.Buffer == buff, "buffer must match constructor's return value")
+		}))
+	})
+
+	t.Run("param recurse", func(t *testing.T) {
+		type anotherParam struct {
+			Param
+
+			Buffer *bytes.Buffer
+		}
+
+		type someParam struct {
+			Param
+
+			Buffer  *bytes.Buffer
+			Another *anotherParam
+		}
+
+		var (
+			buff   *bytes.Buffer
+			called bool
+		)
+
+		c := New()
+		require.NoError(t, c.Provide(func() *bytes.Buffer {
+			require.False(t, called, "constructor must be called exactly once")
+			called = true
+			buff = new(bytes.Buffer)
+			return buff
+		}), "provide must not fail")
+
+		require.NoError(t, c.Invoke(func(p *someParam) {
+			require.True(t, called, "constructor must be called first")
+
+			require.NotNil(t, p, "someParam must not be nil")
+			require.NotNil(t, p.Buffer, "someParam.Buffer must not be nil")
+			require.NotNil(t, p.Another, "anotherParam must not be nil")
+			require.NotNil(t, p.Another.Buffer, "anotherParam.Buffer must not be nil")
+
+			require.True(t, p.Buffer == p.Another.Buffer, "buffers fields must match")
+			require.True(t, p.Buffer == buff, "buffer must match constructor's return value")
+		}), "invoke must not fail")
+	})
+
 	t.Run("multiple-type constructor", func(t *testing.T) {
 		c := New()
 		constructor := func() (*bytes.Buffer, []int, error) {
@@ -390,36 +459,6 @@ func TestProvideConstructorErrors(t *testing.T) {
 			return &A{}, &A{}, nil
 		}
 		require.Error(t, c.Provide(constructor), "provide failed")
-	})
-}
-
-func TestParamsDontRecurse(t *testing.T) {
-	t.Parallel()
-
-	t.Run("param field", func(t *testing.T) {
-
-		type anotherParam struct {
-			Param
-
-			Reader io.Reader
-		}
-
-		type someParam struct {
-			Param
-
-			Writer  io.Writer
-			Another anotherParam
-		}
-
-		c := New()
-		err := c.Provide(func(a someParam) *bytes.Buffer {
-			panic("constructor must not be called")
-		})
-		require.Error(t, err, "provide must fail")
-		require.Contains(t, err.Error(),
-			"parameter objects may not be used as fields of other parameter objects")
-		require.Contains(t, err.Error(),
-			"field Another (type dig.anotherParam) of dig.someParam is a parameter object")
 	})
 }
 

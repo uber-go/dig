@@ -31,7 +31,6 @@ var (
 	_noValue             reflect.Value
 	_errType             = reflect.TypeOf((*error)(nil)).Elem()
 	_parameterObjectType = reflect.TypeOf((*parameterObject)(nil)).Elem()
-	_paramType           = reflect.TypeOf(Param{})
 )
 
 const _optionalTag = "optional"
@@ -175,9 +174,15 @@ func (c *Container) isAcyclic(n node) error {
 	return detectCycles(n, c.nodes, nil, make(map[reflect.Type]struct{}))
 }
 
+// Retrieve a type from the container
 func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	if v, ok := c.cache[t]; ok {
 		return v, nil
+	}
+
+	if t.Implements(_parameterObjectType) {
+		// We do not want parameter objects to be cached.
+		return c.createParamObject(t)
 	}
 
 	n, ok := c.nodes[t]
@@ -233,18 +238,7 @@ func (c *Container) remove(nodes []node) {
 func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error) {
 	args := make([]reflect.Value, 0, ctype.NumIn())
 	for i := 0; i < ctype.NumIn(); i++ {
-		var (
-			arg reflect.Value
-			err error
-		)
-
-		t := ctype.In(i)
-		if t.Implements(_parameterObjectType) {
-			arg, err = c.getParameterObject(t)
-		} else {
-			arg, err = c.get(t)
-		}
-
+		arg, err := c.get(ctype.In(i))
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get arguments for constructor %v: %v", ctype, err)
 		}
@@ -263,16 +257,7 @@ type node struct {
 func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
 	deps := make([]reflect.Type, 0, ctype.NumIn())
 	for i := 0; i < ctype.NumIn(); i++ {
-		t := ctype.In(i)
-		if t.Implements(_parameterObjectType) {
-			pdeps, err := getParameterDependencies(t)
-			if err != nil {
-				return node{}, err
-			}
-			deps = append(deps, pdeps...)
-		} else {
-			deps = append(deps, t)
-		}
+		deps = append(deps, getConstructorDependencies(ctype.In(i))...)
 	}
 
 	return node{
@@ -281,6 +266,23 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 		ctype:    ctype,
 		deps:     deps,
 	}, nil
+}
+
+// Retrives the dependencies for the parameter of a constructor.
+func getConstructorDependencies(t reflect.Type) []reflect.Type {
+	if !t.Implements(_parameterObjectType) {
+		return []reflect.Type{t}
+	}
+
+	deps := make([]reflect.Type, 0, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.PkgPath != "" {
+			continue // skip private fields
+		}
+		deps = append(deps, getConstructorDependencies(f.Type)...)
+	}
+	return deps
 }
 
 func cycleError(cycle []reflect.Type, last reflect.Type) error {
@@ -312,9 +314,9 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type, seen
 
 // Param is embedded inside structs to opt those structs in as Dig parameter
 // objects.
-//
-// TODO usage docs
 type Param struct{}
+
+// TODO usage docs for param
 
 var _ parameterObject = Param{}
 
@@ -329,38 +331,9 @@ type parameterObject interface {
 	parameterObject()
 }
 
-// Returns dependencies introduced by a parameter object.
-func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	var deps []reflect.Type
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		if f.PkgPath != "" {
-			continue // skip private fields
-		}
-
-		// Skip the embedded Param type.
-		if f.Anonymous && f.Type == _paramType {
-			continue
-		}
-
-		// The user added a parameter object as a dependency. We don't recurse
-		// /yet/ so let's try to give an informative error message.
-		if f.Type.Implements(_parameterObjectType) {
-			return nil, fmt.Errorf(
-				"dig parameter objects may not be used as fields of other parameter objects: "+
-					"field %v (type %v) of %v is a parameter object", f.Name, f.Type, t)
-		}
-
-		deps = append(deps, f.Type)
-	}
-	return deps, nil
-}
-
-func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
+// Returns a new Param parent object with all the dependency fields
+// populated from the dig container.
+func (c *Container) createParamObject(t reflect.Type) (reflect.Value, error) {
 	dest := reflect.New(t).Elem()
 	result := dest
 	for t.Kind() == reflect.Ptr {
@@ -373,11 +346,6 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 		f := t.Field(i)
 		if f.PkgPath != "" {
 			continue // skip private fields
-		}
-
-		// Skip the embedded Param type.
-		if f.Anonymous && f.Type == _paramType {
-			continue
 		}
 
 		v, err := c.get(f.Type)
@@ -393,6 +361,5 @@ func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
 
 		dest.Field(i).Set(v)
 	}
-
 	return result, nil
 }
