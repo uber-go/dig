@@ -116,7 +116,7 @@ func (c *Container) provideInstance(val interface{}) error {
 	if vtype == _errType {
 		return errors.New("can't provide errors")
 	}
-	if vtype.Implements(_parameterObjectType) {
+	if isParameterObject(vtype) {
 		return errors.New("can't provide parameter objects")
 	}
 	if _, ok := c.nodes[vtype]; ok {
@@ -135,7 +135,7 @@ func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) err
 			// Don't register errors into the container.
 			continue
 		}
-		if rt.Implements(_parameterObjectType) {
+		if isParameterObject(rt) {
 			return errors.New("can't provide parameter objects")
 		}
 		if _, ok := returnTypes[rt]; ok {
@@ -180,7 +180,7 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 		return v, nil
 	}
 
-	if t.Implements(_parameterObjectType) {
+	if isParameterObject(t) {
 		// We do not want parameter objects to be cached.
 		return c.createParamObject(t)
 	}
@@ -270,7 +270,7 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 
 // Retrives the dependencies for the parameter of a constructor.
 func getConstructorDependencies(t reflect.Type) []reflect.Type {
-	if !t.Implements(_parameterObjectType) {
+	if !isParameterObject(t) {
 		return []reflect.Type{t}
 	}
 
@@ -331,17 +331,14 @@ type parameterObject interface {
 	parameterObject()
 }
 
+func isParameterObject(t reflect.Type) bool {
+	return t.Implements(_parameterObjectType) && t.Kind() == reflect.Struct
+}
+
 // Returns a new Param parent object with all the dependency fields
 // populated from the dig container.
 func (c *Container) createParamObject(t reflect.Type) (reflect.Value, error) {
 	dest := reflect.New(t).Elem()
-	result := dest
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-		dest.Set(reflect.New(t))
-		dest = dest.Elem()
-	}
-
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		if f.PkgPath != "" {
@@ -354,12 +351,12 @@ func (c *Container) createParamObject(t reflect.Type) (reflect.Value, error) {
 			case "true", "yes":
 				v = reflect.Zero(f.Type)
 			default:
-				return result, fmt.Errorf(
+				return dest, fmt.Errorf(
 					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
 			}
 		}
 
 		dest.Field(i).Set(v)
 	}
-	return result, nil
+	return dest, nil
 }
