@@ -28,8 +28,10 @@ import (
 )
 
 var (
-	_noValue reflect.Value
-	_errType = reflect.TypeOf((*error)(nil)).Elem()
+	_noValue             reflect.Value
+	_errType             = reflect.TypeOf((*error)(nil)).Elem()
+	_parameterObjectType = reflect.TypeOf((*parameterObject)(nil)).Elem()
+	_paramType           = reflect.TypeOf(Param{})
 )
 
 // A Container is a directed, acyclic graph of dependencies. Dependencies are
@@ -113,6 +115,9 @@ func (c *Container) provideInstance(val interface{}) error {
 	if vtype == _errType {
 		return errors.New("can't provide errors")
 	}
+	if vtype.Implements(_parameterObjectType) {
+		return errors.New("can't provide parameter objects")
+	}
 	if _, ok := c.nodes[vtype]; ok {
 		return errors.New("already in container")
 	}
@@ -129,6 +134,9 @@ func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) err
 			// Don't register errors into the container.
 			continue
 		}
+		if rt.Implements(_parameterObjectType) {
+			return errors.New("can't provide parameter objects")
+		}
 		if _, ok := returnTypes[rt]; ok {
 			return fmt.Errorf("returns multiple %v", rt)
 		}
@@ -143,7 +151,10 @@ func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) err
 
 	nodes := make([]node, 0, len(returnTypes))
 	for rt := range returnTypes {
-		n := newNode(rt, ctor, ctype)
+		n, err := newNode(rt, ctor, ctype)
+		if err != nil {
+			return err
+		}
 		nodes = append(nodes, n)
 		c.nodes[rt] = n
 	}
@@ -220,7 +231,18 @@ func (c *Container) remove(nodes []node) {
 func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error) {
 	args := make([]reflect.Value, 0, ctype.NumIn())
 	for i := 0; i < ctype.NumIn(); i++ {
-		arg, err := c.get(ctype.In(i))
+		var (
+			arg reflect.Value
+			err error
+		)
+
+		t := ctype.In(i)
+		if t.Implements(_parameterObjectType) {
+			arg, err = c.getParameterObject(t)
+		} else {
+			arg, err = c.get(t)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get arguments for constructor %v: %v", ctype, err)
 		}
@@ -236,17 +258,27 @@ type node struct {
 	deps     []reflect.Type
 }
 
-func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) node {
-	deps := make([]reflect.Type, ctype.NumIn())
-	for i := range deps {
-		deps[i] = ctype.In(i)
+func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
+	deps := make([]reflect.Type, 0, ctype.NumIn())
+	for i := 0; i < ctype.NumIn(); i++ {
+		t := ctype.In(i)
+		if t.Implements(_parameterObjectType) {
+			pdeps, err := getParameterDependencies(t)
+			if err != nil {
+				return node{}, err
+			}
+			deps = append(deps, pdeps...)
+		} else {
+			deps = append(deps, t)
+		}
 	}
+
 	return node{
 		provides: provides,
 		ctor:     ctor,
 		ctype:    ctype,
 		deps:     deps,
-	}
+	}, nil
 }
 
 func cycleError(cycle []reflect.Type, last reflect.Type) error {
@@ -274,4 +306,86 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type, seen
 		}
 	}
 	return nil
+}
+
+// Param is embedded inside structs to opt those structs in as Dig parameter
+// objects.
+//
+// TODO usage docs
+type Param struct{}
+
+var _ parameterObject = Param{}
+
+// Param is the only instance of parameterObject.
+func (Param) parameterObject() {}
+
+// Users embed the Param struct to opt a struct in as a parameter object.
+// Param implements this interface so the struct into which Param is embedded
+// also implements this interface. This provides us an easy way to check if
+// something embeds Param without iterating through all its fields.
+type parameterObject interface {
+	parameterObject()
+}
+
+// Returns dependencies introduced by a parameter object.
+func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	var deps []reflect.Type
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		// Skip the embedded Param type.
+		if f.Anonymous && f.Type == _paramType {
+			continue
+		}
+
+		// The user added a parameter object as a dependency. We don't recurse
+		// /yet/ so let's try to give an informative error message.
+		if f.Type.Implements(_parameterObjectType) {
+			return nil, fmt.Errorf(
+				"dig parameter objects may not be used as fields of other parameter objects: "+
+					"field %v (type %v) of %v is a parameter object", f.Name, f.Type, t)
+		}
+
+		deps = append(deps, f.Type)
+	}
+	return deps, nil
+}
+
+func (c *Container) getParameterObject(t reflect.Type) (reflect.Value, error) {
+	dest := reflect.New(t).Elem()
+	result := dest
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+		dest.Set(reflect.New(t))
+		dest = dest.Elem()
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		// Skip the embedded Param type.
+		if f.Anonymous && f.Type == _paramType {
+			continue
+		}
+
+		v, err := c.get(f.Type)
+		if err != nil {
+			return result, fmt.Errorf(
+				"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
+		}
+
+		dest.Field(i).Set(v)
+	}
+
+	return result, nil
 }
