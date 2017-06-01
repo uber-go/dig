@@ -655,6 +655,27 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Error(t, c.Invoke(func(*bytes.Buffer) {}))
 	})
 
+	t.Run("unmet required dependency", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+
+		type args struct {
+			Param
+
+			T1 *type1 `optional:"yes"`
+			T2 *type2 `optional:"no"`
+		}
+
+		c := New()
+		err := c.Invoke(func(a *args) {
+			t.Fatal("function must not be called")
+		})
+
+		require.Error(t, err, "expected invoke error")
+		require.Contains(t, err.Error(), "could not get field T2")
+		require.Contains(t, err.Error(), "dig.type2 isn't in the container")
+	})
+
 	t.Run("returned error", func(t *testing.T) {
 		c := New()
 		assert.Error(t, c.Invoke(func() error { return errors.New("oh no") }))
