@@ -181,7 +181,7 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	}
 
 	if t.Implements(_parameterObjectType) {
-		// No caching
+		// We do not want parameter objects to be cached.
 		return c.createParamObject(t)
 	}
 
