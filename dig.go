@@ -32,7 +32,7 @@ var (
 	_noValue             reflect.Value
 	_errType             = reflect.TypeOf((*error)(nil)).Elem()
 	_parameterObjectType = reflect.TypeOf((*digInObject)(nil)).Elem()
-	_paramType           = reflect.TypeOf(In{})
+	_inType              = reflect.TypeOf(In{})
 )
 
 const _optionalTag = "optional"
@@ -332,7 +332,7 @@ func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
 		}
 
 		// Skip the embedded Param type.
-		if f.Anonymous && f.Type == _paramType {
+		if f.Anonymous && f.Type == _inType {
 			continue
 		}
 
