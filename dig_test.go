@@ -69,7 +69,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("struct", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		c := New()
 		var buf bytes.Buffer
 		buf.WriteString("foo")
@@ -81,7 +80,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("struct constructor", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		c := New()
 		var buf bytes.Buffer
 		buf.WriteString("foo")
@@ -157,7 +155,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("channel", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		c := New()
 		ch := make(chan int)
 		require.NoError(t, c.Provide(ch), "provide failed")
@@ -167,7 +164,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("channel constructor", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		c := New()
 		require.NoError(t, c.Provide(func() chan int {
 			return make(chan int)
@@ -178,7 +174,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("func constructor", func(t *testing.T) {
-		t.Skip("Not yet supported.")
 		// Functions passed directly to Provide are treated as constructors,
 		// but we can still put functions into the container with constructors.
 		// This makes injecting builders simple.
@@ -231,6 +226,48 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Invoke(consumer), "invoke failed")
 	})
 
+	t.Run("multiple-type constructor is called once", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type B struct{}
+		count := 0
+		constructor := func() (*A, *B, error) {
+			count++
+			return &A{}, &B{}, nil
+		}
+		getA := func(a *A) {
+			assert.NotNil(t, a, "got nil A")
+		}
+		getB := func(b *B) {
+			assert.NotNil(t, b, "got nil B")
+		}
+		require.NoError(t, c.Provide(constructor), "provide failed")
+		require.NoError(t, c.Invoke(getA), "A invoke failed")
+		require.NoError(t, c.Invoke(getB), "B invoke failed")
+		require.NoError(t, c.Invoke(func(a *A, b *B) {}), "AB invoke failed")
+		require.Equal(t, 1, count, "Constructor must be called once")
+	})
+	t.Run("method invocation inside Invoke", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type B struct{}
+		cA := func() (*A, error) {
+			return &A{}, nil
+		}
+		cB := func() (*B, error) {
+			return &B{}, nil
+		}
+		getA := func(a *A) {
+			c.Invoke(func(b *B) {
+				assert.NotNil(t, b, "got nil B")
+			})
+			assert.NotNil(t, a, "got nil A")
+		}
+
+		require.NoError(t, c.Provide(cA), "provide failed")
+		require.NoError(t, c.Provide(cB), "provide failed")
+		require.NoError(t, c.Invoke(getA), "A invoke failed")
+	})
 	t.Run("collections and instances of same type", func(t *testing.T) {
 		c := New()
 		require.NoError(t, c.Provide(func() []*bytes.Buffer {
@@ -239,6 +276,17 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
 			return &bytes.Buffer{}
 		}), "providing pointer failed")
+	})
+}
+
+func TestProvideConstructorErrors(t *testing.T) {
+	t.Run("multiple-type constructor returns multiple objects of same type", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		constructor := func() (*A, *A, error) {
+			return &A{}, &A{}, nil
+		}
+		require.Error(t, c.Provide(constructor), "provide failed")
 	})
 }
 
@@ -266,7 +314,6 @@ func TestProvideRespectsConstructorErrors(t *testing.T) {
 }
 
 func TestCantProvideUntypedNil(t *testing.T) {
-	t.Skip("Calling Container.Provide(nil) crashes the main testing thread")
 	t.Parallel()
 	c := New()
 	assert.Error(t, c.Provide(nil))
@@ -332,6 +379,21 @@ func TestProvideKnownTypesFails(t *testing.T) {
 			}
 		})
 	}
+	t.Run("provide constructor twice", func(t *testing.T) {
+		c := New()
+		assert.NoError(t, c.Provide(func() *bytes.Buffer { return nil }))
+		assert.Error(t, c.Provide(func() *bytes.Buffer { return nil }))
+	})
+	t.Run("provide instance and constructor fails", func(t *testing.T) {
+		c := New()
+		assert.NoError(t, c.Provide(&bytes.Buffer{}))
+		assert.Error(t, c.Provide(func() *bytes.Buffer { return nil }))
+	})
+	t.Run("provide constructor then object instance fails", func(t *testing.T) {
+		c := New()
+		assert.NoError(t, c.Provide(func() *bytes.Buffer { return nil }))
+		assert.Error(t, c.Provide(&bytes.Buffer{}))
+	})
 }
 
 func TestProvideCycleFails(t *testing.T) {
@@ -405,6 +467,11 @@ func TestInvokesUseCachedObjects(t *testing.T) {
 
 func TestInvokeFailures(t *testing.T) {
 	t.Parallel()
+
+	t.Run("untyped nil", func(t *testing.T) {
+		c := New()
+		assert.Error(t, c.Invoke(nil))
+	})
 
 	t.Run("unmet dependency", func(t *testing.T) {
 		c := New()

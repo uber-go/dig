@@ -6,7 +6,6 @@ testImport:
   - assert
   - require
 - package: github.com/mattn/goveralls
-- package: github.com/pkg/errors
 - package: golang.org/x/tools
   subpackages:
   - cover
