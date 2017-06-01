@@ -31,7 +31,8 @@ import (
 var (
 	_noValue             reflect.Value
 	_errType             = reflect.TypeOf((*error)(nil)).Elem()
-	_parameterObjectType = reflect.TypeOf((*parameterObject)(nil)).Elem()
+	_parameterObjectType = reflect.TypeOf((*digInObject)(nil)).Elem()
+	_paramType           = reflect.TypeOf(In{})
 )
 
 const _optionalTag = "optional"
@@ -313,27 +314,39 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type, seen
 	return nil
 }
 
-// Param is embedded inside structs to opt those structs in as Dig parameter
-// objects.
-type Param struct{}
-
-// TODO usage docs for param
-
-var _ parameterObject = Param{}
-
-// Param is the only instance of parameterObject.
-func (Param) parameterObject() {}
-
-// Users embed the Param struct to opt a struct in as a parameter object.
-// Param implements this interface so the struct into which Param is embedded
-// also implements this interface. This provides us an easy way to check if
-// something embeds Param without iterating through all its fields.
-type parameterObject interface {
-	parameterObject()
-}
-
 func isParameterObject(t reflect.Type) bool {
 	return t.Implements(_parameterObjectType) && t.Kind() == reflect.Struct
+}
+
+// Returns dependencies introduced by a parameter object.
+func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	var deps []reflect.Type
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		// Skip the embedded Param type.
+		if f.Anonymous && f.Type == _paramType {
+			continue
+		}
+
+		// The user added a parameter object as a dependency. We don't recurse
+		// /yet/ so let's try to give an informative error message.
+		if f.Type.Implements(_parameterObjectType) {
+			return nil, fmt.Errorf(
+				"dig parameter objects may not be used as fields of other parameter objects: "+
+					"field %v (type %v) of %v is a parameter object", f.Name, f.Type, t)
+		}
+
+		deps = append(deps, f.Type)
+	}
+	return deps, nil
 }
 
 // Returns a new Param parent object with all the dependency fields
