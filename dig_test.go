@@ -426,6 +426,26 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.NotNil(t, p.T4, "optional type in the graph should not return nil")
 			assert.Nil(t, p.T5, "optional type not in the graph should return nil")
 		}))
+
+		t.Run("out type", func(t *testing.T) {
+			c := New()
+			type A struct{}
+			type B struct{}
+
+			type Ret struct {
+				Out
+
+				*A
+				*B
+			}
+			require.NoError(t, c.Provide(func() Ret {
+				return Ret{A: &A{}, B: &B{}}
+			}), "provide for the Ret struct should succeed")
+			require.NoError(t, c.Invoke(func(a *A, b *B) {
+				assert.NotNil(t, a, "*A has to be present")
+				assert.NotNil(t, b, "*B has to be present")
+			}))
+		})
 	})
 
 	t.Run("constructor with optional", func(t *testing.T) {

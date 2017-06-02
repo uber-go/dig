@@ -28,14 +28,9 @@ import (
 	"strconv"
 )
 
-var (
-	_noValue         reflect.Value
-	_errType         = reflect.TypeOf((*error)(nil)).Elem()
-	_inInterfaceType = reflect.TypeOf((*digInObject)(nil)).Elem()
-	_inType          = reflect.TypeOf(In{})
+const (
+	_optionalTag = "optional"
 )
-
-const _optionalTag = "optional"
 
 // A Container is a directed, acyclic graph of dependencies. Dependencies are
 // constructed on-demand and returned from a cache thereafter, so they're
