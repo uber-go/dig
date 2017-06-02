@@ -1,11 +1,7 @@
-hash: c30ea712100d21a90bc195c7cd4c39aa43e46d99229e7189f6044c729c6b11d4
-updated: 2017-06-02T11:14:33.486489523-07:00
+hash: fdd7122108d34cf543d2dd819f2c794d94d44245ab0ac8ff298a7720a5b93976
+updated: 2017-06-02T11:14:49.117711757-07:00
 imports: []
 testImports:
-- name: github.com/axw/gocov
-  version: 3a69a0d2a4ef1f263e2d92b041a69593d6964fe8
-  subpackages:
-  - gocov
 - name: github.com/davecgh/go-spew
   version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
   subpackages:

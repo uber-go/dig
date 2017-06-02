@@ -11,8 +11,5 @@ testImport:
 - package: github.com/golang/lint
   subpackages:
   - golint
-- package: github.com/axw/gocov
-  subpackages:
-  - gocov
 - package: github.com/sectioneight/md-to-godoc
   version: master

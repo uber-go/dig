@@ -19,9 +19,6 @@ dependencies:
 	@echo "Installing Glide and locked dependencies..."
 	glide --version || go get -u -f github.com/Masterminds/glide
 	glide install
-	@echo "Installing test dependencies..."
-	go install ./vendor/github.com/axw/gocov/gocov
-	go install ./vendor/github.com/mattn/goveralls
 	@$(call label,Installing md-to-godoc...)
 	$(ECHO_V)go install ./vendor/github.com/sectioneight/md-to-godoc
 	@echo "Installing uber-license tool..."
