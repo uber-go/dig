@@ -1,5 +1,5 @@
 BENCH_FLAGS ?= -cpuprofile=cpu.pprof -memprofile=mem.pprof -benchmem
-PKGS ?= $(shell glide novendor)
+PKGS ?= $(shell glide novendor | grep -v examples)
 PKG_FILES ?= *.go
 
 # The linting tools evolve with each Go version, so run them only on the latest
