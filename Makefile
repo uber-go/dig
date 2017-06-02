@@ -58,15 +58,12 @@ endif
 
 .PHONY: test
 test:
-	go test -race $(PKGS)
+	@.build/test.sh
 
-.PHONY: cover
-cover:
-	go test -cover -coverprofile cover.out -race $(PKGS)
-
-.PHONY: coveralls
-coveralls:
-	goveralls -service=travis-ci || echo "Coveralls failed"
+.PHONY: ci
+ci: SHELL := /bin/bash
+ci: test
+	bash <(curl -s https://codecov.io/bash)
 
 .PHONY: bench
 BENCH ?= .

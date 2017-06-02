@@ -11,6 +11,4 @@ install:
   - make dependencies
 script:
   - make lint
-  - make test
-after_success:
-  - make coveralls
+  - make ci
