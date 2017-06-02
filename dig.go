@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 )
 
 var (
@@ -345,12 +346,22 @@ func (c *Container) createParamObject(t reflect.Type) (reflect.Value, error) {
 			continue // skip private fields
 		}
 
+		var isOptional bool
+		if tag := f.Tag.Get(_optionalTag); tag != "" {
+			var err error
+			isOptional, err = strconv.ParseBool(tag)
+			if err != nil {
+				return dest, fmt.Errorf(
+					"invalid value %q for %q tag on field %v of %v: %v",
+					tag, _optionalTag, f.Name, t, err)
+			}
+		}
+
 		v, err := c.get(f.Type)
 		if err != nil {
-			switch f.Tag.Get(_optionalTag) {
-			case "true", "yes":
+			if isOptional {
 				v = reflect.Zero(f.Type)
-			default:
+			} else {
 				return dest, fmt.Errorf(
 					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
 			}

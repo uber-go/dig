@@ -417,7 +417,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			T2 *type2 `optional:"true" useless_tag:"false"` // optional type NOT in the graph
 			T3 *type3 `unrelated:"foo=42, optional"`        // type in the graph with unrelated tag
 			T4 *type4 `optional:"true"`                     // optional type present in the graph
-			T5 *type5 `optional:"yes"`                      // optional type NOT in the graph with "yes"
+			T5 *type5 `optional:"t"`                        // optional type NOT in the graph with "yes"
 		}
 		require.NoError(t, c.Provide(constructor))
 		require.NoError(t, c.Invoke(func(p param) {
@@ -685,8 +685,8 @@ func TestInvokeFailures(t *testing.T) {
 		type args struct {
 			Param
 
-			T1 *type1 `optional:"yes"`
-			T2 *type2 `optional:"no"`
+			T1 *type1 `optional:"true"`
+			T2 *type2 `optional:"0"`
 		}
 
 		c := New()
@@ -697,6 +697,22 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err, "expected invoke error")
 		require.Contains(t, err.Error(), "could not get field T2")
 		require.Contains(t, err.Error(), "dig.type2 isn't in the container")
+	})
+
+	t.Run("invalid optional tag", func(t *testing.T) {
+		type args struct {
+			Param
+
+			Buffer *bytes.Buffer `optional:"no"`
+		}
+
+		c := New()
+		err := c.Invoke(func(a args) {
+			t.Fatal("function must not be called")
+		})
+
+		require.Error(t, err, "expected invoke error")
+		require.Contains(t, err.Error(), `invalid value "no" for "optional" tag on field Buffer`)
 	})
 
 	t.Run("returned error", func(t *testing.T) {
