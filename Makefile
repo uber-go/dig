@@ -1,5 +1,5 @@
 BENCH_FLAGS ?= -cpuprofile=cpu.pprof -memprofile=mem.pprof -benchmem
-PKGS ?= $(shell glide novendor)
+PKGS ?= $(shell glide novendor | grep -v examples)
 PKG_FILES ?= *.go
 
 # The linting tools evolve with each Go version, so run them only on the latest
@@ -19,9 +19,6 @@ dependencies:
 	@echo "Installing Glide and locked dependencies..."
 	glide --version || go get -u -f github.com/Masterminds/glide
 	glide install
-	@echo "Installing test dependencies..."
-	go install ./vendor/github.com/axw/gocov/gocov
-	go install ./vendor/github.com/mattn/goveralls
 	@$(call label,Installing md-to-godoc...)
 	$(ECHO_V)go install ./vendor/github.com/sectioneight/md-to-godoc
 	@echo "Installing uber-license tool..."
@@ -58,15 +55,12 @@ endif
 
 .PHONY: test
 test:
-	go test -race $(PKGS)
+	@.build/test.sh
 
-.PHONY: cover
-cover:
-	go test -cover -coverprofile cover.out -race $(PKGS)
-
-.PHONY: coveralls
-coveralls:
-	goveralls -service=travis-ci || echo "Coveralls failed"
+.PHONY: ci
+ci: SHELL := /bin/bash
+ci: test
+	bash <(curl -s https://codecov.io/bash)
 
 .PHONY: bench
 BENCH ?= .

@@ -5,15 +5,11 @@ testImport:
   subpackages:
   - assert
   - require
-- package: github.com/mattn/goveralls
 - package: golang.org/x/tools
   subpackages:
   - cover
 - package: github.com/golang/lint
   subpackages:
   - golint
-- package: github.com/axw/gocov
-  subpackages:
-  - gocov
 - package: github.com/sectioneight/md-to-godoc
   version: master
