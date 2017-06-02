@@ -216,11 +216,9 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("param", func(t *testing.T) {
 		c := New()
-
 		type contents string
-
 		type Args struct {
-			Param
+			In
 
 			privateContents contents
 			Contents        contents
@@ -254,7 +252,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "provide failed")
 
 		type Args struct {
-			Param
+			In
 
 			privateBuffer *bytes.Buffer
 
@@ -281,7 +279,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			return buff
 		}), "provide failed")
 
-		type MyParam struct{ Param }
+		type MyParam struct{ In }
 
 		type Args struct {
 			MyParam
@@ -298,13 +296,13 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("param recurse", func(t *testing.T) {
 		type anotherParam struct {
-			Param
+			In
 
 			Buffer *bytes.Buffer
 		}
 
 		type someParam struct {
-			Param
+			In
 
 			Buffer  *bytes.Buffer
 			Another anotherParam
@@ -411,7 +409,7 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		c := New()
 		type param struct {
-			Param
+			In
 
 			T1 *type1 // regular 'ol type
 			T2 *type2 `optional:"true" useless_tag:"false"` // optional type NOT in the graph
@@ -514,7 +512,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 	t.Parallel()
 
 	t.Run("instance", func(t *testing.T) {
-		type Args struct{ Param }
+		type Args struct{ In }
 
 		c := New()
 		err := c.Provide(Args{})
@@ -523,7 +521,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 	})
 
 	t.Run("pointer", func(t *testing.T) {
-		type Args struct{ Param }
+		type Args struct{ In }
 
 		args := &Args{}
 
@@ -535,7 +533,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 	})
 
 	t.Run("constructor", func(t *testing.T) {
-		type Args struct{ Param }
+		type Args struct{ In }
 
 		c := New()
 		err := c.Provide(func() (Args, error) {
@@ -546,7 +544,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 	})
 
 	t.Run("pointer from constructor", func(t *testing.T) {
-		type Args struct{ Param }
+		type Args struct{ In }
 
 		args := &Args{}
 
@@ -683,7 +681,7 @@ func TestInvokeFailures(t *testing.T) {
 		type type2 struct{}
 
 		type args struct {
-			Param
+			In
 
 			T1 *type1 `optional:"true"`
 			T2 *type2 `optional:"0"`
@@ -701,7 +699,7 @@ func TestInvokeFailures(t *testing.T) {
 
 	t.Run("invalid optional tag", func(t *testing.T) {
 		type args struct {
-			Param
+			In
 
 			Buffer *bytes.Buffer `optional:"no"`
 		}
