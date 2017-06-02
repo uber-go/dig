@@ -723,3 +723,18 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Error(t, c.Invoke(func() (int, error) { return 42, errors.New("oh no") }))
 	})
 }
+
+func TestStringer(t *testing.T) {
+	c := New()
+	type A struct{}
+	type B struct{}
+	require.NoError(t, c.Provide(func() (*A, *B) { return &A{}, &B{} }))
+
+	b := &bytes.Buffer{}
+	fmt.Fprintln(b, c)
+	s := b.String()
+
+	require.Contains(t, s, "*dig.A ->")
+	require.Contains(t, s, "*dig.B ->")
+	require.Contains(t, s, "func() (*dig.A, *dig.B)")
+}
