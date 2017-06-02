@@ -29,10 +29,10 @@ import (
 )
 
 var (
-	_noValue             reflect.Value
-	_errType             = reflect.TypeOf((*error)(nil)).Elem()
-	_parameterObjectType = reflect.TypeOf((*digInObject)(nil)).Elem()
-	_inType              = reflect.TypeOf(In{})
+	_noValue         reflect.Value
+	_errType         = reflect.TypeOf((*error)(nil)).Elem()
+	_inInterfaceType = reflect.TypeOf((*digInObject)(nil)).Elem()
+	_inType          = reflect.TypeOf(In{})
 )
 
 const _optionalTag = "optional"
@@ -118,7 +118,7 @@ func (c *Container) provideInstance(val interface{}) error {
 	if vtype == _errType {
 		return errors.New("can't provide errors")
 	}
-	if isParameterObject(vtype) {
+	if isInObject(vtype) {
 		return errors.New("can't provide parameter objects")
 	}
 	if _, ok := c.nodes[vtype]; ok {
@@ -137,7 +137,7 @@ func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) err
 			// Don't register errors into the container.
 			continue
 		}
-		if isParameterObject(rt) {
+		if isInObject(rt) {
 			return errors.New("can't provide parameter objects")
 		}
 		if _, ok := returnTypes[rt]; ok {
@@ -182,9 +182,9 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 		return v, nil
 	}
 
-	if isParameterObject(t) {
+	if isInObject(t) {
 		// We do not want parameter objects to be cached.
-		return c.createParamObject(t)
+		return c.createInObject(t)
 	}
 
 	n, ok := c.nodes[t]
@@ -272,7 +272,7 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 
 // Retrives the dependencies for the parameter of a constructor.
 func getConstructorDependencies(t reflect.Type) []reflect.Type {
-	if !isParameterObject(t) {
+	if !isInObject(t) {
 		return []reflect.Type{t}
 	}
 
@@ -314,44 +314,13 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type, seen
 	return nil
 }
 
-func isParameterObject(t reflect.Type) bool {
-	return t.Implements(_parameterObjectType) && t.Kind() == reflect.Struct
+func isInObject(t reflect.Type) bool {
+	return t.Implements(_inInterfaceType) && t.Kind() == reflect.Struct
 }
 
-// Returns dependencies introduced by a parameter object.
-func getParameterDependencies(t reflect.Type) ([]reflect.Type, error) {
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	var deps []reflect.Type
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		if f.PkgPath != "" {
-			continue // skip private fields
-		}
-
-		// Skip the embedded Param type.
-		if f.Anonymous && f.Type == _inType {
-			continue
-		}
-
-		// The user added a parameter object as a dependency. We don't recurse
-		// /yet/ so let's try to give an informative error message.
-		if f.Type.Implements(_parameterObjectType) {
-			return nil, fmt.Errorf(
-				"dig parameter objects may not be used as fields of other parameter objects: "+
-					"field %v (type %v) of %v is a parameter object", f.Name, f.Type, t)
-		}
-
-		deps = append(deps, f.Type)
-	}
-	return deps, nil
-}
-
-// Returns a new Param parent object with all the dependency fields
+// Returns a new In parent object with all the dependency fields
 // populated from the dig container.
-func (c *Container) createParamObject(t reflect.Type) (reflect.Value, error) {
+func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 	dest := reflect.New(t).Elem()
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
