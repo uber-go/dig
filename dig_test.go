@@ -729,12 +729,16 @@ func TestStringer(t *testing.T) {
 	type A struct{}
 	type B struct{}
 	require.NoError(t, c.Provide(func() (*A, *B) { return &A{}, &B{} }))
+	require.NoError(t, c.Invoke(func(a *A) {}))
 
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, c)
 	s := b.String()
 
-	require.Contains(t, s, "*dig.A ->")
-	require.Contains(t, s, "*dig.B ->")
-	require.Contains(t, s, "func() (*dig.A, *dig.B)")
+	assert.Contains(t, s, "*dig.A ->")
+	assert.Contains(t, s, "*dig.B ->")
+	assert.Contains(t, s, "func() (*dig.A, *dig.B)")
+
+	assert.Contains(t, s, "*dig.A =>")
+	assert.Contains(t, s, "*dig.B =>")
 }
