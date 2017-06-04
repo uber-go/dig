@@ -125,26 +125,9 @@ func (c *Container) provideInstance(val interface{}) error {
 }
 
 func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) error {
-	returnTypes := make(map[reflect.Type]struct{}, ctype.NumOut())
-	for i := 0; i < ctype.NumOut(); i++ {
-		rt := ctype.Out(i)
-		if rt == _errType {
-			// Don't register errors into the container.
-			continue
-		}
-		if isInObject(rt) {
-			return errors.New("can't provide parameter objects")
-		}
-		if _, ok := returnTypes[rt]; ok {
-			return fmt.Errorf("returns multiple %v", rt)
-		}
-		if _, ok := c.nodes[rt]; ok {
-			return fmt.Errorf("provides type %v, which is already in the container", rt)
-		}
-		returnTypes[rt] = struct{}{}
-	}
-	if len(returnTypes) == 0 {
-		return errors.New("must provide at least one non-error type")
+	returnTypes, err := c.getReturnTypes(ctor, ctype)
+	if err != nil {
+		return fmt.Errorf("unable to collect return types of a constructor: %v", err)
 	}
 
 	nodes := make([]node, 0, len(returnTypes))
@@ -165,6 +148,63 @@ func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) err
 	}
 
 	return nil
+}
+
+// Get the return types of a constructor
+//
+// All the dig.Out returns get expanded
+func (c *Container) getReturnTypes(
+	ctor interface{},
+	ctype reflect.Type,
+) (map[reflect.Type]struct{}, error) {
+	// Could pre-compute the size but it's tricky as counter is different
+	// when dig.Out objects are mixed in
+	returnTypes := make(map[reflect.Type]struct{})
+
+	// Check each return object
+	for i := 0; i < ctype.NumOut(); i++ {
+		rt := ctype.Out(i)
+		if rt == _errType {
+			// Don't register errors into the container.
+			continue
+		}
+
+		// Tons of error checking
+		if isInObject(rt) {
+			return nil, errors.New("can't provide parameter objects")
+		}
+		if _, ok := returnTypes[rt]; ok {
+			return nil, fmt.Errorf("returns multiple %v", rt)
+		}
+		if _, ok := c.nodes[rt]; ok {
+			return nil, fmt.Errorf("provides type %v, which is already in the container", rt)
+		}
+
+		// dig.Out behaviour is different - register all the struct members
+		if isOutObject(rt) {
+			for i := 0; i < rt.NumField(); i++ {
+				f := rt.Field(i)
+				if f.PkgPath != "" {
+					continue // skip private fields
+				}
+
+				if isOutObject(f.Type) {
+					continue // skip dig.In embed
+				}
+
+				// Register dig.Out struct member as the return type of the constructor
+				returnTypes[f.Type] = struct{}{}
+			}
+		} else {
+			// Regular object or a pointer gets registered in the container
+			returnTypes[rt] = struct{}{}
+		}
+	}
+	if len(returnTypes) == 0 {
+		return nil, errors.New("must provide at least one non-error type")
+	}
+
+	return returnTypes, nil
 }
 
 func (c *Container) isAcyclic(n node) error {
@@ -208,7 +248,27 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 		if ct == _errType {
 			continue
 		}
-		c.cache[ct] = con
+		if isOutObject(ct) {
+			// dig.Out object doesn't get cached directly,
+			// but rather it's memebers are
+			for i := 0; i < ct.NumField(); i++ {
+				field := ct.Field(i)
+
+				ft := field.Type
+				fv := con.Field(i)
+
+				// skip the actual dig.Out embed
+				if isOutObject(ft) {
+					continue
+				}
+
+				// cache the dig.Out member
+				c.cache[ft] = fv
+			}
+		} else {
+			// cache the returned type
+			c.cache[ct] = con
+		}
 	}
 	return c.cache[t], nil
 }

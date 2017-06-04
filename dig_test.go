@@ -426,26 +426,32 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.NotNil(t, p.T4, "optional type in the graph should not return nil")
 			assert.Nil(t, p.T5, "optional type not in the graph should return nil")
 		}))
+	})
 
-		t.Run("out type", func(t *testing.T) {
-			c := New()
-			type A struct{}
-			type B struct{}
+	t.Run("out type inserts multiple objects into the graph", func(t *testing.T) {
+		t.Parallel()
 
-			type Ret struct {
-				Out
+		type A struct {
+			name string
+		}
+		type B struct {
+			name string
+		}
+		type Ret struct {
+			Out
 
-				*A
-				*B
-			}
-			require.NoError(t, c.Provide(func() Ret {
-				return Ret{A: &A{}, B: &B{}}
-			}), "provide for the Ret struct should succeed")
-			require.NoError(t, c.Invoke(func(a *A, b *B) {
-				assert.NotNil(t, a, "*A has to be present")
-				assert.NotNil(t, b, "*B has to be present")
-			}))
-		})
+			A  // value type A
+			*B // pointer type *B
+		}
+
+		c := New()
+		require.NoError(t, c.Provide(func() Ret {
+			return Ret{A: A{"string A"}, B: &B{"string B"}}
+		}), "provide for the Ret struct should succeed")
+		require.NoError(t, c.Invoke(func(a A, b *B) {
+			assert.Equal(t, a.name, "string A", "value type should work for dig.Out")
+			assert.Equal(t, b.name, "string B", "pointer sohuld work for dig.Out")
+		}))
 	})
 
 	t.Run("constructor with optional", func(t *testing.T) {

@@ -3,10 +3,11 @@ package dig
 import "reflect"
 
 var (
-	_noValue         reflect.Value
-	_errType         = reflect.TypeOf((*error)(nil)).Elem()
-	_inInterfaceType = reflect.TypeOf((*digInObject)(nil)).Elem()
-	_inType          = reflect.TypeOf(In{})
+	_noValue          reflect.Value
+	_errType          = reflect.TypeOf((*error)(nil)).Elem()
+	_inInterfaceType  = reflect.TypeOf((*digInObject)(nil)).Elem()
+	_outInterfaceType = reflect.TypeOf((*digOutObject)(nil)).Elem()
+	_inType           = reflect.TypeOf(In{})
 )
 
 // In is an embeddable object that signals to dig that the struct
@@ -47,6 +48,14 @@ type digInObject interface {
 
 type digOutObject interface {
 	digOutObject()
+}
+
+func isInObject(t reflect.Type) bool {
+	return t.Implements(_inInterfaceType) && t.Kind() == reflect.Struct
+}
+
+func isOutObject(t reflect.Type) bool {
+	return t.Implements(_outInterfaceType) && t.Kind() == reflect.Struct
 }
 
 // Validate interfaces are satisfied
