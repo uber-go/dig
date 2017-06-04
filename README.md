@@ -89,13 +89,44 @@ In order to successfully use use `Invoke`, the function must meet the following 
 1. All arguments to the function must be types in the container
 1. If an error is returned from an invoked function, it will be propagated to the caller
 
+Here is a fully working somewhat real-world `Invoke` example:
+
 ```go
-// c := dig.New()
-// c.Provide config.Provider, zap.Logger, etc
-err := c.Invoke(func(cfg *config.Provider, l *zap.Logger) error {
-	// function body
-	return nil
-})
+package main
+
+import (
+	"go.uber.org/config"
+	"go.uber.org/dig"
+	"go.uber.org/zap"
+)
+
+func main() {
+	c := dig.New()
+
+	// Provide configuration object
+	c.Provide(func() config.Provider {
+		return config.NewYAMLProviderFromBytes([]byte("tag: Hello, world!"))
+	})
+
+	// Provide a zap logger which relies on configuration
+	c.Provide(func(cfg config.Provider) (*zap.Logger, error) {
+		l, err := zap.NewDevelopment()
+		if err != nil {
+			return nil, err
+		}
+		return l.With(zap.String("iconic phrase", cfg.Get("tag").AsString())), nil
+	})
+
+	// Invoke a function that requires both
+	c.Invoke(func(l *zap.Logger) {
+		l.Info("You've been invoked")
+		// Logger output:
+		//     INFO    You've been invoked     {"iconic phrase": "Hello, world!"}
+		//
+		// As we can see, Invoke caused the Logger to be created, which in turn
+		// required the configuration to be created.
+	})
+}
 ```
 
 [doc]: https://godoc.org/go.uber.org/dig
