@@ -435,8 +435,8 @@ func TestEndToEndSuccess(t *testing.T) {
 		c := New()
 
 		require.NoError(t, c.Provide(func() A { return A{} }), "provide failed")
-		require.NoError(t, c.Provide(func(_ A) B { return B{} }), "provide failed")
-		require.NoError(t, c.Provide(func(_ A, _ B) C { return C{} }), "provide failed")
+		require.NoError(t, c.Provide(func(A) B { return B{} }), "provide failed")
+		require.NoError(t, c.Provide(func(A, B) C { return C{} }), "provide failed")
 	})
 }
 
