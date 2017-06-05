@@ -17,6 +17,7 @@ BETA. Expect potential API changes.
 directional dependency graph.
 
 To create one:
+
 ```go
 import "go.uber.org/dig"
 
@@ -26,9 +27,8 @@ func main() {
 }
 ```
 
-Objects in the container are identified by their `reflect.Type` and **everything
-is treated as a singleton**, meaning there can be only one object in the graph
-of a given type.
+**All objects in the container are treated as a singletons**, meaning there can be
+only one object in the graph of a given type.
 
 There are plans to expand the API to support multiple objects of the same type
 in the container, but for time being consider using a factory pattern.
@@ -39,7 +39,7 @@ The `Provide` method adds an object, or a constructor of an object, to the conta
 
 ### Provide a constructor
 
-Constructor can be a function returning any number of objects and, optionally,
+A constructor can be a function returning any number of objects and, optionally,
 an error.
 
 Each argument to the constructor is registered as a **dependency** in the graph.
@@ -117,7 +117,7 @@ func main() {
 		return l.With(zap.String("iconic phrase", cfg.Get("tag").AsString())), nil
 	})
 
-	// Invoke a function that requires both
+	// Invoke a function that requires a zap logger, which in turn requires config
 	c.Invoke(func(l *zap.Logger) {
 		l.Info("You've been invoked")
 		// Logger output:
