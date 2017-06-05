@@ -11,7 +11,7 @@
 
 BETA. Expect potential API changes.
 
-## Conatiner
+## Container
 
 `package dig` exposes `type Container` as an object capable of resolving a
 directional dependency graph.
