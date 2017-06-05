@@ -173,7 +173,7 @@ func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) err
 }
 
 func (c *Container) isAcyclic(n node) error {
-	return detectCycles(n, c.nodes, nil, make(map[reflect.Type]struct{}))
+	return detectCycles(n, c.nodes, nil)
 }
 
 // Retrieve a type from the container
@@ -296,18 +296,19 @@ func cycleError(cycle []reflect.Type, last reflect.Type) error {
 	return errors.New(b.String())
 }
 
-func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type, seen map[reflect.Type]struct{}) error {
-	if _, ok := seen[n.provides]; ok {
-		return cycleError(path, n.provides)
+func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) error {
+	for _, p := range path {
+		if p == n.provides {
+			return cycleError(path, n.provides)
+		}
 	}
 	path = append(path, n.provides)
-	seen[n.provides] = struct{}{}
 	for _, depType := range n.deps {
 		depNode, ok := graph[depType]
 		if !ok {
 			continue
 		}
-		if err := detectCycles(depNode, graph, path, seen); err != nil {
+		if err := detectCycles(depNode, graph, path); err != nil {
 			return err
 		}
 	}
