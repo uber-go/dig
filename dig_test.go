@@ -440,8 +440,9 @@ func TestEndToEndSuccess(t *testing.T) {
 		type Ret struct {
 			Out
 
-			A  // value type A
-			*B // pointer type *B
+			foo string // private field to be ignored
+			A          // value type A
+			*B         // pointer type *B
 		}
 
 		c := New()
