@@ -10,6 +10,8 @@ import (
 )
 
 func TestStringer(t *testing.T) {
+	t.Parallel()
+
 	c := New()
 	type A struct{}
 	type B struct{}
