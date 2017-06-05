@@ -429,8 +429,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("out type inserts multiple objects into the graph", func(t *testing.T) {
-		t.Parallel()
-
 		type A struct {
 			name string
 		}
@@ -509,6 +507,37 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, int64(24), i64)
 			assert.Equal(t, "piper", s)
 			assert.Equal(t, 10*time.Second, d)
+		}))
+	})
+
+	t.Run("out types recurse", func(t *testing.T) {
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		// Contains A
+		type Ret1 struct {
+			Out
+			*A
+		}
+		// Contains *A (through Ret1), *B and C
+		type Ret2 struct {
+			Ret1
+			*B
+			C
+		}
+		c := New()
+
+		require.NoError(t, c.Provide(func() Ret2 {
+			return Ret2{
+				Ret1: Ret1{
+					A: &A{},
+				},
+				B: &B{},
+				C: C{},
+			}
+		}), "provide for the Ret struct should succeed")
+		require.NoError(t, c.Invoke(func(a *A, b *B, c C) {
+			require.NotNil(t, a, "*A should be part of the container through Ret2->Ret1")
 		}))
 	})
 }
