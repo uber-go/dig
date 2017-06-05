@@ -6,7 +6,7 @@ import (
 )
 
 // String representation of the entire Container
-func (c *Container) String() string {
+func (c Container) String() string {
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "nodes: {")
 	for k, v := range c.nodes {
