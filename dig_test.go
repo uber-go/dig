@@ -426,6 +426,18 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Nil(t, p.T5, "optional type not in the graph should return nil")
 		}))
 	})
+
+	t.Run("nested dependencies", func(t *testing.T) {
+		type A struct{}
+		type B struct{}
+		type C struct{}
+
+		c := New()
+
+		require.NoError(t, c.Provide(func() A { return A{} }), "provide failed")
+		require.NoError(t, c.Provide(func(dep0 A) B { return B{} }), "provide failed")
+		require.NoError(t, c.Provide(func(dep0 A, dep1 B) C { return C{} }), "provide failed")
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {
