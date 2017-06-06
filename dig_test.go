@@ -444,11 +444,13 @@ func TestEndToEndSuccess(t *testing.T) {
 		c := New()
 		require.NoError(t, c.Provide(func() string { return "piper" }), "string provide failed")
 		require.NoError(t, c.Provide(func() int { return 42 }), "int provide failed")
+		require.NoError(t, c.Provide(func() int64 { return 24 }), "int provide failed")
 		require.NoError(t, c.Provide(func() time.Duration {
 			return 10 * time.Second
 		}), "time.Duration provide failed")
-		require.NoError(t, c.Invoke(func(i int, s string, d time.Duration) {
+		require.NoError(t, c.Invoke(func(i64 int64, i int, s string, d time.Duration) {
 			assert.Equal(t, 42, i)
+			assert.Equal(t, int64(24), i64)
 			assert.Equal(t, "piper", s)
 			assert.Equal(t, 10*time.Second, d)
 		}))
