@@ -2,12 +2,12 @@
 
 
 ## v0.4 (unreleased)
-- Add support form `map`, `slice` and `array` to dig
-- Remove `Must*` funcs to greatly reduce API surface area.
-- Remove `*All` funcs to reduce API surface area. Available methods on
-container are `Provide`, `Resolve` and `Invoke`
+
+- **[Breaking]** Remove `Must*` funcs to greatly reduce API surface area.
+- **[Breaking]** Restrict the API surface to only `Provide` and `Invoke`.
 - Providing constructors with common returned types results in an error.
-- Update `Provide` and `Resolve` methods to accept variadic arguments.
+- **[Breaking]** Update `Provide` method to accept variadic arguments.
+- Add support for value types and many built-ins (maps, slices, channels).
 
 ## v0.3 (2 May 2017)
 
