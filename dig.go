@@ -221,25 +221,6 @@ func traverseOutTypes(t reflect.Type, f func(t reflect.Type) error) error {
 	return nil
 }
 
-// DFS over values and types for all nested dig.Outs
-func traverseOutValues(v reflect.Value, t reflect.Type, f func(reflect.Type, reflect.Value)) {
-	// dig.Out objects are not acted upon directly, but rather their memebers are considered
-	if isOutObject(t) {
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
-
-			ft := field.Type
-			fv := v.Field(i)
-
-			// recurse into other embedded Out objects
-			traverseOutValues(fv, ft, f)
-		}
-	} else {
-		// tun the provided function on the object itself (no need to recurse in)
-		f(t, v)
-	}
-}
-
 func (c *Container) isAcyclic(n node) error {
 	return detectCycles(n, c.nodes, nil)
 }
@@ -278,11 +259,7 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 
 	for _, con := range constructed {
 		ct := con.Type()
-		traverseOutValues(con, ct, func(ft reflect.Type, fv reflect.Value) {
-			if ct != _errType {
-				c.cache[ft] = fv
-			}
-		})
+		c.set(ct, con)
 	}
 	return c.cache[t], nil
 }
@@ -321,6 +298,27 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 		dest.Field(i).Set(v)
 	}
 	return dest, nil
+}
+
+// Set the value in the cache after a node resolution
+func (c *Container) set(t reflect.Type, v reflect.Value) {
+	// dig.Out objects are not acted upon directly, but rather their memebers are considered
+	if isOutObject(t) {
+		for i := 0; i < t.NumField(); i++ {
+			var (
+				field = t.Field(i)
+				ft    = field.Type
+				fv    = v.Field(i)
+			)
+			// recurse into all embedded objects
+			c.set(ft, fv)
+		}
+	} else {
+		// do not cache error types
+		if t != _errType {
+			c.cache[t] = v
+		}
+	}
 }
 
 func (c *Container) contains(deps []dep) error {
