@@ -163,31 +163,30 @@ func (c *Container) getReturnTypes(
 
 	// Check each return object
 	for i := 0; i < ctype.NumOut(); i++ {
-		rt := ctype.Out(i)
-		if rt == _errType {
-			// Don't register errors into the container.
-			continue
-		}
+		outt := ctype.Out(i)
 
-		// Tons of error checking
-		if isInObject(rt) {
-			return nil, errors.New("can't provide parameter objects")
-		}
-		if _, ok := returnTypes[rt]; ok {
-			return nil, fmt.Errorf("returns multiple %v", rt)
-		}
-		if _, ok := c.nodes[rt]; ok {
-			return nil, fmt.Errorf("provides type %v, which is already in the container", rt)
-		}
+		err := traverseOutTypes(outt, func(rt reflect.Type) error {
+			if rt == _errType {
+				// Don't register errors into the container.
+				return nil
+			}
 
-		// dig.Out behaviour is different - register all the struct members
-		if isOutObject(rt) {
-			traverseOutTypes(rt, func(t reflect.Type) {
-				returnTypes[t] = struct{}{}
-			})
-		} else {
-			// Regular object or a pointer gets registered in the container
+			// Tons of error checking
+			if isInObject(rt) {
+				return errors.New("can't provide parameter objects")
+			}
+			if _, ok := returnTypes[rt]; ok {
+				return fmt.Errorf("returns multiple %v", rt)
+			}
+			if _, ok := c.nodes[rt]; ok {
+				return fmt.Errorf("provides type %v, which is already in the container", rt)
+			}
+
 			returnTypes[rt] = struct{}{}
+			return nil
+		})
+		if err != nil {
+			return returnTypes, err
 		}
 	}
 	if len(returnTypes) == 0 {
