@@ -262,57 +262,26 @@ type dep struct {
 }
 
 func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
-	deps := make([]dep, 0, ctype.NumIn())
-	for i := 0; i < ctype.NumIn(); i++ {
-		t := ctype.In(i)
-		if isInObject(t) {
-			newDeps, err := getInDependencies(t)
-			if err != nil {
-				return node{}, err
-			}
-			deps = append(deps, newDeps...)
-		} else {
-			deps = append(deps, dep{Type: t})
-		}
-	}
-
+	deps, err := getConstructorDependencies(ctype)
 	return node{
 		provides: provides,
 		ctor:     ctor,
 		ctype:    ctype,
 		deps:     deps,
-	}, nil
+	}, err
 }
 
-// Retrieves the dependencies for a dig.In object
-func getInDependencies(t reflect.Type) ([]dep, error) {
-	deps := make([]dep, 0, t.NumField())
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		if f.PkgPath != "" {
-			continue // skip private fields
-		}
-
-		if isInObject(f.Type) {
-			newDeps, err := getInDependencies(f.Type)
-			if err != nil {
-				return nil, err
-			}
-			deps = append(deps, newDeps...)
-			continue
-		}
-
-		d := dep{Type: f.Type}
-
-		var err error
-		d.Optional, err = isFieldOptional(t, f)
+// Retrieves the dependencies for a constructor
+func getConstructorDependencies(ctype reflect.Type) ([]dep, error) {
+	var deps []dep
+	for i := 0; i < ctype.NumIn(); i++ {
+		err := traverseInTypes(ctype.In(i), func(t reflect.Type, opt bool) {
+			deps = append(deps, dep{Type: t, Optional: opt})
+		})
 		if err != nil {
 			return nil, err
 		}
-
-		deps = append(deps, d)
 	}
-
 	return deps, nil
 }
 
@@ -341,6 +310,39 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) erro
 			return err
 		}
 	}
+	return nil
+}
+
+// traverseInTypes traverses fields of a dig.In struct in depth-first order.
+//
+// If called with a non-In object, the function is called right away.
+func traverseInTypes(t reflect.Type, fn func(ftype reflect.Type, optional bool)) error {
+	if !isInObject(t) {
+		fn(t, false)
+		return nil
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		if isInObject(f.Type) {
+			if err := traverseInTypes(f.Type, fn); err != nil {
+				return err
+			}
+			continue
+		}
+
+		optional, err := isFieldOptional(t, f)
+		if err != nil {
+			return err
+		}
+
+		fn(f.Type, optional)
+	}
+
 	return nil
 }
 

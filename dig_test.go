@@ -777,6 +777,30 @@ func TestInvokeFailures(t *testing.T) {
 		require.Contains(t, err.Error(), `invalid value "no" for "optional" tag on field Buffer`)
 	})
 
+	t.Run("constructor invalid optional tag", func(t *testing.T) {
+		type type1 struct{}
+
+		type nestedArgs struct {
+			In
+
+			Buffer *bytes.Buffer `optional:"no"`
+		}
+
+		type args struct {
+			In
+
+			Args nestedArgs
+		}
+
+		c := New()
+		err := c.Provide(func(a args) *type1 {
+			panic("function must not be called")
+		})
+
+		require.Error(t, err, "expected invoke error")
+		require.Contains(t, err.Error(), `invalid value "no" for "optional" tag on field Buffer`)
+	})
+
 	t.Run("returned error", func(t *testing.T) {
 		c := New()
 		assert.Error(t, c.Invoke(func() error { return errors.New("oh no") }))
