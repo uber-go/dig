@@ -199,25 +199,25 @@ func (c *Container) getReturnTypes(
 // Do a DFS traverse over all dig.Out members (recursive) and perform an action.
 // Returns the first error encountered.
 func traverseOutTypes(t reflect.Type, f func(t reflect.Type) error) error {
-	if isOutObject(t) {
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
-			ft := field.Type
-
-			if field.PkgPath != "" {
-				continue // skip private fields
-			}
-
-			// keep recursing to traverse all the embedded objects
-			traverseOutTypes(ft, f)
-		}
-	} else {
+	if !isOutObject(t) {
 		// call the provided function on non-Out type
 		if err := f(t); err != nil {
 			return err
 		}
+		return nil
 	}
 
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		ft := field.Type
+
+		if field.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		// keep recursing to traverse all the embedded objects
+		traverseOutTypes(ft, f)
+	}
 	return nil
 }
 
@@ -302,22 +302,23 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 
 // Set the value in the cache after a node resolution
 func (c *Container) set(t reflect.Type, v reflect.Value) {
-	// dig.Out objects are not acted upon directly, but rather their memebers are considered
-	if isOutObject(t) {
-		for i := 0; i < t.NumField(); i++ {
-			var (
-				field = t.Field(i)
-				ft    = field.Type
-				fv    = v.Field(i)
-			)
-			// recurse into all embedded objects
-			c.set(ft, fv)
-		}
-	} else {
+	if !isOutObject(t) {
 		// do not cache error types
 		if t != _errType {
 			c.cache[t] = v
 		}
+		return
+	}
+
+	// dig.Out objects are not acted upon directly, but rather their memebers are considered
+	for i := 0; i < t.NumField(); i++ {
+		var (
+			field = t.Field(i)
+			ft    = field.Type
+			fv    = v.Field(i)
+		)
+		// recurse into all embedded objects
+		c.set(ft, fv)
 	}
 }
 
