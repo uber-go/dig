@@ -428,19 +428,19 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("nested dependencies", func(t *testing.T) {
-		type A struct{}
-		type B struct{}
-		type C struct{}
-
 		c := New()
 
-		require.NoError(t, c.Provide(func() A { return A{} }))
-		require.NoError(t, c.Provide(func(A) B { return B{} }))
-		require.NoError(t, c.Provide(func(A, B) C { return C{} }))
+		type A struct{ name string }
+		type B struct{ name string }
+		type C struct{ name string }
+
+		require.NoError(t, c.Provide(func() A { return A{"->A"} }))
+		require.NoError(t, c.Provide(func(A) B { return B{"A->B"} }))
+		require.NoError(t, c.Provide(func(A, B) C { return C{"AB->C"} }))
 		require.NoError(t, c.Invoke(func(a A, b B, c C) {
-			assert.Equal(t, a, A{})
-			assert.Equal(t, b, B{})
-			assert.Equal(t, c, C{})
+			assert.Equal(t, a, A{"->A"})
+			assert.Equal(t, b, B{"A->B"})
+			assert.Equal(t, c, C{"AB->C"})
 		}), "invoking should succeed")
 	})
 }
