@@ -182,19 +182,9 @@ func (c *Container) getReturnTypes(
 
 		// dig.Out behaviour is different - register all the struct members
 		if isOutObject(rt) {
-			for i := 0; i < rt.NumField(); i++ {
-				f := rt.Field(i)
-				if f.PkgPath != "" {
-					continue // skip private fields
-				}
-
-				if isOutObject(f.Type) {
-					continue // skip dig.In embed
-				}
-
-				// Register dig.Out struct member as the return type of the constructor
-				returnTypes[f.Type] = struct{}{}
-			}
+			traverseTypes(rt, func(t reflect.Type) {
+				returnTypes[t] = struct{}{}
+			})
 		} else {
 			// Regular object or a pointer gets registered in the container
 			returnTypes[rt] = struct{}{}
@@ -205,6 +195,49 @@ func (c *Container) getReturnTypes(
 	}
 
 	return returnTypes, nil
+}
+
+// DFS traverse over all dig.Out members (recursive) and perform an action
+func traverseTypes(t reflect.Type, f func(t reflect.Type)) {
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		ft := field.Type
+
+		if field.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		if isOutObject(ft) {
+			// keep recursing to traverse all the embedded objects
+			traverseTypes(ft, f)
+		} else {
+			// call the provided function
+			f(ft)
+		}
+	}
+}
+
+func traverseValues(v reflect.Value, t reflect.Type, f func(reflect.Type, reflect.Value)) {
+	// dig.Out objects are not acted upon directly, but rather their memebers are considered
+	if isOutObject(t) {
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+
+			ft := field.Type
+			fv := v.Field(i)
+
+			// recurse into other embedded Out objects
+			if isOutObject(ft) {
+				traverseValues(fv, ft, f)
+			} else {
+				// run the provided function on the struct field
+				f(ft, fv)
+			}
+		}
+	} else {
+		// tun the provided function on the object itself (no need to recurse in)
+		f(t, v)
+	}
 }
 
 func (c *Container) isAcyclic(n node) error {
@@ -245,30 +278,11 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 
 	for _, con := range constructed {
 		ct := con.Type()
-		if ct == _errType {
-			continue
-		}
-		if isOutObject(ct) {
-			// dig.Out object doesn't get cached directly,
-			// but rather it's memebers are
-			for i := 0; i < ct.NumField(); i++ {
-				field := ct.Field(i)
-
-				ft := field.Type
-				fv := con.Field(i)
-
-				// skip the actual dig.Out embed
-				if isOutObject(ft) {
-					continue
-				}
-
-				// cache the dig.Out member
+		traverseValues(con, ct, func(ft reflect.Type, fv reflect.Value) {
+			if ct != _errType {
 				c.cache[ft] = fv
 			}
-		} else {
-			// cache the returned type
-			c.cache[ct] = con
-		}
+		})
 	}
 	return c.cache[t], nil
 }
