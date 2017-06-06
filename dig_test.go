@@ -434,9 +434,14 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		c := New()
 
-		require.NoError(t, c.Provide(func() A { return A{} }), "provide failed")
-		require.NoError(t, c.Provide(func(A) B { return B{} }), "provide failed")
-		require.NoError(t, c.Provide(func(A, B) C { return C{} }), "provide failed")
+		require.NoError(t, c.Provide(func() A { return A{} }))
+		require.NoError(t, c.Provide(func(A) B { return B{} }))
+		require.NoError(t, c.Provide(func(A, B) C { return C{} }))
+		require.NoError(t, c.Invoke(func(a A, b B, c C) {
+			assert.Equal(t, a, A{})
+			assert.Equal(t, b, B{})
+			assert.Equal(t, c, C{})
+		}), "invoking should succeed")
 	})
 }
 
