@@ -197,24 +197,29 @@ func (c *Container) getReturnTypes(
 	return returnTypes, nil
 }
 
-// DFS traverse over all dig.Out members (recursive) and perform an action
-func traverseOutTypes(t reflect.Type, f func(t reflect.Type)) {
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		ft := field.Type
+// Do a DFS traverse over all dig.Out members (recursive) and perform an action.
+// Returns the first error encountered.
+func traverseOutTypes(t reflect.Type, f func(t reflect.Type) error) error {
+	if isOutObject(t) {
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			ft := field.Type
 
-		if field.PkgPath != "" {
-			continue // skip private fields
-		}
+			if field.PkgPath != "" {
+				continue // skip private fields
+			}
 
-		if isOutObject(ft) {
 			// keep recursing to traverse all the embedded objects
 			traverseOutTypes(ft, f)
-		} else {
-			// call the provided function
-			f(ft)
+		}
+	} else {
+		// call the provided function on non-Out type
+		if err := f(t); err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
 
 // DFS over values and types for all nested dig.Outs
@@ -228,12 +233,7 @@ func traverseOutValues(v reflect.Value, t reflect.Type, f func(reflect.Type, ref
 			fv := v.Field(i)
 
 			// recurse into other embedded Out objects
-			if isOutObject(ft) {
-				traverseOutValues(fv, ft, f)
-			} else {
-				// run the provided function on the struct field
-				f(ft, fv)
-			}
+			traverseOutValues(fv, ft, f)
 		}
 	} else {
 		// tun the provided function on the object itself (no need to recurse in)
