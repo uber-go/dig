@@ -27,6 +27,7 @@ import (
 	"io"
 	"io/ioutil"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -443,9 +444,13 @@ func TestEndToEndSuccess(t *testing.T) {
 		c := New()
 		require.NoError(t, c.Provide(func() string { return "piper" }), "string provide failed")
 		require.NoError(t, c.Provide(func() int { return 42 }), "int provide failed")
-		require.NoError(t, c.Invoke(func(i int, s string) {
+		require.NoError(t, c.Provide(func() time.Duration {
+			return 10 * time.Second
+		}), "time.Duration provide failed")
+		require.NoError(t, c.Invoke(func(i int, s string, d time.Duration) {
 			assert.Equal(t, 42, i)
 			assert.Equal(t, "piper", s)
+			assert.Equal(t, 10*time.Second, d)
 		}))
 	})
 }
