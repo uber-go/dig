@@ -438,6 +438,16 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Provide(func(A) B { return B{} }), "provide failed")
 		require.NoError(t, c.Provide(func(A, B) C { return C{} }), "provide failed")
 	})
+
+	t.Run("primitives", func(t *testing.T) {
+		c := New()
+		require.NoError(t, c.Provide(func() string { return "piper" }), "string provide failed")
+		require.NoError(t, c.Provide(func() int { return 42 }), "int provide failed")
+		require.NoError(t, c.Invoke(func(i int, s string) {
+			assert.Equal(t, 42, i)
+			assert.Equal(t, "piper", s)
+		}))
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {
