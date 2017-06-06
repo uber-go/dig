@@ -287,6 +287,42 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	return c.cache[t], nil
 }
 
+// Returns a new In parent object with all the dependency fields
+// populated from the dig container.
+func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
+	dest := reflect.New(t).Elem()
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		var isOptional bool
+		if tag := f.Tag.Get(_optionalTag); tag != "" {
+			var err error
+			isOptional, err = strconv.ParseBool(tag)
+			if err != nil {
+				return dest, fmt.Errorf(
+					"invalid value %q for %q tag on field %v of %v: %v",
+					tag, _optionalTag, f.Name, t, err)
+			}
+		}
+
+		v, err := c.get(f.Type)
+		if err != nil {
+			if isOptional {
+				v = reflect.Zero(f.Type)
+			} else {
+				return dest, fmt.Errorf(
+					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
+			}
+		}
+
+		dest.Field(i).Set(v)
+	}
+	return dest, nil
+}
+
 func (c *Container) contains(deps []dep) error {
 	var missing []reflect.Type
 	for _, d := range deps {
@@ -413,40 +449,6 @@ func traverseInTypes(t reflect.Type, fn func(ftype reflect.Type, optional bool))
 	}
 
 	return nil
-}
-
-func isInObject(t reflect.Type) bool {
-	return t.Implements(_inInterfaceType) && t.Kind() == reflect.Struct
-}
-
-// Returns a new In parent object with all the dependency fields
-// populated from the dig container.
-func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
-	dest := reflect.New(t).Elem()
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		if f.PkgPath != "" {
-			continue // skip private fields
-		}
-
-		optional, err := isFieldOptional(t, f)
-		if err != nil {
-			return dest, err
-		}
-
-		v, err := c.get(f.Type)
-		if err != nil {
-			if optional {
-				v = reflect.Zero(f.Type)
-			} else {
-				return dest, fmt.Errorf(
-					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
-			}
-		}
-
-		dest.Field(i).Set(v)
-	}
-	return dest, nil
 }
 
 // Checks if a field of an In struct is optional.
