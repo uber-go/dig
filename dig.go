@@ -284,7 +284,7 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 	}, nil
 }
 
-// Retrives the dependencies for a dig.In object
+// Retrieves the dependencies for a dig.In object
 func getInDependencies(t reflect.Type) ([]dep, error) {
 	deps := make([]dep, 0, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
