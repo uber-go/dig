@@ -218,11 +218,11 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	return c.cache[t], nil
 }
 
-func (c *Container) contains(types []reflect.Type) error {
+func (c *Container) contains(deps []dep) error {
 	var missing []reflect.Type
-	for _, t := range types {
-		if _, ok := c.nodes[t]; !ok {
-			missing = append(missing, t)
+	for _, d := range deps {
+		if _, ok := c.nodes[d.Type]; !ok && !d.Optional {
+			missing = append(missing, d.Type)
 		}
 	}
 	if len(missing) > 0 {
@@ -253,13 +253,27 @@ type node struct {
 	provides reflect.Type
 	ctor     interface{}
 	ctype    reflect.Type
-	deps     []reflect.Type
+	deps     []dep
+}
+
+type dep struct {
+	Type     reflect.Type
+	Optional bool
 }
 
 func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
-	deps := make([]reflect.Type, 0, ctype.NumIn())
+	deps := make([]dep, 0, ctype.NumIn())
 	for i := 0; i < ctype.NumIn(); i++ {
-		deps = append(deps, getConstructorDependencies(ctype.In(i))...)
+		t := ctype.In(i)
+		if isInObject(t) {
+			newDeps, err := getInDependencies(t)
+			if err != nil {
+				return node{}, err
+			}
+			deps = append(deps, newDeps...)
+		} else {
+			deps = append(deps, dep{Type: t})
+		}
 	}
 
 	return node{
@@ -270,21 +284,36 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 	}, nil
 }
 
-// Retrives the dependencies for the parameter of a constructor.
-func getConstructorDependencies(t reflect.Type) []reflect.Type {
-	if !isInObject(t) {
-		return []reflect.Type{t}
-	}
-
-	deps := make([]reflect.Type, 0, t.NumField())
+// Retrives the dependencies for a dig.In object
+func getInDependencies(t reflect.Type) ([]dep, error) {
+	deps := make([]dep, 0, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		if f.PkgPath != "" {
 			continue // skip private fields
 		}
-		deps = append(deps, getConstructorDependencies(f.Type)...)
+
+		if isInObject(f.Type) {
+			newDeps, err := getInDependencies(f.Type)
+			if err != nil {
+				return nil, err
+			}
+			deps = append(deps, newDeps...)
+			continue
+		}
+
+		d := dep{Type: f.Type}
+
+		var err error
+		d.Optional, err = isFieldOptional(t, f)
+		if err != nil {
+			return nil, err
+		}
+
+		deps = append(deps, d)
 	}
-	return deps
+
+	return deps, nil
 }
 
 func cycleError(cycle []reflect.Type, last reflect.Type) error {
@@ -303,8 +332,8 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) erro
 		}
 	}
 	path = append(path, n.provides)
-	for _, depType := range n.deps {
-		depNode, ok := graph[depType]
+	for _, dep := range n.deps {
+		depNode, ok := graph[dep.Type]
 		if !ok {
 			continue
 		}
@@ -329,20 +358,14 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 			continue // skip private fields
 		}
 
-		var isOptional bool
-		if tag := f.Tag.Get(_optionalTag); tag != "" {
-			var err error
-			isOptional, err = strconv.ParseBool(tag)
-			if err != nil {
-				return dest, fmt.Errorf(
-					"invalid value %q for %q tag on field %v of %v: %v",
-					tag, _optionalTag, f.Name, t, err)
-			}
+		optional, err := isFieldOptional(t, f)
+		if err != nil {
+			return dest, err
 		}
 
 		v, err := c.get(f.Type)
 		if err != nil {
-			if isOptional {
+			if optional {
 				v = reflect.Zero(f.Type)
 			} else {
 				return dest, fmt.Errorf(
@@ -353,4 +376,21 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 		dest.Field(i).Set(v)
 	}
 	return dest, nil
+}
+
+// Checks if a field of an In struct is optional.
+func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
+	tag := f.Tag.Get(_optionalTag)
+	if tag == "" {
+		return false, nil
+	}
+
+	optional, err := strconv.ParseBool(tag)
+	if err != nil {
+		err = fmt.Errorf(
+			"invalid value %q for %q tag on field %v of %v: %v",
+			tag, _optionalTag, f.Name, parent, err)
+	}
+
+	return optional, err
 }
