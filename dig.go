@@ -182,7 +182,7 @@ func (c *Container) getReturnTypes(
 
 		// dig.Out behaviour is different - register all the struct members
 		if isOutObject(rt) {
-			traverseTypes(rt, func(t reflect.Type) {
+			traverseOutTypes(rt, func(t reflect.Type) {
 				returnTypes[t] = struct{}{}
 			})
 		} else {
@@ -198,7 +198,7 @@ func (c *Container) getReturnTypes(
 }
 
 // DFS traverse over all dig.Out members (recursive) and perform an action
-func traverseTypes(t reflect.Type, f func(t reflect.Type)) {
+func traverseOutTypes(t reflect.Type, f func(t reflect.Type)) {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		ft := field.Type
@@ -209,7 +209,7 @@ func traverseTypes(t reflect.Type, f func(t reflect.Type)) {
 
 		if isOutObject(ft) {
 			// keep recursing to traverse all the embedded objects
-			traverseTypes(ft, f)
+			traverseOutTypes(ft, f)
 		} else {
 			// call the provided function
 			f(ft)
@@ -217,7 +217,8 @@ func traverseTypes(t reflect.Type, f func(t reflect.Type)) {
 	}
 }
 
-func traverseValues(v reflect.Value, t reflect.Type, f func(reflect.Type, reflect.Value)) {
+// DFS over values and types for all nested dig.Outs
+func traverseOutValues(v reflect.Value, t reflect.Type, f func(reflect.Type, reflect.Value)) {
 	// dig.Out objects are not acted upon directly, but rather their memebers are considered
 	if isOutObject(t) {
 		for i := 0; i < t.NumField(); i++ {
@@ -228,7 +229,7 @@ func traverseValues(v reflect.Value, t reflect.Type, f func(reflect.Type, reflec
 
 			// recurse into other embedded Out objects
 			if isOutObject(ft) {
-				traverseValues(fv, ft, f)
+				traverseOutValues(fv, ft, f)
 			} else {
 				// run the provided function on the struct field
 				f(ft, fv)
@@ -278,7 +279,7 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 
 	for _, con := range constructed {
 		ct := con.Type()
-		traverseValues(con, ct, func(ft reflect.Type, fv reflect.Value) {
+		traverseOutValues(con, ct, func(ft reflect.Type, fv reflect.Value) {
 			if ct != _errType {
 				c.cache[ft] = fv
 			}
