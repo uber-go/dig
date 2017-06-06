@@ -428,6 +428,30 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
+	t.Run("constructor with optional", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+
+		type param struct {
+			In
+
+			T1 *type1 `optional:"true"`
+		}
+
+		c := New()
+
+		var gave *type2
+		require.NoError(t, c.Provide(func(p param) *type2 {
+			require.Nil(t, p.T1, "T1 must be nil")
+			gave = &type2{}
+			return gave
+		}), "provide failed")
+
+		require.NoError(t, c.Invoke(func(got *type2) {
+			require.True(t, got == gave, "type2 reference must be the same")
+		}), "invoke failed")
+	})
+
 	t.Run("nested dependencies", func(t *testing.T) {
 		c := New()
 
@@ -731,6 +755,34 @@ func TestInvokeFailures(t *testing.T) {
 		require.Contains(t, err.Error(), "dig.type2 isn't in the container")
 	})
 
+	t.Run("unmet constructor dependency", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+
+		type param struct {
+			In
+
+			T1 *type1
+			T2 *type2 `optional:"true"`
+		}
+
+		c := New()
+
+		require.NoError(t, c.Provide(func(p param) *type3 {
+			panic("function must not be called")
+		}), "provide failed")
+
+		err := c.Invoke(func(*type3) {
+			t.Fatal("function must not be called")
+		})
+		require.Error(t, err, "invoke must fail")
+		require.Contains(t, err.Error(), "missing dependencies for type *dig.type3")
+		require.Contains(t, err.Error(), "container is missing types: [*dig.type1]")
+		// We don't expect type2 to be mentioned in the list because it's
+		// optional
+	})
+
 	t.Run("invalid optional tag", func(t *testing.T) {
 		type args struct {
 			In
@@ -741,6 +793,30 @@ func TestInvokeFailures(t *testing.T) {
 		c := New()
 		err := c.Invoke(func(a args) {
 			t.Fatal("function must not be called")
+		})
+
+		require.Error(t, err, "expected invoke error")
+		require.Contains(t, err.Error(), `invalid value "no" for "optional" tag on field Buffer`)
+	})
+
+	t.Run("constructor invalid optional tag", func(t *testing.T) {
+		type type1 struct{}
+
+		type nestedArgs struct {
+			In
+
+			Buffer *bytes.Buffer `optional:"no"`
+		}
+
+		type args struct {
+			In
+
+			Args nestedArgs
+		}
+
+		c := New()
+		err := c.Provide(func(a args) *type1 {
+			panic("function must not be called")
 		})
 
 		require.Error(t, err, "expected invoke error")
