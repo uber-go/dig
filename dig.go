@@ -150,9 +150,7 @@ func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) err
 	return nil
 }
 
-// Get the return types of a constructor
-//
-// All the dig.Out returns get expanded
+// Get the return types of a constructor with all the dig.Out returns get expanded.
 func (c *Container) getReturnTypes(
 	ctor interface{},
 	ctype reflect.Type,
@@ -258,8 +256,7 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	}
 
 	for _, con := range constructed {
-		ct := con.Type()
-		c.set(ct, con)
+		c.set(con)
 	}
 	return c.cache[t], nil
 }
@@ -301,7 +298,8 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 }
 
 // Set the value in the cache after a node resolution
-func (c *Container) set(t reflect.Type, v reflect.Value) {
+func (c *Container) set(v reflect.Value) {
+	t := v.Type()
 	if !isOutObject(t) {
 		// do not cache error types
 		if t != _errType {
@@ -312,13 +310,8 @@ func (c *Container) set(t reflect.Type, v reflect.Value) {
 
 	// dig.Out objects are not acted upon directly, but rather their memebers are considered
 	for i := 0; i < t.NumField(); i++ {
-		var (
-			field = t.Field(i)
-			ft    = field.Type
-			fv    = v.Field(i)
-		)
-		// recurse into all embedded objects
-		c.set(ft, fv)
+		// recurse into all fields, which may or may not be more dig.Out objects
+		c.set(v.Field(i))
 	}
 }
 
