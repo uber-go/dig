@@ -28,14 +28,9 @@ import (
 	"strconv"
 )
 
-var (
-	_noValue         reflect.Value
-	_errType         = reflect.TypeOf((*error)(nil)).Elem()
-	_inInterfaceType = reflect.TypeOf((*digInObject)(nil)).Elem()
-	_inType          = reflect.TypeOf(In{})
+const (
+	_optionalTag = "optional"
 )
-
-const _optionalTag = "optional"
 
 // A Container is a directed, acyclic graph of dependencies. Dependencies are
 // constructed on-demand and returned from a cache thereafter, so they're
@@ -130,26 +125,9 @@ func (c *Container) provideInstance(val interface{}) error {
 }
 
 func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) error {
-	returnTypes := make(map[reflect.Type]struct{}, ctype.NumOut())
-	for i := 0; i < ctype.NumOut(); i++ {
-		rt := ctype.Out(i)
-		if rt == _errType {
-			// Don't register errors into the container.
-			continue
-		}
-		if isInObject(rt) {
-			return errors.New("can't provide parameter objects")
-		}
-		if _, ok := returnTypes[rt]; ok {
-			return fmt.Errorf("returns multiple %v", rt)
-		}
-		if _, ok := c.nodes[rt]; ok {
-			return fmt.Errorf("provides type %v, which is already in the container", rt)
-		}
-		returnTypes[rt] = struct{}{}
-	}
-	if len(returnTypes) == 0 {
-		return errors.New("must provide at least one non-error type")
+	returnTypes, err := c.getReturnTypes(ctor, ctype)
+	if err != nil {
+		return fmt.Errorf("unable to collect return types of a constructor: %v", err)
 	}
 
 	nodes := make([]node, 0, len(returnTypes))
@@ -169,6 +147,75 @@ func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) err
 		}
 	}
 
+	return nil
+}
+
+// Get the return types of a constructor with all the dig.Out returns get expanded.
+func (c *Container) getReturnTypes(
+	ctor interface{},
+	ctype reflect.Type,
+) (map[reflect.Type]struct{}, error) {
+	// Could pre-compute the size but it's tricky as counter is different
+	// when dig.Out objects are mixed in
+	returnTypes := make(map[reflect.Type]struct{})
+
+	// Check each return object
+	for i := 0; i < ctype.NumOut(); i++ {
+		outt := ctype.Out(i)
+
+		err := traverseOutTypes(outt, func(rt reflect.Type) error {
+			if rt == _errType {
+				// Don't register errors into the container.
+				return nil
+			}
+
+			// Tons of error checking
+			if isInObject(rt) {
+				return errors.New("can't provide parameter objects")
+			}
+			if _, ok := returnTypes[rt]; ok {
+				return fmt.Errorf("returns multiple %v", rt)
+			}
+			if _, ok := c.nodes[rt]; ok {
+				return fmt.Errorf("provides type %v, which is already in the container", rt)
+			}
+
+			returnTypes[rt] = struct{}{}
+			return nil
+		})
+		if err != nil {
+			return returnTypes, err
+		}
+	}
+	if len(returnTypes) == 0 {
+		return nil, errors.New("must provide at least one non-error type")
+	}
+
+	return returnTypes, nil
+}
+
+// Do a DFS traverse over all dig.Out members (recursive) and perform an action.
+// Returns the first error encountered.
+func traverseOutTypes(t reflect.Type, f func(t reflect.Type) error) error {
+	if !isOutObject(t) {
+		// call the provided function on non-Out type
+		if err := f(t); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		ft := field.Type
+
+		if field.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		// keep recursing to traverse all the embedded objects
+		traverseOutTypes(ft, f)
+	}
 	return nil
 }
 
@@ -209,13 +256,63 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	}
 
 	for _, con := range constructed {
-		ct := con.Type()
-		if ct == _errType {
-			continue
-		}
-		c.cache[ct] = con
+		c.set(con)
 	}
 	return c.cache[t], nil
+}
+
+// Returns a new In parent object with all the dependency fields
+// populated from the dig container.
+func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
+	dest := reflect.New(t).Elem()
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.PkgPath != "" {
+			continue // skip private fields
+		}
+
+		var isOptional bool
+		if tag := f.Tag.Get(_optionalTag); tag != "" {
+			var err error
+			isOptional, err = strconv.ParseBool(tag)
+			if err != nil {
+				return dest, fmt.Errorf(
+					"invalid value %q for %q tag on field %v of %v: %v",
+					tag, _optionalTag, f.Name, t, err)
+			}
+		}
+
+		v, err := c.get(f.Type)
+		if err != nil {
+			if isOptional {
+				v = reflect.Zero(f.Type)
+			} else {
+				return dest, fmt.Errorf(
+					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
+			}
+		}
+
+		dest.Field(i).Set(v)
+	}
+	return dest, nil
+}
+
+// Set the value in the cache after a node resolution
+func (c *Container) set(v reflect.Value) {
+	t := v.Type()
+	if !isOutObject(t) {
+		// do not cache error types
+		if t != _errType {
+			c.cache[t] = v
+		}
+		return
+	}
+
+	// dig.Out objects are not acted upon directly, but rather their memebers are considered
+	for i := 0; i < t.NumField(); i++ {
+		// recurse into all fields, which may or may not be more dig.Out objects
+		c.set(v.Field(i))
+	}
 }
 
 func (c *Container) contains(deps []dep) error {
@@ -344,40 +441,6 @@ func traverseInTypes(t reflect.Type, fn func(ftype reflect.Type, optional bool))
 	}
 
 	return nil
-}
-
-func isInObject(t reflect.Type) bool {
-	return t.Implements(_inInterfaceType) && t.Kind() == reflect.Struct
-}
-
-// Returns a new In parent object with all the dependency fields
-// populated from the dig container.
-func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
-	dest := reflect.New(t).Elem()
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		if f.PkgPath != "" {
-			continue // skip private fields
-		}
-
-		optional, err := isFieldOptional(t, f)
-		if err != nil {
-			return dest, err
-		}
-
-		v, err := c.get(f.Type)
-		if err != nil {
-			if optional {
-				v = reflect.Zero(f.Type)
-			} else {
-				return dest, fmt.Errorf(
-					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
-			}
-		}
-
-		dest.Field(i).Set(v)
-	}
-	return dest, nil
 }
 
 // Checks if a field of an In struct is optional.

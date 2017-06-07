@@ -428,6 +428,31 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
+	t.Run("out type inserts multiple objects into the graph", func(t *testing.T) {
+		type A struct{ name string }
+		type B struct{ name string }
+		type Ret struct {
+			Out
+			A  // value type A
+			*B // pointer type *B
+
+			foo string // private field to be ignored
+		}
+		myA := A{"string A"}
+		myB := &B{"string B"}
+
+		c := New()
+		require.NoError(t, c.Provide(func() Ret {
+			return Ret{A: myA, B: myB}
+		}), "provide for the Ret struct should succeed")
+		require.NoError(t, c.Invoke(func(a A, b *B) {
+			assert.Equal(t, a.name, "string A", "value type should work for dig.Out")
+			assert.Equal(t, b.name, "string B", "pointer should work for dig.Out")
+			assert.True(t, myA == a, "should get the same pointer for &A")
+			assert.Equal(t, b, myB, "b and myB should be uqual")
+		}))
+	})
+
 	t.Run("constructor with optional", func(t *testing.T) {
 		type type1 struct{}
 		type type2 struct{}
@@ -482,6 +507,37 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, int64(24), i64)
 			assert.Equal(t, "piper", s)
 			assert.Equal(t, 10*time.Second, d)
+		}))
+	})
+
+	t.Run("out types recurse", func(t *testing.T) {
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		// Contains A
+		type Ret1 struct {
+			Out
+			*A
+		}
+		// Contains *A (through Ret1), *B and C
+		type Ret2 struct {
+			Ret1
+			*B
+			C
+		}
+		c := New()
+
+		require.NoError(t, c.Provide(func() Ret2 {
+			return Ret2{
+				Ret1: Ret1{
+					A: &A{},
+				},
+				B: &B{},
+				C: C{},
+			}
+		}), "provide for the Ret struct should succeed")
+		require.NoError(t, c.Invoke(func(a *A, b *B, c C) {
+			require.NotNil(t, a, "*A should be part of the container through Ret2->Ret1")
 		}))
 	})
 }

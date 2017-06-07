@@ -7,6 +7,10 @@
 - **[Breaking]** Restrict the API surface to only `Provide` and `Invoke`.
 - Providing constructors with common returned types results in an error.
 - **[Breaking]** Update `Provide` method to accept variadic arguments.
+- Add `dig.In` embeddable type for advanced use-cases of specifying dependencies.
+- Add `dig.Out` embeddable type for advanced use-cases of constructors
+  inserting types in the container.
+- Add support for optional parameters through `optional:"true"` tag on `dig.In` objects.
 - Add support for value types and many built-ins (maps, slices, channels).
 
 ## v0.3 (2 May 2017)
