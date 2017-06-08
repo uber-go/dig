@@ -24,7 +24,11 @@ func (c Container) String() string {
 }
 
 func (n node) String() string {
+	deps := make([]string, len(n.deps))
+	for i, d := range n.deps {
+		deps[i] = fmt.Sprint(d.Type)
+	}
 	return fmt.Sprintf(
-		"deps: %v, constructor: %v", n.deps, n.ctype,
+		"deps: %v, constructor: %v", deps, n.ctype,
 	)
 }
