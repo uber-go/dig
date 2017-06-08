@@ -881,11 +881,13 @@ func TestInvokeFailures(t *testing.T) {
 
 	t.Run("returned error", func(t *testing.T) {
 		c := New()
-		assert.Error(t, c.Invoke(func() error { return errors.New("oh no") }))
+		err := c.Invoke(func() error { return errors.New("oh no") })
+		require.Equal(t, errors.New("oh no"), err, "error must match")
 	})
 
 	t.Run("many returns", func(t *testing.T) {
 		c := New()
-		assert.Error(t, c.Invoke(func() (int, error) { return 42, errors.New("oh no") }))
+		err := c.Invoke(func() (int, error) { return 42, errors.New("oh no") })
+		require.Equal(t, errors.New("oh no"), err, "error must match")
 	})
 }
