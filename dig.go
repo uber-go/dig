@@ -102,8 +102,10 @@ func (c *Container) Invoke(function interface{}) error {
 	if len(returned) == 0 {
 		return nil
 	}
-	if last := returned[len(returned)-1]; last.Type() == _errType && last.Interface() != nil {
-		return fmt.Errorf("failed to execute %v (type %v): %v", function, ftype, last.Interface())
+	if last := returned[len(returned)-1]; last.Type() == _errType {
+		if err, _ := last.Interface().(error); err != nil {
+			return err
+		}
 	}
 	return nil
 }
