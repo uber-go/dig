@@ -7,7 +7,6 @@ var (
 	_errType          = reflect.TypeOf((*error)(nil)).Elem()
 	_inInterfaceType  = reflect.TypeOf((*digInObject)(nil)).Elem()
 	_outInterfaceType = reflect.TypeOf((*digOutObject)(nil)).Elem()
-	_inType           = reflect.TypeOf(In{})
 )
 
 // In is an embeddable object that signals to dig that the struct
