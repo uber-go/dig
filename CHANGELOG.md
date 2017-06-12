@@ -1,5 +1,7 @@
 # Changelog
 
+## v0.5 (unreleased)
+
 ## v0.4 (12 Jun 2017)
 
 - **[Breaking]** Remove `Must*` funcs to greatly reduce API surface area.
