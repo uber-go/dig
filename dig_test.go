@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -35,27 +36,6 @@ import (
 
 func TestEndToEndSuccess(t *testing.T) {
 	t.Parallel()
-
-	t.Run("pointer", func(t *testing.T) {
-		c := New()
-		b := &bytes.Buffer{}
-		require.NoError(t, c.Provide(b), "provide failed")
-		require.NoError(t, c.Invoke(func(got *bytes.Buffer) {
-			require.NotNil(t, got, "invoke got nil buffer")
-			require.True(t, got == b, "invoke got wrong buffer")
-		}), "invoke failed")
-	})
-
-	t.Run("nil pointer", func(t *testing.T) {
-		// Dig shouldn't forbid this - it's perfectly reasonable to explicitly
-		// provide a typed nil, since that's often a convenient way to supply a
-		// default no-op implementation.
-		c := New()
-		require.NoError(t, c.Provide((*bytes.Buffer)(nil)), "provide failed")
-		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
-			require.Nil(t, b, "expected to get nil buffer")
-		}), "invoke failed")
-	})
 
 	t.Run("pointer constructor", func(t *testing.T) {
 		c := New()
@@ -70,14 +50,14 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "invoke failed")
 	})
 
-	t.Run("struct", func(t *testing.T) {
+	t.Run("nil pointer constructor", func(t *testing.T) {
+		// Dig shouldn't forbid this - it's perfectly reasonable to explicitly
+		// provide a typed nil, since that's often a convenient way to supply a
+		// default no-op implementation.
 		c := New()
-		var buf bytes.Buffer
-		buf.WriteString("foo")
-		require.NoError(t, c.Provide(buf), "provide failed")
-		require.NoError(t, c.Invoke(func(b bytes.Buffer) {
-			// ensure we're getting back the buffer we put in
-			require.Equal(t, "foo", buf.String(), "invoke got new buffer")
+		require.NoError(t, c.Provide(func() *bytes.Buffer { return nil }), "provide failed")
+		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
+			require.Nil(t, b, "expected to get nil buffer")
 		}), "invoke failed")
 	})
 
@@ -85,23 +65,10 @@ func TestEndToEndSuccess(t *testing.T) {
 		c := New()
 		var buf bytes.Buffer
 		buf.WriteString("foo")
-		require.NoError(t, c.Provide(buf), "provide failed")
+		require.NoError(t, c.Provide(func() bytes.Buffer { return buf }), "provide failed")
 		require.NoError(t, c.Invoke(func(b bytes.Buffer) {
 			// ensure we're getting back the buffer we put in
 			require.Equal(t, "foo", buf.String(), "invoke got new buffer")
-		}), "invoke failed")
-	})
-
-	t.Run("slice", func(t *testing.T) {
-		c := New()
-		b1 := &bytes.Buffer{}
-		b2 := &bytes.Buffer{}
-		bufs := []*bytes.Buffer{b1, b2}
-		require.NoError(t, c.Provide(bufs), "provide failed")
-		require.NoError(t, c.Invoke(func(bs []*bytes.Buffer) {
-			require.Equal(t, 2, len(bs), "invoke got unexpected number of buffers")
-			require.True(t, b1 == bs[0], "first item did not match")
-			require.True(t, b2 == bs[1], "second item did not match")
 		}), "invoke failed")
 	})
 
@@ -119,30 +86,12 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "invoke failed")
 	})
 
-	t.Run("array", func(t *testing.T) {
-		c := New()
-		bufs := [1]*bytes.Buffer{{}}
-		require.NoError(t, c.Provide(bufs), "provide failed")
-		require.NoError(t, c.Invoke(func(bs [1]*bytes.Buffer) {
-			require.NotNil(t, bs[0], "invoke got new array")
-		}), "invoke failed")
-	})
-
 	t.Run("array constructor", func(t *testing.T) {
 		c := New()
 		bufs := [1]*bytes.Buffer{{}}
-		require.NoError(t, c.Provide(bufs), "provide failed")
+		require.NoError(t, c.Provide(func() [1]*bytes.Buffer { return bufs }), "provide failed")
 		require.NoError(t, c.Invoke(func(bs [1]*bytes.Buffer) {
 			require.NotNil(t, bs[0], "invoke got new array")
-		}), "invoke failed")
-	})
-
-	t.Run("map", func(t *testing.T) {
-		c := New()
-		m := map[string]string{}
-		require.NoError(t, c.Provide(m), "provide failed")
-		require.NoError(t, c.Invoke(func(m map[string]string) {
-			require.NotNil(t, m, "invoke got zero value map")
 		}), "invoke failed")
 	})
 
@@ -153,15 +102,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "provide failed")
 		require.NoError(t, c.Invoke(func(m map[string]string) {
 			require.NotNil(t, m, "invoke got zero value map")
-		}), "invoke failed")
-	})
-
-	t.Run("channel", func(t *testing.T) {
-		c := New()
-		ch := make(chan int)
-		require.NoError(t, c.Provide(ch), "provide failed")
-		require.NoError(t, c.Invoke(func(ch chan int) {
-			require.NotNil(t, ch, "invoke got nil chan")
 		}), "invoke failed")
 	})
 
@@ -176,9 +116,6 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("func constructor", func(t *testing.T) {
-		// Functions passed directly to Provide are treated as constructors,
-		// but we can still put functions into the container with constructors.
-		// This makes injecting builders simple.
 		c := New()
 		require.NoError(t, c.Provide(func() func(int) {
 			return func(int) {}
@@ -186,23 +123,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Invoke(func(f func(int)) {
 			require.NotNil(t, f, "invoke got nil function pointer")
 		}), "invoke failed")
-	})
-
-	t.Run("interface", func(t *testing.T) {
-		// TODO: This doesn't work as a reasonable user would expect, since
-		// passing an io.Writer as interface{} erases information. (Put
-		// differently, we go from having an io.Writer satisfied by a
-		// *bytes.Buffer to having an interface{} satisfied by *bytes.Buffer;
-		// the fact that the io.Writer interface was involved is lost forever.)
-		c := New()
-		var w io.Writer = &bytes.Buffer{}
-		require.NoError(t, c.Provide(w), "provide failed")
-		require.Error(t, c.Invoke(func(w io.Writer) {
-		}), "expected relying on provided interface to fail")
-		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
-			assert.NotNil(t, b, "expected to get concrete type of interface")
-		}), "expected relying on concrete type to succeed")
-
 	})
 
 	t.Run("interface constructor", func(t *testing.T) {
@@ -236,7 +156,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			}), "provide constructor failed")
 
 		require.NoError(t,
-			c.Provide(contents("hello world")),
+			c.Provide(func() contents { return "hello world" }),
 			"provide value failed")
 
 		require.NoError(t, c.Invoke(func(buff *bytes.Buffer) {
@@ -367,6 +287,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Invoke(func(a *A, b *B) {}), "AB invoke failed")
 		require.Equal(t, 1, count, "Constructor must be called once")
 	})
+
 	t.Run("method invocation inside Invoke", func(t *testing.T) {
 		c := New()
 		type A struct{}
@@ -388,6 +309,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Provide(cB), "provide failed")
 		require.NoError(t, c.Invoke(getA), "A invoke failed")
 	})
+
 	t.Run("collections and instances of same type", func(t *testing.T) {
 		c := New()
 		require.NoError(t, c.Provide(func() []*bytes.Buffer {
@@ -576,38 +498,43 @@ func TestProvideRespectsConstructorErrors(t *testing.T) {
 	})
 }
 
+func TestCantProvideObjects(t *testing.T) {
+	t.Parallel()
+
+	var writer io.Writer = &bytes.Buffer{}
+	tests := []struct {
+		object   interface{}
+		typeDesc string
+	}{
+		{&bytes.Buffer{}, "pointer"},
+		{bytes.Buffer{}, "struct"},
+		{writer, "interface"},
+		{map[string]string{}, "map"},
+		{[]string{}, "slice"},
+		{[1]string{}, "array"},
+		{make(chan struct{}), "channel"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.typeDesc, func(t *testing.T) {
+			c := New()
+			assert.Error(t, c.Provide(tt.object))
+		})
+	}
+}
+
 func TestCantProvideUntypedNil(t *testing.T) {
 	t.Parallel()
 	c := New()
 	assert.Error(t, c.Provide(nil))
 }
 
-func TestCantProvideErrors(t *testing.T) {
-	t.Parallel()
-	c := New()
-
-	assert.Error(t, c.Provide(func() error { return errors.New("foo") }))
-	// TODO: This is another case where we're losing type information, which
-	// (again) makes the provide-instance path behave differently from the
-	// provide-constructor path. This is fixable by not allowing users to
-	// provide types that *implement* error, but let's discuss a holistic
-	// solution.
-	assert.NoError(t, c.Provide(errors.New("foo")))
-}
-
-type someError struct{}
-
-var _ error = (*someError)(nil)
-
-func (*someError) Error() string { return "foo" }
-
 func TestCanProvideErrorLikeType(t *testing.T) {
 	t.Parallel()
 
 	tests := []interface{}{
-		func() *someError { return &someError{} },
-		func() (*someError, error) { return &someError{}, nil },
-		&someError{},
+		func() *os.PathError { return &os.PathError{} },
+		func() (*os.PathError, error) { return &os.PathError{}, nil },
 	}
 
 	for _, tt := range tests {
@@ -615,7 +542,7 @@ func TestCanProvideErrorLikeType(t *testing.T) {
 			c := New()
 			require.NoError(t, c.Provide(tt), "provide must not fail")
 
-			require.NoError(t, c.Invoke(func(err *someError) {
+			require.NoError(t, c.Invoke(func(err *os.PathError) {
 				assert.NotNil(t, err, "invoke received nil")
 			}), "invoke must not fail")
 		})
@@ -624,27 +551,6 @@ func TestCanProvideErrorLikeType(t *testing.T) {
 
 func TestCantProvideParameterObjects(t *testing.T) {
 	t.Parallel()
-
-	t.Run("instance", func(t *testing.T) {
-		type Args struct{ In }
-
-		c := New()
-		err := c.Provide(Args{})
-		require.Error(t, err, "provide should fail")
-		require.Contains(t, err.Error(), "can't provide parameter objects")
-	})
-
-	t.Run("pointer", func(t *testing.T) {
-		type Args struct{ In }
-
-		args := &Args{}
-
-		c := New()
-		require.NoError(t, c.Provide(args), "provide failed")
-		require.NoError(t, c.Invoke(func(a *Args) {
-			require.True(t, args == a, "args must match")
-		}), "invoke failed")
-	})
 
 	t.Run("constructor", func(t *testing.T) {
 		type Args struct{ In }
@@ -678,7 +584,6 @@ func TestProvideKnownTypesFails(t *testing.T) {
 	provideArgs := []interface{}{
 		func() *bytes.Buffer { return nil },
 		func() (*bytes.Buffer, error) { return nil, nil },
-		&bytes.Buffer{},
 	}
 
 	for _, first := range provideArgs {
@@ -695,16 +600,6 @@ func TestProvideKnownTypesFails(t *testing.T) {
 		c := New()
 		assert.NoError(t, c.Provide(func() *bytes.Buffer { return nil }))
 		assert.Error(t, c.Provide(func() *bytes.Buffer { return nil }))
-	})
-	t.Run("provide instance and constructor fails", func(t *testing.T) {
-		c := New()
-		assert.NoError(t, c.Provide(&bytes.Buffer{}))
-		assert.Error(t, c.Provide(func() *bytes.Buffer { return nil }))
-	})
-	t.Run("provide constructor then object instance fails", func(t *testing.T) {
-		c := New()
-		assert.NoError(t, c.Provide(func() *bytes.Buffer { return nil }))
-		assert.Error(t, c.Provide(&bytes.Buffer{}))
 	})
 }
 

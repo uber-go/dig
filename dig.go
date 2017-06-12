@@ -66,18 +66,13 @@ func (c *Container) Provide(constructor interface{}) error {
 	if ctype == nil {
 		return errors.New("can't provide an untyped nil")
 	}
-	// Since we want to wrap any errors, don't return early.
-	var err error
 	if ctype.Kind() != reflect.Func {
-		err = c.provideInstance(constructor)
-	} else {
-		err = c.provideConstructor(constructor, ctype)
+		return fmt.Errorf("must provide constructor function, got %v (type %v)", constructor, ctype)
 	}
-
-	if err == nil {
-		return nil
+	if err := c.provide(constructor, ctype); err != nil {
+		return fmt.Errorf("can't provide %v: %v", ctype, err)
 	}
-	return fmt.Errorf("can't provide %v: %v", ctype, err)
+	return nil
 }
 
 // Invoke runs a function, supplying its arguments from the Container. If the
@@ -110,23 +105,7 @@ func (c *Container) Invoke(function interface{}) error {
 	return nil
 }
 
-func (c *Container) provideInstance(val interface{}) error {
-	vtype := reflect.TypeOf(val)
-	if vtype == _errType {
-		return errors.New("can't provide errors")
-	}
-	if isInObject(vtype) {
-		return errors.New("can't provide parameter objects")
-	}
-	if _, ok := c.nodes[vtype]; ok {
-		return errors.New("already in container")
-	}
-	c.nodes[vtype] = node{provides: vtype}
-	c.cache[vtype] = reflect.ValueOf(val)
-	return nil
-}
-
-func (c *Container) provideConstructor(ctor interface{}, ctype reflect.Type) error {
+func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 	returnTypes, err := c.getReturnTypes(ctor, ctype)
 	if err != nil {
 		return fmt.Errorf("unable to collect return types of a constructor: %v", err)
