@@ -1,7 +1,6 @@
 # Changelog
 
-
-## v0.4 (unreleased)
+## v0.4 (12 Jun 2017)
 
 - **[Breaking]** Remove `Must*` funcs to greatly reduce API surface area.
 - **[Breaking]** Restrict the API surface to only `Provide` and `Invoke`.
