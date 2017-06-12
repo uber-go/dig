@@ -31,7 +31,7 @@ else
 endif
 
 .PHONY: lint
-lint:
+lint: license
 ifdef SHOULD_LINT
 	@rm -rf lint.log
 	@echo "Checking formatting..."
@@ -70,3 +70,7 @@ bench:
 .PHONY: gendoc
 gendoc:
 	$(ECHO_V)find . -name README.md -not -path "./vendor/*" | xargs -I% md-to-godoc -input=%
+
+.PHONY: license
+license:
+	@update-license $(PKG_FILES)
