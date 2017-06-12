@@ -35,10 +35,7 @@ in the container, but for time being consider using a factory pattern.
 
 ## Provide
 
-The `Provide` method adds an object, or a constructor of an object, to the container.
-
-### Provide a constructor
-
+The `Provide` method adds a constructor of an object (or objects), to the container.
 A constructor can be a function returning any number of objects and, optionally,
 an error.
 
@@ -64,18 +61,10 @@ err := c.Provide(constructor)
 // be instantiated.
 ```
 
-### Provide an object
+### Advanced Provide
 
-As a shortcut for any object without dependencies, register it directly.
-
-```go
-type A struct {
-	Name string
-}
-
-c := dig.New()
-err := c.Provide(&A{Name: "Hello, dig!"})
-```
+// TODO: docs on dig.In usage
+// TODO: docs on dig.Out usage
 
 ## Invoke
 
