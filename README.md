@@ -61,6 +61,11 @@ err := c.Provide(constructor)
 // be instantiated.
 ```
 
+### Advanced Provide
+
+// TODO: docs on dig.In usage
+// TODO: docs on dig.Out usage
+
 ## Invoke
 
 The `Invoke` API is the flip side of `Provide` and used to retrieve types from the container.
