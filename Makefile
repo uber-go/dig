@@ -31,7 +31,7 @@ else
 endif
 
 .PHONY: lint
-lint:
+lint: license
 ifdef SHOULD_LINT
 	@rm -rf lint.log
 	@echo "Checking formatting..."
