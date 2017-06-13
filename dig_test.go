@@ -462,6 +462,21 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.NotNil(t, a, "*A should be part of the container through Ret2->Ret1")
 		}))
 	})
+
+	t.Run("optional type and type are the same thing", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type Param struct {
+			In
+
+			OptionalA *A `optional:"true"`
+		}
+		require.NoError(t, c.Provide(func() *A { return &A{} }))
+		require.NoError(t, c.Invoke(func(p Param) {
+			fmt.Println(c)
+			require.NotNil(t, p.OptionalA, "*A is present in the graph and should not be nil")
+		}))
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {
