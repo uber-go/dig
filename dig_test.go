@@ -50,7 +50,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "invoke failed")
 	})
 
-	t.Run("nil pointer constructor", func(t *testing.T) {
+	t.Run("nil pointer fails", func(t *testing.T) {
 		// Dig shouldn't forbid this - it's perfectly reasonable to explicitly
 		// provide a typed nil, since that's often a convenient way to supply a
 		// default no-op implementation.
@@ -460,6 +460,21 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "provide for the Ret struct should succeed")
 		require.NoError(t, c.Invoke(func(a *A, b *B, c C) {
 			require.NotNil(t, a, "*A should be part of the container through Ret2->Ret1")
+		}))
+	})
+
+	t.Run("optional type and type are the same thing", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type Param struct {
+			In
+
+			OptionalA *A `optional:"true"`
+		}
+		require.NoError(t, c.Provide(func() *A { return &A{} }))
+		require.NoError(t, c.Invoke(func(p Param) {
+			fmt.Println(c)
+			require.NotNil(t, p.OptionalA, "*A is present in the graph and should not be nil")
 		}))
 	})
 }

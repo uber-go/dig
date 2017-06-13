@@ -21,38 +21,28 @@
 package dig
 
 import (
-	"bytes"
-	"fmt"
+	"reflect"
 )
 
-// String representation of the entire Container
-func (c Container) String() string {
-	b := &bytes.Buffer{}
-	fmt.Fprintln(b, "nodes: {")
-	for k, v := range c.nodes {
-		fmt.Fprintln(b, "\t", k.t, "->", v)
-	}
-	fmt.Fprintln(b, "}")
-
-	fmt.Fprintln(b, "cache: {")
-	for k, v := range c.cache {
-		fmt.Fprintln(b, "\t", k.t, "=>", v)
-	}
-	fmt.Fprintln(b, "}")
-
-	return b.String()
+// Used to unieuqly identify a dig node.
+type nodeKey struct {
+	t        reflect.Type
+	optional bool
 }
 
-func (n node) String() string {
-	deps := make([]string, len(n.deps))
-	for i, d := range n.deps {
-		deps[i] = fmt.Sprint(d.t)
+type keyOption func(*nodeKey)
+
+func optional(opt bool) keyOption {
+	return func(k *nodeKey) {
+		k.optional = opt
 	}
-	return fmt.Sprintf(
-		"deps: %v, constructor: %v, key: %+v", deps, n.ctype, n.key,
-	)
 }
 
-func (k nodeKey) String() string {
-	return fmt.Sprintf("t: %v, opt: %v", k.t, k.optional)
+// Given a reflect type (and a collection of options) make a key.
+func key(t reflect.Type, opts ...keyOption) nodeKey {
+	k := nodeKey{t: t, optional: false}
+	for _, opt := range opts {
+		opt(&k)
+	}
+	return k
 }
