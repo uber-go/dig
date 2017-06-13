@@ -44,10 +44,9 @@ ifdef SHOULD_LINT
 	@$(foreach dir,$(PKGS),golint $(dir) 2>&1 | tee -a lint.log;)
 	@echo "Checking for unresolved FIXMEs..."
 	@git grep -i fixme | grep -v -e vendor -e Makefile | tee -a lint.log
-	@echo "Ensuring generated doc.go are up to date"
-	$(ECHO_V)$(MAKE) gendoc
 	@echo "Checking for license headers..."
-	@./check_license.sh | tee -a lint.log
+	@DRY_RUN=1 ./check_license.sh | tee -a lint.log
+	@$(MAKE) gendoc
 	@[ ! -s lint.log ]
 else
 	@echo "Skipping linters on" $(GO_VERSION)
@@ -69,4 +68,7 @@ bench:
 
 .PHONY: gendoc
 gendoc:
-	$(ECHO_V)find . -name README.md -not -path "./vendor/*" | xargs -I% md-to-godoc -input=%
+	@echo "Generating doc.go from README.md..."
+	@find . -name README.md -not -path "./vendor/*" | xargs -I% md-to-godoc -input=%
+	@# doc.go gets regenerated, so refresh its license
+	@update-license doc.go
