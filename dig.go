@@ -299,11 +299,11 @@ func (c *Container) set(v reflect.Value) {
 	}
 }
 
-func (c *Container) contains(deps []dep) error {
+func (c *Container) contains(keys []nodeKey) error {
 	var missing []reflect.Type
-	for _, d := range deps {
-		if _, ok := c.nodes[key(d.Type)]; !ok && !d.Optional {
-			missing = append(missing, d.Type)
+	for _, k := range keys {
+		if _, ok := c.nodes[k]; !ok && !k.optional {
+			missing = append(missing, k.t)
 		}
 	}
 	if len(missing) > 0 {
@@ -339,13 +339,8 @@ type node struct {
 	provides reflect.Type
 	ctor     interface{}
 	ctype    reflect.Type
-	deps     []dep
+	deps     []nodeKey
 	key      nodeKey
-}
-
-type dep struct {
-	Type     reflect.Type
-	Optional bool
 }
 
 func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
@@ -360,11 +355,11 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 }
 
 // Retrieves the dependencies for a constructor
-func getConstructorDependencies(ctype reflect.Type) ([]dep, error) {
-	var deps []dep
+func getConstructorDependencies(ctype reflect.Type) ([]nodeKey, error) {
+	var deps []nodeKey
 	for i := 0; i < ctype.NumIn(); i++ {
-		err := traverseInTypes(ctype.In(i), func(t reflect.Type, opt bool) {
-			deps = append(deps, dep{Type: t, Optional: opt})
+		err := traverseInTypes(ctype.In(i), func(k nodeKey) {
+			deps = append(deps, k)
 		})
 		if err != nil {
 			return nil, err
@@ -390,7 +385,7 @@ func detectCycles(n node, graph map[nodeKey]node, path []reflect.Type) error {
 	}
 	path = append(path, n.provides)
 	for _, dep := range n.deps {
-		depNode, ok := graph[key(dep.Type)]
+		depNode, ok := graph[dep]
 		if !ok {
 			continue
 		}
@@ -404,9 +399,9 @@ func detectCycles(n node, graph map[nodeKey]node, path []reflect.Type) error {
 // traverseInTypes traverses fields of a dig.In struct in depth-first order.
 //
 // If called with a non-In object, the function is called right away.
-func traverseInTypes(t reflect.Type, fn func(ftype reflect.Type, optional bool)) error {
+func traverseInTypes(t reflect.Type, fn func(k nodeKey)) error {
 	if !isInObject(t) {
-		fn(t, false)
+		fn(key(t))
 		return nil
 	}
 
@@ -423,12 +418,12 @@ func traverseInTypes(t reflect.Type, fn func(ftype reflect.Type, optional bool))
 			continue
 		}
 
-		optional, err := isFieldOptional(t, f)
+		opt, err := isFieldOptional(t, f)
 		if err != nil {
 			return err
 		}
 
-		fn(f.Type, optional)
+		fn(key(f.Type, optional(opt)))
 	}
 
 	return nil

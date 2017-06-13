@@ -30,13 +30,13 @@ func (c Container) String() string {
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "nodes: {")
 	for k, v := range c.nodes {
-		fmt.Fprintln(b, "\t", k, "->", v)
+		fmt.Fprintln(b, "\t", k.t, "->", v)
 	}
 	fmt.Fprintln(b, "}")
 
 	fmt.Fprintln(b, "cache: {")
 	for k, v := range c.cache {
-		fmt.Fprintln(b, "\t", k, "=>", v)
+		fmt.Fprintln(b, "\t", k.t, "=>", v)
 	}
 	fmt.Fprintln(b, "}")
 
@@ -46,7 +46,7 @@ func (c Container) String() string {
 func (n node) String() string {
 	deps := make([]string, len(n.deps))
 	for i, d := range n.deps {
-		deps[i] = fmt.Sprint(d.Type)
+		deps[i] = fmt.Sprint(d.t)
 	}
 	return fmt.Sprintf(
 		"deps: %v, constructor: %v, key: %+v", deps, n.ctype, n.key,
@@ -54,5 +54,5 @@ func (n node) String() string {
 }
 
 func (k nodeKey) String() string {
-	return k.t.String()
+	return fmt.Sprintf("t: %v, opt: %v", k.t, k.optional)
 }

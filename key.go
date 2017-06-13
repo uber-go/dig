@@ -26,17 +26,23 @@ import (
 
 // Used to unieuqly identify a dig node.
 type nodeKey struct {
-	t reflect.Type
+	t        reflect.Type
+	optional bool
 }
 
-// No opts available right now, but named instances are on deck.
-type keyOption func(nodeKey)
+type keyOption func(*nodeKey)
+
+func optional(opt bool) keyOption {
+	return func(k *nodeKey) {
+		k.optional = opt
+	}
+}
 
 // Given a reflect type (and a collection of options) make a key.
 func key(t reflect.Type, opts ...keyOption) nodeKey {
-	k := nodeKey{t: t}
+	k := nodeKey{t: t, optional: false}
 	for _, opt := range opts {
-		opt(k)
+		opt(&k)
 	}
 	return k
 }
