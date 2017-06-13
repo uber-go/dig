@@ -330,6 +330,11 @@ func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error)
 	return args, nil
 }
 
+// Graph node represents a single return type from a constructor.
+// One constructor function returning multiple types get adeed to the graph
+// as multiple individual nodes. When one type is required to be initialized,
+// all nodes in the graph beloning to the constructor get inserted into the
+// cache.
 type node struct {
 	provides reflect.Type
 	ctor     interface{}
