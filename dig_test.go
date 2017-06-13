@@ -672,6 +672,30 @@ func TestInvokesUseCachedObjects(t *testing.T) {
 	}
 }
 
+func TestProvideFailures(t *testing.T) {
+	t.Run("out returning multiple instances of the same type", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+		type ret struct {
+			Out
+
+			A1 A // sampe type A provided three times
+			A2 A
+			A3 A
+		}
+
+		err := c.Provide(func() ret {
+			return ret{
+				A1: A{idx: 1},
+				A2: A{idx: 2},
+				A3: A{idx: 3},
+			}
+		})
+		require.Error(t, err, "provide must return error")
+		require.Contains(t, err.Error(), "returns multiple dig.A")
+	})
+}
+
 func TestInvokeFailures(t *testing.T) {
 	t.Parallel()
 
