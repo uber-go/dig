@@ -54,6 +54,6 @@ func TestStringer(t *testing.T) {
 	assert.Contains(t, s, "func(*dig.B) *dig.C")
 
 	// cache
-	assert.Contains(t, s, "*dig.A =>")
-	assert.Contains(t, s, "*dig.B =>")
+	assert.Regexp(t, "dig.B -> .* cachedValue: &{}", s)
+	assert.Regexp(t, "dig.C -> .* cached: false", s)
 }
