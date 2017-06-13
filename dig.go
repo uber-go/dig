@@ -36,15 +36,15 @@ const (
 // constructed on-demand and returned from a cache thereafter, so they're
 // effectively singletons.
 type Container struct {
-	nodes map[reflect.Type]node
-	cache map[reflect.Type]reflect.Value
+	nodes map[nodeKey]node
+	cache map[nodeKey]reflect.Value
 }
 
 // New constructs a ready-to-use Container.
 func New() *Container {
 	return &Container{
-		nodes: make(map[reflect.Type]node),
-		cache: make(map[reflect.Type]reflect.Value),
+		nodes: make(map[nodeKey]node),
+		cache: make(map[nodeKey]reflect.Value),
 	}
 }
 
@@ -118,7 +118,7 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 			return err
 		}
 		nodes = append(nodes, n)
-		c.nodes[rt] = n
+		c.nodes[n.key] = n
 	}
 
 	for _, n := range nodes {
@@ -145,6 +145,7 @@ func (c *Container) getReturnTypes(
 		outt := ctype.Out(i)
 
 		err := traverseOutTypes(outt, func(rt reflect.Type) error {
+			k := key(rt)
 			if rt == _errType {
 				// Don't register errors into the container.
 				return nil
@@ -157,7 +158,7 @@ func (c *Container) getReturnTypes(
 			if _, ok := returnTypes[rt]; ok {
 				return fmt.Errorf("returns multiple %v", rt)
 			}
-			if _, ok := c.nodes[rt]; ok {
+			if _, ok := c.nodes[k]; ok {
 				return fmt.Errorf("provides type %v, which is already in the container", rt)
 			}
 
@@ -205,23 +206,23 @@ func (c *Container) isAcyclic(n node) error {
 }
 
 // Retrieve a type from the container
-func (c *Container) get(t reflect.Type) (reflect.Value, error) {
-	if v, ok := c.cache[t]; ok {
+func (c *Container) get(k nodeKey) (reflect.Value, error) {
+	if v, ok := c.cache[k]; ok {
 		return v, nil
 	}
 
-	if isInObject(t) {
+	if isInObject(k.t) {
 		// We do not want parameter objects to be cached.
-		return c.createInObject(t)
+		return c.createInObject(k.t)
 	}
 
-	n, ok := c.nodes[t]
+	n, ok := c.nodes[k]
 	if !ok {
-		return _noValue, fmt.Errorf("type %v isn't in the container", t)
+		return _noValue, fmt.Errorf("type %v isn't in the container", k.t)
 	}
 
 	if err := c.contains(n.deps); err != nil {
-		return _noValue, fmt.Errorf("missing dependencies for type %v: %v", t, err)
+		return _noValue, fmt.Errorf("missing dependencies for type %v: %v", k.t, err)
 	}
 
 	args, err := c.constructorArgs(n.ctype)
@@ -233,13 +234,15 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	// Provide-time validation ensures that all constructors return at least
 	// one value.
 	if err := constructed[len(constructed)-1]; err.Type() == _errType && err.Interface() != nil {
-		return _noValue, fmt.Errorf("constructor %v for type %v failed: %v", n.ctype, t, err.Interface())
+		return _noValue, fmt.Errorf(
+			"constructor %v for type %v failed: %v", n.ctype, k.t, err.Interface(),
+		)
 	}
 
 	for _, con := range constructed {
 		c.set(con)
 	}
-	return c.cache[t], nil
+	return c.cache[k], nil
 }
 
 // Returns a new In parent object with all the dependency fields
@@ -263,7 +266,7 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 			}
 		}
 
-		v, err := c.get(f.Type)
+		v, err := c.get(key(f.Type))
 		if err != nil {
 			if isOptional {
 				v = reflect.Zero(f.Type)
@@ -284,7 +287,7 @@ func (c *Container) set(v reflect.Value) {
 	if !isOutObject(t) {
 		// do not cache error types
 		if t != _errType {
-			c.cache[t] = v
+			c.cache[key(t)] = v
 		}
 		return
 	}
@@ -299,7 +302,7 @@ func (c *Container) set(v reflect.Value) {
 func (c *Container) contains(deps []dep) error {
 	var missing []reflect.Type
 	for _, d := range deps {
-		if _, ok := c.nodes[d.Type]; !ok && !d.Optional {
+		if _, ok := c.nodes[key(d.Type)]; !ok && !d.Optional {
 			missing = append(missing, d.Type)
 		}
 	}
@@ -311,14 +314,14 @@ func (c *Container) contains(deps []dep) error {
 
 func (c *Container) remove(nodes []node) {
 	for _, n := range nodes {
-		delete(c.nodes, n.provides)
+		delete(c.nodes, n.key)
 	}
 }
 
 func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error) {
 	args := make([]reflect.Value, 0, ctype.NumIn())
 	for i := 0; i < ctype.NumIn(); i++ {
-		arg, err := c.get(ctype.In(i))
+		arg, err := c.get(key(ctype.In(i)))
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get arguments for constructor %v: %v", ctype, err)
 		}
@@ -332,6 +335,7 @@ type node struct {
 	ctor     interface{}
 	ctype    reflect.Type
 	deps     []dep
+	key      nodeKey
 }
 
 type dep struct {
@@ -346,6 +350,7 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 		ctor:     ctor,
 		ctype:    ctype,
 		deps:     deps,
+		key:      key(provides),
 	}, err
 }
 
@@ -372,7 +377,7 @@ func cycleError(cycle []reflect.Type, last reflect.Type) error {
 	return errors.New(b.String())
 }
 
-func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) error {
+func detectCycles(n node, graph map[nodeKey]node, path []reflect.Type) error {
 	for _, p := range path {
 		if p == n.provides {
 			return cycleError(path, n.provides)
@@ -380,7 +385,7 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) erro
 	}
 	path = append(path, n.provides)
 	for _, dep := range n.deps {
-		depNode, ok := graph[dep.Type]
+		depNode, ok := graph[key(dep.Type)]
 		if !ok {
 			continue
 		}

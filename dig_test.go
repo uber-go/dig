@@ -50,7 +50,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "invoke failed")
 	})
 
-	t.Run("nil pointer constructor", func(t *testing.T) {
+	t.Run("nil pointer fails", func(t *testing.T) {
 		// Dig shouldn't forbid this - it's perfectly reasonable to explicitly
 		// provide a typed nil, since that's often a convenient way to supply a
 		// default no-op implementation.
