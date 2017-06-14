@@ -252,15 +252,9 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 			continue // skip private fields
 		}
 
-		var isOptional bool
-		if tag := f.Tag.Get(_optionalTag); tag != "" {
-			var err error
-			isOptional, err = strconv.ParseBool(tag)
-			if err != nil {
-				return dest, fmt.Errorf(
-					"invalid value %q for %q tag on field %v of %v: %v",
-					tag, _optionalTag, f.Name, t, err)
-			}
+		isOptional, err := isFieldOptional(t, f)
+		if err != nil {
+			return dest, err
 		}
 
 		v, err := c.get(f.Type)
