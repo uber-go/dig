@@ -37,14 +37,12 @@ const (
 // effectively singletons.
 type Container struct {
 	nodes map[reflect.Type]node
-	cache map[reflect.Type]reflect.Value
 }
 
 // New constructs a ready-to-use Container.
 func New() *Container {
 	return &Container{
 		nodes: make(map[reflect.Type]node),
-		cache: make(map[reflect.Type]reflect.Value),
 	}
 }
 
@@ -206,10 +204,33 @@ func (c *Container) isAcyclic(n node) error {
 	return detectCycles(n, c.nodes, nil)
 }
 
-// Retrieve a type from the container
-func (c *Container) get(t reflect.Type) (reflect.Value, error) {
-	if v, ok := c.cache[t]; ok {
-		return v, nil
+type keyOpt func(*key)
+
+// Specifies if absence of the object in the graph is ok on retrieval.
+func optional(opt bool) keyOpt {
+	return func(k *key) {
+		k.optional = opt
+	}
+}
+
+// Represents an edge in the graph.
+type key struct {
+	t        reflect.Type
+	optional bool
+}
+
+// Custom map get method for the underlying nodes.
+//
+// Behaves in the following ways:
+//     - get without any options will return a value from the graph, or an error
+//     - get for type not in the map with optional=true returns zero value for type.
+//     - get with a dig.In embed will construct a new object, and populate all the
+//       members based on the memebers, including a parse of the struct tags that
+//       drives the aforementioned behaviors.
+func (c *Container) get(t reflect.Type, opts ...keyOpt) (reflect.Value, error) {
+	k := key{t: t}
+	for _, opt := range opts {
+		opt(&k)
 	}
 
 	if isInObject(t) {
@@ -219,7 +240,14 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 
 	n, ok := c.nodes[t]
 	if !ok {
+		if k.optional {
+			return reflect.Zero(t), nil
+		}
 		return _noValue, fmt.Errorf("type %v isn't in the container", t)
+	}
+
+	if n.cached {
+		return n.value, nil
 	}
 
 	if err := c.contains(n.deps); err != nil {
@@ -241,7 +269,8 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	for _, con := range constructed {
 		c.set(con)
 	}
-	return c.cache[t], nil
+
+	return c.nodes[t].value, nil
 }
 
 // Returns a new In parent object with all the dependency fields
@@ -254,21 +283,19 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 			continue // skip private fields
 		}
 
+		// check for optional tag
 		isOptional, err := isFieldOptional(t, f)
 		if err != nil {
 			return dest, err
 		}
 
-		v, err := c.get(f.Type)
+		// get the value from the map
+		v, err := c.get(f.Type, optional(isOptional))
 		if err != nil {
-			if isOptional {
-				v = reflect.Zero(f.Type)
-			} else {
-				return dest, fmt.Errorf(
-					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
-			}
+			return dest, err
 		}
 
+		// set the dig.In fiels to the node value
 		dest.Field(i).Set(v)
 	}
 	return dest, nil
@@ -280,7 +307,10 @@ func (c *Container) set(v reflect.Value) {
 	if !isOutObject(t) {
 		// do not cache error types
 		if t != _errType {
-			c.cache[t] = v
+			n := c.nodes[t]
+			n.cached = true
+			n.value = v
+			c.nodes[t] = n
 		}
 		return
 	}
@@ -292,11 +322,11 @@ func (c *Container) set(v reflect.Value) {
 	}
 }
 
-func (c *Container) contains(deps []dep) error {
+func (c *Container) contains(deps []key) error {
 	var missing []reflect.Type
 	for _, d := range deps {
-		if _, ok := c.nodes[d.Type]; !ok && !d.Optional {
-			missing = append(missing, d.Type)
+		if _, ok := c.nodes[d.t]; !ok && !d.optional {
+			missing = append(missing, d.t)
 		}
 	}
 	if len(missing) > 0 {
@@ -324,15 +354,12 @@ func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error)
 }
 
 type node struct {
-	provides reflect.Type
-	ctor     interface{}
-	ctype    reflect.Type
-	deps     []dep
-}
-
-type dep struct {
-	Type     reflect.Type
-	Optional bool
+	provides reflect.Type  // type of the return argument, i.e. *bytes.Buffer
+	ctor     interface{}   // constructor function
+	ctype    reflect.Type  // node's type (also the key in the Graph map)
+	value    reflect.Value // cached value of the node
+	cached   bool          // quick check for if the value is cached
+	deps     []key
 }
 
 func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
@@ -346,11 +373,11 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 }
 
 // Retrieves the dependencies for a constructor
-func getConstructorDependencies(ctype reflect.Type) ([]dep, error) {
-	var deps []dep
+func getConstructorDependencies(ctype reflect.Type) ([]key, error) {
+	var deps []key
 	for i := 0; i < ctype.NumIn(); i++ {
 		err := traverseInTypes(ctype.In(i), func(t reflect.Type, opt bool) {
-			deps = append(deps, dep{Type: t, Optional: opt})
+			deps = append(deps, key{t: t, optional: opt})
 		})
 		if err != nil {
 			return nil, err
@@ -376,7 +403,7 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) erro
 	}
 	path = append(path, n.provides)
 	for _, dep := range n.deps {
-		depNode, ok := graph[dep.Type]
+		depNode, ok := graph[dep.t]
 		if !ok {
 			continue
 		}

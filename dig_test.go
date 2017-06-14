@@ -462,6 +462,35 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.NotNil(t, a, "*A should be part of the container through Ret2->Ret1")
 		}))
 	})
+
+	t.Run("named instances", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+
+		// returns three named instances of A
+		type ret struct {
+			Out
+
+			A1 A `name:"first"`
+			A2 A `name:"second"`
+			A3 A `name:"third"`
+		}
+
+		// requires two specific named instances
+		type param struct {
+			In
+
+			A1 A `name:"first"`
+			A3 A `name:"third"`
+		}
+		require.NoError(t, c.Provide(func() ret {
+			return ret{A1: A{1}, A2: A{2}, A3: A{3}}
+		}), "provide for three named instances should succeed")
+		require.NoError(t, c.Invoke(func(p param) {
+			assert.Equal(t, 1, p.A1.idx)
+			assert.Equal(t, 3, p.A3.idx)
+		}), "invoke should succeed, pulling out two named instances")
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {
@@ -726,7 +755,6 @@ func TestInvokeFailures(t *testing.T) {
 		})
 
 		require.Error(t, err, "expected invoke error")
-		require.Contains(t, err.Error(), "could not get field T2")
 		require.Contains(t, err.Error(), "dig.type2 isn't in the container")
 	})
 

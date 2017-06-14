@@ -34,21 +34,16 @@ func (c Container) String() string {
 	}
 	fmt.Fprintln(b, "}")
 
-	fmt.Fprintln(b, "cache: {")
-	for k, v := range c.cache {
-		fmt.Fprintln(b, "\t", k, "=>", v)
-	}
-	fmt.Fprintln(b, "}")
-
 	return b.String()
 }
 
 func (n node) String() string {
 	deps := make([]string, len(n.deps))
 	for i, d := range n.deps {
-		deps[i] = fmt.Sprint(d.Type)
+		deps[i] = fmt.Sprint(d.t)
 	}
-	return fmt.Sprintf(
-		"deps: %v, constructor: %v", deps, n.ctype,
-	)
+	if n.cached {
+		return fmt.Sprintf("deps: %v, constructor: %v, cachedValue: %v", deps, n.ctype, n.value)
+	}
+	return fmt.Sprintf("deps: %v, constructor: %v, cached: %v", deps, n.ctype, n.cached)
 }
