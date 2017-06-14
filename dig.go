@@ -37,14 +37,12 @@ const (
 // effectively singletons.
 type Container struct {
 	nodes map[reflect.Type]node
-	cache map[reflect.Type]reflect.Value
 }
 
 // New constructs a ready-to-use Container.
 func New() *Container {
 	return &Container{
 		nodes: make(map[reflect.Type]node),
-		cache: make(map[reflect.Type]reflect.Value),
 	}
 }
 
@@ -206,10 +204,6 @@ func (c *Container) isAcyclic(n node) error {
 
 // Retrieve a type from the container
 func (c *Container) get(t reflect.Type) (reflect.Value, error) {
-	if v, ok := c.cache[t]; ok {
-		return v, nil
-	}
-
 	if isInObject(t) {
 		// We do not want parameter objects to be cached.
 		return c.createInObject(t)
@@ -218,6 +212,10 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	n, ok := c.nodes[t]
 	if !ok {
 		return _noValue, fmt.Errorf("type %v isn't in the container", t)
+	}
+
+	if n.cached {
+		return n.value, nil
 	}
 
 	if err := c.contains(n.deps); err != nil {
@@ -239,7 +237,7 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	for _, con := range constructed {
 		c.set(con)
 	}
-	return c.cache[t], nil
+	return c.nodes[t].value, nil
 }
 
 // Returns a new In parent object with all the dependency fields
@@ -284,7 +282,10 @@ func (c *Container) set(v reflect.Value) {
 	if !isOutObject(t) {
 		// do not cache error types
 		if t != _errType {
-			c.cache[t] = v
+			n := c.nodes[t]
+			n.cached = true
+			n.value = v
+			c.nodes[t] = n
 		}
 		return
 	}
@@ -328,12 +329,15 @@ func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error)
 }
 
 type node struct {
-	provides reflect.Type
-	ctor     interface{}
-	ctype    reflect.Type
+	provides reflect.Type  // type of the return argument, i.e. *bytes.Buffer
+	ctor     interface{}   // constructor function
+	ctype    reflect.Type  // node's type (also the key in the Graph map)
+	value    reflect.Value // cached value of the node
+	cached   bool          // quick check for if the value is cached
 	deps     []dep
 }
 
+// Represents a node's dependency (edge in the graph).
 type dep struct {
 	Type     reflect.Type
 	Optional bool
