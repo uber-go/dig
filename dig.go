@@ -302,7 +302,6 @@ func (c *Container) set(k key, v reflect.Value) {
 	// dig.Out objects are not acted upon directly, but rather their memebers are considered
 	for i := 0; i < k.t.NumField(); i++ {
 		f := k.t.Field(i)
-		// TODO: READ THE TAGS!!!
 
 		// recurse into all fields, which may or may not be more dig.Out objects
 		fk := key{t: f.Type, name: f.Tag.Get(_nameTag)}
