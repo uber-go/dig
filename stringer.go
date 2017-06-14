@@ -46,7 +46,11 @@ func (c *Container) String() string {
 func (n *node) String() string {
 	deps := make([]string, len(n.deps))
 	for i, d := range n.deps {
-		deps[i] = fmt.Sprintf("%v opt:%v", d.key, d.optional)
+		if d.optional {
+			deps[i] = fmt.Sprintf("%v opt: true", d.key)
+			continue
+		}
+		deps[i] = d.key.String()
 	}
 	return fmt.Sprintf(
 		"deps: %v, ctor: %v", deps, n.ctype,
