@@ -491,6 +491,41 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 3, p.A3.idx)
 		}), "invoke should succeed, pulling out two named instances")
 	})
+
+	t.Run("named instances recurse", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+
+		type Ret1 struct {
+			Out
+
+			A1 A `name:"first"`
+		}
+		type Ret2 struct {
+			Ret1
+
+			A2 A `name:"second"`
+		}
+		type param struct {
+			In
+
+			A1 A `name:"first"`  // should come from ret1 through ret2
+			A2 A `name:"second"` // should come from ret2
+		}
+		require.NoError(t, c.Provide(func() Ret2 {
+			return Ret2{
+				Ret1: Ret1{
+					A1: A{1},
+				},
+				A2: A{2},
+			}
+		}))
+		fmt.Println(c)
+		require.NoError(t, c.Invoke(func(p param) {
+			assert.Equal(t, 1, p.A1.idx)
+			assert.Equal(t, 2, p.A2.idx)
+		}), "invoke should succeed, pulling out two named instances")
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {

@@ -192,7 +192,7 @@ func (c *Container) getReturnKeys(
 
 // DFS traverse over all the types and execute the provided function.
 // Types that embed dig.Out get recursed on. Returns the first error encountered.
-func traverseOutTypes(k key, f func(k key) error) error {
+func traverseOutTypes(k key, f func(key) error) error {
 	if !isOutObject(k.t) {
 		// call the provided function on non-Out type
 		if err := f(k); err != nil {
