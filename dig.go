@@ -30,21 +30,36 @@ import (
 
 const (
 	_optionalTag = "optional"
+	_nameTag     = "name"
 )
+
+// Unique identification of an object in the graph.
+type key struct {
+	t    reflect.Type
+	name string
+}
 
 // A Container is a directed, acyclic graph of dependencies. Dependencies are
 // constructed on-demand and returned from a cache thereafter, so they're
 // effectively singletons.
 type Container struct {
-	nodes map[reflect.Type]node
-	cache map[reflect.Type]reflect.Value
+	nodes map[key]*node
+	cache map[key]reflect.Value
+	// TODO: for advanced use-case, add an index
+	// This will allow retrieval of a single type, without specifying the exact
+	// tag, provided there is only one object of that given type
+	//
+	// It will also allow library owners to create a "default" tag for their
+	// object, in case users want to provide another type with a different name
+	//
+	// index map[reflect.Type]key
 }
 
 // New constructs a ready-to-use Container.
 func New() *Container {
 	return &Container{
-		nodes: make(map[reflect.Type]node),
-		cache: make(map[reflect.Type]reflect.Value),
+		nodes: make(map[key]*node),
+		cache: make(map[key]reflect.Value),
 	}
 }
 
@@ -106,19 +121,19 @@ func (c *Container) Invoke(function interface{}) error {
 }
 
 func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
-	returnTypes, err := c.getReturnTypes(ctor, ctype)
+	keys, err := c.getReturnKeys(ctor, ctype)
 	if err != nil {
 		return fmt.Errorf("unable to collect return types of a constructor: %v", err)
 	}
 
-	nodes := make([]node, 0, len(returnTypes))
-	for rt := range returnTypes {
-		n, err := newNode(rt, ctor, ctype)
+	nodes := make([]*node, 0, len(keys))
+	for k := range keys {
+		n, err := newNode(k, ctor, ctype)
 		if err != nil {
 			return err
 		}
 		nodes = append(nodes, n)
-		c.nodes[rt] = n
+		c.nodes[k] = n
 	}
 
 	for _, n := range nodes {
@@ -132,36 +147,36 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 }
 
 // Get the return types of a constructor with all the dig.Out returns get expanded.
-func (c *Container) getReturnTypes(
+func (c *Container) getReturnKeys(
 	ctor interface{},
 	ctype reflect.Type,
-) (map[reflect.Type]struct{}, error) {
+) (map[key]struct{}, error) {
 	// Could pre-compute the size but it's tricky as counter is different
 	// when dig.Out objects are mixed in
-	returnTypes := make(map[reflect.Type]struct{})
+	returnTypes := make(map[key]struct{})
 
 	// Check each return object
 	for i := 0; i < ctype.NumOut(); i++ {
 		outt := ctype.Out(i)
 
-		err := traverseOutTypes(outt, func(rt reflect.Type) error {
-			if rt == _errType {
+		err := traverseOutTypes(key{t: outt}, func(k key) error {
+			if k.t == _errType {
 				// Don't register errors into the container.
 				return nil
 			}
 
 			// Tons of error checking
-			if isInObject(rt) {
+			if isInObject(k.t) {
 				return errors.New("can't provide parameter objects")
 			}
-			if _, ok := returnTypes[rt]; ok {
-				return fmt.Errorf("returns multiple %v", rt)
+			if _, ok := returnTypes[k]; ok {
+				return fmt.Errorf("returns multiple %v", k.t)
 			}
-			if _, ok := c.nodes[rt]; ok {
-				return fmt.Errorf("provides type %v, which is already in the container", rt)
+			if _, ok := c.nodes[k]; ok {
+				return fmt.Errorf("provides type %v, which is already in the container", k.t)
 			}
 
-			returnTypes[rt] = struct{}{}
+			returnTypes[k] = struct{}{}
 			return nil
 		})
 		if err != nil {
@@ -175,19 +190,19 @@ func (c *Container) getReturnTypes(
 	return returnTypes, nil
 }
 
-// Do a DFS traverse over all dig.Out members (recursive) and perform an action.
-// Returns the first error encountered.
-func traverseOutTypes(t reflect.Type, f func(t reflect.Type) error) error {
-	if !isOutObject(t) {
+// DFS traverse over all the types and execute the provided function.
+// Types that embed dig.Out get recursed on. Returns the first error encountered.
+func traverseOutTypes(k key, f func(k key) error) error {
+	if !isOutObject(k.t) {
 		// call the provided function on non-Out type
-		if err := f(t); err != nil {
+		if err := f(k); err != nil {
 			return err
 		}
 		return nil
 	}
 
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
+	for i := 0; i < k.t.NumField(); i++ {
+		field := k.t.Field(i)
 		ft := field.Type
 
 		if field.PkgPath != "" {
@@ -195,35 +210,35 @@ func traverseOutTypes(t reflect.Type, f func(t reflect.Type) error) error {
 		}
 
 		// keep recursing to traverse all the embedded objects
-		if err := traverseOutTypes(ft, f); err != nil {
+		if err := traverseOutTypes(key{t: ft, name: field.Tag.Get(_nameTag)}, f); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Container) isAcyclic(n node) error {
+func (c *Container) isAcyclic(n *node) error {
 	return detectCycles(n, c.nodes, nil)
 }
 
 // Retrieve a type from the container
-func (c *Container) get(t reflect.Type) (reflect.Value, error) {
-	if v, ok := c.cache[t]; ok {
+func (c *Container) get(e edge) (reflect.Value, error) {
+	if v, ok := c.cache[e.key]; ok {
 		return v, nil
 	}
 
-	if isInObject(t) {
+	if isInObject(e.t) {
 		// We do not want parameter objects to be cached.
-		return c.createInObject(t)
+		return c.createInObject(e.t)
 	}
 
-	n, ok := c.nodes[t]
+	n, ok := c.nodes[e.key]
 	if !ok {
-		return _noValue, fmt.Errorf("type %v isn't in the container", t)
+		return _noValue, fmt.Errorf("type %v isn't in the container", e.t)
 	}
 
 	if err := c.contains(n.deps); err != nil {
-		return _noValue, fmt.Errorf("missing dependencies for type %v: %v", t, err)
+		return _noValue, fmt.Errorf("missing dependencies for type %v: %v", e.t, err)
 	}
 
 	args, err := c.constructorArgs(n.ctype)
@@ -235,13 +250,13 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	// Provide-time validation ensures that all constructors return at least
 	// one value.
 	if err := constructed[len(constructed)-1]; err.Type() == _errType && err.Interface() != nil {
-		return _noValue, fmt.Errorf("constructor %v for type %v failed: %v", n.ctype, t, err.Interface())
+		return _noValue, fmt.Errorf("constructor %v for type %v failed: %v", n.ctype, e.t, err.Interface())
 	}
 
 	for _, con := range constructed {
-		c.set(con)
+		c.set(key{t: con.Type()}, con)
 	}
-	return c.cache[t], nil
+	return c.cache[e.key], nil
 }
 
 // Returns a new In parent object with all the dependency fields
@@ -259,7 +274,7 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 			return dest, err
 		}
 
-		v, err := c.get(f.Type)
+		v, err := c.get(edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}})
 		if err != nil {
 			if isOptional {
 				v = reflect.Zero(f.Type)
@@ -275,28 +290,31 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 }
 
 // Set the value in the cache after a node resolution
-func (c *Container) set(v reflect.Value) {
-	t := v.Type()
-	if !isOutObject(t) {
+func (c *Container) set(k key, v reflect.Value) {
+	if !isOutObject(k.t) {
 		// do not cache error types
-		if t != _errType {
-			c.cache[t] = v
+		if k.t != _errType {
+			c.cache[k] = v
 		}
 		return
 	}
 
 	// dig.Out objects are not acted upon directly, but rather their memebers are considered
-	for i := 0; i < t.NumField(); i++ {
+	for i := 0; i < k.t.NumField(); i++ {
+		f := k.t.Field(i)
+		// TODO: READ THE TAGS!!!
+
 		// recurse into all fields, which may or may not be more dig.Out objects
-		c.set(v.Field(i))
+		fk := key{t: f.Type, name: f.Tag.Get(_nameTag)}
+		c.set(fk, v.Field(i))
 	}
 }
 
-func (c *Container) contains(deps []dep) error {
+func (c *Container) contains(deps []edge) error {
 	var missing []reflect.Type
 	for _, d := range deps {
-		if _, ok := c.nodes[d.Type]; !ok && !d.Optional {
-			missing = append(missing, d.Type)
+		if _, ok := c.nodes[d.key]; !ok && !d.optional {
+			missing = append(missing, d.t)
 		}
 	}
 	if len(missing) > 0 {
@@ -305,16 +323,16 @@ func (c *Container) contains(deps []dep) error {
 	return nil
 }
 
-func (c *Container) remove(nodes []node) {
+func (c *Container) remove(nodes []*node) {
 	for _, n := range nodes {
-		delete(c.nodes, n.provides)
+		delete(c.nodes, n.key)
 	}
 }
 
 func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error) {
 	args := make([]reflect.Value, 0, ctype.NumIn())
 	for i := 0; i < ctype.NumIn(); i++ {
-		arg, err := c.get(ctype.In(i))
+		arg, err := c.get(edge{key: key{t: ctype.In(i)}})
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get arguments for constructor %v: %v", ctype, err)
 		}
@@ -324,33 +342,35 @@ func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error)
 }
 
 type node struct {
-	provides reflect.Type
-	ctor     interface{}
-	ctype    reflect.Type
-	deps     []dep
+	key
+
+	ctor  interface{}
+	ctype reflect.Type
+	deps  []edge
 }
 
-type dep struct {
-	Type     reflect.Type
-	Optional bool
+type edge struct {
+	key
+
+	optional bool
 }
 
-func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
+func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
 	deps, err := getConstructorDependencies(ctype)
-	return node{
-		provides: provides,
-		ctor:     ctor,
-		ctype:    ctype,
-		deps:     deps,
+	return &node{
+		key:   k,
+		ctor:  ctor,
+		ctype: ctype,
+		deps:  deps,
 	}, err
 }
 
 // Retrieves the dependencies for a constructor
-func getConstructorDependencies(ctype reflect.Type) ([]dep, error) {
-	var deps []dep
+func getConstructorDependencies(ctype reflect.Type) ([]edge, error) {
+	var deps []edge
 	for i := 0; i < ctype.NumIn(); i++ {
 		err := traverseInTypes(ctype.In(i), func(t reflect.Type, opt bool) {
-			deps = append(deps, dep{Type: t, Optional: opt})
+			deps = append(deps, edge{key: key{t: t}, optional: opt})
 		})
 		if err != nil {
 			return nil, err
@@ -368,15 +388,15 @@ func cycleError(cycle []reflect.Type, last reflect.Type) error {
 	return errors.New(b.String())
 }
 
-func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) error {
+func detectCycles(n *node, graph map[key]*node, path []reflect.Type) error {
 	for _, p := range path {
-		if p == n.provides {
-			return cycleError(path, n.provides)
+		if p == n.t {
+			return cycleError(path, n.t)
 		}
 	}
-	path = append(path, n.provides)
+	path = append(path, n.t)
 	for _, dep := range n.deps {
-		depNode, ok := graph[dep.Type]
+		depNode, ok := graph[dep.key]
 		if !ok {
 			continue
 		}
@@ -387,9 +407,8 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) erro
 	return nil
 }
 
-// traverseInTypes traverses fields of a dig.In struct in depth-first order.
-//
-// If called with a non-In object, the function is called right away.
+// Traverse all fields starting with the given type.
+// Types that dig.In get recursed on. Returns the first error encountered.
 func traverseInTypes(t reflect.Type, fn func(ftype reflect.Type, optional bool)) error {
 	if !isInObject(t) {
 		fn(t, false)
