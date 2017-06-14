@@ -40,7 +40,7 @@ func (c Container) String() string {
 func (n node) String() string {
 	deps := make([]string, len(n.deps))
 	for i, d := range n.deps {
-		deps[i] = fmt.Sprint(d.Type)
+		deps[i] = fmt.Sprint(d.t)
 	}
 	if n.cached {
 		return fmt.Sprintf("deps: %v, constructor: %v, cachedValue: %v", deps, n.ctype, n.value)
