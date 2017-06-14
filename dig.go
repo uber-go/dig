@@ -368,8 +368,8 @@ func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
 func getConstructorDependencies(ctype reflect.Type) ([]edge, error) {
 	var deps []edge
 	for i := 0; i < ctype.NumIn(); i++ {
-		err := traverseInTypes(ctype.In(i), func(t reflect.Type, opt bool) {
-			deps = append(deps, edge{key: key{t: t}, optional: opt})
+		err := traverseInTypes(ctype.In(i), func(e edge) {
+			deps = append(deps, e)
 		})
 		if err != nil {
 			return nil, err
@@ -408,9 +408,9 @@ func detectCycles(n *node, graph map[key]*node, path []key) error {
 
 // Traverse all fields starting with the given type.
 // Types that dig.In get recursed on. Returns the first error encountered.
-func traverseInTypes(t reflect.Type, fn func(ftype reflect.Type, optional bool)) error {
+func traverseInTypes(t reflect.Type, fn func(edge)) error {
 	if !isInObject(t) {
-		fn(t, false)
+		fn(edge{key: key{t: t}})
 		return nil
 	}
 
@@ -432,7 +432,7 @@ func traverseInTypes(t reflect.Type, fn func(ftype reflect.Type, optional bool))
 			return err
 		}
 
-		fn(f.Type, optional)
+		fn(edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: optional})
 	}
 
 	return nil
