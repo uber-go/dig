@@ -520,7 +520,6 @@ func TestEndToEndSuccess(t *testing.T) {
 				A2: A{2},
 			}
 		}))
-		fmt.Println(c)
 		require.NoError(t, c.Invoke(func(p param) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
