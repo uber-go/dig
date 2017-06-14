@@ -234,6 +234,9 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 
 	n, ok := c.nodes[e.key]
 	if !ok {
+		if e.optional {
+			return reflect.Zero(e.t), nil
+		}
 		return _noValue, fmt.Errorf("type %v isn't in the container", e.t)
 	}
 
@@ -274,14 +277,10 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 			return dest, err
 		}
 
-		v, err := c.get(edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}})
+		v, err := c.get(edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: isOptional})
 		if err != nil {
-			if isOptional {
-				v = reflect.Zero(f.Type)
-			} else {
-				return dest, fmt.Errorf(
-					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
-			}
+			return dest, fmt.Errorf(
+				"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
 		}
 
 		dest.Field(i).Set(v)
