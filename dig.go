@@ -195,7 +195,9 @@ func traverseOutTypes(t reflect.Type, f func(t reflect.Type) error) error {
 		}
 
 		// keep recursing to traverse all the embedded objects
-		traverseOutTypes(ft, f)
+		if err := traverseOutTypes(ft, f); err != nil {
+			return err
+		}
 	}
 	return nil
 }
