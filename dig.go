@@ -204,8 +204,35 @@ func (c *Container) isAcyclic(n node) error {
 	return detectCycles(n, c.nodes, nil)
 }
 
-// Retrieve a type from the container
-func (c *Container) get(t reflect.Type) (reflect.Value, error) {
+type keyOpt func(*key)
+
+// Specifies if absence of the object in the graph is ok on retrieval.
+func optional(opt bool) keyOpt {
+	return func(k *key) {
+		k.optional = opt
+	}
+}
+
+// Represents an edge in the graph.
+type key struct {
+	t        reflect.Type
+	optional bool
+}
+
+// Custom map get method for the underlying nodes.
+//
+// Behaves in the following ways:
+//     - get without any options will return a value from the graph, or an error
+//     - get for type not in the map with optional=true returns zero value for type.
+//     - get with a dig.In embed will construct a new object, and populate all the
+//       members based on the memebers, including a parse of the struct tags that
+//       drives the aforementioned behaviors.
+func (c *Container) get(t reflect.Type, opts ...keyOpt) (reflect.Value, error) {
+	k := key{t: t}
+	for _, opt := range opts {
+		opt(&k)
+	}
+
 	if isInObject(t) {
 		// We do not want parameter objects to be cached.
 		return c.createInObject(t)
@@ -213,6 +240,9 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 
 	n, ok := c.nodes[t]
 	if !ok {
+		if k.optional {
+			return reflect.Zero(t), nil
+		}
 		return _noValue, fmt.Errorf("type %v isn't in the container", t)
 	}
 
@@ -239,6 +269,7 @@ func (c *Container) get(t reflect.Type) (reflect.Value, error) {
 	for _, con := range constructed {
 		c.set(con)
 	}
+
 	return c.nodes[t].value, nil
 }
 
@@ -252,21 +283,19 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 			continue // skip private fields
 		}
 
+		// check for optional tag
 		isOptional, err := isFieldOptional(t, f)
 		if err != nil {
 			return dest, err
 		}
 
-		v, err := c.get(f.Type)
+		// get the value from the map
+		v, err := c.get(f.Type, optional(isOptional))
 		if err != nil {
-			if isOptional {
-				v = reflect.Zero(f.Type)
-			} else {
-				return dest, fmt.Errorf(
-					"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
-			}
+			return dest, err
 		}
 
+		// set the dig.In fiels to the node value
 		dest.Field(i).Set(v)
 	}
 	return dest, nil
@@ -293,11 +322,11 @@ func (c *Container) set(v reflect.Value) {
 	}
 }
 
-func (c *Container) contains(deps []dep) error {
+func (c *Container) contains(deps []key) error {
 	var missing []reflect.Type
 	for _, d := range deps {
-		if _, ok := c.nodes[d.Type]; !ok && !d.Optional {
-			missing = append(missing, d.Type)
+		if _, ok := c.nodes[d.t]; !ok && !d.optional {
+			missing = append(missing, d.t)
 		}
 	}
 	if len(missing) > 0 {
@@ -330,13 +359,7 @@ type node struct {
 	ctype    reflect.Type  // node's type (also the key in the Graph map)
 	value    reflect.Value // cached value of the node
 	cached   bool          // quick check for if the value is cached
-	deps     []dep
-}
-
-// Represents a node's dependency (edge in the graph).
-type dep struct {
-	Type     reflect.Type
-	Optional bool
+	deps     []key
 }
 
 func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node, error) {
@@ -350,11 +373,11 @@ func newNode(provides reflect.Type, ctor interface{}, ctype reflect.Type) (node,
 }
 
 // Retrieves the dependencies for a constructor
-func getConstructorDependencies(ctype reflect.Type) ([]dep, error) {
-	var deps []dep
+func getConstructorDependencies(ctype reflect.Type) ([]key, error) {
+	var deps []key
 	for i := 0; i < ctype.NumIn(); i++ {
 		err := traverseInTypes(ctype.In(i), func(t reflect.Type, opt bool) {
-			deps = append(deps, dep{Type: t, Optional: opt})
+			deps = append(deps, key{t: t, optional: opt})
 		})
 		if err != nil {
 			return nil, err
@@ -380,7 +403,7 @@ func detectCycles(n node, graph map[reflect.Type]node, path []reflect.Type) erro
 	}
 	path = append(path, n.provides)
 	for _, dep := range n.deps {
-		depNode, ok := graph[dep.Type]
+		depNode, ok := graph[dep.t]
 		if !ok {
 			continue
 		}
