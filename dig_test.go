@@ -702,7 +702,6 @@ func TestInvokeFailures(t *testing.T) {
 		})
 
 		require.Error(t, err, "expected invoke error")
-		require.Contains(t, err.Error(), "could not get field T2")
 		require.Contains(t, err.Error(), "dig.type2 isn't in the container")
 	})
 
