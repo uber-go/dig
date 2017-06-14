@@ -525,6 +525,40 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 2, p.A2.idx)
 		}), "invoke should succeed, pulling out two named instances")
 	})
+
+	t.Run("named instances do not cause cycles", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+		type param struct {
+			In
+			A `name:"uno"`
+		}
+		type paramBoth struct {
+			In
+
+			A1 A `name:"uno"`
+			A2 A `name:"dos"`
+		}
+		type retUno struct {
+			Out
+			A `name:"uno"`
+		}
+		type retDos struct {
+			Out
+			A `name:"dos"`
+		}
+
+		require.NoError(t, c.Provide(func() retUno {
+			return retUno{A: A{1}}
+		}), "should be able to provide A:uno")
+		require.NoError(t, c.Provide(func(p param) retDos {
+			return retDos{A: A{2}}
+		}), "A:dos should be able to rely on A:uno")
+		require.NoError(t, c.Invoke(func(p paramBoth) {
+			assert.Equal(t, 1, p.A1.idx)
+			assert.Equal(t, 2, p.A2.idx)
+		}), "both objects should be successfully resolved on Invoke")
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {

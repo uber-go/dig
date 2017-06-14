@@ -378,22 +378,22 @@ func getConstructorDependencies(ctype reflect.Type) ([]edge, error) {
 	return deps, nil
 }
 
-func cycleError(cycle []reflect.Type, last reflect.Type) error {
+func cycleError(cycle []key, last key) error {
 	b := &bytes.Buffer{}
-	for _, t := range cycle {
-		fmt.Fprintf(b, "%v ->", t)
+	for _, k := range cycle {
+		fmt.Fprintf(b, "%v ->", k.t)
 	}
-	fmt.Fprintf(b, "%v", last)
+	fmt.Fprintf(b, "%v", last.t)
 	return errors.New(b.String())
 }
 
-func detectCycles(n *node, graph map[key]*node, path []reflect.Type) error {
+func detectCycles(n *node, graph map[key]*node, path []key) error {
 	for _, p := range path {
-		if p == n.t {
-			return cycleError(path, n.t)
+		if p == n.key {
+			return cycleError(path, n.key)
 		}
 	}
-	path = append(path, n.t)
+	path = append(path, n.key)
 	for _, dep := range n.deps {
 		depNode, ok := graph[dep.key]
 		if !ok {
