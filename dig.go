@@ -299,7 +299,7 @@ func (c *Container) set(k key, v reflect.Value) {
 		return
 	}
 
-	// dig.Out objects are not acted upon directly, but rather their memebers are considered
+	// dig.Out objects are not acted upon directly, but rather their members are considered
 	for i := 0; i < k.t.NumField(); i++ {
 		f := k.t.Field(i)
 
