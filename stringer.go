@@ -47,7 +47,9 @@ func (n *node) String() string {
 	deps := make([]string, len(n.deps))
 	for i, d := range n.deps {
 		if d.optional {
-			deps[i] = fmt.Sprintf("%v opt: true", d.key)
+			// ~tally.Scope means optional
+			// ~tally.Scope:foo means named optional
+			deps[i] = fmt.Sprintf("~%v", d.key)
 			continue
 		}
 		deps[i] = d.key.String()
