@@ -462,6 +462,134 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.NotNil(t, a, "*A should be part of the container through Ret2->Ret1")
 		}))
 	})
+
+	t.Run("named instances", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+
+		// returns three named instances of A
+		type ret struct {
+			Out
+
+			A1 A `name:"first"`
+			A2 A `name:"second"`
+			A3 A `name:"third"`
+		}
+
+		// requires two specific named instances
+		type param struct {
+			In
+
+			A1 A `name:"first"`
+			A3 A `name:"third"`
+		}
+		require.NoError(t, c.Provide(func() ret {
+			return ret{A1: A{1}, A2: A{2}, A3: A{3}}
+		}), "provide for three named instances should succeed")
+		require.NoError(t, c.Invoke(func(p param) {
+			assert.Equal(t, 1, p.A1.idx)
+			assert.Equal(t, 3, p.A3.idx)
+		}), "invoke should succeed, pulling out two named instances")
+	})
+
+	t.Run("named instances recurse", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+
+		type Ret1 struct {
+			Out
+
+			A1 A `name:"first"`
+		}
+		type Ret2 struct {
+			Ret1
+
+			A2 A `name:"second"`
+		}
+		type param struct {
+			In
+
+			A1 A `name:"first"`  // should come from ret1 through ret2
+			A2 A `name:"second"` // should come from ret2
+		}
+		require.NoError(t, c.Provide(func() Ret2 {
+			return Ret2{
+				Ret1: Ret1{
+					A1: A{1},
+				},
+				A2: A{2},
+			}
+		}))
+		require.NoError(t, c.Invoke(func(p param) {
+			assert.Equal(t, 1, p.A1.idx)
+			assert.Equal(t, 2, p.A2.idx)
+		}), "invoke should succeed, pulling out two named instances")
+	})
+
+	t.Run("named instances do not cause cycles", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+		type param struct {
+			In
+			A `name:"uno"`
+		}
+		type paramBoth struct {
+			In
+
+			A1 A `name:"uno"`
+			A2 A `name:"dos"`
+		}
+		type retUno struct {
+			Out
+			A `name:"uno"`
+		}
+		type retDos struct {
+			Out
+			A `name:"dos"`
+		}
+
+		require.NoError(t, c.Provide(func() retUno {
+			return retUno{A: A{1}}
+		}), "should be able to provide A:uno")
+		require.NoError(t, c.Provide(func(p param) retDos {
+			return retDos{A: A{2}}
+		}), "A:dos should be able to rely on A:uno")
+		require.NoError(t, c.Invoke(func(p paramBoth) {
+			assert.Equal(t, 1, p.A1.idx)
+			assert.Equal(t, 2, p.A2.idx)
+		}), "both objects should be successfully resolved on Invoke")
+	})
+
+	t.Run("invoke on a type that depends on named parameters", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+		type B struct{ sum int }
+		type param struct {
+			In
+
+			A1 *A `name:"foo"`
+			A2 *A `name:"bar"`
+			A3 *A `name:"baz" optional:"true"`
+		}
+		type ret struct {
+			Out
+
+			A1 *A `name:"foo"`
+			A2 *A `name:"bar"`
+		}
+		require.NoError(t, c.Provide(func() (ret, error) {
+			return ret{
+				A1: &A{1},
+				A2: &A{2},
+			}, nil
+		}), "should be able to provide A1 and A2 into the graph")
+		require.NoError(t, c.Provide(func(p param) *B {
+			return &B{sum: p.A1.idx + p.A2.idx}
+		}), "should be able to provide *B that relies on two named types")
+		require.NoError(t, c.Invoke(func(b *B) {
+			require.Equal(t, 3, b.sum)
+		}))
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {
@@ -691,14 +819,44 @@ func TestProvideFailures(t *testing.T) {
 		require.Error(t, err, "provide must return error")
 		require.Contains(t, err.Error(), "returns multiple dig.A")
 	})
+
+	t.Run("provide multiple instances with the same name", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type ret1 struct {
+			Out
+			*A `name:"foo"`
+		}
+		type ret2 struct {
+			Out
+			*A `name:"foo"`
+		}
+		require.NoError(t, c.Provide(func() ret1 {
+			return ret1{A: &A{}}
+		}))
+		err := c.Provide(func() ret2 {
+			return ret2{A: &A{}}
+		})
+		require.Error(t, err, "expected error on the second provide")
+		assert.Contains(t, err.Error(), "provides *dig.A:foo, which is already in the container")
+	})
 }
 
 func TestInvokeFailures(t *testing.T) {
 	t.Parallel()
 
+	t.Run("invoke a non-function", func(t *testing.T) {
+		c := New()
+		err := c.Invoke("foo")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "can't invoke non-function foo")
+	})
+
 	t.Run("untyped nil", func(t *testing.T) {
 		c := New()
-		assert.Error(t, c.Invoke(nil))
+		err := c.Invoke(nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "can't invoke an untyped nil")
 	})
 
 	t.Run("unmet dependency", func(t *testing.T) {
@@ -727,6 +885,21 @@ func TestInvokeFailures(t *testing.T) {
 		require.Contains(t, err.Error(), "dig.type2 isn't in the container")
 	})
 
+	t.Run("unmet named dependency", func(t *testing.T) {
+		c := New()
+		type param struct {
+			In
+
+			*bytes.Buffer `name:"foo"`
+		}
+		err := c.Invoke(func(p param) {
+			t.Fatal("function should not be called")
+		})
+		require.Error(t, err, "invoke should fail")
+		assert.Contains(t, err.Error(), "edge *bytes.Buffer:foo")
+		assert.Contains(t, err.Error(), "*bytes.Buffer:foo isn't in the container")
+	})
+
 	t.Run("unmet constructor dependency", func(t *testing.T) {
 		type type1 struct{}
 		type type2 struct{}
@@ -749,8 +922,8 @@ func TestInvokeFailures(t *testing.T) {
 			t.Fatal("function must not be called")
 		})
 		require.Error(t, err, "invoke must fail")
-		require.Contains(t, err.Error(), "missing dependencies for type *dig.type3")
-		require.Contains(t, err.Error(), "container is missing types: [*dig.type1]")
+		require.Contains(t, err.Error(), "missing dependencies for *dig.type3")
+		require.Contains(t, err.Error(), "container is missing: [*dig.type1]")
 		// We don't expect type2 to be mentioned in the list because it's
 		// optional
 	})
@@ -805,5 +978,27 @@ func TestInvokeFailures(t *testing.T) {
 		c := New()
 		err := c.Invoke(func() (int, error) { return 42, errors.New("oh no") })
 		require.Equal(t, errors.New("oh no"), err, "error must match")
+	})
+
+	t.Run("named instances are case sensitive", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type ret struct {
+			Out
+			A `name:"CamelCase"`
+		}
+		type param1 struct {
+			In
+			A `name:"CamelCase"`
+		}
+		type param2 struct {
+			In
+			A `name:"camelcase"`
+		}
+		require.NoError(t, c.Provide(func() ret { return ret{A: A{}} }))
+		require.NoError(t, c.Invoke(func(param1) {}))
+		err := c.Invoke(func(param2) {})
+		require.Error(t, err, "provide should return error since cases don't match")
+		assert.Contains(t, err.Error(), "dig.A:camelcase isn't in the container")
 	})
 }

@@ -26,7 +26,7 @@ import (
 )
 
 // String representation of the entire Container
-func (c Container) String() string {
+func (c *Container) String() string {
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "nodes: {")
 	for k, v := range c.nodes {
@@ -43,12 +43,25 @@ func (c Container) String() string {
 	return b.String()
 }
 
-func (n node) String() string {
+func (n *node) String() string {
 	deps := make([]string, len(n.deps))
 	for i, d := range n.deps {
-		deps[i] = fmt.Sprint(d.Type)
+		if d.optional {
+			// ~tally.Scope means optional
+			// ~tally.Scope:foo means named optional
+			deps[i] = fmt.Sprintf("~%v", d.key)
+			continue
+		}
+		deps[i] = d.key.String()
 	}
 	return fmt.Sprintf(
-		"deps: %v, constructor: %v", deps, n.ctype,
+		"deps: %v, ctor: %v", deps, n.ctype,
 	)
+}
+
+func (k key) String() string {
+	if k.name != "" {
+		return fmt.Sprintf("%v:%s", k.t, k.name)
+	}
+	return k.t.String()
 }
