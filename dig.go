@@ -257,6 +257,10 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 	}
 
 	for _, con := range constructed {
+		// Set the resolved object into the cache.
+		// This might look confusing at first like we're ignoring named types,
+		// but `con` in this case will be the dig.Out object, which will
+		// cause a recursion into the .set for each of it's memebers.
 		c.set(key{t: con.Type()}, con)
 	}
 	return c.cache[e.key], nil
