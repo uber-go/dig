@@ -791,6 +791,27 @@ func TestProvideFailures(t *testing.T) {
 		require.Error(t, err, "provide must return error")
 		require.Contains(t, err.Error(), "returns multiple dig.A")
 	})
+
+	t.Run("provide multiple instances with the same name", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type ret1 struct {
+			Out
+			*A `name:"foo"`
+		}
+		type ret2 struct {
+			Out
+			*A `name:"foo"`
+		}
+		require.NoError(t, c.Provide(func() ret1 {
+			return ret1{A: &A{}}
+		}))
+		err := c.Provide(func() ret2 {
+			return ret2{A: &A{}}
+		})
+		require.Error(t, err, "expected error on the second provide")
+		assert.Contains(t, err.Error(), "provides *dig.A:foo, which is already in the container")
+	})
 }
 
 func TestInvokeFailures(t *testing.T) {
@@ -827,6 +848,21 @@ func TestInvokeFailures(t *testing.T) {
 		require.Contains(t, err.Error(), "dig.type2 isn't in the container")
 	})
 
+	t.Run("unmet named dependency", func(t *testing.T) {
+		c := New()
+		type param struct {
+			In
+
+			*bytes.Buffer `name:"foo"`
+		}
+		err := c.Invoke(func(p param) {
+			t.Fatal("function should not be called")
+		})
+		require.Error(t, err, "invoke should fail")
+		assert.Contains(t, err.Error(), "edge *bytes.Buffer:foo")
+		assert.Contains(t, err.Error(), "*bytes.Buffer:foo isn't in the container")
+	})
+
 	t.Run("unmet constructor dependency", func(t *testing.T) {
 		type type1 struct{}
 		type type2 struct{}
@@ -849,8 +885,8 @@ func TestInvokeFailures(t *testing.T) {
 			t.Fatal("function must not be called")
 		})
 		require.Error(t, err, "invoke must fail")
-		require.Contains(t, err.Error(), "missing dependencies for type *dig.type3")
-		require.Contains(t, err.Error(), "container is missing types: [*dig.type1]")
+		require.Contains(t, err.Error(), "missing dependencies for *dig.type3")
+		require.Contains(t, err.Error(), "container is missing: [*dig.type1]")
 		// We don't expect type2 to be mentioned in the list because it's
 		// optional
 	})

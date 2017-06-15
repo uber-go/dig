@@ -170,10 +170,10 @@ func (c *Container) getReturnKeys(
 				return errors.New("can't provide parameter objects")
 			}
 			if _, ok := returnTypes[k]; ok {
-				return fmt.Errorf("returns multiple %v", k.t)
+				return fmt.Errorf("returns multiple %v", k)
 			}
 			if _, ok := c.nodes[k]; ok {
-				return fmt.Errorf("provides type %v, which is already in the container", k.t)
+				return fmt.Errorf("provides %v, which is already in the container", k)
 			}
 
 			returnTypes[k] = struct{}{}
@@ -237,11 +237,11 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 		if e.optional {
 			return reflect.Zero(e.t), nil
 		}
-		return _noValue, fmt.Errorf("type %v isn't in the container", e.t)
+		return _noValue, fmt.Errorf("type %v isn't in the container", e.key)
 	}
 
 	if err := c.contains(n.deps); err != nil {
-		return _noValue, fmt.Errorf("missing dependencies for type %v: %v", e.t, err)
+		return _noValue, fmt.Errorf("missing dependencies for %v: %v", e.key, err)
 	}
 
 	args, err := c.constructorArgs(n.ctype)
@@ -277,10 +277,11 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 			return dest, err
 		}
 
-		v, err := c.get(edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: isOptional})
+		e := edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: isOptional}
+		v, err := c.get(e)
 		if err != nil {
 			return dest, fmt.Errorf(
-				"could not get field %v (type %v) of %v: %v", f.Name, f.Type, t, err)
+				"could not get field %v (edge %v) of %v: %v", f.Name, e, t, err)
 		}
 
 		dest.Field(i).Set(v)
@@ -309,14 +310,14 @@ func (c *Container) set(k key, v reflect.Value) {
 }
 
 func (c *Container) contains(deps []edge) error {
-	var missing []reflect.Type
+	var missing []key
 	for _, d := range deps {
 		if _, ok := c.nodes[d.key]; !ok && !d.optional {
-			missing = append(missing, d.t)
+			missing = append(missing, d.key)
 		}
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("container is missing types: %v", missing)
+		return fmt.Errorf("container is missing: %v", missing)
 	}
 	return nil
 }

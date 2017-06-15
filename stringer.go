@@ -59,7 +59,7 @@ func (n *node) String() string {
 
 func (k key) String() string {
 	if k.name != "" {
-		return fmt.Sprintf("%v %q", k.t, k.name)
+		return fmt.Sprintf("%v:%s", k.t, k.name)
 	}
 	return k.t.String()
 }
