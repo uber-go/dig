@@ -845,9 +845,18 @@ func TestProvideFailures(t *testing.T) {
 func TestInvokeFailures(t *testing.T) {
 	t.Parallel()
 
+	t.Run("invoke a non-function", func(t *testing.T) {
+		c := New()
+		err := c.Invoke("foo")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "can't invoke non-function foo")
+	})
+
 	t.Run("untyped nil", func(t *testing.T) {
 		c := New()
-		assert.Error(t, c.Invoke(nil))
+		err := c.Invoke(nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "can't invoke an untyped nil")
 	})
 
 	t.Run("unmet dependency", func(t *testing.T) {
