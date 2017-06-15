@@ -69,6 +69,10 @@ type digOutObject interface {
 	digOutObject()
 }
 
+func isError(t reflect.Type) bool {
+	return t.Implements(_errType)
+}
+
 func isInObject(t reflect.Type) bool {
 	return t.Implements(_inInterfaceType) && t.Kind() == reflect.Struct
 }
