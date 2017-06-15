@@ -979,4 +979,26 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func() (int, error) { return 42, errors.New("oh no") })
 		require.Equal(t, errors.New("oh no"), err, "error must match")
 	})
+
+	t.Run("named instances are case sensitive", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type ret struct {
+			Out
+			A `name:"CamelCase"`
+		}
+		type param1 struct {
+			In
+			A `name:"CamelCase"`
+		}
+		type param2 struct {
+			In
+			A `name:"camelcase"`
+		}
+		require.NoError(t, c.Provide(func() ret { return ret{A: A{}} }))
+		require.NoError(t, c.Invoke(func(param1) {}))
+		err := c.Invoke(func(param2) {})
+		require.Error(t, err, "provide should return error since cases don't match")
+		assert.Contains(t, err.Error(), "dig.A:camelcase isn't in the container")
+	})
 }
