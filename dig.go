@@ -112,7 +112,7 @@ func (c *Container) Invoke(function interface{}) error {
 	if len(returned) == 0 {
 		return nil
 	}
-	if last := returned[len(returned)-1]; last.Type() == _errType {
+	if last := returned[len(returned)-1]; isError(last.Type()) {
 		if err, _ := last.Interface().(error); err != nil {
 			return err
 		}
@@ -160,7 +160,7 @@ func (c *Container) getReturnKeys(
 		outt := ctype.Out(i)
 
 		err := traverseOutTypes(key{t: outt}, func(k key) error {
-			if k.t == _errType {
+			if isError(k.t) {
 				// Don't register errors into the container.
 				return nil
 			}
@@ -252,8 +252,9 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 
 	// Provide-time validation ensures that all constructors return at least
 	// one value.
-	if err := constructed[len(constructed)-1]; err.Type() == _errType && err.Interface() != nil {
-		return _noValue, fmt.Errorf("constructor %v for type %v failed: %v", n.ctype, e.t, err.Interface())
+	if err := constructed[len(constructed)-1]; isError(err.Type()) && err.Interface() != nil {
+		return _noValue, fmt.Errorf(
+			"constructor %v for type %v failed: %v", n.ctype, e.t, err.Interface())
 	}
 
 	for _, con := range constructed {

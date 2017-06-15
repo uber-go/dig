@@ -657,22 +657,19 @@ func TestCantProvideUntypedNil(t *testing.T) {
 	assert.Error(t, c.Provide(nil))
 }
 
-func TestCanProvideErrorLikeType(t *testing.T) {
+func TestCantProvideErrorLikeType(t *testing.T) {
 	t.Parallel()
 
 	tests := []interface{}{
 		func() *os.PathError { return &os.PathError{} },
+		func() error { return &os.PathError{} },
 		func() (*os.PathError, error) { return &os.PathError{}, nil },
 	}
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%T", tt), func(t *testing.T) {
 			c := New()
-			require.NoError(t, c.Provide(tt), "provide must not fail")
-
-			require.NoError(t, c.Invoke(func(err *os.PathError) {
-				assert.NotNil(t, err, "invoke received nil")
-			}), "invoke must not fail")
+			assert.Error(t, c.Provide(tt), "providing errors should fail")
 		})
 	}
 }
