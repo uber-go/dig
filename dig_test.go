@@ -559,6 +559,37 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 2, p.A2.idx)
 		}), "both objects should be successfully resolved on Invoke")
 	})
+
+	t.Run("invoke on a type that depends on named parameters", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+		type B struct{ sum int }
+		type param struct {
+			In
+
+			A1 *A `name:"foo"`
+			A2 *A `name:"bar"`
+			A3 *A `name:"baz" optional:"true"`
+		}
+		type ret struct {
+			Out
+
+			A1 *A `name:"foo"`
+			A2 *A `name:"bar"`
+		}
+		require.NoError(t, c.Provide(func() (ret, error) {
+			return ret{
+				A1: &A{1},
+				A2: &A{2},
+			}, nil
+		}), "should be able to provide A1 and A2 into the graph")
+		require.NoError(t, c.Provide(func(p param) *B {
+			return &B{sum: p.A1.idx + p.A2.idx}
+		}), "should be able to provide *B that relies on two named types")
+		require.NoError(t, c.Invoke(func(b *B) {
+			require.Equal(t, 3, b.sum)
+		}))
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {
