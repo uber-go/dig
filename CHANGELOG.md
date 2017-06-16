@@ -2,6 +2,9 @@
 
 ## v0.5 (unreleased)
 
+- Structs compatible with `dig.In` and `dig.Out` may now be generated using
+  `reflect.StructOf`.
+
 ## v0.4 (12 Jun 2017)
 
 - **[Breaking]** Remove `Must*` funcs to greatly reduce API surface area.
