@@ -27,6 +27,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -589,6 +590,115 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Invoke(func(b *B) {
 			require.Equal(t, 3, b.sum)
 		}))
+	})
+
+	t.Run("dynamically generated dig.In", func(t *testing.T) {
+		// This test verifies that a dig.In generated using reflect.StructOf
+		// works with our dig.In detection logic.
+		c := New()
+
+		type type1 struct{}
+		type type2 struct{}
+
+		var gave *type1
+		new1 := func() *type1 {
+			require.Nil(t, gave, "constructor must be called only once")
+			gave = &type1{}
+			return gave
+		}
+
+		require.NoError(t, c.Provide(new1), "failed to provide constructor")
+
+		// We generate a struct that embeds dig.In.
+		//
+		// Note that the fix for https://github.com/golang/go/issues/18780
+		// requires that StructField.Name is always set but versions of Go
+		// older than 1.9 expect Name to be empty for embedded fields.
+		//
+		// We use utils_for_go19_test and utils_for_pre_go19_test with build
+		// tags to implement this behavior differently in the two Go versions.
+
+		inType := reflect.StructOf([]reflect.StructField{
+			anonymousField(reflect.TypeOf(In{})),
+			{
+				Name: "Foo",
+				Type: reflect.TypeOf(&type1{}),
+			},
+			{
+				Name: "Bar",
+				Type: reflect.TypeOf(&type2{}),
+				Tag:  `optional:"true"`,
+			},
+		})
+
+		// We generate a function that relies on that struct and validates the
+		// result.
+		fn := reflect.MakeFunc(
+			reflect.FuncOf([]reflect.Type{inType}, nil /* returns */, false /* variadic */),
+			func(args []reflect.Value) []reflect.Value {
+				require.Len(t, args, 1, "expected only one argument")
+				require.Equal(t, reflect.Struct, args[0].Kind(), "argument must be a struct")
+				require.Equal(t, 3, args[0].NumField(), "struct must have two fields")
+
+				t1, ok := args[0].Field(1).Interface().(*type1)
+				require.True(t, ok, "field must be a type1")
+				require.NotNil(t, t1, "value must not be nil")
+				require.True(t, t1 == gave, "value must match constructor's return value")
+
+				require.True(t, args[0].Field(2).IsNil(), "type2 must be nil")
+				return nil
+			},
+		)
+
+		require.NoError(t, c.Invoke(fn.Interface()), "invoke failed")
+	})
+
+	t.Run("dynamically generated dig.Out", func(t *testing.T) {
+		// This test verifies that a dig.Out generated using reflect.StructOf
+		// works with our dig.Out detection logic.
+
+		c := New()
+
+		type A struct{ Value int }
+
+		outType := reflect.StructOf([]reflect.StructField{
+			anonymousField(reflect.TypeOf(Out{})),
+			{
+				Name: "Foo",
+				Type: reflect.TypeOf(&A{}),
+				Tag:  `name:"foo"`,
+			},
+			{
+				Name: "Bar",
+				Type: reflect.TypeOf(&A{}),
+				Tag:  `name:"bar"`,
+			},
+		})
+
+		fn := reflect.MakeFunc(
+			reflect.FuncOf(nil /* params */, []reflect.Type{outType}, false /* variadict */),
+			func([]reflect.Value) []reflect.Value {
+				result := reflect.New(outType).Elem()
+				result.Field(1).Set(reflect.ValueOf(&A{Value: 1}))
+				result.Field(2).Set(reflect.ValueOf(&A{Value: 2}))
+				return []reflect.Value{result}
+			},
+		)
+		require.NoError(t, c.Provide(fn.Interface()), "provide failed")
+
+		type params struct {
+			In
+
+			Foo *A `name:"foo"`
+			Bar *A `name:"bar"`
+			Baz *A `name:"baz" optional:"true"`
+		}
+
+		require.NoError(t, c.Invoke(func(p params) {
+			assert.Equal(t, &A{Value: 1}, p.Foo, "Foo must match")
+			assert.Equal(t, &A{Value: 2}, p.Bar, "Bar must match")
+			assert.Nil(t, p.Baz, "Baz must be unset")
+		}), "invoke failed")
 	})
 }
 

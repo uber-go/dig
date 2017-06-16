@@ -20,14 +20,24 @@
 
 package dig
 
-import "reflect"
+import (
+	"container/list"
+	"reflect"
+)
 
 var (
-	_noValue          reflect.Value
-	_errType          = reflect.TypeOf((*error)(nil)).Elem()
-	_inInterfaceType  = reflect.TypeOf((*digInObject)(nil)).Elem()
-	_outInterfaceType = reflect.TypeOf((*digOutObject)(nil)).Elem()
+	_noValue reflect.Value
+	_errType = reflect.TypeOf((*error)(nil)).Elem()
+	_inType  = reflect.TypeOf((*In)(nil)).Elem()
+	_outType = reflect.TypeOf((*Out)(nil)).Elem()
 )
+
+// Special interface embedded inside dig sentinel values (dig.In, dig.Out) to
+// make their special nature obvious in the godocs. Otherwise they will appear
+// as plain empty structs.
+type digSentinel interface {
+	digSentinel()
+}
 
 // In is an embeddable object that signals to dig that the struct
 // should be treated differently. Instead of itself becoming an object
@@ -42,47 +52,52 @@ var (
 //      T *Thingy `optional:"true"`
 //    }
 //
-type In struct{}
+type In struct{ digSentinel }
 
 // Out is an embeddable type that signals to dig that the returned
 // struct should be treated differently. Instead of the struct itself
 // becoming part of the container, all members of the struct will.
-type Out struct{}
+type Out struct{ digSentinel }
 
 // TODO: better usage docs
 // Try to add some symmetry for In-Out docs as well.
-
-// In is the only instance that implements the digInObject interface.
-func (In) digInObject() {}
-
-// Out is the only instance that implements the digOutObject interface
-func (Out) digOutObject() {}
-
-// Users embed the In struct to opt a struct in as a parameter object.
-// This provides us an easy way to check if something embeds dig.In
-// without iterating through all its fields.
-type digInObject interface {
-	digInObject()
-}
-
-type digOutObject interface {
-	digOutObject()
-}
 
 func isError(t reflect.Type) bool {
 	return t.Implements(_errType)
 }
 
 func isInObject(t reflect.Type) bool {
-	return t.Implements(_inInterfaceType) && t.Kind() == reflect.Struct
+	return embedsType(t, _inType)
 }
 
 func isOutObject(t reflect.Type) bool {
-	return t.Implements(_outInterfaceType) && t.Kind() == reflect.Struct
+	return embedsType(t, _outType)
 }
 
-// Validate interfaces are satisfied
-var (
-	_ digInObject  = In{}
-	_ digOutObject = Out{}
-)
+// Returns true if t embeds e or if any of the types embedded by t embed e.
+func embedsType(t reflect.Type, e reflect.Type) bool {
+	// We are going to do a breadth-first search of all embedded fields.
+	types := list.New()
+	types.PushBack(t)
+	for types.Len() > 0 {
+		t := types.Remove(types.Front()).(reflect.Type)
+
+		if t == e {
+			return true
+		}
+		if t.Kind() != reflect.Struct {
+			continue
+		}
+
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			if f.Anonymous {
+				types.PushBack(f.Type)
+			}
+		}
+	}
+
+	// If perf is an issue, we can cache known In objects and Out objects in a
+	// map[reflect.Type]struct{}.
+	return false
+}
