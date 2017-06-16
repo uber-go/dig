@@ -25,9 +25,5 @@ package dig
 import "reflect"
 
 func anonymousField(t reflect.Type) reflect.StructField {
-	return reflect.StructField{
-		Name:      t.Name(),
-		Anonymous: true,
-		Type:      t,
-	}
+	return reflect.StructField{Name: t.Name(), Anonymous: true, Type: t}
 }
