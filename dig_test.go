@@ -676,7 +676,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		})
 
 		fn := reflect.MakeFunc(
-			reflect.FuncOf(nil /* params */, []reflect.Type{outType}, false /* variadict */),
+			reflect.FuncOf(nil /* params */, []reflect.Type{outType}, false /* variadic */),
 			func([]reflect.Value) []reflect.Value {
 				result := reflect.New(outType).Elem()
 				result.Field(1).Set(reflect.ValueOf(&A{Value: 1}))
