@@ -120,8 +120,8 @@ func main() {
 
 [doc]: https://godoc.org/go.uber.org/dig
 [doc-img]: https://godoc.org/go.uber.org/dig?status.svg
-[cov]: https://coveralls.io/github/uber-go/dig?branch=master
-[cov-img]: https://coveralls.io/repos/github/uber-go/dig/badge.svg?branch=master
+[cov]: https://codecov.io/gh/uber-go/dig/branch/master
+[cov-img]: https://codecov.io/gh/uber-go/dig/branch/master/graph/badge.svg
 [ci]: https://travis-ci.org/uber-go/dig
 [ci-img]: https://travis-ci.org/uber-go/dig.svg?branch=master
 [report-card]: https://goreportcard.com/report/github.com/uber-go/dig
