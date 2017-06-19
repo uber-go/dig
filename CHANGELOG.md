@@ -1,11 +1,22 @@
 # Changelog
 
-## v0.5 (unreleased)
+## v0.5.0 (19 Jun 2017)
+
+- `dig.In` and `dig.Out` now support named instances, i.e.:
+
+  ```go
+  type param struct {
+    dig.In
+
+    DB1 DB.Connection `name:"primary"`
+    DB2 DB.Connection `name:"secondary"`
+  }
+  ```
 
 - Structs compatible with `dig.In` and `dig.Out` may now be generated using
   `reflect.StructOf`.
 
-## v0.4 (12 Jun 2017)
+## v0.4.0 (12 Jun 2017)
 
 - **[Breaking]** Remove `Must*` funcs to greatly reduce API surface area.
 - **[Breaking]** Restrict the API surface to only `Provide` and `Invoke`.
