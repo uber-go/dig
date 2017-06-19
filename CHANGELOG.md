@@ -1,5 +1,7 @@
 # Changelog
 
+## v0.6.0 (unreleased)
+
 ## v0.5.0 (19 Jun 2017)
 
 - `dig.In` and `dig.Out` now support named instances, i.e.:
