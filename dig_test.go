@@ -1074,8 +1074,38 @@ func TestInvokeFailures(t *testing.T) {
 			panic("function must not be called")
 		})
 
-		require.Error(t, err, "expected invoke error")
+		require.Error(t, err, "expected provide error")
 		require.Contains(t, err.Error(), `invalid value "no" for "optional" tag on field Buffer`)
+	})
+
+	t.Run("optional dep with unmet transitive dep", func(t *testing.T) {
+		type missing struct{}
+		type dep struct{}
+
+		type params struct {
+			In
+
+			Dep *dep `optional:"true"`
+		}
+
+		c := New()
+
+		// Container has a constructor for *dep, but that constructor has unmet
+		// dependencies.
+		err := c.Provide(func(missing) *dep {
+			panic("function must not be called")
+		})
+		require.NoError(t, err, "unexpected provide error")
+
+		// Should still be able to invoke a function that takes params, since *dep
+		// is optional.
+		var count int
+		err = c.Invoke(func(p params) {
+			count++
+			assert.Nil(t, p.Dep, "expected optional dependency to be unmet")
+		})
+		assert.NoError(t, err, "unexpected invoke error")
+		assert.Equal(t, 1, count, "expected invoke function to be called")
 	})
 
 	t.Run("returned error", func(t *testing.T) {

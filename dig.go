@@ -284,9 +284,10 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 
 		e := edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: isOptional}
 		v, err := c.get(e)
-		if err != nil {
-			return dest, fmt.Errorf(
-				"could not get field %v (edge %v) of %v: %v", f.Name, e, t, err)
+		if isOptional && err != nil {
+			v = reflect.Zero(f.Type)
+		} else if err != nil {
+			return dest, fmt.Errorf("could not get field %v (edge %v) of %v: %v", f.Name, e, t, err)
 		}
 
 		dest.Field(i).Set(v)
