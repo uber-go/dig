@@ -241,6 +241,9 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 	}
 
 	if err := c.contains(n.deps); err != nil {
+		if e.optional {
+			return reflect.Zero(e.t), nil
+		}
 		return _noValue, fmt.Errorf("missing dependencies for %v: %v", e.key, err)
 	}
 
@@ -285,10 +288,8 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 		e := edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: isOptional}
 		v, err := c.get(e)
 		if err != nil {
-			return dest, fmt.Errorf(
-				"could not get field %v (edge %v) of %v: %v", f.Name, e, t, err)
+			return dest, fmt.Errorf("could not get field %v (edge %v) of %v: %v", f.Name, e, t, err)
 		}
-
 		dest.Field(i).Set(v)
 	}
 	return dest, nil
