@@ -33,6 +33,11 @@ const (
 	_nameTag     = "name"
 )
 
+// Sentinel error for missing constructors.
+type errMissing string
+
+func (e errMissing) Error() string { return string(e) }
+
 // Unique identification of an object in the graph.
 type key struct {
 	t    reflect.Type
@@ -241,7 +246,7 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 	}
 
 	if err := c.contains(n.deps); err != nil {
-		return _noValue, fmt.Errorf("missing dependencies for %v: %v", e.key, err)
+		return _noValue, errMissing(fmt.Sprintf("missing dependencies for %v: %v", e.key, err))
 	}
 
 	args, err := c.constructorArgs(n.ctype)
@@ -284,12 +289,13 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 
 		e := edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: isOptional}
 		v, err := c.get(e)
-		if isOptional && err != nil {
-			v = reflect.Zero(f.Type)
-		} else if err != nil {
-			return dest, fmt.Errorf("could not get field %v (edge %v) of %v: %v", f.Name, e, t, err)
+		if err != nil {
+			if _, ok := err.(errMissing); ok {
+				v = reflect.Zero(f.Type)
+			} else {
+				return dest, fmt.Errorf("could not get field %v (edge %v) of %v: %v", f.Name, e, t, err)
+			}
 		}
-
 		dest.Field(i).Set(v)
 	}
 	return dest, nil
