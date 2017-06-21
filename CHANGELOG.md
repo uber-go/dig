@@ -1,6 +1,8 @@
 # Changelog
 
-## v0.6.0 (unreleased)
+## v1.0.0-rc1 (21 Jun 2017)
+
+- First release candidate.
 
 ## v0.5.0 (19 Jun 2017)
 
