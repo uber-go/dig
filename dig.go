@@ -63,8 +63,7 @@ func New() *Container {
 	}
 }
 
-// Provide teaches the Container how to construct one or more new types. It
-// accepts either a constructor function or an already-constructed object.
+// Provide teaches the Container how to construct one or more new types.
 //
 // Any function passed to Provide is assumed to be a constructor. Constructors
 // can take any number of parameters, which will be supplied by the Container
