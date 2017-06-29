@@ -55,6 +55,20 @@ type Container struct {
 	// index map[reflect.Type]key
 }
 
+// Constructor is a function that takes any number of parameters (dependencies)
+// which will be supplied by the Container on demand, and returns any number
+// of objects that will be inserted into the dependency graph.
+//
+// Constructor must return at least one non-error value, all of which are
+// then available in the Container.
+type Constructor interface{}
+
+// Extractor is a function that takes any number of arguments which supplied
+// from the underlying Container. This action will result in the resolution
+// of the dependency graph for the parameters, calling their constructors,
+// and recursing into the dependencies.
+type Extractor interface{}
+
 // New constructs a ready-to-use Container.
 func New() *Container {
 	return &Container{
@@ -65,17 +79,14 @@ func New() *Container {
 
 // Provide teaches the Container how to construct one or more new types.
 //
-// Any function passed to Provide is assumed to be a constructor. Constructors
-// can take any number of parameters, which will be supplied by the Container
-// on demand. They must return at least one non-error value, all of which are
-// then available in the Container. If the last returned value is an error, the
+// If the last returned value is an error, the
 // Container inspects it to determine whether the constructor succeeded or
 // failed. Regardless of position, returned errors are never put into the
 // Container's dependency graph.
 //
 // All non-functions (including structs, pointers, Go's built-in collections,
 // and primitive types like ints) are inserted into the Container as-is.
-func (c *Container) Provide(constructor interface{}) error {
+func (c *Container) Provide(constructor Constructor) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {
 		return errors.New("can't provide an untyped nil")
@@ -95,7 +106,7 @@ func (c *Container) Provide(constructor interface{}) error {
 //
 // Passing anything other than a function to Invoke returns an error
 // immediately.
-func (c *Container) Invoke(function interface{}) error {
+func (c *Container) Invoke(function Extractor) error {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
 		return errors.New("can't invoke an untyped nil")
