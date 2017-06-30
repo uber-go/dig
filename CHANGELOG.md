@@ -2,7 +2,8 @@
 
 ## v1.0.0-rc2 (unreleased)
 
-- No changes yet.
+- So that we can introduce new functionality after a 1.0 release, add a
+  variadic options parameter to all public APIs.
 
 ## v1.0.0-rc1 (21 Jun 2017)
 
