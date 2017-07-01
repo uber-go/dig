@@ -42,16 +42,20 @@ type key struct {
 // Option configures a Container. It's included for future functionality;
 // currently, there are no concrete implementations.
 type Option interface {
-	apply(*Container)
+	unimplemented()
 }
 
 // A ProvideOption modifies the default behavior of Provide. It's included for
 // future functionality; currently, there are no concrete implementations.
-type ProvideOption interface{}
+type ProvideOption interface {
+	unimplemented()
+}
 
 // An InvokeOption modifies the default behavior of Invoke. It's included for
 // future functionality; currently, there are no concrete implementations.
-type InvokeOption interface{}
+type InvokeOption interface {
+	unimplemented()
+}
 
 // A Container is a directed, acyclic graph of dependencies. Dependencies are
 // constructed on-demand and returned from a cache thereafter, so they're
