@@ -39,6 +39,24 @@ type key struct {
 	name string
 }
 
+// Option configures a Container. It's included for future functionality;
+// currently, there are no concrete implementations.
+type Option interface {
+	unimplemented()
+}
+
+// A ProvideOption modifies the default behavior of Provide. It's included for
+// future functionality; currently, there are no concrete implementations.
+type ProvideOption interface {
+	unimplemented()
+}
+
+// An InvokeOption modifies the default behavior of Invoke. It's included for
+// future functionality; currently, there are no concrete implementations.
+type InvokeOption interface {
+	unimplemented()
+}
+
 // A Container is a directed, acyclic graph of dependencies. Dependencies are
 // constructed on-demand and returned from a cache thereafter, so they're
 // effectively singletons.
@@ -56,7 +74,7 @@ type Container struct {
 }
 
 // New constructs a ready-to-use Container.
-func New() *Container {
+func New(opts ...Option) *Container {
 	return &Container{
 		nodes: make(map[key]*node),
 		cache: make(map[key]reflect.Value),
@@ -75,7 +93,7 @@ func New() *Container {
 //
 // All non-functions (including structs, pointers, Go's built-in collections,
 // and primitive types like ints) are inserted into the Container as-is.
-func (c *Container) Provide(constructor interface{}) error {
+func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {
 		return errors.New("can't provide an untyped nil")
@@ -95,7 +113,7 @@ func (c *Container) Provide(constructor interface{}) error {
 //
 // Passing anything other than a function to Invoke returns an error
 // immediately.
-func (c *Container) Invoke(function interface{}) error {
+func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
 		return errors.New("can't invoke an untyped nil")
