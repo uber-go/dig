@@ -1,15 +1,17 @@
 # :hammer: dig [![GoDoc][doc-img]][doc] [![Build Status][ci-img]][ci] [![Coverage Status][cov-img]][cov] [![Report Card][report-card-img]][report-card]
 
-A dependency injection toolkit for Go. Good for:
+A dependency injection toolkit for Go.
 
-* Powering an application framework, e.g. dig powers [Fx](github.com/uber-go/fx)
-* Resolving the object graph during process startup
+### Good for:
 
-Bad for:
+* Powering an application framework, e.g. dig powers [Fx](github.com/uber-go/fx).
+* Resolving the object graph during process startup.
 
-* Using in place of an application framework, like [Fx](github.com/uber-go/fx)
-* Resolving deps once the process has already started
-* Using as a [Service Locator](https://martinfowler.com/articles/injection.html#UsingAServiceLocator)
+### Bad for:
+
+* Using in place of an application framework, like [Fx](github.com/uber-go/fx).
+* Resolving deps once the process has already started.
+* Using as a [Service Locator](https://martinfowler.com/articles/injection.html#UsingAServiceLocator).
 
 ## Status
 
