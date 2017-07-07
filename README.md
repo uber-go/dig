@@ -4,12 +4,12 @@ A dependency injection toolkit for Go.
 
 ### Good for:
 
-* Powering an application framework, e.g. dig powers [Fx](github.com/uber-go/fx).
+* Powering an application framework, e.g. dig powers [Fx](https://github.com/uber-go/fx).
 * Resolving the object graph during process startup.
 
 ### Bad for:
 
-* Using in place of an application framework, like [Fx](github.com/uber-go/fx).
+* Using in place of an application framework, like [Fx](https://github.com/uber-go/fx).
 * Resolving deps once the process has already started.
 * Using as a [Service Locator](https://martinfowler.com/articles/injection.html#UsingAServiceLocator).
 
