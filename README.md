@@ -4,8 +4,13 @@ A dependency injection toolkit for Go.
 
 ## Status
 
-Almost stable: `v1.0.0-rc1`. Expect potential API changes.
+Almost stable: `v1.0.0-rc1`. Expect minor API changes and bug fixes. See [our changelog](CHANGELOG.md)
 
+## Install
+
+```
+go get -u go.uber.org/dig
+```
 
 [doc]: https://godoc.org/go.uber.org/dig
 [doc-img]: https://godoc.org/go.uber.org/dig?status.svg
