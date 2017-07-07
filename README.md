@@ -1,6 +1,6 @@
 # :hammer: dig [![GoDoc][doc-img]][doc] [![Build Status][ci-img]][ci] [![Coverage Status][cov-img]][cov] [![Report Card][report-card-img]][report-card]
 
-A dependency injection toolkit for Go.
+A reflection based dependency injection toolkit for Go.
 
 ### Good for:
 
