@@ -2,6 +2,17 @@
 
 A dependency injection toolkit for Go.
 
+Good for:
+
+* Powering an application framework, e.g. dig powers [Fx](github.com/uber-go/fx)
+* Resolving the object graph during process startup
+
+Bad for:
+
+* Using in place of an application framework, like [Fx](github.com/uber-go/fx)
+* Resolving deps once the process has already started
+* Using as a [Service Locator](https://martinfowler.com/articles/injection.html#UsingAServiceLocator)
+
 ## Status
 
 Almost stable: `v1.0.0-rc1`. Expect minor API changes and bug fixes. See [our changelog](CHANGELOG.md)
