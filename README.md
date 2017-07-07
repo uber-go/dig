@@ -1,8 +1,6 @@
 # :hammer: dig [![GoDoc][doc-img]][doc] [![Build Status][ci-img]][ci] [![Coverage Status][cov-img]][cov] [![Report Card][report-card-img]][report-card]
 
-A dependency injection toolkit for Go.
-
-Good for:
+A dependency injection toolkit for Go. Good for:
 
 * Powering an application framework, e.g. dig powers [Fx](github.com/uber-go/fx)
 * Resolving the object graph during process startup
