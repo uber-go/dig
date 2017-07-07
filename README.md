@@ -11,7 +11,7 @@ A reflection based dependency injection toolkit for Go.
 
 * Using in place of an application framework, e.g. [Fx](https://github.com/uber-go/fx).
 * Resolving dependencies after the process has already started.
-* Using as a [Service Locator](https://martinfowler.com/articles/injection.html#UsingAServiceLocator).
+* Exposing to user-land code as a [Service Locator](https://martinfowler.com/articles/injection.html#UsingAServiceLocator).
 
 ## Status
 
