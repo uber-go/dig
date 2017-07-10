@@ -352,13 +352,24 @@ func (c *Container) remove(nodes []*node) {
 }
 
 func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error) {
+	numArgs := ctype.NumIn()
+
 	args := make([]reflect.Value, 0, ctype.NumIn())
-	for i := 0; i < ctype.NumIn(); i++ {
+	for i := 0; i < numArgs; i++ {
 		arg, err := c.get(edge{key: key{t: ctype.In(i)}})
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get arguments for constructor %v: %v", ctype, err)
 		}
-		args = append(args, arg)
+
+		// If the function is variadic, the last argument is a slice that must
+		// be expanded into the argument list.
+		if i == numArgs-1 && ctype.IsVariadic() {
+			for j := 0; j < arg.Len(); j++ {
+				args = append(args, arg.Index(j))
+			}
+		} else {
+			args = append(args, arg)
+		}
 	}
 	return args, nil
 }

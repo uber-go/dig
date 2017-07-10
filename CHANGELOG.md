@@ -4,6 +4,8 @@
 
 - So that we can introduce new functionality after a 1.0 release, add a
   variadic options parameter to all public APIs.
+- Added support for functions with variadic arguments. These functions declare
+  a dependency on a slice of values of the variadic type.
 
 ## v1.0.0-rc1 (21 Jun 2017)
 
