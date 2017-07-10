@@ -700,6 +700,59 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Nil(t, p.Baz, "Baz must be unset")
 		}), "invoke failed")
 	})
+
+	t.Run("variadic arguments invoke", func(t *testing.T) {
+		c := New()
+
+		type A struct{}
+
+		var gaveA *A
+		require.NoError(t, c.Provide(func() *A {
+			gaveA = &A{}
+			return gaveA
+		}), "failed to provide A")
+
+		require.NoError(t, c.Provide(func() []*A {
+			panic("[]*A constructor must not be called.")
+		}), "failed to provide A slice")
+
+		require.NoError(t, c.Invoke(func(a *A, as ...*A) {
+			require.NotNil(t, a, "A must not be nil")
+			require.True(t, a == gaveA, "A must match")
+			require.Empty(t, as, "varargs must be empty")
+		}), "failed to invoke")
+	})
+
+	t.Run("variadic arguments dependency", func(t *testing.T) {
+		c := New()
+
+		type A struct{}
+		type B struct{}
+
+		var gaveA *A
+		require.NoError(t, c.Provide(func() *A {
+			gaveA = &A{}
+			return gaveA
+		}), "failed to provide A")
+
+		require.NoError(t, c.Provide(func() []*A {
+			panic("[]*A constructor must not be called.")
+		}), "failed to provide A slice")
+
+		var gaveB *B
+		require.NoError(t, c.Provide(func(a *A, as ...*A) *B {
+			require.NotNil(t, a, "A must not be nil")
+			require.True(t, a == gaveA, "A must match")
+			require.Empty(t, as, "varargs must be empty")
+			gaveB = &B{}
+			return gaveB
+		}), "failed to provide B")
+
+		require.NoError(t, c.Invoke(func(b *B) {
+			require.NotNil(t, b, "B must not be nil")
+			require.True(t, b == gaveB, "B must match")
+		}), "failed to invoke")
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {

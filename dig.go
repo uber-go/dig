@@ -352,8 +352,15 @@ func (c *Container) remove(nodes []*node) {
 }
 
 func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error) {
-	args := make([]reflect.Value, 0, ctype.NumIn())
-	for i := 0; i < ctype.NumIn(); i++ {
+	numArgs := ctype.NumIn()
+	if ctype.IsVariadic() {
+		// NOTE: If the function is variadic, we skip the last argument
+		// because we're not filling variadic arguments yet. See #120.
+		numArgs--
+	}
+
+	args := make([]reflect.Value, 0, numArgs)
+	for i := 0; i < numArgs; i++ {
 		arg, err := c.get(edge{key: key{t: ctype.In(i)}})
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get arguments for constructor %v: %v", ctype, err)
@@ -389,8 +396,15 @@ func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
 
 // Retrieves the dependencies for a constructor
 func getConstructorDependencies(ctype reflect.Type) ([]edge, error) {
+	numArgs := ctype.NumIn()
+	if ctype.IsVariadic() {
+		// NOTE: If the function is variadic, we skip the last argument
+		// because we're not filling variadic arguments yet. See #120.
+		numArgs--
+	}
+
 	var deps []edge
-	for i := 0; i < ctype.NumIn(); i++ {
+	for i := 0; i < numArgs; i++ {
 		err := traverseInTypes(ctype.In(i), func(e edge) {
 			deps = append(deps, e)
 		})
