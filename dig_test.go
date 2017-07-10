@@ -700,6 +700,49 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Nil(t, p.Baz, "Baz must be unset")
 		}), "invoke failed")
 	})
+
+	t.Run("variadic arguments invoke", func(t *testing.T) {
+		c := New()
+
+		type A struct{ i int }
+
+		require.NoError(t, c.Provide(func() []*A {
+			return []*A{{1}, {2}, {3}}
+		}), "failed to provide A slice")
+
+		require.NoError(t, c.Invoke(func(as ...*A) {
+			require.Len(t, as, 3, "length must match")
+			assert.Equal(t, &A{1}, as[0], "as[0] must match")
+			assert.Equal(t, &A{2}, as[1], "as[1] must match")
+			assert.Equal(t, &A{3}, as[2], "as[2] must match")
+		}), "failed to invoke")
+	})
+
+	t.Run("variadic arguments dependency", func(t *testing.T) {
+		c := New()
+
+		type A struct{ i int }
+		type B struct{ i []int }
+
+		require.NoError(t, c.Provide(func() []*A {
+			return []*A{{1}, {2}, {3}}
+		}), "failed to provide A slice")
+
+		require.NoError(t, c.Provide(func(as ...*A) *B {
+			var b B
+			for _, a := range as {
+				b.i = append(b.i, a.i)
+			}
+			return &b
+		}), "failed to provide B")
+
+		require.NoError(t, c.Invoke(func(b *B) {
+			require.Len(t, b.i, 3, "length must match")
+			assert.Equal(t, 1, b.i[0], "b.i[0] must match")
+			assert.Equal(t, 2, b.i[1], "b.i[1] must match")
+			assert.Equal(t, 3, b.i[2], "b.i[2] must match")
+		}), "failed to invoke")
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {
