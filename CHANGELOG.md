@@ -4,6 +4,8 @@
 
 - So that we can introduce new functionality after a 1.0 release, add a
   variadic options parameter to all public APIs.
+- Added support for functions with variadic arguments. These functions will be
+  called without supplying their variadic arguments.
 
 ## v1.0.0-rc1 (21 Jun 2017)
 
