@@ -352,16 +352,10 @@ func (c *Container) remove(nodes []*node) {
 }
 
 func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error) {
-	numArgs := ctype.NumIn()
-	if ctype.IsVariadic() {
-		// NOTE: If the function is variadic, we skip the last argument
-		// because we're not filling variadic arguments yet. See #120.
-		numArgs--
-	}
-
-	args := make([]reflect.Value, 0, numArgs)
-	for i := 0; i < numArgs; i++ {
-		arg, err := c.get(edge{key: key{t: ctype.In(i)}})
+	argTypes := getConstructorArgTypes(ctype)
+	args := make([]reflect.Value, 0, len(argTypes))
+	for _, t := range argTypes {
+		arg, err := c.get(edge{key: key{t: t}})
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get arguments for constructor %v: %v", ctype, err)
 		}
@@ -396,16 +390,9 @@ func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
 
 // Retrieves the dependencies for a constructor
 func getConstructorDependencies(ctype reflect.Type) ([]edge, error) {
-	numArgs := ctype.NumIn()
-	if ctype.IsVariadic() {
-		// NOTE: If the function is variadic, we skip the last argument
-		// because we're not filling variadic arguments yet. See #120.
-		numArgs--
-	}
-
 	var deps []edge
-	for i := 0; i < numArgs; i++ {
-		err := traverseInTypes(ctype.In(i), func(e edge) {
+	for _, t := range getConstructorArgTypes(ctype) {
+		err := traverseInTypes(t, func(e edge) {
 			deps = append(deps, e)
 		})
 		if err != nil {
@@ -413,6 +400,26 @@ func getConstructorDependencies(ctype reflect.Type) ([]edge, error) {
 		}
 	}
 	return deps, nil
+}
+
+// Retrieves the types of the arguments of a constructor in-order.
+//
+// If the constructor is a variadic function, the returned list does NOT
+// include the implicit slice argument because dig does not support passing
+// those values in yet.
+func getConstructorArgTypes(ctype reflect.Type) []reflect.Type {
+	numArgs := ctype.NumIn()
+	if ctype.IsVariadic() {
+		// NOTE: If the function is variadic, we skip the last argument
+		// because we're not filling variadic arguments yet. See #120.
+		numArgs--
+	}
+
+	args := make([]reflect.Type, numArgs)
+	for i := 0; i < numArgs; i++ {
+		args[i] = ctype.In(i)
+	}
+	return args
 }
 
 func cycleError(cycle []key, last key) error {
