@@ -753,6 +753,19 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.True(t, b == gaveB, "B must match")
 		}), "failed to invoke")
 	})
+
+	t.Run("non-error return arguments from invoke are ignored", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type B struct{}
+
+		require.NoError(t, c.Provide(func() A { return A{} }))
+		require.NoError(t, c.Invoke(func(A) B { return B{} }))
+
+		err := c.Invoke(func(B) {})
+		require.Error(t, err, "invoking with B param should error out")
+		assert.Contains(t, err.Error(), "B isn't in the container")
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {
