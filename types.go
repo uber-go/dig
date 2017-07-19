@@ -67,13 +67,13 @@ func isError(t reflect.Type) bool {
 }
 
 // IsIn returns true if passed in type embeds dig.In either directly
-// or through another struct field.
+// or through another embedded field.
 func IsIn(t reflect.Type) bool {
 	return embedsType(t, _inType)
 }
 
 // IsOut returns true if passed in type embeds dig.Out either directly
-// or through another struct field.
+// or through another embedded field.
 func IsOut(t reflect.Type) bool {
 	return embedsType(t, _outType)
 }
