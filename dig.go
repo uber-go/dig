@@ -183,7 +183,7 @@ func (c *Container) getReturnKeys(
 			}
 
 			// Tons of error checking
-			if isInObject(k.t) {
+			if IsIn(k.t) {
 				return errors.New("can't provide parameter objects")
 			}
 			if _, ok := returnTypes[k]; ok {
@@ -210,7 +210,7 @@ func (c *Container) getReturnKeys(
 // DFS traverse over all the types and execute the provided function.
 // Types that embed dig.Out get recursed on. Returns the first error encountered.
 func traverseOutTypes(k key, f func(key) error) error {
-	if !isOutObject(k.t) {
+	if !IsOut(k.t) {
 		// call the provided function on non-Out type
 		if err := f(k); err != nil {
 			return err
@@ -244,7 +244,7 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 		return v, nil
 	}
 
-	if isInObject(e.t) {
+	if IsIn(e.t) {
 		// We do not want parameter objects to be cached.
 		return c.createInObject(e.t)
 	}
@@ -314,7 +314,7 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 
 // Set the value in the cache after a node resolution
 func (c *Container) set(k key, v reflect.Value) {
-	if !isOutObject(k.t) {
+	if !IsOut(k.t) {
 		// do not cache error types
 		if k.t != _errType {
 			c.cache[k] = v
@@ -453,7 +453,7 @@ func detectCycles(n *node, graph map[key]*node, path []key) error {
 // Traverse all fields starting with the given type.
 // Types that dig.In get recursed on. Returns the first error encountered.
 func traverseInTypes(t reflect.Type, fn func(edge)) error {
-	if !isInObject(t) {
+	if !IsIn(t) {
 		fn(edge{key: key{t: t}})
 		return nil
 	}
@@ -464,7 +464,7 @@ func traverseInTypes(t reflect.Type, fn func(edge)) error {
 			continue // skip private fields
 		}
 
-		if isInObject(f.Type) {
+		if IsIn(f.Type) {
 			if err := traverseInTypes(f.Type, fn); err != nil {
 				return err
 			}

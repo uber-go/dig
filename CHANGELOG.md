@@ -6,6 +6,7 @@
   variadic options parameter to all public APIs.
 - Added support for functions with variadic arguments. These functions will be
   called without supplying their variadic arguments.
+- Export `IsIn` and `IsOut` package level functions.
 
 ## v1.0.0-rc1 (21 Jun 2017)
 
