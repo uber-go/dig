@@ -493,6 +493,31 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "invoke should succeed, pulling out two named instances")
 	})
 
+	t.Run("named and unnamed instances coexist", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+
+		type out struct {
+			Out
+
+			A `name:"foo"`
+		}
+
+		require.NoError(t, c.Provide(func() out { return out{A: A{1}} }))
+		require.NoError(t, c.Provide(func() A { return A{2} }))
+
+		type in struct {
+			In
+
+			A1 A `name:"foo"`
+			A2 A
+		}
+		require.NoError(t, c.Invoke(func(i in) {
+			assert.Equal(t, 1, i.A1.idx)
+			assert.Equal(t, 2, i.A2.idx)
+		}))
+	})
+
 	t.Run("named instances recurse", func(t *testing.T) {
 		c := New()
 		type A struct{ idx int }
