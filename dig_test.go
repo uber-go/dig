@@ -956,15 +956,22 @@ func TestTypeCheckingEquality(t *testing.T) {
 		A
 	}
 	type in struct {
+		In
 		A
 	}
 	type out struct {
 		B
 	}
-	i := in{}
-	o := out{}
-	require.Equal(t, IsIn(i), isInType(reflect.TypeOf(i)))
-	require.Equal(t, IsOut(o), isOutType(reflect.TypeOf(o)))
+	tt := []interface{}{
+		in{},
+		out{},
+		A{},
+		B{},
+	}
+	for _, s := range tt {
+		require.Equal(t, IsIn(s), isInType(reflect.TypeOf(s)))
+		require.Equal(t, IsOut(s), isOutType(reflect.TypeOf(s)))
+	}
 }
 
 func TestInvokesUseCachedObjects(t *testing.T) {
