@@ -971,6 +971,7 @@ func TestTypeCheckingEquality(t *testing.T) {
 		{out{}, false, true},
 		{A{}, false, false},
 		{B{}, false, true},
+		{nil, false, false},
 	}
 	for _, tt := range tests {
 		require.Equal(t, tt.isIn, IsIn(tt.item))
