@@ -962,15 +962,19 @@ func TestTypeCheckingEquality(t *testing.T) {
 	type out struct {
 		B
 	}
-	tt := []interface{}{
-		in{},
-		out{},
-		A{},
-		B{},
+	tests := []struct {
+		item  interface{}
+		isIn  bool
+		isOut bool
+	}{
+		{in{}, true, false},
+		{out{}, false, true},
+		{A{}, false, false},
+		{B{}, false, true},
 	}
-	for _, s := range tt {
-		require.Equal(t, IsIn(s), isInType(reflect.TypeOf(s)))
-		require.Equal(t, IsOut(s), isOutType(reflect.TypeOf(s)))
+	for _, tt := range tests {
+		require.Equal(t, tt.isIn, IsIn(tt.item))
+		require.Equal(t, tt.isOut, IsOut(tt.item))
 	}
 }
 
