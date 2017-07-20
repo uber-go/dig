@@ -68,18 +68,33 @@ func isError(t reflect.Type) bool {
 
 // IsIn returns true if passed in type embeds dig.In either directly
 // or through another embedded field.
-func IsIn(t reflect.Type) bool {
-	return embedsType(t, _inType)
+//
+// Parameter can be a struct directly, or reflect.Type of it.
+func IsIn(o interface{}) bool {
+	return embedsType(o, _inType)
 }
 
 // IsOut returns true if passed in type embeds dig.Out either directly
 // or through another embedded field.
-func IsOut(t reflect.Type) bool {
-	return embedsType(t, _outType)
+//
+// Parameter can be a struct directly, or reflect.Type of it.
+func IsOut(o interface{}) bool {
+	return embedsType(o, _outType)
 }
 
 // Returns true if t embeds e or if any of the types embedded by t embed e.
-func embedsType(t reflect.Type, e reflect.Type) bool {
+func embedsType(i interface{}, e reflect.Type) bool {
+	if i == nil {
+		return false
+	}
+
+	// maybe it's already a reflect.Type
+	t, ok := i.(reflect.Type)
+	if !ok {
+		// take the type if it's not
+		t = reflect.TypeOf(i)
+	}
+
 	// We are going to do a breadth-first search of all embedded fields.
 	types := list.New()
 	types.PushBack(t)

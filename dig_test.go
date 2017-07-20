@@ -949,6 +949,36 @@ func TestProvideFuncsWithoutReturnsFails(t *testing.T) {
 	assert.Error(t, c.Provide(func(*bytes.Buffer) {}))
 }
 
+func TestTypeCheckingEquality(t *testing.T) {
+	type A struct{}
+	type B struct {
+		Out
+		A
+	}
+	type in struct {
+		In
+		A
+	}
+	type out struct {
+		B
+	}
+	tests := []struct {
+		item  interface{}
+		isIn  bool
+		isOut bool
+	}{
+		{in{}, true, false},
+		{out{}, false, true},
+		{A{}, false, false},
+		{B{}, false, true},
+		{nil, false, false},
+	}
+	for _, tt := range tests {
+		require.Equal(t, tt.isIn, IsIn(tt.item))
+		require.Equal(t, tt.isOut, IsOut(tt.item))
+	}
+}
+
 func TestInvokesUseCachedObjects(t *testing.T) {
 	t.Parallel()
 
