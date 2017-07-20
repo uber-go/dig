@@ -68,12 +68,16 @@ func isError(t reflect.Type) bool {
 
 // IsIn returns true if passed in type embeds dig.In either directly
 // or through another embedded field.
+//
+// Can on structs directly and on reflect.Types of them.
 func IsIn(o interface{}) bool {
 	return embedsType(o, _inType)
 }
 
 // IsOut returns true if passed in type embeds dig.Out either directly
 // or through another embedded field.
+//
+// Can on structs directly and on reflect.Types of them.
 func IsOut(o interface{}) bool {
 	return embedsType(o, _outType)
 }
