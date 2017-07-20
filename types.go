@@ -88,13 +88,10 @@ func embedsType(i interface{}, e reflect.Type) bool {
 		return false
 	}
 
-	var t reflect.Type
-
-	// maybe it's already reflect.Type
-	if mt, ok := i.(reflect.Type); ok {
-		t = mt
-	} else {
-		// if not just take the type
+	// maybe it's already a reflect.Type
+	t, ok := i.(reflect.Type)
+	if !ok {
+		// take the type if it's not
 		t = reflect.TypeOf(i)
 	}
 
