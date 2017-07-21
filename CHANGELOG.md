@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.0-rc3 (unreleased)
+
+- No changes yet.
+
 ## v1.0.0-rc2 (21 Jul 2017)
 
 - Added variadic options to all public APIS so that new functionality can be
