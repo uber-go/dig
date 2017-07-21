@@ -1,13 +1,13 @@
 # Changelog
 
-## v1.0.0-rc2 (unreleased)
+## v1.0.0-rc2 (21 Jul 2017)
 
-- So that we can introduce new functionality after a 1.0 release, add a
-  variadic options parameter to all public APIs.
-- Added support for functions with variadic arguments. These functions will be
-  called without supplying their variadic arguments.
-- Exported `IsIn` and `IsOut` functions to check if types are `dig.In` or
-  `dig.Out` compatible.
+- Added variadic options to all public APIS so that new functionality can be
+  introduced post v1.0.0 without introducing breaking changes.
+- Functions with variadic arguments can now be passed to `dig.Provide` and
+  `dig.Invoke`. Previously this caused an error, whereas now the args will be ignored.
+- Exported `dig.IsIn` and `dig.IsOut` so that consuming libraries can check if
+  a params or return struct embeds the `dig.In` and `dig.Out` types, respectively.
 
 ## v1.0.0-rc1 (21 Jun 2017)
 

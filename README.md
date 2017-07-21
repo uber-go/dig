@@ -15,7 +15,7 @@ A reflection based dependency injection toolkit for Go.
 
 ## Status
 
-Almost stable: `v1.0.0-rc1`. Some breaking changes might occur before `v1.0.0`. See [CHANGELOG.md](CHANGELOG.md) for more info.
+Almost stable: `v1.0.0-rc2`. Some breaking changes might occur before `v1.0.0`. See [CHANGELOG.md](CHANGELOG.md) for more info.
 
 ## Install
 
