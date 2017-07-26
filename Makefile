@@ -1,15 +1,7 @@
 BENCH_FLAGS ?= -cpuprofile=cpu.pprof -memprofile=mem.pprof -benchmem
 PKGS ?= $(shell glide novendor | grep -v examples)
 PKG_FILES ?= *.go
-
-# The linting tools evolve with each Go version, so run them only on the latest
-# stable release.
 GO_VERSION := $(shell go version | cut -d " " -f 3)
-GO_MINOR_VERSION := $(word 2,$(subst ., ,$(GO_VERSION)))
-LINTABLE_MINOR_VERSIONS := 8
-ifneq ($(filter $(LINTABLE_MINOR_VERSIONS),$(GO_MINOR_VERSION)),)
-SHOULD_LINT := true
-endif
 
 .PHONY: all
 all: lint test
@@ -32,7 +24,6 @@ endif
 
 .PHONY: lint
 lint:
-ifdef SHOULD_LINT
 	@rm -rf lint.log
 	@echo "Checking formatting..."
 	@gofmt -d -s $(PKG_FILES) 2>&1 | tee lint.log
@@ -48,9 +39,6 @@ ifdef SHOULD_LINT
 	@DRY_RUN=1 ./check_license.sh | tee -a lint.log
 	@$(MAKE) gendoc
 	@[ ! -s lint.log ]
-else
-	@echo "Skipping linters on" $(GO_VERSION)
-endif
 
 .PHONY: test
 test:

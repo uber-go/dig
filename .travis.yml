@@ -1,15 +1,20 @@
 language: go
 sudo: false
-go:
-  - 1.7
-  - 1.8
-  - tip
 go_import_path: go.uber.org/dig
+
+matrix:
+  include:
+    - go: 1.7
+    - go: 1.8
+    # TODO: Switch to Go 1.9 when released
+    - go: tip
+      env: LINT=1
+
 cache:
   directories:
     - vendor
 install:
   - make dependencies
 script:
-  - make lint
+  - test "$LINT" -eq 1 && make lint || echo "Skipping lint"
   - make ci
