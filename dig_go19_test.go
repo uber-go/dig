@@ -48,6 +48,20 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 		}), "invoke failed")
 	})
 
+	t.Run("duplicate provide", func(t *testing.T) {
+		type A struct{}
+		type B = A
+
+		c := New()
+		require.NoError(t, c.Provide(func() A { 
+			return A{}
+		}), "A should not fail to provide")
+
+		require.Error(t, c.Provide(func() B {
+			return B{}
+		}), "B should fail to provide")
+	})
+
 	t.Run("named instances", func(t *testing.T) {
 		c := New()
 		type A1 struct{ s string }
