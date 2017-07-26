@@ -53,7 +53,7 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 		type B = A
 
 		c := New()
-		require.NoError(t, c.Provide(func() A { 
+		require.NoError(t, c.Provide(func() A {
 			return A{}
 		}), "A should not fail to provide")
 
