@@ -91,7 +91,17 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	if ctype.Kind() != reflect.Func {
 		return fmt.Errorf("must provide constructor function, got %v (type %v)", constructor, ctype)
 	}
-	if err := c.provide(constructor, ctype); err != nil {
+
+	p := &provider{
+		caller:      getCaller(c.skipper),
+		constructor: constructor,
+		t:           ctype,
+	}
+	for _, opt := range opts {
+		opt.apply(p)
+	}
+
+	if err := c.provide(p); err != nil {
 		return fmt.Errorf("can't provide %v: %v", ctype, err)
 	}
 	return nil
@@ -127,7 +137,19 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
-func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
+// Internal data structure that encompases all the context for a single
+// conatiner.Provide call.
+type provider struct {
+	t           reflect.Type
+	constructor interface{}
+	caller      string
+	hook        ProvideHook
+}
+
+func (c *Container) provide(p *provider) error {
+	ctor := p.constructor
+	ctype := p.t
+
 	keys, err := c.getReturnKeys(ctor, ctype)
 	if err != nil {
 		return fmt.Errorf("unable to collect return types of a constructor: %v", err)
@@ -148,6 +170,13 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 			c.remove(nodes)
 			return fmt.Errorf("introduces a cycle: %v", err)
 		}
+	}
+
+	if p.hook != nil {
+		e := ProvideEvent{
+			Caller: p.caller,
+		}
+		p.hook(e)
 	}
 
 	return nil
