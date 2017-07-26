@@ -26,8 +26,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEndToEndSuccessWithAliases(t *testing.T) {
@@ -50,7 +50,7 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 
 	t.Run("named instances", func(t *testing.T) {
 		c := New()
-		type A1 struct{s string}
+		type A1 struct{ s string }
 		type A2 = A1
 		type A3 = A2
 
@@ -98,4 +98,3 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 	})
 
 }
-
