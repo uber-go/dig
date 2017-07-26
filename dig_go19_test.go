@@ -57,9 +57,10 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 			return A{}
 		}), "A should not fail to provide")
 
-		require.Error(t, c.Provide(func() B {
-			return B{}
-		}), "B should fail to provide")
+		err := c.Provide(func() B { return B{} })
+		require.Error(t, err, "B should fail to provide")
+		assert.Contains(t, err.Error(), `can't provide func() dig.A`)
+		assert.Contains(t, err.Error(), `already in the container`)
 	})
 
 	t.Run("named instances", func(t *testing.T) {
