@@ -39,24 +39,6 @@ type key struct {
 	name string
 }
 
-// Option configures a Container. It's included for future functionality;
-// currently, there are no concrete implementations.
-type Option interface {
-	unimplemented()
-}
-
-// A ProvideOption modifies the default behavior of Provide. It's included for
-// future functionality; currently, there are no concrete implementations.
-type ProvideOption interface {
-	unimplemented()
-}
-
-// An InvokeOption modifies the default behavior of Invoke. It's included for
-// future functionality; currently, there are no concrete implementations.
-type InvokeOption interface {
-	unimplemented()
-}
-
 // A Container is a directed, acyclic graph of dependencies. Dependencies are
 // constructed on-demand and returned from a cache thereafter, so they're
 // effectively singletons.
@@ -71,14 +53,22 @@ type Container struct {
 	// object, in case users want to provide another type with a different name
 	//
 	// index map[reflect.Type]key
+	skipper FrameSkipper
 }
 
 // New constructs a ready-to-use Container.
 func New(opts ...Option) *Container {
-	return &Container{
-		nodes: make(map[key]*node),
-		cache: make(map[key]reflect.Value),
+	c := &Container{
+		nodes:   make(map[key]*node),
+		cache:   make(map[key]reflect.Value),
+		skipper: defaultFrameSkipper,
 	}
+
+	for _, opt := range opts {
+		opt.apply(c)
+	}
+
+	return c
 }
 
 // Provide teaches the Container how to construct one or more new types.
