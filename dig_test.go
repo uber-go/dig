@@ -1078,7 +1078,7 @@ func TestProvideFailures(t *testing.T) {
 		err := c.Provide(func() out1 { return out1{a2: A{77}} })
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "private fields not allowed in dig.Out")
-		assert.Contains(t, err.Error(), "a2 dig.A")
+		assert.Contains(t, err.Error(), `"a2" (dig.A)`)
 		assert.Contains(t, err.Error(), "did you mean to export")
 	})
 }
@@ -1318,7 +1318,7 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "private fields not allowed in dig.In")
-		assert.Contains(t, err.Error(), "a2 dig.A")
+		assert.Contains(t, err.Error(), `"a2" (dig.A)`)
 		assert.Contains(t, err.Error(), "did you mean to export")
 	})
 
@@ -1339,7 +1339,5 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "private fields not allowed in dig.In")
-		assert.Contains(t, err.Error(), "a2 dig.A")
-		assert.Contains(t, err.Error(), "did you mean to export")
 	})
 }
