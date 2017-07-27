@@ -300,8 +300,16 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 	dest := reflect.New(t).Elem()
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
+
+		if f.Type == _inType {
+			// skip over the dig.In embed itself
+			continue
+		}
+
 		if f.PkgPath != "" {
-			continue // skip private fields
+			return dest, fmt.Errorf(
+				"private fields not allowed in dig.In, did you mean to export %q?",
+				fmt.Sprintf("%v %v", f.Name, f.Type))
 		}
 
 		isOptional, err := isFieldOptional(t, f)
