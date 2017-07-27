@@ -1340,4 +1340,17 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "private fields not allowed in dig.In")
 	})
+
+	t.Run("embedded private member gets an error", func(t *testing.T) {
+		c := New()
+		type a struct{}
+		type param struct {
+			In
+
+			a // embedded unexported struct, should be subject to the same error
+		}
+		err := c.Invoke(func(p param) { assert.Fail(t, "should never get here") })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `did you mean to export "a" (dig.a) from dig.param?`)
+	})
 }
