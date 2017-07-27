@@ -2,9 +2,9 @@
 
 ## v1.0.0-rc3 (unreleased)
 
-- `Provide` and `Invoke` will now error out if `dig.In` or `dig.Out` structs
-  contain private fields. Previously these fields were ignored which often led
-  to confusion.
+- `Provide` and `Invoke` will now fail if `dig.In` or `dig.Out` structs
+  contain unexported fields. Previously these fields were ignored which often
+  led to confusion.
 
 ## v1.0.0-rc2 (21 Jul 2017)
 
