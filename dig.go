@@ -222,8 +222,15 @@ func traverseOutTypes(k key, f func(key) error) error {
 		field := k.t.Field(i)
 		ft := field.Type
 
+		if field.Type == _outType {
+			// do not recurse into dig.Out itself, it will contain digSentinel only
+			continue
+		}
+
 		if field.PkgPath != "" {
-			continue // skip private fields
+			return fmt.Errorf(
+				"private fields not allowed in dig.Out, did you mean to export %q (%v) from %v",
+				field.Name, field.Type, k.t)
 		}
 
 		// keep recursing to traverse all the embedded objects
@@ -293,8 +300,16 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 	dest := reflect.New(t).Elem()
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
+
+		if f.Type == _inType {
+			// skip over the dig.In embed itself
+			continue
+		}
+
 		if f.PkgPath != "" {
-			continue // skip private fields
+			return dest, fmt.Errorf(
+				"private fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
+				f.Name, f.Type, t)
 		}
 
 		isOptional, err := isFieldOptional(t, f)

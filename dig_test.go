@@ -142,16 +142,11 @@ func TestEndToEndSuccess(t *testing.T) {
 		type Args struct {
 			In
 
-			privateContents contents
-			Contents        contents
+			Contents contents
 		}
 
 		require.NoError(t,
 			c.Provide(func(args Args) *bytes.Buffer {
-				// testify's Empty doesn't work on string aliases for some
-				// reason
-				require.Len(t, args.privateContents, 0, "private contents must be empty")
-
 				require.NotEmpty(t, args.Contents, "contents must not be empty")
 				return bytes.NewBufferString(string(args.Contents))
 			}), "provide constructor failed")
@@ -176,13 +171,10 @@ func TestEndToEndSuccess(t *testing.T) {
 		type Args struct {
 			In
 
-			privateBuffer *bytes.Buffer
-
 			*bytes.Buffer
 		}
 
 		require.NoError(t, c.Invoke(func(args Args) {
-			require.Nil(t, args.privateBuffer, "private buffer must be nil")
 			require.NotNil(t, args.Buffer, "invoke got nil buffer")
 		}))
 	})
@@ -358,8 +350,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			Out
 			A  // value type A
 			*B // pointer type *B
-
-			foo string // private field to be ignored
 		}
 		myA := A{"string A"}
 		myB := &B{"string B"}
@@ -791,7 +781,10 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.Error(t, err, "invoking with B param should error out")
 		assert.Contains(t, err.Error(), "B isn't in the container")
 	})
+
 }
+
+// --- END OF END TO END TESTS
 
 func TestProvideConstructorErrors(t *testing.T) {
 	t.Run("multiple-type constructor returns multiple objects of same type", func(t *testing.T) {
@@ -1071,6 +1064,23 @@ func TestProvideFailures(t *testing.T) {
 		require.Error(t, err, "expected error on the second provide")
 		assert.Contains(t, err.Error(), "provides *dig.A:foo, which is already in the container")
 	})
+
+	t.Run("out with private field should error", func(t *testing.T) {
+		c := New()
+
+		type A struct{ idx int }
+		type out1 struct {
+			Out
+
+			A1 A // should be ok
+			a2 A // oops, private field. should generate an error
+		}
+		err := c.Provide(func() out1 { return out1{a2: A{77}} })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "private fields not allowed in dig.Out")
+		assert.Contains(t, err.Error(), `"a2" (dig.A)`)
+		assert.Contains(t, err.Error(), "did you mean to export")
+	})
 }
 
 func TestInvokeFailures(t *testing.T) {
@@ -1292,5 +1302,42 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(param2) {})
 		require.Error(t, err, "provide should return error since cases don't match")
 		assert.Contains(t, err.Error(), "dig.A:camelcase isn't in the container")
+	})
+
+	t.Run("in private member gets an error", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type in struct {
+			In
+
+			A1 A // all is good
+			a2 A // oops, private type
+		}
+		require.NoError(t, c.Provide(func() A { return A{} }))
+
+		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "private fields not allowed in dig.In")
+		assert.Contains(t, err.Error(), `"a2" (dig.A)`)
+		assert.Contains(t, err.Error(), "did you mean to export")
+	})
+
+	t.Run("embedded private member gets an error", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type Embed struct {
+			In
+
+			A1 A // all is good
+			a2 A // oops, private type
+		}
+		type in struct {
+			Embed
+		}
+		require.NoError(t, c.Provide(func() A { return A{} }))
+
+		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "private fields not allowed in dig.In")
 	})
 }
