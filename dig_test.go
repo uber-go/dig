@@ -1321,4 +1321,25 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "a2 dig.A")
 		assert.Contains(t, err.Error(), "did you mean to export")
 	})
+
+	t.Run("embedded private member gets an error", func(t *testing.T) {
+		c := New()
+		type A struct{}
+		type Embed struct {
+			In
+
+			A1 A // all is good
+			a2 A // oops, private type
+		}
+		type in struct {
+			Embed
+		}
+		require.NoError(t, c.Provide(func() A { return A{} }))
+
+		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "private fields not allowed in dig.In")
+		assert.Contains(t, err.Error(), "a2 dig.A")
+		assert.Contains(t, err.Error(), "did you mean to export")
+	})
 }
