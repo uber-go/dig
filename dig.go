@@ -186,6 +186,11 @@ func (c *Container) getReturnKeys(
 			if IsIn(k.t) {
 				return errors.New("can't provide parameter objects")
 			}
+			if k.t.Kind() == reflect.Ptr {
+				if IsIn(k.t.Elem()) {
+					return errors.New("can't provide pointers to parameter objects")
+				}
+			}
 			if _, ok := returnTypes[k]; ok {
 				return fmt.Errorf("returns multiple %v", k)
 			}
@@ -254,6 +259,14 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 	if IsIn(e.t) {
 		// We do not want parameter objects to be cached.
 		return c.createInObject(e.t)
+	}
+
+	if e.t.Kind() == reflect.Ptr {
+		if IsIn(e.t.Elem()) {
+			return _noValue, fmt.Errorf(
+				"depepdency %v is a pointer to dig.In, use value type instead", e.t,
+			)
+		}
 	}
 
 	n, ok := c.nodes[e.key]

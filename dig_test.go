@@ -883,17 +883,14 @@ func TestCantProvideParameterObjects(t *testing.T) {
 	})
 
 	t.Run("pointer from constructor", func(t *testing.T) {
+		c := New()
 		type Args struct{ In }
 
 		args := &Args{}
 
-		c := New()
-		require.NoError(t, c.Provide(func() (*Args, error) {
-			return args, nil
-		}), "provide failed")
-		require.NoError(t, c.Invoke(func(a *Args) {
-			require.True(t, args == a, "args must match")
-		}), "invoke failed")
+		err := c.Provide(func() (*Args, error) { return args, nil })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "can't provide pointers to parameter objects")
 	})
 }
 
@@ -1351,5 +1348,19 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(p param) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `did you mean to export "string" (string) from dig.param?`)
+	})
+
+	t.Run("embedding pointer to in is not supported", func(t *testing.T) {
+		c := New()
+		type in struct {
+			In
+
+			String string
+			Num    int
+		}
+		err := c.Invoke(func(i *in) { assert.Fail(t, "should never get here") })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "*dig.in is a pointer")
+		assert.Contains(t, err.Error(), "use value type instead")
 	})
 }
