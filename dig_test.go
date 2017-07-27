@@ -358,8 +358,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			Out
 			A  // value type A
 			*B // pointer type *B
-
-			foo string // private field to be ignored
 		}
 		myA := A{"string A"}
 		myB := &B{"string B"}
@@ -791,7 +789,10 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.Error(t, err, "invoking with B param should error out")
 		assert.Contains(t, err.Error(), "B isn't in the container")
 	})
+
 }
+
+// --- END OF END TO END TESTS
 
 func TestProvideConstructorErrors(t *testing.T) {
 	t.Run("multiple-type constructor returns multiple objects of same type", func(t *testing.T) {
@@ -1070,6 +1071,23 @@ func TestProvideFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected error on the second provide")
 		assert.Contains(t, err.Error(), "provides *dig.A:foo, which is already in the container")
+	})
+
+	t.Run("out with private field should error", func(t *testing.T) {
+		c := New()
+
+		type A struct{ idx int }
+		type out1 struct {
+			Out
+
+			A1 A // should be ok
+			a2 A // oops, private field. should generate an error
+		}
+		err := c.Provide(func() out1 { return out1{a2: A{77}} })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "private fields not allowed in dig.Out")
+		assert.Contains(t, err.Error(), "a2 dig.A")
+		assert.Contains(t, err.Error(), "did you mean to export")
 	})
 }
 

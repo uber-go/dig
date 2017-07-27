@@ -222,8 +222,15 @@ func traverseOutTypes(k key, f func(key) error) error {
 		field := k.t.Field(i)
 		ft := field.Type
 
+		if field.Type == _outType {
+			// do not recurse into dig.Out itself, it will contain digSentinel only
+			continue
+		}
+
 		if field.PkgPath != "" {
-			continue // skip private fields
+			return fmt.Errorf(
+				"private fields not allowed in dig.Out, did you mean to export %q?",
+				fmt.Sprintf("%v %v", field.Name, field.Type))
 		}
 
 		// keep recursing to traverse all the embedded objects
