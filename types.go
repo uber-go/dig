@@ -28,10 +28,10 @@ import (
 var (
 	_noValue    reflect.Value
 	_errType    = reflect.TypeOf((*error)(nil)).Elem()
-	_inType     = reflect.TypeOf((*In)(nil)).Elem()
 	_inPtrType  = reflect.TypeOf((*In)(nil))
-	_outType    = reflect.TypeOf((*Out)(nil)).Elem()
+	_inType     = _inPtrType.Elem()
 	_outPtrType = reflect.TypeOf((*Out)(nil))
+	_outType    = _outPtrType.Elem()
 )
 
 // Special interface embedded inside dig sentinel values (dig.In, dig.Out) to
