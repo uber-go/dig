@@ -278,7 +278,7 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 	if e.t.Kind() == reflect.Ptr {
 		if IsIn(e.t.Elem()) {
 			return _noValue, fmt.Errorf(
-				"depepdency %v is a pointer to dig.In, use value type instead", e.t,
+				"dependency %v is a pointer to dig.In, use value type instead", e.t,
 			)
 		}
 	}
