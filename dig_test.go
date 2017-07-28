@@ -1078,6 +1078,33 @@ func TestProvideFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), `"a2" (dig.A)`)
 		assert.Contains(t, err.Error(), "did you mean to export")
 	})
+
+	t.Run("providing pointer to out should fail", func(t *testing.T) {
+		c := New()
+		type out struct {
+			Out
+
+			String string
+		}
+		err := c.Provide(func() *out { return &out{String: "foo"} })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dig.out is a pointer to dig.Out")
+	})
+
+	t.Run("embedding pointer to out should fail", func(t *testing.T) {
+		c := New()
+
+		type out struct {
+			*Out
+
+			String string
+		}
+
+		err := c.Provide(func() out { return out{String: "foo"} })
+		fmt.Println(c)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "can't embed *dig.Out pointers")
+	})
 }
 
 func TestInvokeFailures(t *testing.T) {
@@ -1350,7 +1377,7 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), `did you mean to export "string" (string) from dig.param?`)
 	})
 
-	t.Run("embedding pointer to in is not supported", func(t *testing.T) {
+	t.Run("pointer in dependency is not supported", func(t *testing.T) {
 		c := New()
 		type in struct {
 			In
@@ -1362,5 +1389,19 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "*dig.in is a pointer")
 		assert.Contains(t, err.Error(), "use value type instead")
+	})
+
+	t.Run("embedding in pointer is not supported", func(t *testing.T) {
+		c := New()
+		type in struct {
+			*In
+
+			String string
+			Num    int
+		}
+		err := c.Invoke(func(i in) { assert.Fail(t, "should never get here") })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dig.in embeds *dig.In")
+		assert.Contains(t, err.Error(), "embed dig.In value instead")
 	})
 }
