@@ -1101,7 +1101,6 @@ func TestProvideFailures(t *testing.T) {
 		}
 
 		err := c.Provide(func() out { return out{String: "foo"} })
-		fmt.Println(c)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "can't embed *dig.Out pointers")
 	})
