@@ -186,6 +186,14 @@ func (c *Container) getReturnKeys(
 			if IsIn(k.t) {
 				return errors.New("can't provide parameter objects")
 			}
+			if embedsType(k.t, _outPtrType) {
+				return errors.New("can't embed *dig.Out pointers")
+			}
+			if k.t.Kind() == reflect.Ptr {
+				if IsIn(k.t.Elem()) {
+					return errors.New("can't provide pointers to parameter objects")
+				}
+			}
 			if _, ok := returnTypes[k]; ok {
 				return fmt.Errorf("returns multiple %v", k)
 			}
@@ -211,6 +219,12 @@ func (c *Container) getReturnKeys(
 // Types that embed dig.Out get recursed on. Returns the first error encountered.
 func traverseOutTypes(k key, f func(key) error) error {
 	if !IsOut(k.t) {
+		if k.t.Kind() == reflect.Ptr {
+			if IsOut(k.t.Elem()) {
+				return fmt.Errorf("%v is a pointer to dig.Out, use value type instead", k.t)
+			}
+		}
+
 		// call the provided function on non-Out type
 		if err := f(k); err != nil {
 			return err
@@ -255,6 +269,19 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 		// We do not want parameter objects to be cached.
 		return c.createInObject(e.t)
 	}
+	if embedsType(e.t, _inPtrType) {
+		return _noValue, fmt.Errorf(
+			"%v embeds *dig.In which is not supported, embed dig.In value instead", e.t,
+		)
+	}
+
+	if e.t.Kind() == reflect.Ptr {
+		if IsIn(e.t.Elem()) {
+			return _noValue, fmt.Errorf(
+				"dependency %v is a pointer to dig.In, use value type instead", e.t,
+			)
+		}
+	}
 
 	n, ok := c.nodes[e.key]
 	if !ok {
@@ -298,6 +325,7 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 // populated from the dig container.
 func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 	dest := reflect.New(t).Elem()
+
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 

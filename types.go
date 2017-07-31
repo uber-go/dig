@@ -26,10 +26,12 @@ import (
 )
 
 var (
-	_noValue reflect.Value
-	_errType = reflect.TypeOf((*error)(nil)).Elem()
-	_inType  = reflect.TypeOf((*In)(nil)).Elem()
-	_outType = reflect.TypeOf((*Out)(nil)).Elem()
+	_noValue    reflect.Value
+	_errType    = reflect.TypeOf((*error)(nil)).Elem()
+	_inPtrType  = reflect.TypeOf((*In)(nil))
+	_inType     = reflect.TypeOf(In{})
+	_outPtrType = reflect.TypeOf((*Out)(nil))
+	_outType    = reflect.TypeOf(Out{})
 )
 
 // Special interface embedded inside dig sentinel values (dig.In, dig.Out) to
@@ -84,6 +86,12 @@ func IsOut(o interface{}) bool {
 
 // Returns true if t embeds e or if any of the types embedded by t embed e.
 func embedsType(i interface{}, e reflect.Type) bool {
+	// TODO: this function doesn't consider e being a pointer.
+	// given `type A foo { *In }`, this function would return false for
+	// embedding dig.In, which makes for some extra error checking in places
+	// that call this funciton. Might be worthwhile to consider reflect.Indirect
+	// usage to clean up the callers.
+
 	if i == nil {
 		return false
 	}
@@ -104,6 +112,7 @@ func embedsType(i interface{}, e reflect.Type) bool {
 		if t == e {
 			return true
 		}
+
 		if t.Kind() != reflect.Struct {
 			continue
 		}
