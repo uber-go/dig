@@ -29,9 +29,9 @@ var (
 	_noValue    reflect.Value
 	_errType    = reflect.TypeOf((*error)(nil)).Elem()
 	_inPtrType  = reflect.TypeOf((*In)(nil))
-	_inType     = _inPtrType.Elem()
+	_inType     = reflect.TypeOf(In{})
 	_outPtrType = reflect.TypeOf((*Out)(nil))
-	_outType    = _outPtrType.Elem()
+	_outType    = reflect.TypeOf(Out{})
 )
 
 // Special interface embedded inside dig sentinel values (dig.In, dig.Out) to
