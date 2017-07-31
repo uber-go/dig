@@ -1,6 +1,8 @@
 # Changelog
 
-## v1.0.0-rc3 (unreleased)
+## v1.0.0 (31 Jul 2017)
+
+First stable release: no breaking changes will be made in the 1.x series.
 
 - `Provide` and `Invoke` will now fail if `dig.In` or `dig.Out` structs
   contain unexported fields. Previously these fields were ignored which often
