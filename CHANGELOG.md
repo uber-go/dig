@@ -1,12 +1,14 @@
 # Changelog
 
-## v1.0.0-rc3 (unreleased)
+## v1.0.0 (2017-07-31)
+
+First stable release: no breaking changes will be made in the 1.x series.
 
 - `Provide` and `Invoke` will now fail if `dig.In` or `dig.Out` structs
   contain unexported fields. Previously these fields were ignored which often
   led to confusion.
 
-## v1.0.0-rc2 (21 Jul 2017)
+## v1.0.0-rc2 (2017-07-21)
 
 - Added variadic options to all public APIS so that new functionality can be
   introduced post v1.0.0 without introducing breaking changes.
@@ -15,11 +17,11 @@
 - Exported `dig.IsIn` and `dig.IsOut` so that consuming libraries can check if
   a params or return struct embeds the `dig.In` and `dig.Out` types, respectively.
 
-## v1.0.0-rc1 (21 Jun 2017)
+## v1.0.0-rc1 (2017-06-21)
 
 - First release candidate.
 
-## v0.5.0 (19 Jun 2017)
+## v0.5.0 (2017-06-19)
 
 - `dig.In` and `dig.Out` now support named instances, i.e.:
 
@@ -35,7 +37,7 @@
 - Structs compatible with `dig.In` and `dig.Out` may now be generated using
   `reflect.StructOf`.
 
-## v0.4.0 (12 Jun 2017)
+## v0.4.0 (2017-06-12)
 
 - **[Breaking]** Remove `Must*` funcs to greatly reduce API surface area.
 - **[Breaking]** Restrict the API surface to only `Provide` and `Invoke`.
@@ -47,7 +49,7 @@
 - Add support for optional parameters through `optional:"true"` tag on `dig.In` objects.
 - Add support for value types and many built-ins (maps, slices, channels).
 
-## v0.3 (2 May 2017)
+## v0.3 (2017-05-02)
 
 - Rename `RegisterAll` and `MustRegisterAll` to `ProvideAll` and
   `MustProvideAll`.
@@ -56,13 +58,13 @@
 - Add `Invoke` function to invoke provided function and insert return
   objects into the `dig.Graph`
 
-## v0.2 (27 Mar 2017)
+## v0.2 (2017-03-27)
 
 - Rename `Register` to `Provide` for clarity and to recude clash with other
   Register functions.
 - Rename `dig.Graph` to `dig.Container`.
 - Remove the package-level functions and the `DefaultGraph`.
 
-## v0.1 (23 Mar 2017)
+## v0.1 (2017-03-23)
 
 Initial release.

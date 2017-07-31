@@ -1,5 +1,5 @@
 hash: fdd7122108d34cf543d2dd819f2c794d94d44245ab0ac8ff298a7720a5b93976
-updated: 2017-06-02T11:14:49.117711757-07:00
+updated: 2017-07-31T11:25:37.451934681-07:00
 imports: []
 testImports:
 - name: github.com/davecgh/go-spew
@@ -7,7 +7,7 @@ testImports:
   subpackages:
   - spew
 - name: github.com/golang/lint
-  version: a5f4a247366d8fc436941822e14fc3eac7727015
+  version: c5fb716d6688a859aae56d26d3e6070808df29f7
   subpackages:
   - golint
 - name: github.com/pmezard/go-difflib
@@ -17,7 +17,7 @@ testImports:
 - name: github.com/sectioneight/md-to-godoc
   version: 79157ff08f1acd5c5b1d13d71c0adb7908dbb8a2
 - name: github.com/stretchr/testify
-  version: f6abca593680b2315d2075e0f5e2a9751e3f431a
+  version: 05e8a0eda380579888eb53c394909df027f06991
   subpackages:
   - assert
   - require

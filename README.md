@@ -13,15 +13,19 @@ A reflection based dependency injection toolkit for Go.
 * Resolving dependencies after the process has already started.
 * Exposing to user-land code as a [Service Locator](https://martinfowler.com/articles/injection.html#UsingAServiceLocator).
 
-## Status
+## Installation
 
-Almost stable: `v1.0.0-rc2`. Some breaking changes might occur before `v1.0.0`. See [CHANGELOG.md](CHANGELOG.md) for more info.
-
-## Install
+We recommend locking to [SemVer](http://semver.org/) range `^1` using [Glide](https://github.com/Masterminds/glide):
 
 ```
-go get -u go.uber.org/dig
+glide get 'go.uber.org/dig#^1'
 ```
+
+## Stability
+
+This library is `v1` and follows [SemVer](http://semver.org/) strictly.
+
+No breaking changes will be made to exported APIs before `v2.0.0`.
 
 [doc]: https://godoc.org/go.uber.org/dig
 [doc-img]: https://godoc.org/go.uber.org/dig?status.svg
