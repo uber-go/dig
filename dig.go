@@ -81,7 +81,7 @@ func New(opts ...Option) *Container {
 }
 
 // Provide teaches the container how to build values of one or more types and
-// expresses their dependency types.
+// expresses their dependencies.
 //
 // The first argument of Provide is a function that accepts zero or more
 // parameters and returns one or more results. The function may optionally
