@@ -92,9 +92,10 @@ func New(opts ...Option) *Container {
 // same types are requested multiple times, the previously produced value will
 // be reused.
 //
-// In addition to accepting vanilla constructors, Provide also accepts
-// constructors that accept dig.In structs as dependencies and/or return
-// dig.Out results.
+// In addition to accepting constructors that accept dependencies as separate
+// arguments and produce results as separate return values, Provide also
+// accepts constructors that specify dependencies as dig.In structs and/or
+// specify results as dig.Out structs.
 func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {
