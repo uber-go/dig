@@ -111,9 +111,10 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 }
 
 // Invoke runs the given function after instantiating its dependencies.
-// Any arguments that the function has are treated as its dependencies and
-// they are instantiated in an unspecified order along with any dependencies
-// that they might have.
+//
+// Any arguments that the function has are treated as its dependencies. The
+// dependencies are instantiated in an unspecified order along with any
+// dependencies that they might have.
 //
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
