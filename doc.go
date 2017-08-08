@@ -36,7 +36,7 @@
 // Constructors for different types are added to the container by using the
 // Provide method. A constructor can declare a dependency on another type by
 // simply adding it as a function parameter. Dependencies for a type can be
-// added to the graph both, before and after that type was added.
+// added to the graph both, before and after the type was added.
 //
 //   err := c.Provide(func(conn *sql.DB) (*UserGateway, error) {
 //     // ...
@@ -87,7 +87,7 @@
 // Invoke
 //
 // Types added to to the container may be consumed by using the Invoke method.
-// Invoke accepts a function which accepts one or more parameters and
+// Invoke accepts any function that accepts one or more parameters and
 // optionally, returns an error. Dig calls the function with the requested
 // type, instantiating only those types that were requested by the function.
 // The call fails if any type or its dependencies (both direct and transitive)
@@ -107,7 +107,7 @@
 //     // ...
 //   }
 //
-// If the invoked function returns an error, that error is propagated to the
+// Any error returned by the invoked function is propagated back to the
 // caller.
 //
 // Parameter Objects
@@ -121,11 +121,11 @@
 //   }
 //
 // A pattern employed to improve readability in a situation like this is to
-// create a struct which lists all the parameters of the function as fields
-// and changing the function to accept that struct instead. This is referred
-// to as a parameter object.
+// create a struct that lists all the parameters of the function as fields and
+// changing the function to accept that struct instead. This is referred to as
+// a parameter object.
 //
-// Dig has first class support for parameter objects: any struct that embeds
+// Dig has first class support for parameter objects: any struct embedding
 // dig.In gets treated as a parameter object. The following is equivalent to
 // the constructor above.
 //
@@ -152,8 +152,8 @@
 // Result Objects
 //
 // Result objects are the flip side of parameter objects. These are structs
-// which represent multiple outputs from a single function as fields in the
-// struct. Structs that embed dig.Out get treated as result objects.
+// that represent multiple outputs from a single function as fields in the
+// struct. Structs embedding dig.Out get treated as result objects.
 //
 //   func SetupGateways(conn *sql.DB) (*UserGateway, *CommentGateway, *PostGateway, error) {
 //     // ...
@@ -178,8 +178,10 @@
 // Often times constructors don't have a hard dependency on some types and
 // are able to operate in a degraded state when that dependency is missing.
 // Dig supports declaring dependencies as optional by adding an
-// `optional:"true"` tag to fields of a dig.In struct.  Fields in a dig.In
-// structs which have that tag are treated as optional by Dig.
+// `optional:"true"` tag to fields of a dig.In struct.
+//
+// Fields in a dig.In structs that have the `optional:"true"` tag are treated
+// as optional by Dig.
 //
 //   type UserGatewayParams struct {
 //     dig.In
@@ -189,7 +191,7 @@
 //   }
 //
 // If an optional field is not available in the container, the constructor
-// will receive a zero value for that field.
+// will receive a zero value for the field.
 //
 //   func NewUserGateway(p UserGatewayParams, log *log.Logger) (*UserGateway, error) {
 //     if p.Cache != nil {
@@ -198,8 +200,8 @@
 //     // ...
 //   }
 //
-// Constructors which declare dependencies as optional MUST handle the case of
-// that dependency being missing.
+// Constructors that declare dependencies as optional MUST handle the case of
+// those dependencies being absent.
 //
 // The optional tag also allows adding new dependencies without breaking
 // existing consumers of the constructor.
@@ -210,8 +212,9 @@
 // multiple values of the same type to the container with the use of
 // `name:".."` tags on fields of dig.In and dig.Out structs.
 //
-// A constructor which produces a dig.Out struct can tag any field with
-// `name:".."` to have that value added to the graph under the specified name.
+// A constructor that produces a dig.Out struct can tag any field with
+// `name:".."` to have the corresponding value added to the graph under the
+// specified name.
 //
 //   type ConnectionResult {
 //     dig.Out
@@ -235,7 +238,7 @@
 //     ReadFromConn *sql.DB `name:"ro"`
 //   }
 //
-// The name tag may be combined with the optional tag to declare that
+// The name tag may be combined with the optional tag to declare the
 // dependency optional.
 //
 //   type GatewayParams struct {

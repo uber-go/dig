@@ -83,17 +83,17 @@ func New(opts ...Option) *Container {
 // Provide teaches the container how to build values of one or more types and
 // expresses their dependency types.
 //
-// The first argument of Provide is a function which accepts zero or more
+// The first argument of Provide is a function that accepts zero or more
 // parameters and returns one or more results. The function may optionally
 // return an error to indicate that it failed to build the value. This
 // function will be treated as the constructor for all the types it returns.
 // This function will be called AT MOST ONCE when a type produced by it, or a
-// type which depends on this function's output, is requested via Invoke. If
-// the same types are requested multiple times, the previously produced value
-// will be reused.
+// type that consumes this function's output, is requested via Invoke. If the
+// same types are requested multiple times, the previously produced value will
+// be reused.
 //
 // In addition to accepting vanilla constructors, Provide also accepts
-// constructors which accept dig.In structs as dependencies and/or return
+// constructors that accept dig.In structs as dependencies and/or return
 // dig.Out results.
 func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) error {
 	ctype := reflect.TypeOf(constructor)
