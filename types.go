@@ -78,10 +78,10 @@ func isError(t reflect.Type) bool {
 	return t.Implements(_errType)
 }
 
-// IsIn checks if the given struct is a dig.In struct. A struct qualifies as a
-// dig.In struct if it embeds the dig.In type or if any struct that it embeds
-// is a dig.In struct. The parameter may be the reflect.Type of the struct
-// rather than the struct itself.
+// IsIn checks whether the given struct is a dig.In struct. A struct qualifies
+// as a dig.In struct if it embeds the dig.In type or if any struct that it
+// embeds is a dig.In struct. The parameter may be the reflect.Type of the
+// struct rather than the struct itself.
 //
 // A struct MUST qualify as a dig.In struct for its fields to support dig.In
 // tags.
@@ -92,10 +92,10 @@ func IsIn(o interface{}) bool {
 	return embedsType(o, _inType)
 }
 
-// IsOut checks if the given struct is a dig.Out struct. A struct qualifies as
-// a dig.Out struct if it embeds the dig.Out type or if any struct that it
-// embeds is a dig.Out struct. The parameter may be the reflect.Type of the
-// struct rather than the struct itself.
+// IsOut checks whether the given struct is a dig.Out struct. A struct
+// qualifies as a dig.Out struct if it embeds the dig.Out type or if any
+// struct that it embeds is a dig.Out struct. The parameter may be the
+// reflect.Type of the struct rather than the struct itself.
 //
 // A struct MUST qualify as a dig.Out struct for its fields to support dig.Out
 // tags.
