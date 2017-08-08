@@ -26,8 +26,8 @@
 //
 // Container
 //
-// Dig exposes type Container as an object capable of resolving a directional
-// dependency graph. To create one, simply use the New function.
+// Dig exposes type Container as an object capable of resolving a directed
+// dependency graph. Use the New function to create one.
 //
 //   c := dig.New()
 //
@@ -49,9 +49,9 @@
 //     // ...
 //   }
 //
-// Multiple constructors can rely on the same type. Types in the container are
-// treated as singletons, so the constructors for them will be called at most
-// once when requested by another type.
+// Multiple constructors can rely on the same type. The container creates a
+// singleton for each retained type, instantiating it at most once when
+// requested directly or as a dependency of another type.
 //
 //   err := c.Provide(func(conn *sql.DB) *CommentGateway {
 //     // ...
@@ -200,6 +200,9 @@
 //
 // Constructors which declare dependencies as optional MUST handle the case of
 // that dependency being missing.
+//
+// The optional tag also allows adding new dependencies without breaking
+// existing consumers of the constructor.
 //
 // Named Values
 //

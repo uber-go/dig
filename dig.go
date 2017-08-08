@@ -80,7 +80,8 @@ func New(opts ...Option) *Container {
 	}
 }
 
-// Provide teaches the container how to build values of one or more types.
+// Provide teaches the container how to build values of one or more types and
+// expresses their dependency types.
 //
 // The first argument of Provide is a function which accepts zero or more
 // parameters and returns one or more results. The function may optionally
@@ -108,12 +109,13 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	return nil
 }
 
-// Invoke runs the given function immediately, supplying its arguments from
-// the container. All types requested by the function will be instantiated,
-// and their dependencies will be instantiated in the process.
+// Invoke runs the given function after instantiating its dependencies.
+// Any arguments that the function has are treated as its dependencies and
+// they are instantiated in an unspecified order along with any dependencies
+// that they might have.
 //
-// The provided function may return an error to indicate failure. The error
-// will be returned to the caller as-is.
+// The function may return an error to indicate failure. The error will be
+// returned to the caller as-is.
 func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
