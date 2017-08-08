@@ -60,7 +60,7 @@
 //     // ...
 //   }
 //
-// Constructors can declare any number of dependencies in their parameters and
+// Constructors can declare any number of dependencies as parameters and
 // optionally, return errors.
 //
 //   err := c.Provide(func(u *UserGateway, c *CommentGateway) (*RequestHandler, error) {
@@ -83,6 +83,18 @@
 //   if err != nil {
 //     // ...
 //   }
+//
+// Constructors that accept a variadic number of arguments are treated as if
+// they don't have those arguments. That is,
+//
+//   func NewVoteGateway(db *sql.DB, options ...Option) *VoteGateway
+//
+// Is treated the same as,
+//
+//   func NewVoteGateway(db *sql.DB) *VoteGateway
+//
+// The constructor will be called with all other dependencies and no variadic
+// arguments.
 //
 // Invoke
 //
