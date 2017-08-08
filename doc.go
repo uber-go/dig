@@ -175,7 +175,7 @@
 //
 // Optional Dependencies
 //
-// Often times constructors don't have a hard dependency on some types and
+// Constructors often don't have a hard dependency on some types and
 // are able to operate in a degraded state when that dependency is missing.
 // Dig supports declaring dependencies as optional by adding an
 // `optional:"true"` tag to fields of a dig.In struct.
