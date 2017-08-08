@@ -42,10 +42,10 @@ type digSentinel interface {
 }
 
 // In may be embedded into structs to request dig to treat them as special
-// parameter structs. When a constructor accepts such a struct as an argument,
-// instead of the struct becoming a dependency for that constructor, all its
-// fields become dependencies instead. See the section on Parameter Objects
-// above for more information.
+// parameter structs. When a constructor accepts such a struct, instead of the
+// struct becoming a dependency for that constructor, all its fields become
+// dependencies instead. See the section on Parameter Objects above for more
+// information.
 //
 // Fields of the struct may optionally be tagged to customize the behavior of
 // dig. The following tags are supported,
@@ -61,10 +61,10 @@ type In struct{ digSentinel }
 // becoming part of the container, all members of the struct will.
 
 // Out may be embedded into structs to request dig to treat them as special
-// result structs. When a constructor produces such a struct as a result,
-// instead of the struct becoming a result of the constructor, all its fields
-// become results of the constructor. See the section on Result Objects above
-// for more information.
+// result structs. When a constructor returns such a struct, instead of the
+// struct becoming a result of the constructor, all its fields become results
+// of the constructor. See the section on Result Objects above for more
+// information.
 //
 // Fields of the struct may optionally be tagged to customize the behavior of
 // dig. The following tags are supported,
