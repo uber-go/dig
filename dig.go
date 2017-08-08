@@ -57,12 +57,11 @@ type InvokeOption interface {
 	unimplemented()
 }
 
-// A Container is a directed, acyclic graph of dependencies. Dependencies are
-// constructed on-demand and returned from a cache thereafter, so they're
-// effectively singletons.
+// Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
 	nodes map[key]*node
 	cache map[key]reflect.Value
+
 	// TODO: for advanced use-case, add an index
 	// This will allow retrieval of a single type, without specifying the exact
 	// tag, provided there is only one object of that given type
@@ -73,7 +72,7 @@ type Container struct {
 	// index map[reflect.Type]key
 }
 
-// New constructs a ready-to-use Container.
+// New constructs a Container.
 func New(opts ...Option) *Container {
 	return &Container{
 		nodes: make(map[key]*node),
@@ -81,18 +80,22 @@ func New(opts ...Option) *Container {
 	}
 }
 
-// Provide teaches the Container how to construct one or more new types.
+// Provide teaches the container how to build values of one or more types and
+// expresses their dependencies.
 //
-// Any function passed to Provide is assumed to be a constructor. Constructors
-// can take any number of parameters, which will be supplied by the Container
-// on demand. They must return at least one non-error value, all of which are
-// then available in the Container. If the last returned value is an error, the
-// Container inspects it to determine whether the constructor succeeded or
-// failed. Regardless of position, returned errors are never put into the
-// Container's dependency graph.
+// The first argument of Provide is a function that accepts zero or more
+// parameters and returns one or more results. The function may optionally
+// return an error to indicate that it failed to build the value. This
+// function will be treated as the constructor for all the types it returns.
+// This function will be called AT MOST ONCE when a type produced by it, or a
+// type that consumes this function's output, is requested via Invoke. If the
+// same types are requested multiple times, the previously produced value will
+// be reused.
 //
-// All non-functions (including structs, pointers, Go's built-in collections,
-// and primitive types like ints) are inserted into the Container as-is.
+// In addition to accepting constructors that accept dependencies as separate
+// arguments and produce results as separate return values, Provide also
+// accepts constructors that specify dependencies as dig.In structs and/or
+// specify results as dig.Out structs.
 func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {
@@ -107,12 +110,14 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	return nil
 }
 
-// Invoke runs a function, supplying its arguments from the Container. If the
-// function's last return value is an error, that error is propagated to the
-// caller. All other returned values (if any) are ignored.
+// Invoke runs the given function after instantiating its dependencies.
 //
-// Passing anything other than a function to Invoke returns an error
-// immediately.
+// Any arguments that the function has are treated as its dependencies. The
+// dependencies are instantiated in an unspecified order along with any
+// dependencies that they might have.
+//
+// The function may return an error to indicate failure. The error will be
+// returned to the caller as-is.
 func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {

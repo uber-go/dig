@@ -18,121 +18,253 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// Package dig is the dig: Dependency Injection Framework for Go.
-//
-// package dig provides an opinionated way of resolving object dependencies.
+// Package dig provides an opinionated way of resolving object dependencies.
 //
 // Status
 //
-// BETA. Expect potential API changes.
+// STABLE. No breaking changes will be made in this major version.
 //
 // Container
 //
-// package dig exposes type Container as an object capable of resolving a
-// directional dependency graph.
+// Dig exposes type Container as an object capable of resolving a directed
+// acyclic dependency graph. Use the New function to create one.
 //
-//
-// To create one:
-//
-//   import "go.uber.org/dig"
-//
-//   func main() {
-//   	c := dig.New()
-//   	// dig container `c` is ready to use!
-//   }
-//
-// **All objects in the container are treated as a singletons**, meaning there can be
-// only one object in the graph of a given type.
-//
-//
-// There are plans to expand the API to support multiple objects of the same type
-// in the container, but for time being consider using a factory pattern.
-//
+//   c := dig.New()
 //
 // Provide
 //
-// The Provide method adds a constructor of an object (or objects), to the container.
-// A constructor can be a function returning any number of objects and, optionally,
-// an error.
+// Constructors for different types are added to the container by using the
+// Provide method. A constructor can declare a dependency on another type by
+// simply adding it as a function parameter. Dependencies for a type can be
+// added to the graph both, before and after the type was added.
 //
-//
-// Each argument to the constructor is registered as a **dependency** in the graph.
-//
-//   type A struct {}
-//   type B struct {}
-//   type C struct {}
-//
-//   c := dig.New()
-//   constructor := func (*A, *B) *C {
-//     // At this point, *A and *B have been resolved through the graph
-//     // and can be used to provide an object of type *C
-//     return &C{}
+//   err := c.Provide(func(conn *sql.DB) (*UserGateway, error) {
+//     // ...
+//   })
+//   if err != nil {
+//     // ...
 //   }
-//   err := c.Provide(constructor)
-//   // dig container is now able to provide *C to any constructor.
-//   //
-//   // However, note that in the current example *A and *B
-//   // have not been provided, meaning that the resolution of type
-//   // *C will result in an error, because types *A and *B can not
-//   // be instantiated.
 //
-// Advanced Provide
+//   if err := c.Provide(newDBConnection); err != nil {
+//     // ...
+//   }
 //
-// // TODO: docs on dig.In usage
-// // TODO: docs on dig.Out usage
+// Multiple constructors can rely on the same type. The container creates a
+// singleton for each retained type, instantiating it at most once when
+// requested directly or as a dependency of another type.
 //
+//   err := c.Provide(func(conn *sql.DB) *CommentGateway {
+//     // ...
+//   })
+//   if err != nil {
+//     // ...
+//   }
+//
+// Constructors can declare any number of dependencies as parameters and
+// optionally, return errors.
+//
+//   err := c.Provide(func(u *UserGateway, c *CommentGateway) (*RequestHandler, error) {
+//     // ...
+//   })
+//   if err != nil {
+//     // ...
+//   }
+//
+//   if err := c.Provide(newHTTPServer); err != nil {
+//     // ...
+//   }
+//
+// Constructors can also return multiple results to add multiple types to the
+// container.
+//
+//   err := c.Provide(func(conn *sql.DB) (*UserGateway, *CommentGateway, error) {
+//     // ...
+//   })
+//   if err != nil {
+//     // ...
+//   }
+//
+// Constructors that accept a variadic number of arguments are treated as if
+// they don't have those arguments. That is,
+//
+//   func NewVoteGateway(db *sql.DB, options ...Option) *VoteGateway
+//
+// Is treated the same as,
+//
+//   func NewVoteGateway(db *sql.DB) *VoteGateway
+//
+// The constructor will be called with all other dependencies and no variadic
+// arguments.
 //
 // Invoke
 //
-// The Invoke API is the flip side of Provide and used to retrieve types from the container.
+// Types added to to the container may be consumed by using the Invoke method.
+// Invoke accepts any function that accepts one or more parameters and
+// optionally, returns an error. Dig calls the function with the requested
+// type, instantiating only those types that were requested by the function.
+// The call fails if any type or its dependencies (both direct and transitive)
+// were not available in the container.
 //
-// Invoke looks through the graph and resolves all the constructor parameters for execution.
-//
-// In order to successfully use use Invoke, the function must meet the following criteria:
-//
-// • Input to the Invoke must be a function
-//
-// • All arguments to the function must be types in the container
-//
-// • If an error is returned from an invoked function, it will be propagated to the caller
-//
-// Here is a fully working somewhat real-world Invoke example:
-//
-//   package main
-//
-//   import (
-//   	"go.uber.org/config"
-//   	"go.uber.org/dig"
-//   	"go.uber.org/zap"
-//   )
-//
-//   func main() {
-//   	c := dig.New()
-//
-//   	// Provide configuration object
-//   	c.Provide(func() config.Provider {
-//   		return config.NewYAMLProviderFromBytes([]byte("tag: Hello, world!"))
-//   	})
-//
-//   	// Provide a zap logger which relies on configuration
-//   	c.Provide(func(cfg config.Provider) (*zap.Logger, error) {
-//   		l, err := zap.NewDevelopment()
-//   		if err != nil {
-//   			return nil, err
-//   		}
-//   		return l.With(zap.String("iconic phrase", cfg.Get("tag").AsString())), nil
-//   	})
-//
-//   	// Invoke a function that requires a zap logger, which in turn requires config
-//   	c.Invoke(func(l *zap.Logger) {
-//   		l.Info("You've been invoked")
-//   		// Logger output:
-//   		//     INFO    You've been invoked     {"iconic phrase": "Hello, world!"}
-//   		//
-//   		// As we can see, Invoke caused the Logger to be created, which in turn
-//   		// required the configuration to be created.
-//   	})
+//   err := c.Invoke(func(l *log.Logger) {
+//     // ...
+//   })
+//   if err != nil {
+//     // ...
 //   }
 //
+//   err := c.Invoke(func(server *http.Server) error {
+//     // ...
+//   })
+//   if err != nil {
+//     // ...
+//   }
 //
+// Any error returned by the invoked function is propagated back to the
+// caller.
+//
+// Parameter Objects
+//
+// Constructors declare their dependencies as function parameters. This can
+// very quickly become unreadable if the constructor has a lot of
+// dependencies.
+//
+//   func NewHandler(users *UserGateway, comments *CommentGateway, posts *PostGateway, votes *VoteGateway, authz *AuthZGateway) *Handler {
+//     // ...
+//   }
+//
+// A pattern employed to improve readability in a situation like this is to
+// create a struct that lists all the parameters of the function as fields and
+// changing the function to accept that struct instead. This is referred to as
+// a parameter object.
+//
+// Dig has first class support for parameter objects: any struct embedding
+// dig.In gets treated as a parameter object. The following is equivalent to
+// the constructor above.
+//
+//   type HandlerParams struct {
+//     dig.In
+//
+//     Users    *UserGateway
+//     Comments *CommentGateway
+//     Posts    *PostGateway
+//     Votes    *VoteGateway
+//     AuthZ    *AuthZGateway
+//   }
+//
+//   func NewHandler(p HandlerParams) *Handler {
+//     // ...
+//   }
+//
+// Handlers can receive any combination of parameter objects and parameters.
+//
+//   func NewHandler(p HandlerParams, l *log.Logger) *Handler {
+//     // ...
+//   }
+//
+// Result Objects
+//
+// Result objects are the flip side of parameter objects. These are structs
+// that represent multiple outputs from a single function as fields in the
+// struct. Structs embedding dig.Out get treated as result objects.
+//
+//   func SetupGateways(conn *sql.DB) (*UserGateway, *CommentGateway, *PostGateway, error) {
+//     // ...
+//   }
+//
+// The above is equivalent to,
+//
+//  type Gateways struct {
+//    dig.Out
+//
+//    Users    *UserGateway
+//    Comments *CommentGateway
+//    Posts    *PostGateway
+//  }
+//
+//  func SetupGateways(conn *sql.DB) (Gateways, error) {
+//    // ...
+//  }
+//
+// Optional Dependencies
+//
+// Constructors often don't have a hard dependency on some types and
+// are able to operate in a degraded state when that dependency is missing.
+// Dig supports declaring dependencies as optional by adding an
+// `optional:"true"` tag to fields of a dig.In struct.
+//
+// Fields in a dig.In structs that have the `optional:"true"` tag are treated
+// as optional by Dig.
+//
+//   type UserGatewayParams struct {
+//     dig.In
+//
+//     Conn  *sql.DB
+//     Cache *redis.Client `optional:"true"`
+//   }
+//
+// If an optional field is not available in the container, the constructor
+// will receive a zero value for the field.
+//
+//   func NewUserGateway(p UserGatewayParams, log *log.Logger) (*UserGateway, error) {
+//     if p.Cache != nil {
+//       log.Print("Logging disabled")
+//     }
+//     // ...
+//   }
+//
+// Constructors that declare dependencies as optional MUST handle the case of
+// those dependencies being absent.
+//
+// The optional tag also allows adding new dependencies without breaking
+// existing consumers of the constructor.
+//
+// Named Values
+//
+// Some use cases call for multiple values of the same type. Dig allows adding
+// multiple values of the same type to the container with the use of
+// `name:".."` tags on fields of dig.In and dig.Out structs.
+//
+// A constructor that produces a dig.Out struct can tag any field with
+// `name:".."` to have the corresponding value added to the graph under the
+// specified name.
+//
+//   type ConnectionResult {
+//     dig.Out
+//
+//     ReadWrite *sql.DB `name:"rw"`
+//     ReadOnly  *sql.DB `name:"ro"`
+//   }
+//
+//   func ConnectToDatabase(...) (ConnectionResult, error) {
+//     // ...
+//     return ConnectionResult{ReadWrite: rw, ReadOnly:  ro}, nil
+//   }
+//
+// Another constructor can consume these values by adding fields to a dig.In
+// struct with the same name AND type.
+//
+//   type GatewayParams struct {
+//     dig.In
+//
+//     WriteToConn  *sql.DB `name:"rw"`
+//     ReadFromConn *sql.DB `name:"ro"`
+//   }
+//
+// The name tag may be combined with the optional tag to declare the
+// dependency optional.
+//
+//   type GatewayParams struct {
+//     dig.In
+//
+//     WriteToConn  *sql.DB `name:"rw"`
+//     ReadFromConn *sql.DB `name:"ro" optional:"true"`
+//   }
+//
+//   func NewCommentGateway(p GatewayParams, log *log.Logger) (*CommentGateway, error) {
+//     if p.ReadFromConn == nil {
+//       log.Print("Warning: Using RW connection for reads")
+//       p.ReadFromConn = p.WriteToConn
+//     }
+//     // ...
+//   }
 package dig

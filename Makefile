@@ -37,7 +37,6 @@ lint:
 	@git grep -i fixme | grep -v -e vendor -e Makefile | tee -a lint.log
 	@echo "Checking for license headers..."
 	@DRY_RUN=1 ./check_license.sh | tee -a lint.log
-	@$(MAKE) gendoc
 	@[ ! -s lint.log ]
 
 .PHONY: test
@@ -53,10 +52,3 @@ ci: test
 BENCH ?= .
 bench:
 	@$(foreach pkg,$(PKGS),go test -bench=$(BENCH) -run="^$$" $(BENCH_FLAGS) $(pkg);)
-
-.PHONY: gendoc
-gendoc:
-	@echo "Generating doc.go from README.md..."
-	@find . -name README.md -not -path "./vendor/*" | xargs -I% md-to-godoc -input=%
-	@# doc.go gets regenerated, so refresh its license
-	@update-license doc.go

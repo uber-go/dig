@@ -41,45 +41,67 @@ type digSentinel interface {
 	digSentinel()
 }
 
-// In is an embeddable object that signals to dig that the struct
-// should be treated differently. Instead of itself becoming an object
-// in the graph, memebers of the struct are inserted into the graph.
+// In may be embedded into structs to request dig to treat them as special
+// parameter structs. When a constructor accepts such a struct, instead of the
+// struct becoming a dependency for that constructor, all its fields become
+// dependencies instead. See the section on Parameter Objects in the
+// package-level documentation for more information.
 //
-// Tags on those memebers control their behavior. For example,
+// Fields of the struct may optionally be tagged to customize the behavior of
+// dig. The following tags are supported,
 //
-//    type Input struct {
-//      dig.In
-//
-//      S *Something
-//      T *Thingy `optional:"true"`
-//    }
-//
+//   name        Requests a value with the same name and type from the
+//               container. See Named Values for more information.
+//   optional    If set to true, indicates that the dependency is optional and
+//               the constructor gracefully handles its absence.
 type In struct{ digSentinel }
 
 // Out is an embeddable type that signals to dig that the returned
 // struct should be treated differently. Instead of the struct itself
 // becoming part of the container, all members of the struct will.
-type Out struct{ digSentinel }
 
-// TODO: better usage docs
-// Try to add some symmetry for In-Out docs as well.
+// Out may be embedded into structs to request dig to treat them as special
+// result structs. When a constructor returns such a struct, instead of the
+// struct becoming a result of the constructor, all its fields become results
+// of the constructor. See the section on Result Objects in the package-level
+// documentation for more information.
+//
+// Fields of the struct may optionally be tagged to customize the behavior of
+// dig. The following tags are supported,
+//
+//   name        Specifies the name of the value. Only a field on a dig.In
+//               struct with the same 'name' annotation can receive this
+//               value. See Named Values for more information.
+type Out struct{ digSentinel }
 
 func isError(t reflect.Type) bool {
 	return t.Implements(_errType)
 }
 
-// IsIn returns true if passed in type embeds dig.In either directly
-// or through another embedded field.
+// IsIn checks whether the given struct is a dig.In struct. A struct qualifies
+// as a dig.In struct if it embeds the dig.In type or if any struct that it
+// embeds is a dig.In struct. The parameter may be the reflect.Type of the
+// struct rather than the struct itself.
 //
-// Parameter can be a struct directly, or reflect.Type of it.
+// A struct MUST qualify as a dig.In struct for its fields to be treated
+// specially by dig.
+//
+// See the documentation for dig.In for a comprehensive list of supported
+// tags.
 func IsIn(o interface{}) bool {
 	return embedsType(o, _inType)
 }
 
-// IsOut returns true if passed in type embeds dig.Out either directly
-// or through another embedded field.
+// IsOut checks whether the given struct is a dig.Out struct. A struct
+// qualifies as a dig.Out struct if it embeds the dig.Out type or if any
+// struct that it embeds is a dig.Out struct. The parameter may be the
+// reflect.Type of the struct rather than the struct itself.
 //
-// Parameter can be a struct directly, or reflect.Type of it.
+// A struct MUST qualify as a dig.Out struct for its fields to be treated
+// specially by dig.
+//
+// See the documentation for dig.Out for a comprehensive list of supported
+// tags.
 func IsOut(o interface{}) bool {
 	return embedsType(o, _outType)
 }
