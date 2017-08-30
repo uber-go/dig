@@ -6,8 +6,7 @@ matrix:
   include:
     - go: 1.7
     - go: 1.8
-    # TODO: Switch to Go 1.9 when released
-    - go: tip
+    - go: 1.9
       env: LINT=1
 
 cache:
