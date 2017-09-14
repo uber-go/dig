@@ -42,8 +42,13 @@ type key struct {
 // Option configures a Container. It's included for future functionality;
 // currently, there are no concrete implementations.
 type Option interface {
-	unimplemented()
+	applyOption(*Container)
 }
+
+// optionFunc is a function-based implementation of Option.
+type optionFunc func(*Container)
+
+func (f optionFunc) applyOption(c *Container) { f(c) }
 
 // A ProvideOption modifies the default behavior of Provide. It's included for
 // future functionality; currently, there are no concrete implementations.
@@ -62,6 +67,8 @@ type Container struct {
 	nodes map[key]*node
 	cache map[key]reflect.Value
 
+	wrapErrors bool
+
 	// TODO: for advanced use-case, add an index
 	// This will allow retrieval of a single type, without specifying the exact
 	// tag, provided there is only one object of that given type
@@ -74,10 +81,27 @@ type Container struct {
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
-	return &Container{
-		nodes: make(map[key]*node),
-		cache: make(map[key]reflect.Value),
+	c := &Container{
+		nodes:      make(map[key]*node),
+		cache:      make(map[key]reflect.Value),
+		wrapErrors: true,
 	}
+
+	for _, opt := range opts {
+		opt.applyOption(c)
+	}
+	return c
+}
+
+// WrapErrors enables or disables wrapping of errors returned by user
+// functions.
+//
+// If enabled, errors returned by user-provided constructors will be wrapped
+// with more contextual information to aid in debugging the failure.
+//
+// Defaults to true.
+func WrapErrors(shouldWrap bool) Option {
+	return optionFunc(func(c *Container) { c.wrapErrors = shouldWrap })
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -105,7 +129,7 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 		return fmt.Errorf("must provide constructor function, got %v (type %v)", constructor, ctype)
 	}
 	if err := c.provide(constructor, ctype); err != nil {
-		return fmt.Errorf("can't provide %v: %v", ctype, err)
+		return errWrapf(err, "can't provide %v", ctype)
 	}
 	return nil
 }
@@ -119,6 +143,15 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
 func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
+	err := c.invoke(function, opts...)
+	// If error wrapping wasn't requested, return the root cause.
+	if !c.wrapErrors {
+		err = errRootCause(err)
+	}
+	return err
+}
+
+func (c *Container) invoke(function interface{}, opts ...InvokeOption) error {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
 		return errors.New("can't invoke an untyped nil")
@@ -128,7 +161,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	}
 	args, err := c.constructorArgs(ftype)
 	if err != nil {
-		return fmt.Errorf("failed to get arguments for %v (type %v): %v", function, ftype, err)
+		return errWrapf(err, "failed to get arguments for %v (type %v)", function, ftype)
 	}
 	returned := reflect.ValueOf(function).Call(args)
 	if len(returned) == 0 {
@@ -145,7 +178,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 	keys, err := c.getReturnKeys(ctor, ctype)
 	if err != nil {
-		return fmt.Errorf("unable to collect return types of a constructor: %v", err)
+		return errWrapf(err, "unable to collect return types of a constructor")
 	}
 
 	nodes := make([]*node, 0, len(keys))
@@ -161,7 +194,7 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 	for _, n := range nodes {
 		if err := c.isAcyclic(n); err != nil {
 			c.remove(nodes)
-			return fmt.Errorf("introduces a cycle: %v", err)
+			return errWrapf(err, "introduces a cycle")
 		}
 	}
 
@@ -300,20 +333,21 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 		if e.optional {
 			return reflect.Zero(e.t), nil
 		}
-		return _noValue, fmt.Errorf("missing dependencies for %v: %v", e.key, err)
+		return _noValue, errWrapf(err, "missing dependencies for %v", e.key)
 	}
 
 	args, err := c.constructorArgs(n.ctype)
 	if err != nil {
-		return _noValue, fmt.Errorf("couldn't get arguments for constructor %v: %v", n.ctype, err)
+		return _noValue, errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
 	}
 	constructed := reflect.ValueOf(n.ctor).Call(args)
 
 	// Provide-time validation ensures that all constructors return at least
 	// one value.
-	if err := constructed[len(constructed)-1]; isError(err.Type()) && err.Interface() != nil {
-		return _noValue, fmt.Errorf(
-			"constructor %v for type %v failed: %v", n.ctype, e.t, err.Interface())
+	if errV := constructed[len(constructed)-1]; isError(errV.Type()) {
+		if err, _ := errV.Interface().(error); err != nil {
+			return _noValue, errWrapf(err, "constructor %v for type %v failed", n.ctype, e.t)
+		}
 	}
 
 	for _, con := range constructed {
@@ -353,7 +387,7 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 		e := edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: isOptional}
 		v, err := c.get(e)
 		if err != nil {
-			return dest, fmt.Errorf("could not get field %v (edge %v) of %v: %v", f.Name, e, t, err)
+			return dest, errWrapf(err, "could not get field %v (edge %v) of %v", f.Name, e, t)
 		}
 		dest.Field(i).Set(v)
 	}
@@ -405,7 +439,7 @@ func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error)
 	for _, t := range argTypes {
 		arg, err := c.get(edge{key: key{t: t}})
 		if err != nil {
-			return nil, fmt.Errorf("couldn't get arguments for constructor %v: %v", ctype, err)
+			return nil, errWrapf(err, "couldn't get arguments for constructor %v", ctype)
 		}
 		args = append(args, arg)
 	}
@@ -539,9 +573,9 @@ func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
 
 	optional, err := strconv.ParseBool(tag)
 	if err != nil {
-		err = fmt.Errorf(
-			"invalid value %q for %q tag on field %v of %v: %v",
-			tag, _optionalTag, f.Name, parent, err)
+		err = errWrapf(err,
+			"invalid value %q for %q tag on field %v of %v",
+			tag, _optionalTag, f.Name, parent)
 	}
 
 	return optional, err

@@ -2,7 +2,8 @@
 
 ## v1.1.0 (unreleased)
 
-- No changes yet
+- Added support for disabling wrapping of constructor errors with the
+  `WrapErrors` option.
 
 ## v1.0.0 (2017-07-31)
 

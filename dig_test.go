@@ -1404,3 +1404,87 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "embed dig.In value instead")
 	})
 }
+
+func TestDontWrapErrors(t *testing.T) {
+	t.Run("direct dependency error", func(t *testing.T) {
+		type A struct{}
+
+		c := New(WrapErrors(false))
+
+		require.NoError(t, c.Provide(func() (A, error) {
+			return A{}, errors.New("great sadness")
+		}), "Provide failed")
+
+		err := c.Invoke(func(A) { panic("impossible") })
+
+		require.Error(t, err, "expected Invoke error")
+		assert.Equal(t, errors.New("great sadness"), err)
+	})
+
+	t.Run("transitive dependency error", func(t *testing.T) {
+		type A struct{}
+		type B struct{}
+
+		c := New(WrapErrors(false))
+
+		require.NoError(t, c.Provide(func() (A, error) {
+			return A{}, errors.New("great sadness")
+		}), "Provide failed")
+
+		require.NoError(t, c.Provide(func(A) (B, error) {
+			return B{}, nil
+		}), "Provide failed")
+
+		err := c.Invoke(func(B) { panic("impossible") })
+
+		require.Error(t, err, "expected Invoke error")
+		assert.Equal(t, errors.New("great sadness"), err)
+	})
+
+	t.Run("direct parameter object error", func(t *testing.T) {
+		type A struct{}
+
+		c := New(WrapErrors(false))
+
+		require.NoError(t, c.Provide(func() (A, error) {
+			return A{}, errors.New("great sadness")
+		}), "Provide failed")
+
+		type params struct {
+			In
+
+			A A
+		}
+
+		err := c.Invoke(func(params) { panic("impossible") })
+
+		require.Error(t, err, "expected Invoke error")
+		assert.Equal(t, errors.New("great sadness"), err)
+	})
+
+	t.Run("transitive parameter object error", func(t *testing.T) {
+		type A struct{}
+		type B struct{}
+
+		c := New(WrapErrors(false))
+
+		require.NoError(t, c.Provide(func() (A, error) {
+			return A{}, errors.New("great sadness")
+		}), "Provide failed")
+
+		type params struct {
+			In
+
+			A A
+		}
+
+		require.NoError(t, c.Provide(func(params) (B, error) {
+			return B{}, nil
+		}), "Provide failed")
+
+		err := c.Invoke(func(B) { panic("impossible") })
+
+		require.Error(t, err, "expected Invoke error")
+		assert.Equal(t, errors.New("great sadness"), err)
+	})
+}
