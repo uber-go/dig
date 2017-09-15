@@ -21,4 +21,4 @@
 package dig
 
 // Version of the library
-const Version = "1.1.0"
+const Version = "1.2.0"
