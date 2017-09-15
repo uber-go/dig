@@ -4,8 +4,8 @@
 
 - Added the `dig.RootCause` function which allows retrieving the original
   constructor error that caused an `Invoke` failure.
-- Errors from `Invoke` now attempt to hint to the user a precense of a very
-  similar type, for example a pointer to the requested type and vice versa.
+- Errors from `Invoke` now attempt to hint to the user a presence of a similar
+  type, for example a pointer to the requested type and vice versa.
 
 ## v1.0.0 (2017-07-31)
 
