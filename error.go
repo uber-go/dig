@@ -22,10 +22,11 @@ package dig
 
 import "fmt"
 
-// errRootCause returns the root cause of the provided error.
+// RootCause returns the original error that caused the provided dig failure.
 //
-// Returns the error as-is if no root cause is known.
-func errRootCause(err error) error {
+// RootCause may be used on errors returned by Invoke to get the original
+// error returned by a constructor or invoked function.
+func RootCause(err error) error {
 	if we, ok := err.(wrappedError); ok {
 		return we.rootCause
 	}
@@ -38,10 +39,10 @@ func errRootCause(err error) error {
 // provided message, separated by a ":".
 //
 // The given error is treated as the root cause of the returned error,
-// retrievable by using errRootCause. If the provided error knew its root
+// retrievable by using RootCause. If the provided error knew its root
 // cause, that knowledge is retained in the returned error.
 //
-//   errRootCaus(errWrapf(errWrapf(err, ...), ...)) == err
+//   RootCause(errWrapf(errWrapf(err, ...), ...)) == err
 //
 // Use errWrapf in the rest of dig in place of fmt.Errorf if the message ends
 // with ": <original error>".
@@ -69,7 +70,7 @@ func errWrapf(err error, msg string, args ...interface{}) error {
 // error.
 //
 // The root cause will be retained between errWrapf calls and retrievable by
-// using errRootCause.
+// using RootCause.
 type wrappedError struct {
 	rootCause error
 	err       error

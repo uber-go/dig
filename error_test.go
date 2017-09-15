@@ -31,14 +31,14 @@ func TestErrWrapf(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
 		err := errWrapf(nil, "hi")
 		assert.NoError(t, err, "expected no error")
-		assert.NoError(t, errRootCause(err), "root cause must be nil")
+		assert.NoError(t, RootCause(err), "root cause must be nil")
 	})
 
 	t.Run("single wrap", func(t *testing.T) {
 		err := errors.New("great sadness")
 		werr := errWrapf(err, "something went %s", "wrong")
 
-		assert.Equal(t, err, errRootCause(werr), "root cause must match")
+		assert.Equal(t, err, RootCause(werr), "root cause must match")
 		assert.Equal(t, "something went wrong: great sadness", werr.Error(),
 			"error message must match")
 	})
@@ -49,7 +49,7 @@ func TestErrWrapf(t *testing.T) {
 		werr := errWrapf(err, "something went %s", "wrong")
 		werr = errWrapf(werr, "something else went wrong")
 
-		assert.Equal(t, err, errRootCause(werr), "root cause must match")
+		assert.Equal(t, err, RootCause(werr), "root cause must match")
 		assert.Equal(t, "something else went wrong: something went wrong: great sadness", werr.Error(),
 			"error message must match")
 	})

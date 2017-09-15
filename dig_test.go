@@ -1274,8 +1274,9 @@ func TestInvokeFailures(t *testing.T) {
 
 		c := New()
 
+		errFailed := errors.New("failed")
 		err := c.Provide(func() (*failed, error) {
-			return nil, errors.New("failed")
+			return nil, errFailed
 		})
 		require.NoError(t, err, "unexpected provide error")
 
@@ -1291,6 +1292,7 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected invoke error")
 		assert.Contains(t, err.Error(), "couldn't get arguments for constructor", "unexpected error text")
+		assert.Equal(t, errFailed, RootCause(err), "root cause must match")
 	})
 
 	t.Run("returned error", func(t *testing.T) {
@@ -1403,13 +1405,11 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "dig.in embeds *dig.In")
 		assert.Contains(t, err.Error(), "embed dig.In value instead")
 	})
-}
 
-func TestDontWrapErrors(t *testing.T) {
 	t.Run("direct dependency error", func(t *testing.T) {
 		type A struct{}
 
-		c := New(WrapErrors(false))
+		c := New()
 
 		require.NoError(t, c.Provide(func() (A, error) {
 			return A{}, errors.New("great sadness")
@@ -1418,14 +1418,14 @@ func TestDontWrapErrors(t *testing.T) {
 		err := c.Invoke(func(A) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
-		assert.Equal(t, errors.New("great sadness"), err)
+		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 
 	t.Run("transitive dependency error", func(t *testing.T) {
 		type A struct{}
 		type B struct{}
 
-		c := New(WrapErrors(false))
+		c := New()
 
 		require.NoError(t, c.Provide(func() (A, error) {
 			return A{}, errors.New("great sadness")
@@ -1438,13 +1438,13 @@ func TestDontWrapErrors(t *testing.T) {
 		err := c.Invoke(func(B) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
-		assert.Equal(t, errors.New("great sadness"), err)
+		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 
 	t.Run("direct parameter object error", func(t *testing.T) {
 		type A struct{}
 
-		c := New(WrapErrors(false))
+		c := New()
 
 		require.NoError(t, c.Provide(func() (A, error) {
 			return A{}, errors.New("great sadness")
@@ -1459,14 +1459,14 @@ func TestDontWrapErrors(t *testing.T) {
 		err := c.Invoke(func(params) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
-		assert.Equal(t, errors.New("great sadness"), err)
+		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 
 	t.Run("transitive parameter object error", func(t *testing.T) {
 		type A struct{}
 		type B struct{}
 
-		c := New(WrapErrors(false))
+		c := New()
 
 		require.NoError(t, c.Provide(func() (A, error) {
 			return A{}, errors.New("great sadness")
@@ -1485,6 +1485,6 @@ func TestDontWrapErrors(t *testing.T) {
 		err := c.Invoke(func(B) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
-		assert.Equal(t, errors.New("great sadness"), err)
+		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 }

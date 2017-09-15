@@ -42,7 +42,7 @@ type key struct {
 // Option configures a Container. It's included for future functionality;
 // currently, there are no concrete implementations.
 type Option interface {
-	applyOption(*Container)
+	unimplemented()
 }
 
 // optionFunc is a function-based implementation of Option.
@@ -67,8 +67,6 @@ type Container struct {
 	nodes map[key]*node
 	cache map[key]reflect.Value
 
-	wrapErrors bool
-
 	// TODO: for advanced use-case, add an index
 	// This will allow retrieval of a single type, without specifying the exact
 	// tag, provided there is only one object of that given type
@@ -81,27 +79,10 @@ type Container struct {
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
-	c := &Container{
-		nodes:      make(map[key]*node),
-		cache:      make(map[key]reflect.Value),
-		wrapErrors: true,
+	return &Container{
+		nodes: make(map[key]*node),
+		cache: make(map[key]reflect.Value),
 	}
-
-	for _, opt := range opts {
-		opt.applyOption(c)
-	}
-	return c
-}
-
-// WrapErrors enables or disables wrapping of errors returned by user
-// functions.
-//
-// If enabled, errors returned by user-provided constructors will be wrapped
-// with more contextual information to aid in debugging the failure.
-//
-// Defaults to true.
-func WrapErrors(shouldWrap bool) Option {
-	return optionFunc(func(c *Container) { c.wrapErrors = shouldWrap })
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -143,12 +124,7 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
 func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
-	err := c.invoke(function, opts...)
-	// If error wrapping wasn't requested, return the root cause.
-	if !c.wrapErrors {
-		err = errRootCause(err)
-	}
-	return err
+	return c.invoke(function, opts...)
 }
 
 func (c *Container) invoke(function interface{}, opts ...InvokeOption) error {

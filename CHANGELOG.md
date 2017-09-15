@@ -2,8 +2,8 @@
 
 ## v1.1.0 (unreleased)
 
-- Added support for disabling wrapping of constructor errors with the
-  `WrapErrors` option.
+- Added the `dig.RootCause` function which allows retrieving the original
+  constructor error that caused an `Invoke` failure.
 
 ## v1.0.0 (2017-07-31)
 
