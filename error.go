@@ -65,17 +65,12 @@ func errWrapf(err error, msg string, args ...interface{}) error {
 		return nil
 	}
 
-	rootCause := err
-	if we, ok := err.(wrappedError); ok {
-		rootCause = we.rootCause
-	}
-
 	if len(args) > 0 {
 		msg = fmt.Sprintf(msg, args...)
 	}
 
 	return wrappedError{
-		rootCause: rootCause,
+		rootCause: RootCause(err),
 		err:       fmt.Errorf("%v: %v", msg, err),
 	}
 }
