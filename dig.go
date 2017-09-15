@@ -293,6 +293,23 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 		if e.optional {
 			return reflect.Zero(e.t), nil
 		}
+
+		// If the type being asked for is the pointer that is not found,
+		// check if the graph contains the value type element - perhaps the user
+		// accidentally included a splat and vice versa.
+		var typo reflect.Type
+		if e.t.Kind() == reflect.Ptr {
+			typo = e.t.Elem()
+		} else {
+			typo = reflect.PtrTo(e.t)
+		}
+
+		tk := key{t: typo, name: e.name}
+		if _, ok := c.nodes[tk]; ok {
+			return _noValue, fmt.Errorf(
+				"type %v is not in the container, did you mean to use %v that is present?", e.key, tk)
+		}
+
 		return _noValue, fmt.Errorf("type %v isn't in the container", e.key)
 	}
 
