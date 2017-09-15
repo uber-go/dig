@@ -22,6 +22,20 @@ package dig
 
 import "fmt"
 
+// wrappedError is a wrapper around error that tracks the root cause of the
+// error.
+//
+// The root cause will be retained between errWrapf calls and retrievable by
+// using RootCause.
+type wrappedError struct {
+	rootCause error
+	err       error
+}
+
+func (e wrappedError) Error() string {
+	return e.err.Error()
+}
+
 // RootCause returns the original error that caused the provided dig failure.
 //
 // RootCause may be used on errors returned by Invoke to get the original
@@ -64,18 +78,4 @@ func errWrapf(err error, msg string, args ...interface{}) error {
 		rootCause: rootCause,
 		err:       fmt.Errorf("%v: %v", msg, err),
 	}
-}
-
-// wrappedError is a wrapper around error that tracks the root cause of the
-// error.
-//
-// The root cause will be retained between errWrapf calls and retrievable by
-// using RootCause.
-type wrappedError struct {
-	rootCause error
-	err       error
-}
-
-func (e wrappedError) Error() string {
-	return e.err.Error()
 }
