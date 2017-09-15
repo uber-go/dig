@@ -310,7 +310,7 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 		tk := key{t: typo, name: e.name}
 		if _, ok := c.nodes[tk]; ok {
 			return _noValue, fmt.Errorf(
-				"type %v is not in the container, did you mean to use %v that is present?", e.key, tk)
+				"type %v is not in the container, did you mean to use %v?", e.key, tk)
 		}
 
 		return _noValue, fmt.Errorf("type %v isn't in the container", e.key)

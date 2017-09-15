@@ -1426,13 +1426,13 @@ func TestInvokeFailures(t *testing.T) {
 				name:        "value missing, pointer present",
 				provide:     func() *A { return &A{} },
 				invoke:      func(A) {},
-				errContains: []string{"dig.A is not in the container, did you mean to use *dig.A"},
+				errContains: []string{"dig.A is not in the container, did you mean to use *dig.A?"},
 			},
 			{
 				name:        "pointer missing, value present",
 				provide:     func() A { return A{} },
 				invoke:      func(*A) {},
-				errContains: []string{"*dig.A is not in the container, did you mean to use dig.A"},
+				errContains: []string{"*dig.A is not in the container, did you mean to use dig.A?"},
 			},
 			{
 				name:    "named pointer missing, value present",
@@ -1445,7 +1445,7 @@ func TestInvokeFailures(t *testing.T) {
 				},
 				errContains: []string{
 					"*dig.A:hello is not in the container",
-					"did you mean to use dig.A:hello"},
+					"did you mean to use dig.A:hello?"},
 			},
 		}
 
@@ -1461,6 +1461,7 @@ func TestInvokeFailures(t *testing.T) {
 				}
 			})
 		}
+	})
 
 	t.Run("direct dependency error", func(t *testing.T) {
 		type A struct{}
