@@ -45,11 +45,6 @@ type Option interface {
 	unimplemented()
 }
 
-// optionFunc is a function-based implementation of Option.
-type optionFunc func(*Container)
-
-func (f optionFunc) applyOption(c *Container) { f(c) }
-
 // A ProvideOption modifies the default behavior of Provide. It's included for
 // future functionality; currently, there are no concrete implementations.
 type ProvideOption interface {
