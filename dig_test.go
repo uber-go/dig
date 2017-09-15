@@ -1420,19 +1420,19 @@ func TestInvokeFailures(t *testing.T) {
 			name        string
 			provide     interface{}
 			invoke      interface{}
-			errContains []string
+			errContains string
 		}{
 			{
 				name:        "value missing, pointer present",
 				provide:     func() *A { return &A{} },
 				invoke:      func(A) {},
-				errContains: []string{"dig.A is not in the container, did you mean to use *dig.A?"},
+				errContains: "dig.A is not in the container, did you mean to use *dig.A?",
 			},
 			{
 				name:        "pointer missing, value present",
 				provide:     func() A { return A{} },
 				invoke:      func(*A) {},
-				errContains: []string{"*dig.A is not in the container, did you mean to use dig.A?"},
+				errContains: "*dig.A is not in the container, did you mean to use dig.A?",
 			},
 			{
 				name:    "named pointer missing, value present",
@@ -1443,9 +1443,7 @@ func TestInvokeFailures(t *testing.T) {
 					*A `name:"hello"`
 				}) {
 				},
-				errContains: []string{
-					"*dig.A:hello is not in the container",
-					"did you mean to use dig.A:hello?"},
+				errContains: "*dig.A:hello is not in the container, did you mean to use dig.A:hello?",
 			},
 		}
 
@@ -1456,9 +1454,7 @@ func TestInvokeFailures(t *testing.T) {
 
 				err := c.Invoke(tc.invoke)
 				require.Error(t, err)
-				for _, e := range tc.errContains {
-					assert.Contains(t, err.Error(), e)
-				}
+				assert.Contains(t, err.Error(), tc.errContains)
 			})
 		}
 	})
