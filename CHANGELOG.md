@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.1.0 (unreleased)
+## v1.1.0 (2017-09-15)
 
 - Added the `dig.RootCause` function which allows retrieving the original
   constructor error that caused an `Invoke` failure.
