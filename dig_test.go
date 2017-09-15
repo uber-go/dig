@@ -1407,6 +1407,58 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "embed dig.In value instead")
 	})
 
+	t.Run("requesting a value or pointer when other is present", func(t *testing.T) {
+		type A struct{}
+		type outA struct {
+			Out
+
+			A `name:"hello"`
+		}
+		type B struct{}
+
+		cases := []struct {
+			name        string
+			provide     interface{}
+			invoke      interface{}
+			errContains string
+		}{
+			{
+				name:        "value missing, pointer present",
+				provide:     func() *A { return &A{} },
+				invoke:      func(A) {},
+				errContains: "dig.A is not in the container, did you mean to use *dig.A?",
+			},
+			{
+				name:        "pointer missing, value present",
+				provide:     func() A { return A{} },
+				invoke:      func(*A) {},
+				errContains: "*dig.A is not in the container, did you mean to use dig.A?",
+			},
+			{
+				name:    "named pointer missing, value present",
+				provide: func() outA { return outA{A: A{}} },
+				invoke: func(struct {
+					In
+
+					*A `name:"hello"`
+				}) {
+				},
+				errContains: "*dig.A:hello is not in the container, did you mean to use dig.A:hello?",
+			},
+		}
+
+		for _, tc := range cases {
+			c := New()
+			t.Run(tc.name, func(t *testing.T) {
+				require.NoError(t, c.Provide(tc.provide))
+
+				err := c.Invoke(tc.invoke)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errContains)
+			})
+		}
+	})
+
 	t.Run("direct dependency error", func(t *testing.T) {
 		type A struct{}
 
