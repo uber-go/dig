@@ -290,6 +290,9 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 
 	n, ok := c.nodes[e.key]
 	if !ok {
+		// Unlike in the fallback case below, if a user makes an error requesting
+		// a mixed type for an optional parameter, a good error message "did you mean X?"
+		// will not be used and dig will return zero value.
 		if e.optional {
 			return reflect.Zero(e.t), nil
 		}
