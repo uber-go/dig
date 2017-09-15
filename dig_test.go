@@ -1274,8 +1274,9 @@ func TestInvokeFailures(t *testing.T) {
 
 		c := New()
 
+		errFailed := errors.New("failed")
 		err := c.Provide(func() (*failed, error) {
-			return nil, errors.New("failed")
+			return nil, errFailed
 		})
 		require.NoError(t, err, "unexpected provide error")
 
@@ -1291,6 +1292,8 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected invoke error")
 		assert.Contains(t, err.Error(), "couldn't get arguments for constructor", "unexpected error text")
+		assert.Contains(t, err.Error(), ": failed", "unexpected error text")
+		assert.Equal(t, errFailed, RootCause(err), "root cause must match")
 	})
 
 	t.Run("returned error", func(t *testing.T) {
@@ -1458,5 +1461,90 @@ func TestInvokeFailures(t *testing.T) {
 				}
 			})
 		}
+
+	t.Run("direct dependency error", func(t *testing.T) {
+		type A struct{}
+
+		c := New()
+
+		require.NoError(t, c.Provide(func() (A, error) {
+			return A{}, errors.New("great sadness")
+		}), "Provide failed")
+
+		err := c.Invoke(func(A) { panic("impossible") })
+
+		require.Error(t, err, "expected Invoke error")
+		assert.Contains(t, err.Error(), ": great sadness")
+		assert.Equal(t, errors.New("great sadness"), RootCause(err))
+	})
+
+	t.Run("transitive dependency error", func(t *testing.T) {
+		type A struct{}
+		type B struct{}
+
+		c := New()
+
+		require.NoError(t, c.Provide(func() (A, error) {
+			return A{}, errors.New("great sadness")
+		}), "Provide failed")
+
+		require.NoError(t, c.Provide(func(A) (B, error) {
+			return B{}, nil
+		}), "Provide failed")
+
+		err := c.Invoke(func(B) { panic("impossible") })
+
+		require.Error(t, err, "expected Invoke error")
+		assert.Contains(t, err.Error(), ": great sadness")
+		assert.Equal(t, errors.New("great sadness"), RootCause(err))
+	})
+
+	t.Run("direct parameter object error", func(t *testing.T) {
+		type A struct{}
+
+		c := New()
+
+		require.NoError(t, c.Provide(func() (A, error) {
+			return A{}, errors.New("great sadness")
+		}), "Provide failed")
+
+		type params struct {
+			In
+
+			A A
+		}
+
+		err := c.Invoke(func(params) { panic("impossible") })
+
+		require.Error(t, err, "expected Invoke error")
+		assert.Contains(t, err.Error(), ": great sadness")
+		assert.Equal(t, errors.New("great sadness"), RootCause(err))
+	})
+
+	t.Run("transitive parameter object error", func(t *testing.T) {
+		type A struct{}
+		type B struct{}
+
+		c := New()
+
+		require.NoError(t, c.Provide(func() (A, error) {
+			return A{}, errors.New("great sadness")
+		}), "Provide failed")
+
+		type params struct {
+			In
+
+			A A
+		}
+
+		require.NoError(t, c.Provide(func(params) (B, error) {
+			return B{}, nil
+		}), "Provide failed")
+
+		err := c.Invoke(func(B) { panic("impossible") })
+
+		require.Error(t, err, "expected Invoke error")
+		assert.Contains(t, err.Error(), ": great sadness")
+		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 }
