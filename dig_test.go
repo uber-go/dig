@@ -1292,6 +1292,7 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected invoke error")
 		assert.Contains(t, err.Error(), "couldn't get arguments for constructor", "unexpected error text")
+		assert.Contains(t, err.Error(), ": failed", "unexpected error text")
 		assert.Equal(t, errFailed, RootCause(err), "root cause must match")
 	})
 
@@ -1418,6 +1419,7 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(A) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
+		assert.Contains(t, err.Error(), ": great sadness")
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 
@@ -1438,6 +1440,7 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(B) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
+		assert.Contains(t, err.Error(), ": great sadness")
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 
@@ -1459,6 +1462,7 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(params) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
+		assert.Contains(t, err.Error(), ": great sadness")
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 
@@ -1485,6 +1489,7 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(B) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
+		assert.Contains(t, err.Error(), ": great sadness")
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 }
