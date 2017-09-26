@@ -33,6 +33,8 @@ import (
 //  paramObject   dig.In struct where each field in the struct can be another
 //                param.
 type param interface {
+	String() string
+
 	// Comprehensive list of dependencies this parameter represents.
 	Dependencies() []edge
 }
