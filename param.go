@@ -34,9 +34,6 @@ import (
 //                param.
 type param interface {
 	fmt.Stringer
-
-	// Comprehensive list of dependencies this parameter represents.
-	Dependencies() []edge
 }
 
 var (
@@ -110,14 +107,6 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 	return pl, nil
 }
 
-func (pl paramList) Dependencies() []edge {
-	var deps []edge
-	for _, p := range pl.Params {
-		deps = append(deps, p.Dependencies()...)
-	}
-	return deps
-}
-
 // paramSingle is an explicitly requested type, optionally with a name.
 //
 // This object must be present in the graph as-is unless it's specified as
@@ -126,12 +115,6 @@ type paramSingle struct {
 	Name     string
 	Optional bool
 	Type     reflect.Type
-}
-
-func (ps paramSingle) Dependencies() []edge {
-	return []edge{
-		{key: key{t: ps.Type, name: ps.Name}, optional: ps.Optional},
-	}
 }
 
 // paramObjectField is a single field of a dig.In struct.
@@ -200,9 +183,6 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 			FieldIndex: i,
 			Param:      p,
 		})
-		po.deps = append(po.deps, p.Dependencies()...)
 	}
 	return po, nil
 }
-
-func (po paramObject) Dependencies() []edge { return po.deps }
