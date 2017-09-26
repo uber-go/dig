@@ -261,7 +261,7 @@ func traverseOutTypes(k key, f func(key) error) error {
 }
 
 func (c *Container) isAcyclic(n *node) error {
-	return detectCycles(n, c.nodes, nil)
+	return detectCycles(n.Params, c.nodes, []key{n.key})
 }
 
 // Retrieve a type from the container
@@ -492,21 +492,37 @@ func cycleError(cycle []key, last key) error {
 	return errors.New(b.String())
 }
 
-func detectCycles(n *node, graph map[key]*node, path []key) error {
-	for _, p := range path {
-		if p == n.key {
-			return cycleError(path, n.key)
+func detectCycles(param param, graph map[key]*node, path []key) error {
+	switch p := param.(type) {
+	case paramList:
+		for _, p := range p.Params {
+			if err := detectCycles(p, graph, path); err != nil {
+				return err
+			}
 		}
-	}
-	path = append(path, n.key)
-	for _, dep := range n.Params.Dependencies() {
-		depNode, ok := graph[dep.key]
+	case paramSingle:
+		k := key{name: p.Name, t: p.Type}
+		for _, p := range path {
+			if p == k {
+				return cycleError(path, k)
+			}
+		}
+		path = append(path, k)
+
+		n, ok := graph[k]
 		if !ok {
-			continue
+			return nil
 		}
-		if err := detectCycles(depNode, graph, path); err != nil {
-			return err
+
+		return detectCycles(n.Params, graph, path)
+	case paramObject:
+		for _, f := range p.Fields {
+			if err := detectCycles(f.Param, graph, path); err != nil {
+				return err
+			}
 		}
+	default:
+		panic(fmt.Sprintf("unknown param type %T", param))
 	}
 	return nil
 }
