@@ -1207,8 +1207,8 @@ func TestInvokeFailures(t *testing.T) {
 			t.Fatal("function should not be called")
 		})
 		require.Error(t, err, "invoke should fail")
-		assert.Contains(t, err.Error(), "edge *bytes.Buffer:foo")
-		assert.Contains(t, err.Error(), "*bytes.Buffer:foo isn't in the container")
+		assert.Contains(t, err.Error(), "could not get field Buffer of dig.param")
+		assert.Contains(t, err.Error(), "type *bytes.Buffer:foo isn't in the container")
 	})
 
 	t.Run("unmet constructor dependency", func(t *testing.T) {

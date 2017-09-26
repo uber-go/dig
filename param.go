@@ -34,6 +34,11 @@ import (
 //                param.
 type param interface {
 	fmt.Stringer
+
+	// Builds this dependency and any of its from the provided Container.
+	//
+	// This MAY panic if the param does not produce a single value.
+	Build(*Container) (reflect.Value, error)
 }
 
 var (
@@ -41,6 +46,23 @@ var (
 	_ param = paramObject{}
 	_ param = paramList{}
 )
+
+// newParam builds a param from the given type. If the provided type is a
+// dig.In struct, an paramObject will be returned.
+func newParam(t reflect.Type) (param, error) {
+	switch {
+	case IsIn(t):
+		return newParamObject(t)
+	case embedsType(t, _inPtrType):
+		return nil, fmt.Errorf(
+			"%v embeds *dig.In which is not supported, embed dig.In value instead", t)
+	case t.Kind() == reflect.Ptr && IsIn(t.Elem()):
+		return nil, fmt.Errorf(
+			"dependency %v is a pointer to dig.In, use value type instead", t)
+	default:
+		return paramSingle{Type: t}, nil
+	}
+}
 
 // Calls the provided function on all paramSingles in the given param tree.
 func forEachParamSingle(param param, f func(paramSingle)) {
@@ -64,16 +86,10 @@ func forEachParamSingle(param param, f func(paramSingle)) {
 	}
 }
 
-// newParam builds a param from the given type. If the provided type is a
-// dig.In struct, an paramObject will be returned.
-func newParam(t reflect.Type) (param, error) {
-	if IsIn(t) {
-		return newParamObject(t)
-	}
-	return paramSingle{Type: t}, nil
-}
-
 // paramList holds all arguments of the constructor as params.
+//
+// NOTE: Build() MUST NOT be called on paramList. Instead, BuildParams
+// must be called.
 type paramList struct {
 	ctype reflect.Type // type of the constructor
 
@@ -104,7 +120,26 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 		}
 		pl.Params = append(pl.Params, p)
 	}
+
 	return pl, nil
+}
+
+func (pl paramList) Build(*Container) (reflect.Value, error) {
+	panic("paramList.Build() must never be called")
+}
+
+// BuildParams returns an ordered list of values which may be passed directly
+// to the underlying constructor.
+func (pl paramList) BuildParams(c *Container) ([]reflect.Value, error) {
+	args := make([]reflect.Value, len(pl.Params))
+	for i, p := range pl.Params {
+		var err error
+		args[i], err = p.Build(c)
+		if err != nil {
+			return nil, errWrapf(err, "could not build argument %d for constructor %v", i, pl.ctype)
+		}
+	}
+	return args, nil
 }
 
 // paramSingle is an explicitly requested type, optionally with a name.
@@ -115,6 +150,72 @@ type paramSingle struct {
 	Name     string
 	Optional bool
 	Type     reflect.Type
+}
+
+func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
+	k := key{name: ps.Name, t: ps.Type}
+	if v, ok := c.cache[k]; ok {
+		return v, nil
+	}
+
+	n, ok := c.nodes[k]
+	if !ok {
+		// Unlike in the fallback case below, if a user makes an error requesting
+		// a mixed type for an optional parameter, a good error message "did you mean X?"
+		// will not be used and dig will return zero value.
+		if ps.Optional {
+			return reflect.Zero(ps.Type), nil
+		}
+
+		// If the type being asked for is the pointer that is not found,
+		// check if the graph contains the value type element - perhaps the user
+		// accidentally included a splat and vice versa.
+		var typo reflect.Type
+		if ps.Type.Kind() == reflect.Ptr {
+			typo = ps.Type.Elem()
+		} else {
+			typo = reflect.PtrTo(ps.Type)
+		}
+
+		tk := key{t: typo, name: ps.Name}
+		if _, ok := c.nodes[tk]; ok {
+			return _noValue, fmt.Errorf(
+				"type %v is not in the container, did you mean to use %v?", k, tk)
+		}
+
+		return _noValue, fmt.Errorf("type %v isn't in the container", k)
+	}
+
+	if err := shallowCheckDependencies(c, n.Params); err != nil {
+		if ps.Optional {
+			return reflect.Zero(ps.Type), nil
+		}
+		return _noValue, errWrapf(err, "missing dependencies for %v", k)
+	}
+
+	args, err := n.Params.BuildParams(c)
+	if err != nil {
+		return _noValue, errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
+	}
+
+	constructed := reflect.ValueOf(n.ctor).Call(args)
+
+	// Provide-time validation ensures that all constructors return at least
+	// one value.
+	if errV := constructed[len(constructed)-1]; isError(errV.Type()) {
+		if err, _ := errV.Interface().(error); err != nil {
+			return _noValue, errWrapf(err, "constructor %v for type %v failed", n.ctype, ps.Type)
+		}
+	}
+
+	for _, con := range constructed {
+		// Set the resolved object into the cache.
+		// This might look confusing at first like we're ignoring named types,
+		// but `con` in this case will be the dig.Out object, which will
+		// cause a recursion into the .set for each of it's memebers.
+		c.set(key{t: con.Type()}, con)
+	}
+	return c.cache[k], nil
 }
 
 // paramObjectField is a single field of a dig.In struct.
@@ -138,8 +239,6 @@ type paramObjectField struct {
 type paramObject struct {
 	Type   reflect.Type
 	Fields []paramObjectField
-
-	deps []edge
 }
 
 // newParamObject builds an paramObject from the provided type. The type MUST
@@ -171,11 +270,11 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 			return po, err
 		}
 
-		if sp, ok := p.(paramSingle); ok {
+		if ps, ok := p.(paramSingle); ok {
 			// Field tags apply only if the field is "simple"
-			sp.Name = name
-			sp.Optional = optional
-			p = sp
+			ps.Name = name
+			ps.Optional = optional
+			p = ps
 		}
 
 		po.Fields = append(po.Fields, paramObjectField{
@@ -185,4 +284,16 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 		})
 	}
 	return po, nil
+}
+
+func (po paramObject) Build(c *Container) (reflect.Value, error) {
+	dest := reflect.New(po.Type).Elem()
+	for _, f := range po.Fields {
+		v, err := f.Param.Build(c)
+		if err != nil {
+			return v, errWrapf(err, "could not get field %v of %v", f.FieldName, po.Type)
+		}
+		dest.Field(f.FieldIndex).Set(v)
+	}
+	return dest, nil
 }

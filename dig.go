@@ -126,10 +126,17 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	if ftype.Kind() != reflect.Func {
 		return fmt.Errorf("can't invoke non-function %v (type %v)", function, ftype)
 	}
-	args, err := c.constructorArgs(ftype)
+
+	pl, err := newParamList(ftype)
+	if err != nil {
+		return err
+	}
+
+	args, err := pl.BuildParams(c)
 	if err != nil {
 		return errWrapf(err, "failed to get arguments for %v (type %v)", function, ftype)
 	}
+
 	returned := reflect.ValueOf(function).Call(args)
 	if len(returned) == 0 {
 		return nil
@@ -264,123 +271,6 @@ func (c *Container) isAcyclic(n *node) error {
 	return detectCycles(n.Params, c.nodes, []key{n.key})
 }
 
-// Retrieve a type from the container
-func (c *Container) get(e edge) (reflect.Value, error) {
-	if v, ok := c.cache[e.key]; ok {
-		return v, nil
-	}
-
-	if IsIn(e.t) {
-		// We do not want parameter objects to be cached.
-		return c.createInObject(e.t)
-	}
-	if embedsType(e.t, _inPtrType) {
-		return _noValue, fmt.Errorf(
-			"%v embeds *dig.In which is not supported, embed dig.In value instead", e.t,
-		)
-	}
-
-	if e.t.Kind() == reflect.Ptr {
-		if IsIn(e.t.Elem()) {
-			return _noValue, fmt.Errorf(
-				"dependency %v is a pointer to dig.In, use value type instead", e.t,
-			)
-		}
-	}
-
-	n, ok := c.nodes[e.key]
-	if !ok {
-		// Unlike in the fallback case below, if a user makes an error requesting
-		// a mixed type for an optional parameter, a good error message "did you mean X?"
-		// will not be used and dig will return zero value.
-		if e.optional {
-			return reflect.Zero(e.t), nil
-		}
-
-		// If the type being asked for is the pointer that is not found,
-		// check if the graph contains the value type element - perhaps the user
-		// accidentally included a splat and vice versa.
-		var typo reflect.Type
-		if e.t.Kind() == reflect.Ptr {
-			typo = e.t.Elem()
-		} else {
-			typo = reflect.PtrTo(e.t)
-		}
-
-		tk := key{t: typo, name: e.name}
-		if _, ok := c.nodes[tk]; ok {
-			return _noValue, fmt.Errorf(
-				"type %v is not in the container, did you mean to use %v?", e.key, tk)
-		}
-
-		return _noValue, fmt.Errorf("type %v isn't in the container", e.key)
-	}
-
-	if err := shallowCheckDependencies(c, n.Params); err != nil {
-		if e.optional {
-			return reflect.Zero(e.t), nil
-		}
-		return _noValue, errWrapf(err, "missing dependencies for %v", e.key)
-	}
-
-	args, err := c.constructorArgs(n.ctype)
-	if err != nil {
-		return _noValue, errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
-	}
-	constructed := reflect.ValueOf(n.ctor).Call(args)
-
-	// Provide-time validation ensures that all constructors return at least
-	// one value.
-	if errV := constructed[len(constructed)-1]; isError(errV.Type()) {
-		if err, _ := errV.Interface().(error); err != nil {
-			return _noValue, errWrapf(err, "constructor %v for type %v failed", n.ctype, e.t)
-		}
-	}
-
-	for _, con := range constructed {
-		// Set the resolved object into the cache.
-		// This might look confusing at first like we're ignoring named types,
-		// but `con` in this case will be the dig.Out object, which will
-		// cause a recursion into the .set for each of it's memebers.
-		c.set(key{t: con.Type()}, con)
-	}
-	return c.cache[e.key], nil
-}
-
-// Returns a new In parent object with all the dependency fields
-// populated from the dig container.
-func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
-	dest := reflect.New(t).Elem()
-
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-
-		if f.Type == _inType {
-			// skip over the dig.In embed itself
-			continue
-		}
-
-		if f.PkgPath != "" {
-			return dest, fmt.Errorf(
-				"unexported fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
-				f.Name, f.Type, t)
-		}
-
-		isOptional, err := isFieldOptional(t, f)
-		if err != nil {
-			return dest, err
-		}
-
-		e := edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: isOptional}
-		v, err := c.get(e)
-		if err != nil {
-			return dest, errWrapf(err, "could not get field %v (edge %v) of %v", f.Name, e, t)
-		}
-		dest.Field(i).Set(v)
-	}
-	return dest, nil
-}
-
 // Set the value in the cache after a node resolution
 func (c *Container) set(k key, v reflect.Value) {
 	if !IsOut(k.t) {
@@ -407,19 +297,6 @@ func (c *Container) remove(nodes []*node) {
 	}
 }
 
-func (c *Container) constructorArgs(ctype reflect.Type) ([]reflect.Value, error) {
-	argTypes := getConstructorArgTypes(ctype)
-	args := make([]reflect.Value, 0, len(argTypes))
-	for _, t := range argTypes {
-		arg, err := c.get(edge{key: key{t: t}})
-		if err != nil {
-			return nil, errWrapf(err, "couldn't get arguments for constructor %v", ctype)
-		}
-		args = append(args, arg)
-	}
-	return args, nil
-}
-
 type node struct {
 	key
 
@@ -428,12 +305,6 @@ type node struct {
 
 	// Type information about constructor parameters.
 	Params paramList
-}
-
-type edge struct {
-	key
-
-	optional bool
 }
 
 func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
@@ -448,26 +319,6 @@ func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
 		ctype:  ctype,
 		Params: params,
 	}, err
-}
-
-// Retrieves the types of the arguments of a constructor in-order.
-//
-// If the constructor is a variadic function, the returned list does NOT
-// include the implicit slice argument because dig does not support passing
-// those values in yet.
-func getConstructorArgTypes(ctype reflect.Type) []reflect.Type {
-	numArgs := ctype.NumIn()
-	if ctype.IsVariadic() {
-		// NOTE: If the function is variadic, we skip the last argument
-		// because we're not filling variadic arguments yet. See #120.
-		numArgs--
-	}
-
-	args := make([]reflect.Type, numArgs)
-	for i := 0; i < numArgs; i++ {
-		args[i] = ctype.In(i)
-	}
-	return args
 }
 
 type errCycleDetected struct {
