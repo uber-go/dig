@@ -483,13 +483,18 @@ func getConstructorArgTypes(ctype reflect.Type) []reflect.Type {
 	return args
 }
 
-func cycleError(cycle []key, last key) error {
-	b := &bytes.Buffer{}
-	for _, k := range cycle {
+type errCycleDetected struct {
+	Path []key
+	Key  key
+}
+
+func (e errCycleDetected) Error() string {
+	b := new(bytes.Buffer)
+	for _, k := range e.Path {
 		fmt.Fprintf(b, "%v ->", k.t)
 	}
-	fmt.Fprintf(b, "%v", last.t)
-	return errors.New(b.String())
+	fmt.Fprintf(b, "%v", e.Key.t)
+	return b.String()
 }
 
 func detectCycles(param param, graph map[key]*node, path []key) error {
@@ -504,7 +509,7 @@ func detectCycles(param param, graph map[key]*node, path []key) error {
 		k := key{name: p.Name, t: p.Type}
 		for _, p := range path {
 			if p == k {
-				return cycleError(path, k)
+				return errCycleDetected{Path: path, Key: k}
 			}
 		}
 		path = append(path, k)
