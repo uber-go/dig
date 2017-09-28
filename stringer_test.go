@@ -39,7 +39,7 @@ func TestStringer(t *testing.T) {
 	type D struct{}
 	type param struct {
 		In
-		*D `named:"foo" optional:"true"`
+		*D `name:"foo" optional:"true"`
 	}
 	require.NoError(t, c.Provide(func(p param) (*A, *B) { return &A{}, &B{} }))
 	require.NoError(t, c.Provide(func(*B) *C { return &C{} }))
@@ -50,8 +50,8 @@ func TestStringer(t *testing.T) {
 	s := b.String()
 
 	// all nodes are in the graph
-	assert.Contains(t, s, "*dig.A -> deps: [~*dig.D]")
-	assert.Contains(t, s, "*dig.B -> deps: [~*dig.D]")
+	assert.Contains(t, s, "*dig.A -> deps: [~*dig.D:foo]")
+	assert.Contains(t, s, "*dig.B -> deps: [~*dig.D:foo]")
 	assert.Contains(t, s, "*dig.C -> deps: [*dig.B]")
 
 	// constructors
