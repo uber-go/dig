@@ -977,6 +977,14 @@ func TestProvideCycleFails(t *testing.T) {
 		require.Error(t, err, "expected error when introducing cycle")
 		assert.Contains(t, err.Error(), "introduces a cycle")
 	})
+
+	t.Run("detectCycles invalid param", func(t *testing.T) {
+		type badParam struct{ param }
+
+		assert.Panics(t, func() {
+			detectCycles(badParam{}, nil, nil)
+		})
+	})
 }
 
 func TestIncompleteGraphIsOkay(t *testing.T) {
