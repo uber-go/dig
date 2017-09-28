@@ -36,10 +36,6 @@ type (
 	param interface {
 		param()
 
-		// Human-friendly name for this param type. We use this exclusively in
-		// error messages.
-		ParamTypeName() string
-
 		// Comprehensive list of dependencies this parameter represents.
 		Dependencies() []edge
 	}
@@ -99,10 +95,6 @@ var (
 func (paramList) param()   {}
 func (paramSingle) param() {}
 func (paramObject) param() {}
-
-func (paramList) ParamTypeName() string   { return "parameter list" }
-func (paramSingle) ParamTypeName() string { return "simple type" }
-func (paramObject) ParamTypeName() string { return "parameter object" }
 
 // newParamList builds a paramList from the provided constructor type.
 //
@@ -169,15 +161,8 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 			return op, err
 		}
 
-		if name != "" || optional {
-			// If special tags were used, the field must be a simple type.
-			sp, ok := p.(paramSingle)
-			if !ok {
-				return op, fmt.Errorf(
-					"fields which use the `name` or `optional` tags must be simple types: "+
-						"field %q of %v is a %q", f.Name, t, p.ParamTypeName())
-			}
-
+		if sp, ok := p.(paramSingle); ok {
+			// Field tags apply only if the field is "simple"
 			sp.Name = name
 			sp.Optional = optional
 			p = sp
