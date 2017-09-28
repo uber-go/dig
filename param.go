@@ -73,7 +73,10 @@ type (
 
 	// paramObjectField is a single field of a dig.In struct.
 	paramObjectField struct {
-		// Name of the field specified via a name:".." tag.
+		// Name of the field in the struct.
+		//
+		// To clarify, this is the name of the *struct field*, not the name of
+		// the dig value requested by this field.
 		Name string
 
 		// Index of this field in the target struct.
