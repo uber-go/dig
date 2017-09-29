@@ -795,6 +795,47 @@ func TestProvideConstructorErrors(t *testing.T) {
 		}
 		require.Error(t, c.Provide(constructor), "provide failed")
 	})
+
+	t.Run("constructor consumes a dig.Out", func(t *testing.T) {
+		c := New()
+		type out struct {
+			Out
+
+			Reader io.Reader
+		}
+
+		type outPtr struct {
+			*Out
+
+			Reader io.Reader
+		}
+
+		tests := []struct {
+			desc        string
+			constructor interface{}
+		}{
+			{
+				desc:        "dig.Out",
+				constructor: func(out) io.Writer { return nil },
+			},
+			{
+				desc:        "*dig.Out",
+				constructor: func(*out) io.Writer { return nil },
+			},
+			{
+				desc:        "embeds *dig.Out",
+				constructor: func(outPtr) io.Writer { return nil },
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				err := c.Provide(tt.constructor)
+				require.Error(t, err, "provide should fail")
+				assert.Contains(t, err.Error(), "cannot depend on result objects")
+			})
+		}
+	})
 }
 
 func TestProvideRespectsConstructorErrors(t *testing.T) {

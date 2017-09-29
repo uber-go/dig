@@ -59,6 +59,8 @@ func newParam(t reflect.Type) (param, error) {
 	case t.Kind() == reflect.Ptr && IsIn(t.Elem()):
 		return nil, fmt.Errorf(
 			"dependency %v is a pointer to dig.In, use value type instead", t)
+	case IsOut(t) || (t.Kind() == reflect.Ptr && IsOut(t.Elem())) || embedsType(t, _outPtrType):
+		return nil, fmt.Errorf("cannot depend on result objects: %v embeds a dig.Out", t)
 	default:
 		return paramSingle{Type: t}, nil
 	}
