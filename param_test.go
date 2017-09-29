@@ -108,3 +108,62 @@ func TestParamObjectFailure(t *testing.T) {
 			`unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A) from dig.in?`)
 	})
 }
+
+func TestForEachSimpleParam(t *testing.T) {
+	type type1 struct{}
+	type type2 struct{}
+	type type3 struct{}
+	type type4 struct{}
+
+	type in struct {
+		In
+
+		T1 type1
+		T2 type2 `optional:"true"`
+		T3 type3 `name:"foo"`
+
+		Nested struct {
+			In
+
+			A string
+			B int32
+		}
+	}
+
+	constructor := func(in, type1, int64) type4 {
+		return type4{}
+	}
+
+	pl, err := newParamList(reflect.TypeOf(constructor))
+	require.NoError(t, err)
+
+	var pos int
+	forEachSimpleParam(pl, func(p paramSingle) {
+		switch pos {
+		case 0:
+			require.Equal(t, reflect.TypeOf(type1{}), p.Type)
+		case 1:
+			require.Equal(t, reflect.TypeOf(type2{}), p.Type)
+		case 2:
+			require.Equal(t, reflect.TypeOf(type3{}), p.Type)
+		case 3:
+			require.Equal(t, reflect.TypeOf(""), p.Type)
+		case 4:
+			require.Equal(t, reflect.TypeOf(int32(0)), p.Type)
+		case 5:
+			require.Equal(t, reflect.TypeOf(type1{}), p.Type)
+		case 6:
+			require.Equal(t, reflect.TypeOf(int64(0)), p.Type)
+		default:
+			t.Fatalf("forEachSimpleParam: unexpected call with %#v", p)
+		}
+		pos++
+	})
+}
+
+func TestForEachSimpleParamPanic(t *testing.T) {
+	type badParam struct{ param }
+	assert.Panics(t, func() {
+		forEachSimpleParam(badParam{}, func(paramSingle) {})
+	})
+}
