@@ -204,8 +204,18 @@ func newNode(ctor interface{}, ctype reflect.Type) (*node, error) {
 	}, err
 }
 
-func (n *node) Call(args []reflect.Value) []reflect.Value {
-	return reflect.ValueOf(n.ctor).Call(args)
+func (n *node) Call(c *Container) error {
+	args, err := n.Params.BuildList(c)
+	if err != nil {
+		return errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
+	}
+
+	results := reflect.ValueOf(n.ctor).Call(args)
+	if err := n.Results.ExtractResults(c, results); err != nil {
+		return errWrapf(err, "constructor %v failed", n.ctype)
+	}
+
+	return nil
 }
 
 type errCycleDetected struct {

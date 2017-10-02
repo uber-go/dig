@@ -201,13 +201,8 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		return _noValue, errWrapf(err, "missing dependencies for %v", k)
 	}
 
-	args, err := n.Params.BuildList(c)
-	if err != nil {
-		return _noValue, errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
-	}
-
-	if err := n.Results.ExtractResults(c, n.Call(args)); err != nil {
-		return _noValue, errWrapf(err, "constructor %v for type %v failed", n.ctype, ps.Type)
+	if err := n.Call(c); err != nil {
+		return _noValue, errWrapf(err, "failed to build %v", k)
 	}
 
 	return c.cache[k], nil
