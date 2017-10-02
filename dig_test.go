@@ -782,6 +782,57 @@ func TestEndToEndSuccess(t *testing.T) {
 		assert.Contains(t, err.Error(), "B isn't in the container")
 	})
 
+	t.Run("value groups", func(t *testing.T) {
+		c := New()
+
+		type out struct {
+			Out
+
+			Value int `group:"val"`
+		}
+
+		type in struct {
+			In
+
+			Values []int `group:"val"`
+		}
+
+		called := make(map[int]int)
+
+		provideInt := func(i int) {
+			require.NoError(t,
+				c.Provide(func() out {
+					called[i] = called[i] + 1
+					return out{Value: i}
+				}),
+				"failed to provide value")
+		}
+
+		checkResult := func(i in) {
+			require.Len(t, i.Values, 3)
+			got := map[int]struct{}{
+				i.Values[0]: {},
+				i.Values[1]: {},
+				i.Values[2]: {},
+			}
+
+			assert.Equal(t, map[int]struct{}{
+				1: {},
+				2: {},
+				3: {},
+			}, got)
+		}
+
+		provideInt(1)
+		provideInt(2)
+		provideInt(3)
+
+		require.NoError(t, c.Invoke(checkResult), "invoke failed")
+		require.NoError(t, c.Invoke(checkResult), "invoke failed")
+		require.NoError(t, c.Invoke(checkResult), "invoke failed")
+
+		assert.Equal(t, map[int]int{1: 1, 2: 1, 3: 1}, called)
+	})
 }
 
 // --- END OF END TO END TESTS

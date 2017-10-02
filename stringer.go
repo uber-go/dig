@@ -41,6 +41,11 @@ func (c *Container) String() string {
 	for k, v := range c.values {
 		fmt.Fprintln(b, "\t", k, "=>", v)
 	}
+	for k, vs := range c.groups {
+		for _, v := range vs {
+			fmt.Fprintln(b, "\t", k, "=>", v)
+		}
+	}
 	fmt.Fprintln(b, "}")
 
 	return b.String()
@@ -53,6 +58,9 @@ func (n *node) String() string {
 func (k key) String() string {
 	if k.name != "" {
 		return fmt.Sprintf("%v:%s", k.t, k.name)
+	}
+	if k.group != "" {
+		return fmt.Sprintf("%v:[]%s", k.t, k.group)
 	}
 	return k.t.String()
 }
@@ -86,4 +94,8 @@ func (op paramObject) String() string {
 		fields[i] = f.Param.String()
 	}
 	return strings.Join(fields, " ")
+}
+
+func (pt paramGroupedSlice) String() string {
+	return fmt.Sprintf("%v:[]%v", pt.Type.Elem(), pt.Group)
 }

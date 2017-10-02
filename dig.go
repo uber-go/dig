@@ -32,12 +32,14 @@ import (
 const (
 	_optionalTag = "optional"
 	_nameTag     = "name"
+	_groupTag    = "group"
 )
 
 // Unique identification of an object in the graph.
 type key struct {
-	t    reflect.Type
-	name string
+	t     reflect.Type
+	name  string
+	group string
 }
 
 // Option configures a Container. It's included for future functionality;
@@ -66,6 +68,9 @@ type Container struct {
 
 	// Values that have already been generated in the container.
 	values map[key]reflect.Value
+
+	// Values groups that have already been generated in the container.
+	groups map[key][]reflect.Value
 }
 
 // New constructs a Container.
@@ -73,6 +78,7 @@ func New(opts ...Option) *Container {
 	return &Container{
 		providers: make(map[key][]*node),
 		values:    make(map[key]reflect.Value),
+		groups:    make(map[key][]reflect.Value),
 	}
 }
 
@@ -246,28 +252,34 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 
 	path := strings.Join(cv.currentResultPath, ".")
 
-	r, ok := res.(resultSingle)
-	if !ok {
-		return cv
+	switch r := res.(type) {
+	case resultSingle:
+		k := key{name: r.Name, t: r.Type}
+
+		if conflict, ok := cv.keyPaths[k]; ok {
+			*cv.err = fmt.Errorf(
+				"cannot provide %v from %v in constructor %v: already provided by %v",
+				k, path, cv.n.ctype, conflict)
+			return nil
+		}
+
+		if _, ok := cv.c.providers[k]; ok {
+			*cv.err = fmt.Errorf(
+				"cannot provide %v from %v in constructor %v: already in the container",
+				k, path, cv.n.ctype)
+			return nil
+		}
+
+		cv.keyPaths[k] = path
+
+	case resultGrouped:
+		// we don't really care about the path for this since conflicts are
+		// okay for group results. We'll track it for the sake of having a
+		// value there.
+		k := key{group: r.Group, t: r.Type}
+		cv.keyPaths[k] = path
 	}
 
-	k := key{name: r.Name, t: r.Type}
-
-	if conflict, ok := cv.keyPaths[k]; ok {
-		*cv.err = fmt.Errorf(
-			"cannot provide %v from %v in constructor %v: already provided by %v",
-			k, path, cv.n.ctype, conflict)
-		return nil
-	}
-
-	if _, ok := cv.c.providers[k]; ok {
-		*cv.err = fmt.Errorf(
-			"cannot provide %v from %v in constructor %v: already in the container",
-			k, path, cv.n.ctype)
-		return nil
-	}
-
-	cv.keyPaths[k] = path
 	return cv
 }
 
@@ -359,12 +371,17 @@ func detectCycles(par param, graph map[key][]*node, path []key) error {
 			return false
 		}
 
-		p, ok := param.(paramSingle)
-		if !ok {
+		var k key
+		switch p := param.(type) {
+		case paramSingle:
+			k = key{name: p.Name, t: p.Type}
+		case paramGroupedSlice:
+			// NOTE: The key uses the element type, not the slice type.
+			k = key{group: p.Group, t: p.Type.Elem()}
+		default:
 			return true
 		}
 
-		k := key{name: p.Name, t: p.Type}
 		for _, p := range path {
 			if p == k {
 				err = errCycleDetected{Path: path, Key: k}

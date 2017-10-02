@@ -29,10 +29,12 @@ import (
 //
 // The following implementations exist:
 //   resultList    All values returned by the constructor.
-//   resultSingle  An explicitly requested type.
+//   resultSingle  A single value produced by a constructor.
 //   resultError   An error returned by the constructor.
 //   resultObject  dig.Out struct where each field in the struct can be
 //                 another result.
+//   resultGrouped A value produced by a constructor that is part of a value
+//                 group.
 type result interface {
 	// Extracts the values for this result from the provided value and
 	// stores them into the provided resultReceiver.
@@ -55,6 +57,7 @@ var (
 	_ result = resultError{}
 	_ result = resultObject{}
 	_ result = resultList{}
+	_ result = resultGrouped{}
 )
 
 // newResult builds a result from the given type.
@@ -126,7 +129,7 @@ func walkResult(r result, v resultVisitor) {
 	}
 
 	switch res := r.(type) {
-	case resultSingle, resultError:
+	case resultSingle, resultError, resultGrouped:
 		// No sub-results
 	case resultObject:
 		w := v
@@ -257,16 +260,23 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 				f.Name, f.Type, t)
 		}
 
-		r, err := newResult(f.Type)
-		if err != nil {
-			return ro, errWrapf(err, "bad field %q of %v", f.Name, t)
-		}
+		var r result
+		if group := f.Tag.Get(_groupTag); group != "" {
+			// TODO(abg): Verify that a name or optional was not specified.
+			r = newResultGrouped(group, f.Type)
+		} else {
+			var err error
+			r, err = newResult(f.Type)
+			if err != nil {
+				return ro, errWrapf(err, "bad field %q of %v", f.Name, t)
+			}
 
-		name := f.Tag.Get(_nameTag)
-		if rs, ok := r.(resultSingle); ok {
-			// field tags apply only if the result is "simple"
-			rs.Name = name
-			r = rs
+			name := f.Tag.Get(_nameTag)
+			if rs, ok := r.(resultSingle); ok {
+				// field tags apply only if the result is "simple"
+				rs.Name = name
+				r = rs
+			}
 		}
 
 		ro.Fields = append(ro.Fields, resultObjectField{
@@ -282,4 +292,30 @@ func (ro resultObject) Extract(rr resultReceiver, v reflect.Value) {
 	for _, f := range ro.Fields {
 		f.Result.Extract(rr, v.Field(f.FieldIndex))
 	}
+}
+
+// resultGrouped is a value produced by a constructor that is part of a result
+// group.
+//
+// These will be produced as fields of a dig.Out struct.
+type resultGrouped struct {
+	// Name of the group as specified in the `group:".."` tag.
+	Group string
+
+	// Type of value produced.
+	Type reflect.Type
+}
+
+// newResultGrouped builds a new resultGrouped with the provided name and
+// type.
+//
+// The type MUST be a slice type.
+func newResultGrouped(group string, t reflect.Type) resultGrouped {
+	return resultGrouped{Group: group, Type: t}
+}
+
+func (rt resultGrouped) Extract(c *Container, v reflect.Value) error {
+	k := key{group: rt.Group, t: rt.Type}
+	c.groups[k] = append(c.groups[k], v)
+	return nil
 }
