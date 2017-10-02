@@ -206,23 +206,10 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		return _noValue, errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
 	}
 
-	constructed := reflect.ValueOf(n.ctor).Call(args)
-
-	// Provide-time validation ensures that all constructors return at least
-	// one value.
-	if errV := constructed[len(constructed)-1]; isError(errV.Type()) {
-		if err, _ := errV.Interface().(error); err != nil {
-			return _noValue, errWrapf(err, "constructor %v for type %v failed", n.ctype, ps.Type)
-		}
+	if err := n.Results.ExtractResults(c, n.Call(args)); err != nil {
+		return _noValue, errWrapf(err, "constructor %v for type %v failed", n.ctype, ps.Type)
 	}
 
-	for _, con := range constructed {
-		// Set the resolved object into the cache.
-		// This might look confusing at first like we're ignoring named types,
-		// but `con` in this case will be the dig.Out object, which will
-		// cause a recursion into the .set for each of it's members.
-		c.set(key{t: con.Type()}, con)
-	}
 	return c.cache[k], nil
 }
 

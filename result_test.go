@@ -94,6 +94,16 @@ func TestNewResultListErrors(t *testing.T) {
 	}
 }
 
+func TestResultListExtractFails(t *testing.T) {
+	rl, err := newResultList(reflect.TypeOf(func() (io.Writer, error) {
+		panic("function should not be called")
+	}))
+	require.NoError(t, err)
+	assert.Panics(t, func() {
+		rl.Extract(New(), reflect.ValueOf("irrelevant"))
+	})
+}
+
 func TestNewResultErrors(t *testing.T) {
 	type outPtr struct{ *Out }
 	type out struct{ Out }
