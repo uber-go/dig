@@ -304,7 +304,8 @@ type node struct {
 	ctype reflect.Type
 
 	// Type information about constructor parameters.
-	Params paramList
+	Params  paramList
+	Results resultList
 }
 
 func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
@@ -313,11 +314,17 @@ func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
 		return nil, err
 	}
 
+	results, err := newResultList(ctype)
+	if err != nil {
+		return nil, err
+	}
+
 	return &node{
-		key:    k,
-		ctor:   ctor,
-		ctype:  ctype,
-		Params: params,
+		key:     k,
+		ctor:    ctor,
+		ctype:   ctype,
+		Params:  params,
+		Results: results,
 	}, err
 }
 
