@@ -27,8 +27,6 @@ import (
 
 type (
 	result interface {
-		resultType()
-
 		Produces() map[key]struct{}
 	}
 
@@ -66,11 +64,6 @@ var (
 	_ result = resultObject{}
 	_ result = resultList{}
 )
-
-func (resultList) resultType()   {}
-func (resultError) resultType()  {}
-func (resultSingle) resultType() {}
-func (resultObject) resultType() {}
 
 func newResultList(ctype reflect.Type) (resultList, error) {
 	rl := resultList{
