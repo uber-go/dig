@@ -34,8 +34,6 @@ import (
 //                param.
 type (
 	param interface {
-		paramType()
-
 		// Comprehensive list of dependencies this parameter represents.
 		Dependencies() []edge
 	}
@@ -91,10 +89,6 @@ var (
 	_ param = paramObject{}
 	_ param = paramList{}
 )
-
-func (paramList) paramType()   {}
-func (paramSingle) paramType() {}
-func (paramObject) paramType() {}
 
 // newParamList builds a paramList from the provided constructor type.
 //
