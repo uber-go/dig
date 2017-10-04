@@ -168,9 +168,9 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 
 	n, ok := c.nodes[k]
 	if !ok {
-		// Unlike in the fallback case below, if a user makes an error requesting
-		// a mixed type for an optional parameter, a good error message "did you mean X?"
-		// will not be used and dig will return zero value.
+		// Unlike in the fallback case below, if a user makes an error
+		// requesting an optional value, a good error message ("did you mean
+		// X?") will not be used and we'll return a zero value instead.
 		if ps.Optional {
 			return reflect.Zero(ps.Type), nil
 		}
@@ -220,7 +220,7 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		// Set the resolved object into the cache.
 		// This might look confusing at first like we're ignoring named types,
 		// but `con` in this case will be the dig.Out object, which will
-		// cause a recursion into the .set for each of it's memebers.
+		// cause a recursion into the .set for each of it's members.
 		c.set(key{t: con.Type()}, con)
 	}
 	return c.cache[k], nil
