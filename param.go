@@ -59,7 +59,11 @@ func forEachParamSingle(param param, f func(paramSingle)) {
 			forEachParamSingle(field.Param, f)
 		}
 	default:
-		panic(fmt.Sprintf("unknown param type %T", param))
+		panic(fmt.Sprintf(
+			"It looks like you have found a bug in dig. "+
+				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
+				"and provide the following message: "+
+				"received unknown param type %T", param))
 	}
 }
 
