@@ -52,6 +52,8 @@ var (
 // dig.In struct, an paramObject will be returned.
 func newParam(t reflect.Type) (param, error) {
 	switch {
+	case IsOut(t) || (t.Kind() == reflect.Ptr && IsOut(t.Elem())) || embedsType(t, _outPtrType):
+		return nil, fmt.Errorf("cannot depend on result objects: %v embeds a dig.Out", t)
 	case IsIn(t):
 		return newParamObject(t)
 	case embedsType(t, _inPtrType):
@@ -62,8 +64,6 @@ func newParam(t reflect.Type) (param, error) {
 		return nil, fmt.Errorf(
 			"cannot depend on a pointer to a parameter object, use a value instead: "+
 				"%v is a pointer to a struct that embeds dig.In", t)
-	case IsOut(t) || (t.Kind() == reflect.Ptr && IsOut(t.Elem())) || embedsType(t, _outPtrType):
-		return nil, fmt.Errorf("cannot depend on result objects: %v embeds a dig.Out", t)
 	default:
 		return paramSingle{Type: t}, nil
 	}

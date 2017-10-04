@@ -1495,6 +1495,23 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "*dig.in is a pointer to a struct that embeds dig.In")
 	})
 
+	t.Run("embedding dig.In and dig.Out is not supported", func(t *testing.T) {
+		c := New()
+		type in struct {
+			In
+			Out
+
+			String string
+		}
+
+		err := c.Invoke(func(in) {
+			assert.Fail(t, "should never get here")
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot depend on result objects")
+		assert.Contains(t, err.Error(), "dig.in embeds a dig.Out")
+	})
+
 	t.Run("embedding in pointer is not supported", func(t *testing.T) {
 		c := New()
 		type in struct {
