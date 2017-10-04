@@ -136,7 +136,7 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 
 		if f.PkgPath != "" {
 			return ro, fmt.Errorf(
-				"private fields not allowed in dig.Out, did you mean to export %q (%v) from %v?",
+				"unexported fields not allowed in dig.Out, did you mean to export %q (%v) from %v?",
 				f.Name, f.Type, t)
 		}
 

@@ -142,13 +142,13 @@ func TestNewResultObjectErrors(t *testing.T) {
 		err  string
 	}{
 		{
-			desc: "private fields",
+			desc: "unexported fields",
 			give: struct {
 				Out
 
 				writer io.Writer
 			}{},
-			err: `private fields not allowed in dig.Out, did you mean to export "writer" (io.Writer)`,
+			err: `unexported fields not allowed in dig.Out, did you mean to export "writer" (io.Writer)`,
 		},
 		{
 			desc: "error field",
