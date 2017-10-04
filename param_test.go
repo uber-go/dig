@@ -21,12 +21,21 @@
 package dig
 
 import (
+	"io"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestParamListBuild(t *testing.T) {
+	p, err := newParamList(reflect.TypeOf(func() io.Writer { return nil }))
+	require.NoError(t, err)
+	assert.Panics(t, func() {
+		p.Build(New())
+	})
+}
 
 func TestParamObjectSuccess(t *testing.T) {
 	type type1 struct{}

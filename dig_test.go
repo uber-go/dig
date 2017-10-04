@@ -795,6 +795,47 @@ func TestProvideConstructorErrors(t *testing.T) {
 		}
 		require.Error(t, c.Provide(constructor), "provide failed")
 	})
+
+	t.Run("constructor consumes a dig.Out", func(t *testing.T) {
+		c := New()
+		type out struct {
+			Out
+
+			Reader io.Reader
+		}
+
+		type outPtr struct {
+			*Out
+
+			Reader io.Reader
+		}
+
+		tests := []struct {
+			desc        string
+			constructor interface{}
+		}{
+			{
+				desc:        "dig.Out",
+				constructor: func(out) io.Writer { return nil },
+			},
+			{
+				desc:        "*dig.Out",
+				constructor: func(*out) io.Writer { return nil },
+			},
+			{
+				desc:        "embeds *dig.Out",
+				constructor: func(outPtr) io.Writer { return nil },
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				err := c.Provide(tt.constructor)
+				require.Error(t, err, "provide should fail")
+				assert.Contains(t, err.Error(), "cannot depend on result objects")
+			})
+		}
+	})
 }
 
 func TestProvideRespectsConstructorErrors(t *testing.T) {
@@ -1207,8 +1248,8 @@ func TestInvokeFailures(t *testing.T) {
 			t.Fatal("function should not be called")
 		})
 		require.Error(t, err, "invoke should fail")
-		assert.Contains(t, err.Error(), "edge *bytes.Buffer:foo")
-		assert.Contains(t, err.Error(), "*bytes.Buffer:foo isn't in the container")
+		assert.Contains(t, err.Error(), "could not get field Buffer of dig.param")
+		assert.Contains(t, err.Error(), "type *bytes.Buffer:foo isn't in the container")
 	})
 
 	t.Run("unmet constructor dependency", func(t *testing.T) {
@@ -1450,8 +1491,25 @@ func TestInvokeFailures(t *testing.T) {
 		}
 		err := c.Invoke(func(i *in) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "*dig.in is a pointer")
-		assert.Contains(t, err.Error(), "use value type instead")
+		assert.Contains(t, err.Error(), "cannot depend on a pointer to a parameter object, use a value instead")
+		assert.Contains(t, err.Error(), "*dig.in is a pointer to a struct that embeds dig.In")
+	})
+
+	t.Run("embedding dig.In and dig.Out is not supported", func(t *testing.T) {
+		c := New()
+		type in struct {
+			In
+			Out
+
+			String string
+		}
+
+		err := c.Invoke(func(in) {
+			assert.Fail(t, "should never get here")
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot depend on result objects")
+		assert.Contains(t, err.Error(), "dig.in embeds a dig.Out")
 	})
 
 	t.Run("embedding in pointer is not supported", func(t *testing.T) {
@@ -1464,8 +1522,8 @@ func TestInvokeFailures(t *testing.T) {
 		}
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot build a parameter object by embedding *dig.In")
 		assert.Contains(t, err.Error(), "dig.in embeds *dig.In")
-		assert.Contains(t, err.Error(), "embed dig.In value instead")
 	})
 
 	t.Run("requesting a value or pointer when other is present", func(t *testing.T) {
