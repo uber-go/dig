@@ -242,7 +242,11 @@ func (ro resultObject) Extract(c *Container, v reflect.Value) error {
 		if err := f.Result.Extract(c, v.Field(f.FieldIndex)); err != nil {
 			// In reality, this will never fail because none of the fields of
 			// a resultObject can be resultError.
-			return err
+			panic(fmt.Sprintf(
+				"It looks like you have found a bug in dig. "+
+					"Please file an issue at https://github.com/uber-go/dig/issues/ "+
+					"and provide the following message: "+
+					"result.Extract() encountered an error: %v", err))
 		}
 	}
 	return nil
