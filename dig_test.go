@@ -1062,7 +1062,7 @@ func TestProvideFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "provides *dig.A:foo, which is already in the container")
 	})
 
-	t.Run("out with private field should error", func(t *testing.T) {
+	t.Run("out with unexported field should error", func(t *testing.T) {
 		c := New()
 
 		type A struct{ idx int }
@@ -1070,11 +1070,11 @@ func TestProvideFailures(t *testing.T) {
 			Out
 
 			A1 A // should be ok
-			a2 A // oops, private field. should generate an error
+			a2 A // oops, unexported field. should generate an error
 		}
 		err := c.Provide(func() out1 { return out1{a2: A{77}} })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "private fields not allowed in dig.Out")
+		assert.Contains(t, err.Error(), "unexported fields not allowed in dig.Out")
 		assert.Contains(t, err.Error(), `"a2" (dig.A)`)
 		assert.Contains(t, err.Error(), "did you mean to export")
 	})
@@ -1330,25 +1330,25 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "dig.A:camelcase isn't in the container")
 	})
 
-	t.Run("in private member gets an error", func(t *testing.T) {
+	t.Run("in unexported member gets an error", func(t *testing.T) {
 		c := New()
 		type A struct{}
 		type in struct {
 			In
 
 			A1 A // all is good
-			a2 A // oops, private type
+			a2 A // oops, unexported type
 		}
 		require.NoError(t, c.Provide(func() A { return A{} }))
 
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "private fields not allowed in dig.In")
+		assert.Contains(t, err.Error(), "unexported fields not allowed in dig.In")
 		assert.Contains(t, err.Error(), `"a2" (dig.A)`)
 		assert.Contains(t, err.Error(), "did you mean to export")
 	})
 
-	t.Run("in private member gets an error on Provide", func(t *testing.T) {
+	t.Run("in unexported member gets an error on Provide", func(t *testing.T) {
 		c := New()
 		type in struct {
 			In
@@ -1358,18 +1358,18 @@ func TestInvokeFailures(t *testing.T) {
 
 		err := c.Provide(func(in) int { return 0 })
 		require.Error(t, err, "Provide must fail")
-		assert.Contains(t, err.Error(), "private fields not allowed in dig.In")
+		assert.Contains(t, err.Error(), "unexported fields not allowed in dig.In")
 		assert.Contains(t, err.Error(), `"foo" (string)`)
 	})
 
-	t.Run("embedded private member gets an error", func(t *testing.T) {
+	t.Run("embedded unexported member gets an error", func(t *testing.T) {
 		c := New()
 		type A struct{}
 		type Embed struct {
 			In
 
 			A1 A // all is good
-			a2 A // oops, private type
+			a2 A // oops, unexported type
 		}
 		type in struct {
 			Embed
@@ -1378,10 +1378,10 @@ func TestInvokeFailures(t *testing.T) {
 
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "private fields not allowed in dig.In")
+		assert.Contains(t, err.Error(), "unexported fields not allowed in dig.In")
 	})
 
-	t.Run("embedded private member gets an error", func(t *testing.T) {
+	t.Run("embedded unexported member gets an error", func(t *testing.T) {
 		c := New()
 		type param struct {
 			In

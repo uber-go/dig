@@ -93,7 +93,7 @@ func TestParamObjectSuccess(t *testing.T) {
 }
 
 func TestParamObjectFailure(t *testing.T) {
-	t.Run("private field gets an error", func(t *testing.T) {
+	t.Run("unexported field gets an error", func(t *testing.T) {
 		type A struct{}
 		type in struct {
 			In
@@ -105,6 +105,6 @@ func TestParamObjectFailure(t *testing.T) {
 		_, err := newParamObject(reflect.TypeOf(in{}))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
-			`private fields not allowed in dig.In, did you mean to export "a2" (dig.A) from dig.in?`)
+			`unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A) from dig.in?`)
 	})
 }

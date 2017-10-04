@@ -248,7 +248,7 @@ func traverseOutTypes(k key, f func(key) error) error {
 
 		if field.PkgPath != "" {
 			return fmt.Errorf(
-				"private fields not allowed in dig.Out, did you mean to export %q (%v) from %v",
+				"unexported fields not allowed in dig.Out, did you mean to export %q (%v) from %v",
 				field.Name, field.Type, k.t)
 		}
 
@@ -362,7 +362,7 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 
 		if f.PkgPath != "" {
 			return dest, fmt.Errorf(
-				"private fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
+				"unexported fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
 				f.Name, f.Type, t)
 		}
 

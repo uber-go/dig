@@ -149,7 +149,7 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 
 		if f.PkgPath != "" {
 			return po, fmt.Errorf(
-				"private fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
+				"unexported fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
 				f.Name, f.Type, t)
 		}
 
