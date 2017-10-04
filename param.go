@@ -32,63 +32,32 @@ import (
 //  paramSingle   An explicitly requested type.
 //  paramObject   dig.In struct where each field in the struct can be another
 //                param.
-type (
-	param interface {
-		// Comprehensive list of dependencies this parameter represents.
-		Dependencies() []edge
-	}
-
-	// paramList holds all arguments of the constructor as params.
-	paramList struct {
-		ctype reflect.Type // type of the constructor
-
-		Params []param
-	}
-
-	// paramSingle is an explicitly requested type, optionally with a name.
-	//
-	// This object must be present in the graph as-is unless it's specified as
-	// optional.
-	paramSingle struct {
-		Name     string
-		Optional bool
-		Type     reflect.Type
-	}
-
-	// paramObject is a dig.In struct where each field is another param.
-	//
-	// This object is not expected in the graph as-is.
-	paramObject struct {
-		Type   reflect.Type
-		Fields []paramObjectField
-
-		deps []edge
-	}
-
-	// paramObjectField is a single field of a dig.In struct.
-	paramObjectField struct {
-		// Name of the field in the struct.
-		//
-		// To clarify, this is the name of the *struct field*, not the name of
-		// the dig value requested by this field.
-		Name string
-
-		// Index of this field in the target struct.
-		//
-		// We need to track this separately because not all fields of the
-		// struct map to params.
-		Index int
-
-		// The dependency requested by this field.
-		Param param
-	}
-)
+type param interface {
+	// Comprehensive list of dependencies this parameter represents.
+	Dependencies() []edge
+}
 
 var (
 	_ param = paramSingle{}
 	_ param = paramObject{}
 	_ param = paramList{}
 )
+
+// newParam builds a param from the given type. If the provided type is a
+// dig.In struct, an paramObject will be returned.
+func newParam(t reflect.Type) (param, error) {
+	if IsIn(t) {
+		return newParamObject(t)
+	}
+	return paramSingle{Type: t}, nil
+}
+
+// paramList holds all arguments of the constructor as params.
+type paramList struct {
+	ctype reflect.Type // type of the constructor
+
+	Params []param
+}
 
 // newParamList builds a paramList from the provided constructor type.
 //
@@ -117,19 +86,62 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 	return pl, nil
 }
 
-// newParam builds a param from the given type. If the provided type is a
-// dig.In struct, an paramObject will be returned.
-func newParam(t reflect.Type) (param, error) {
-	if IsIn(t) {
-		return newParamObject(t)
+func (pl paramList) Dependencies() []edge {
+	var deps []edge
+	for _, p := range pl.Params {
+		deps = append(deps, p.Dependencies()...)
 	}
-	return paramSingle{Type: t}, nil
+	return deps
+}
+
+// paramSingle is an explicitly requested type, optionally with a name.
+//
+// This object must be present in the graph as-is unless it's specified as
+// optional.
+type paramSingle struct {
+	Name     string
+	Optional bool
+	Type     reflect.Type
+}
+
+func (ps paramSingle) Dependencies() []edge {
+	return []edge{
+		{key: key{t: ps.Type, name: ps.Name}, optional: ps.Optional},
+	}
+}
+
+// paramObjectField is a single field of a dig.In struct.
+type paramObjectField struct {
+	// Name of the field in the struct.
+	//
+	// To clarify, this is the name of the *struct field*, not the name of
+	// the dig value requested by this field.
+	Name string
+
+	// Index of this field in the target struct.
+	//
+	// We need to track this separately because not all fields of the
+	// struct map to params.
+	Index int
+
+	// The dependency requested by this field.
+	Param param
+}
+
+// paramObject is a dig.In struct where each field is another param.
+//
+// This object is not expected in the graph as-is.
+type paramObject struct {
+	Type   reflect.Type
+	Fields []paramObjectField
+
+	deps []edge
 }
 
 // newParamObject builds an paramObject from the provided type. The type MUST
 // be a dig.In struct.
 func newParamObject(t reflect.Type) (paramObject, error) {
-	op := paramObject{Type: t}
+	po := paramObject{Type: t}
 
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -139,20 +151,20 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 		}
 
 		if f.PkgPath != "" {
-			return op, fmt.Errorf(
+			return po, fmt.Errorf(
 				"private fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
 				f.Name, f.Type, t)
 		}
 
 		p, err := newParam(f.Type)
 		if err != nil {
-			return op, errWrapf(err, "bad field %q of %v", f.Name, t)
+			return po, errWrapf(err, "bad field %q of %v", f.Name, t)
 		}
 
 		name := f.Tag.Get(_nameTag)
 		optional, err := isFieldOptional(t, f)
 		if err != nil {
-			return op, err
+			return po, err
 		}
 
 		if sp, ok := p.(paramSingle); ok {
@@ -162,28 +174,14 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 			p = sp
 		}
 
-		op.Fields = append(op.Fields, paramObjectField{
+		po.Fields = append(po.Fields, paramObjectField{
 			Name:  f.Name,
 			Index: i,
 			Param: p,
 		})
-		op.deps = append(op.deps, p.Dependencies()...)
+		po.deps = append(po.deps, p.Dependencies()...)
 	}
-	return op, nil
+	return po, nil
 }
 
-func (pl paramList) Dependencies() []edge {
-	var deps []edge
-	for _, p := range pl.Params {
-		deps = append(deps, p.Dependencies()...)
-	}
-	return deps
-}
-
-func (p paramSingle) Dependencies() []edge {
-	return []edge{
-		{key: key{t: p.Type, name: p.Name}, optional: p.Optional},
-	}
-}
-
-func (op paramObject) Dependencies() []edge { return op.deps }
+func (po paramObject) Dependencies() []edge { return po.deps }
