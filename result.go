@@ -25,6 +25,14 @@ import (
 	"reflect"
 )
 
+// The result interface represents a result produced by a constructor.
+//
+// The following implementations exist:
+//   resultList    All values returned by the constructor.
+//   resultSingle  An explicitly requested type.
+//   resultError   An error returned by the constructor.
+//   resultObject  dig.Out struct where each field in the struct can be
+//                 another result.
 type result interface {
 	Produces() map[key]struct{}
 }
@@ -36,6 +44,7 @@ var (
 	_ result = resultList{}
 )
 
+// newResult builds a result from the given type.
 func newResult(t reflect.Type) (result, error) {
 	switch {
 	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
@@ -57,6 +66,7 @@ func newResult(t reflect.Type) (result, error) {
 	}
 }
 
+// resultList holds all values returned by the constructor as results.
 type resultList struct {
 	ctype    reflect.Type
 	produces map[key]struct{}
@@ -95,11 +105,16 @@ func newResultList(ctype reflect.Type) (resultList, error) {
 
 func (rl resultList) Produces() map[key]struct{} { return rl.produces }
 
+// resultError is an error returned by a constructor.
 type resultError struct{}
 
 // resultError doesn't produce anything
 func (resultError) Produces() map[key]struct{} { return nil }
 
+// resultSingle is an explicit value produced by a constructor, optionally
+// with a name.
+//
+// This object will be added to the graph as-is.
 type resultSingle struct {
 	Name string
 	Type reflect.Type
@@ -111,12 +126,25 @@ func (rs resultSingle) Produces() map[key]struct{} {
 	}
 }
 
+// resultObjectField is a single field inside a dig.Out struct.
 type resultObjectField struct {
-	Name   string
-	Index  int
+	// Name of the field in the struct.
+	Name string
+
+	// Index of the field in the struct.
+	//
+	// We need to track this separately because not all fields of the struct
+	// map to results.
+	Index int
+
+	// Result produced by this field.
 	Result result
 }
 
+// resultObject is a dig.Out struct where each field is another result.
+//
+// This object is not added to the graph. Its fields are interpreted as
+// results and added to the graph if needed.
 type resultObject struct {
 	produces map[key]struct{}
 
