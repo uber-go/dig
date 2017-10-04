@@ -128,7 +128,10 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 }
 
 func (pl paramList) Build(*Container) (reflect.Value, error) {
-	panic("paramList.Build() must never be called")
+	panic("It looks like you have found a bug in dig. " +
+		"Please file an issue at https://github.com/uber-go/dig/issues/ " +
+		"and provide the following message: " +
+		"paramList.Build() must never be called")
 }
 
 // BuildParams returns an ordered list of values which may be passed directly
