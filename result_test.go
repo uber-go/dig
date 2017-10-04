@@ -157,7 +157,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 
 				Error error
 			}{},
-			err: `cannot provide errors from dig.Out: field "Error" (error)`,
+			err: `cannot return errors from dig.Out, return it from the constructor instead: field "Error" (error)`,
 		},
 		{
 			desc: "type conflict",

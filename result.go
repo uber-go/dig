@@ -142,7 +142,8 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 
 		if isError(f.Type) {
 			return ro, fmt.Errorf(
-				"cannot provide errors from dig.Out: field %q (%v) of %v is an error field",
+				"cannot return errors from dig.Out, return it from the constructor instead: "+
+					"field %q (%v) of %v is an error field",
 				f.Name, f.Type, t)
 		}
 
