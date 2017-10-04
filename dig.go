@@ -248,7 +248,7 @@ func traverseOutTypes(k key, f func(key) error) error {
 
 		if field.PkgPath != "" {
 			return fmt.Errorf(
-				"private fields not allowed in dig.Out, did you mean to export %q (%v) from %v",
+				"unexported fields not allowed in dig.Out, did you mean to export %q (%v) from %v",
 				field.Name, field.Type, k.t)
 		}
 
@@ -316,7 +316,7 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 		return _noValue, fmt.Errorf("type %v isn't in the container", e.key)
 	}
 
-	if err := c.contains(n.deps); err != nil {
+	if err := c.contains(n.Params.Dependencies()); err != nil {
 		if e.optional {
 			return reflect.Zero(e.t), nil
 		}
@@ -362,7 +362,7 @@ func (c *Container) createInObject(t reflect.Type) (reflect.Value, error) {
 
 		if f.PkgPath != "" {
 			return dest, fmt.Errorf(
-				"private fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
+				"unexported fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
 				f.Name, f.Type, t)
 		}
 
@@ -438,7 +438,9 @@ type node struct {
 
 	ctor  interface{}
 	ctype reflect.Type
-	deps  []edge
+
+	// Type information about constructor parameters.
+	Params paramList
 }
 
 type edge struct {
@@ -448,27 +450,17 @@ type edge struct {
 }
 
 func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
-	deps, err := getConstructorDependencies(ctype)
-	return &node{
-		key:   k,
-		ctor:  ctor,
-		ctype: ctype,
-		deps:  deps,
-	}, err
-}
-
-// Retrieves the dependencies for a constructor
-func getConstructorDependencies(ctype reflect.Type) ([]edge, error) {
-	var deps []edge
-	for _, t := range getConstructorArgTypes(ctype) {
-		err := traverseInTypes(t, func(e edge) {
-			deps = append(deps, e)
-		})
-		if err != nil {
-			return nil, err
-		}
+	params, err := newParamList(ctype)
+	if err != nil {
+		return nil, err
 	}
-	return deps, nil
+
+	return &node{
+		key:    k,
+		ctor:   ctor,
+		ctype:  ctype,
+		Params: params,
+	}, err
 }
 
 // Retrieves the types of the arguments of a constructor in-order.
@@ -507,7 +499,7 @@ func detectCycles(n *node, graph map[key]*node, path []key) error {
 		}
 	}
 	path = append(path, n.key)
-	for _, dep := range n.deps {
+	for _, dep := range n.Params.Dependencies() {
 		depNode, ok := graph[dep.key]
 		if !ok {
 			continue
@@ -516,38 +508,6 @@ func detectCycles(n *node, graph map[key]*node, path []key) error {
 			return err
 		}
 	}
-	return nil
-}
-
-// Traverse all fields starting with the given type.
-// Types that dig.In get recursed on. Returns the first error encountered.
-func traverseInTypes(t reflect.Type, fn func(edge)) error {
-	if !IsIn(t) {
-		fn(edge{key: key{t: t}})
-		return nil
-	}
-
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		if f.PkgPath != "" {
-			continue // skip private fields
-		}
-
-		if IsIn(f.Type) {
-			if err := traverseInTypes(f.Type, fn); err != nil {
-				return err
-			}
-			continue
-		}
-
-		optional, err := isFieldOptional(t, f)
-		if err != nil {
-			return err
-		}
-
-		fn(edge{key: key{t: f.Type, name: f.Tag.Get(_nameTag)}, optional: optional})
-	}
-
 	return nil
 }
 

@@ -44,8 +44,9 @@ func (c *Container) String() string {
 }
 
 func (n *node) String() string {
-	deps := make([]string, len(n.deps))
-	for i, d := range n.deps {
+	paramDeps := n.Params.Dependencies()
+	deps := make([]string, len(paramDeps))
+	for i, d := range paramDeps {
 		if d.optional {
 			// ~tally.Scope means optional
 			// ~tally.Scope:foo means named optional
