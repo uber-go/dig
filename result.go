@@ -38,18 +38,20 @@ var (
 
 func newResult(t reflect.Type) (result, error) {
 	switch {
+	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
+		return nil, fmt.Errorf("cannot provide parameter objects: %v embeds a dig.In", t)
 	case isError(t):
 		return resultError{}, nil
 	case IsOut(t):
 		return newResultObject(t)
 	case embedsType(t, _outPtrType):
 		return nil, fmt.Errorf(
-			"%v embeds *dig.Out which is not supported, embed dig.Out value instead", t)
+			"cannot build a result object by embedding *dig.Out, embed dig.Out instead: "+
+				"%v embeds *dig.Out", t)
 	case t.Kind() == reflect.Ptr && IsOut(t.Elem()):
-		return nil, fmt.Errorf("%v is a pointer to dig.Out, use value type instead", t)
-		// Make sure we're not producing dig.In's either.
-	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
-		return nil, fmt.Errorf("cannot provide parameter objects: %v embeds a dig.In", t)
+		return nil, fmt.Errorf(
+			"cannot return a pointer to a result object, use a value instead: "+
+				"%v is a pointer to a struct that embeds dig.Out", t)
 	default:
 		return resultSingle{Type: t}, nil
 	}

@@ -57,6 +57,16 @@ func TestNewResultListErrors(t *testing.T) {
 			err:  "bad result 1: cannot provide parameter objects",
 		},
 		{
+			desc: "returns dig.Out+dig.In",
+			give: func() struct {
+				Out
+				In
+			} {
+				panic("invalid")
+			},
+			err: "bad result 1: cannot provide parameter objects",
+		},
+		{
 			desc: "type conflict",
 			give: func() (io.Reader, io.Writer, io.Reader) { panic("invalid") },
 			err:  "returns multiple io.Reader",
@@ -85,25 +95,33 @@ func TestNewResultListErrors(t *testing.T) {
 }
 
 func TestNewResultErrors(t *testing.T) {
+	type outPtr struct{ *Out }
+	type out struct{ Out }
+	type in struct{ In }
+	type inOut struct {
+		In
+		Out
+	}
+
 	tests := []struct {
 		give interface{}
 		err  string
 	}{
 		{
-			give: struct{ *Out }{},
-			err:  "embeds *dig.Out which is not supported, embed dig.Out value instead",
+			give: outPtr{},
+			err:  "cannot build a result object by embedding *dig.Out, embed dig.Out instead: dig.outPtr embeds *dig.Out",
 		},
 		{
-			give: (*struct{ Out })(nil),
-			err:  "pointer to dig.Out, use value type instead",
+			give: (*out)(nil),
+			err:  "cannot return a pointer to a result object, use a value instead: *dig.out is a pointer to a struct that embeds dig.Out",
 		},
 		{
-			give: struct{ *In }{},
-			err:  "cannot provide parameter objects",
+			give: in{},
+			err:  "cannot provide parameter objects: dig.in embeds a dig.In",
 		},
 		{
-			give: struct{ In }{},
-			err:  "cannot provide parameter objects",
+			give: inOut{},
+			err:  "cannot provide parameter objects: dig.inOut embeds a dig.In",
 		},
 	}
 
