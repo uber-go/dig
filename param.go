@@ -113,16 +113,13 @@ func (ps paramSingle) Dependencies() []edge {
 // paramObjectField is a single field of a dig.In struct.
 type paramObjectField struct {
 	// Name of the field in the struct.
-	//
-	// To clarify, this is the name of the *struct field*, not the name of
-	// the dig value requested by this field.
-	Name string
+	FieldName string
 
 	// Index of this field in the target struct.
 	//
 	// We need to track this separately because not all fields of the
 	// struct map to params.
-	Index int
+	FieldIndex int
 
 	// The dependency requested by this field.
 	Param param
@@ -175,9 +172,9 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 		}
 
 		po.Fields = append(po.Fields, paramObjectField{
-			Name:  f.Name,
-			Index: i,
-			Param: p,
+			FieldName:  f.Name,
+			FieldIndex: i,
+			Param:      p,
 		})
 		po.deps = append(po.deps, p.Dependencies()...)
 	}

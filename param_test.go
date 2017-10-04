@@ -54,7 +54,7 @@ func TestParamObjectSuccess(t *testing.T) {
 	require.Len(t, po.Fields, 4)
 
 	t.Run("no tags", func(t *testing.T) {
-		require.Equal(t, "T1", po.Fields[0].Name)
+		require.Equal(t, "T1", po.Fields[0].FieldName)
 		t1, ok := po.Fields[0].Param.(paramSingle)
 		require.True(t, ok, "T1 must be a paramSingle")
 		assert.Empty(t, t1.Name)
@@ -63,7 +63,7 @@ func TestParamObjectSuccess(t *testing.T) {
 	})
 
 	t.Run("optional field", func(t *testing.T) {
-		require.Equal(t, "T2", po.Fields[1].Name)
+		require.Equal(t, "T2", po.Fields[1].FieldName)
 
 		t2, ok := po.Fields[1].Param.(paramSingle)
 		require.True(t, ok, "T2 must be a paramSingle")
@@ -73,7 +73,7 @@ func TestParamObjectSuccess(t *testing.T) {
 	})
 
 	t.Run("named value", func(t *testing.T) {
-		require.Equal(t, "T3", po.Fields[2].Name)
+		require.Equal(t, "T3", po.Fields[2].FieldName)
 		t3, ok := po.Fields[2].Param.(paramSingle)
 		require.True(t, ok, "T3 must be a paramSingle")
 		assert.Equal(t, "foo", t3.Name)
@@ -81,7 +81,7 @@ func TestParamObjectSuccess(t *testing.T) {
 	})
 
 	t.Run("tags don't apply to nested dig.In", func(t *testing.T) {
-		require.Equal(t, "Nested", po.Fields[3].Name)
+		require.Equal(t, "Nested", po.Fields[3].FieldName)
 		nested, ok := po.Fields[3].Param.(paramObject)
 		require.True(t, ok, "Nested must be a paramObject")
 
