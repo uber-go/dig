@@ -93,7 +93,7 @@ func forEachParamSingle(param param, f func(paramSingle)) {
 
 // paramList holds all arguments of the constructor as params.
 //
-// NOTE: Build() MUST NOT be called on paramList. Instead, BuildParams
+// NOTE: Build() MUST NOT be called on paramList. Instead, BuildList
 // must be called.
 type paramList struct {
 	ctype reflect.Type // type of the constructor
@@ -136,9 +136,9 @@ func (pl paramList) Build(*Container) (reflect.Value, error) {
 		"paramList.Build() must never be called")
 }
 
-// BuildParams returns an ordered list of values which may be passed directly
+// BuildList returns an ordered list of values which may be passed directly
 // to the underlying constructor.
-func (pl paramList) BuildParams(c *Container) ([]reflect.Value, error) {
+func (pl paramList) BuildList(c *Container) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
 	for i, p := range pl.Params {
 		var err error
@@ -201,7 +201,7 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		return _noValue, errWrapf(err, "missing dependencies for %v", k)
 	}
 
-	args, err := n.Params.BuildParams(c)
+	args, err := n.Params.BuildList(c)
 	if err != nil {
 		return _noValue, errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
 	}

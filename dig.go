@@ -132,7 +132,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return err
 	}
 
-	args, err := pl.BuildParams(c)
+	args, err := pl.BuildList(c)
 	if err != nil {
 		return errWrapf(err, "failed to get arguments for %v (type %v)", function, ftype)
 	}
