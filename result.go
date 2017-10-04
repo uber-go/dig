@@ -36,6 +36,8 @@ import (
 type result interface {
 	// Extracts the values for this result from the provided value and
 	// stores them in the container.
+	//
+	// This MAY panic if the result does not consume a single value.
 	Extract(*Container, reflect.Value) error
 
 	Produces() map[key]struct{}
@@ -110,7 +112,10 @@ func newResultList(ctype reflect.Type) (resultList, error) {
 func (rl resultList) Produces() map[key]struct{} { return rl.produces }
 
 func (resultList) Extract(*Container, reflect.Value) error {
-	panic("resultList.Extract() must never be called")
+	panic("It looks like you have found a bug in dig. " +
+		"Please file an issue at https://github.com/uber-go/dig/issues/ " +
+		"and provide the following message: " +
+		"resultList.Extract() must never be called")
 }
 
 func (rl resultList) ExtractResults(c *Container, values []reflect.Value) error {
