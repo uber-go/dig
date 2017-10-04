@@ -922,22 +922,69 @@ func TestProvideKnownTypesFails(t *testing.T) {
 func TestProvideCycleFails(t *testing.T) {
 	t.Parallel()
 
-	// A <- B <- C
-	// |         ^
-	// |_________|
-	type A struct{}
-	type B struct{}
-	type C struct{}
-	newA := func(*C) *A { return &A{} }
-	newB := func(*A) *B { return &B{} }
-	newC := func(*B) *C { return &C{} }
+	t.Run("parameters only", func(t *testing.T) {
+		// A <- B <- C
+		// |         ^
+		// |_________|
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		newA := func(*C) *A { return &A{} }
+		newB := func(*A) *B { return &B{} }
+		newC := func(*B) *C { return &C{} }
 
-	c := New()
-	assert.NoError(t, c.Provide(newA))
-	assert.NoError(t, c.Provide(newB))
-	err := c.Provide(newC)
-	require.Error(t, err, "expected error when introducing cycle")
-	require.Contains(t, err.Error(), "cycle")
+		c := New()
+		assert.NoError(t, c.Provide(newA))
+		assert.NoError(t, c.Provide(newB))
+		err := c.Provide(newC)
+		require.Error(t, err, "expected error when introducing cycle")
+		require.Contains(t, err.Error(), "cycle")
+	})
+
+	t.Run("dig.In based cycle", func(t *testing.T) {
+		// Same cycle as before but in terms of dig.Ins.
+
+		type A struct{}
+		type B struct{}
+		type C struct{}
+
+		type AParams struct {
+			In
+
+			C C
+		}
+		newA := func(AParams) A { return A{} }
+
+		type BParams struct {
+			In
+
+			A A
+		}
+		newB := func(BParams) B { return B{} }
+
+		type CParams struct {
+			In
+
+			B B
+		}
+		newC := func(CParams) C { return C{} }
+
+		c := New()
+		require.NoError(t, c.Provide(newA))
+		require.NoError(t, c.Provide(newB))
+
+		err := c.Provide(newC)
+		require.Error(t, err, "expected error when introducing cycle")
+		assert.Contains(t, err.Error(), "introduces a cycle")
+	})
+
+	t.Run("detectCycles invalid param", func(t *testing.T) {
+		type badParam struct{ param }
+
+		assert.Panics(t, func() {
+			detectCycles(badParam{}, nil, nil)
+		})
+	})
 }
 
 func TestIncompleteGraphIsOkay(t *testing.T) {
