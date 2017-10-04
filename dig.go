@@ -544,7 +544,7 @@ func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
 // the container. Returns an error if not.
 func shallowCheckDependencies(c *Container, p param) error {
 	var missing []key
-	forEachSimpleParam(p, func(p paramSingle) {
+	forEachParamSingle(p, func(p paramSingle) {
 		k := key{name: p.Name, t: p.Type}
 		if _, ok := c.nodes[k]; !ok && !p.Optional {
 			missing = append(missing, k)

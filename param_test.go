@@ -109,7 +109,7 @@ func TestParamObjectFailure(t *testing.T) {
 	})
 }
 
-func TestForEachSimpleParam(t *testing.T) {
+func TestForEachParamSingle(t *testing.T) {
 	type type1 struct{}
 	type type2 struct{}
 	type type3 struct{}
@@ -138,7 +138,7 @@ func TestForEachSimpleParam(t *testing.T) {
 	require.NoError(t, err)
 
 	var pos int
-	forEachSimpleParam(pl, func(p paramSingle) {
+	forEachParamSingle(pl, func(p paramSingle) {
 		switch pos {
 		case 0:
 			require.Equal(t, reflect.TypeOf(type1{}), p.Type)
@@ -155,15 +155,15 @@ func TestForEachSimpleParam(t *testing.T) {
 		case 6:
 			require.Equal(t, reflect.TypeOf(int64(0)), p.Type)
 		default:
-			t.Fatalf("forEachSimpleParam: unexpected call with %#v", p)
+			t.Fatalf("forEachParamSingle: unexpected call with %#v", p)
 		}
 		pos++
 	})
 }
 
-func TestForEachSimpleParamPanic(t *testing.T) {
+func TestForEachParamSinglePanic(t *testing.T) {
 	type badParam struct{ param }
 	assert.Panics(t, func() {
-		forEachSimpleParam(badParam{}, func(paramSingle) {})
+		forEachParamSingle(badParam{}, func(paramSingle) {})
 	})
 }

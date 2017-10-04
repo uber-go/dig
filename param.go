@@ -46,17 +46,17 @@ var (
 )
 
 // Calls the provided function on all paramSingles in the given param tree.
-func forEachSimpleParam(param param, f func(paramSingle)) {
+func forEachParamSingle(param param, f func(paramSingle)) {
 	switch p := param.(type) {
 	case paramList:
 		for _, arg := range p.Params {
-			forEachSimpleParam(arg, f)
+			forEachParamSingle(arg, f)
 		}
 	case paramSingle:
 		f(p)
 	case paramObject:
 		for _, field := range p.Fields {
-			forEachSimpleParam(field.Param, f)
+			forEachParamSingle(field.Param, f)
 		}
 	default:
 		panic(fmt.Sprintf("unknown param type %T", param))
