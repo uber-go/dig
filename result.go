@@ -25,38 +25,9 @@ import (
 	"reflect"
 )
 
-type (
-	result interface {
-		Produces() map[key]struct{}
-	}
-
-	resultList struct {
-		ctype    reflect.Type
-		produces map[key]struct{}
-
-		Results []result
-	}
-
-	resultError struct{}
-
-	resultSingle struct {
-		Name string
-		Type reflect.Type
-	}
-
-	resultObject struct {
-		produces map[key]struct{}
-
-		Type   reflect.Type
-		Fields []resultObjectField
-	}
-
-	resultObjectField struct {
-		Name   string
-		Index  int
-		Result result
-	}
-)
+type result interface {
+	Produces() map[key]struct{}
+}
 
 var (
 	_ result = resultSingle{}
@@ -64,6 +35,32 @@ var (
 	_ result = resultObject{}
 	_ result = resultList{}
 )
+
+func newResult(t reflect.Type) (result, error) {
+	switch {
+	case isError(t):
+		return resultError{}, nil
+	case IsOut(t):
+		return newResultObject(t)
+	case embedsType(t, _outPtrType):
+		return nil, fmt.Errorf(
+			"%v embeds *dig.Out which is not supported, embed dig.Out value instead", t)
+	case t.Kind() == reflect.Ptr && IsOut(t.Elem()):
+		return nil, fmt.Errorf("%v is a pointer to dig.Out, use value type instead", t)
+		// Make sure we're not producing dig.In's either.
+	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
+		return nil, fmt.Errorf("cannot provide parameter objects: %v embeds a dig.In", t)
+	default:
+		return resultSingle{Type: t}, nil
+	}
+}
+
+type resultList struct {
+	ctype    reflect.Type
+	produces map[key]struct{}
+
+	Results []result
+}
 
 func newResultList(ctype reflect.Type) (resultList, error) {
 	rl := resultList{
@@ -96,23 +93,14 @@ func newResultList(ctype reflect.Type) (resultList, error) {
 
 func (rl resultList) Produces() map[key]struct{} { return rl.produces }
 
-func newResult(t reflect.Type) (result, error) {
-	switch {
-	case isError(t):
-		return resultError{}, nil
-	case IsOut(t):
-		return newResultObject(t)
-	case embedsType(t, _outPtrType):
-		return nil, fmt.Errorf(
-			"%v embeds *dig.Out which is not supported, embed dig.Out value instead", t)
-	case t.Kind() == reflect.Ptr && IsOut(t.Elem()):
-		return nil, fmt.Errorf("%v is a pointer to dig.Out, use value type instead", t)
-		// Make sure we're not producing dig.In's either.
-	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
-		return nil, fmt.Errorf("cannot provide parameter objects: %v embeds a dig.In", t)
-	default:
-		return resultSingle{Type: t}, nil
-	}
+type resultError struct{}
+
+// resultError doesn't produce anything
+func (resultError) Produces() map[key]struct{} { return nil }
+
+type resultSingle struct {
+	Name string
+	Type reflect.Type
 }
 
 func (rs resultSingle) Produces() map[key]struct{} {
@@ -121,8 +109,18 @@ func (rs resultSingle) Produces() map[key]struct{} {
 	}
 }
 
-// resultError doesn't produce anything
-func (resultError) Produces() map[key]struct{} { return nil }
+type resultObjectField struct {
+	Name   string
+	Index  int
+	Result result
+}
+
+type resultObject struct {
+	produces map[key]struct{}
+
+	Type   reflect.Type
+	Fields []resultObjectField
+}
 
 func newResultObject(t reflect.Type) (resultObject, error) {
 	ro := resultObject{Type: t, produces: make(map[key]struct{})}
