@@ -35,7 +35,8 @@ import (
 type param interface {
 	fmt.Stringer
 
-	// Builds this dependency and any of its from the provided Container.
+	// Builds this dependency and any of its dependencies from the provided
+	// Container.
 	//
 	// This MAY panic if the param does not produce a single value.
 	Build(*Container) (reflect.Value, error)
