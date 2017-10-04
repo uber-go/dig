@@ -174,26 +174,6 @@ func (c *Container) isAcyclic(p param, k key) error {
 	return detectCycles(p, c.nodes, []key{k})
 }
 
-// Set the value in the cache after a node resolution
-func (c *Container) set(k key, v reflect.Value) {
-	if !IsOut(k.t) {
-		// do not cache error types
-		if k.t != _errType {
-			c.cache[k] = v
-		}
-		return
-	}
-
-	// dig.Out objects are not acted upon directly, but rather their members are considered
-	for i := 0; i < k.t.NumField(); i++ {
-		f := k.t.Field(i)
-
-		// recurse into all fields, which may or may not be more dig.Out objects
-		fk := key{t: f.Type, name: f.Tag.Get(_nameTag)}
-		c.set(fk, v.Field(i))
-	}
-}
-
 type node struct {
 	ctor  interface{}
 	ctype reflect.Type
@@ -222,6 +202,20 @@ func newNode(ctor interface{}, ctype reflect.Type) (*node, error) {
 		Params:  params,
 		Results: results,
 	}, err
+}
+
+func (n *node) Call(c *Container) error {
+	args, err := n.Params.BuildList(c)
+	if err != nil {
+		return errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
+	}
+
+	results := reflect.ValueOf(n.ctor).Call(args)
+	if err := n.Results.ExtractList(c, results); err != nil {
+		return errWrapf(err, "constructor %v failed", n.ctype)
+	}
+
+	return nil
 }
 
 type errCycleDetected struct {

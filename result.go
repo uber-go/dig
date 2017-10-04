@@ -34,6 +34,12 @@ import (
 //   resultObject  dig.Out struct where each field in the struct can be
 //                 another result.
 type result interface {
+	// Extracts the values for this result from the provided value and
+	// stores them in the container.
+	//
+	// This MAY panic if the result does not consume a single value.
+	Extract(*Container, reflect.Value) error
+
 	Produces() map[key]struct{}
 }
 
@@ -105,11 +111,32 @@ func newResultList(ctype reflect.Type) (resultList, error) {
 
 func (rl resultList) Produces() map[key]struct{} { return rl.produces }
 
+func (resultList) Extract(*Container, reflect.Value) error {
+	panic("It looks like you have found a bug in dig. " +
+		"Please file an issue at https://github.com/uber-go/dig/issues/ " +
+		"and provide the following message: " +
+		"resultList.Extract() must never be called")
+}
+
+func (rl resultList) ExtractList(c *Container, values []reflect.Value) error {
+	for i, r := range rl.Results {
+		if err := r.Extract(c, values[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // resultError is an error returned by a constructor.
 type resultError struct{}
 
 // resultError doesn't produce anything
 func (resultError) Produces() map[key]struct{} { return nil }
+
+func (resultError) Extract(_ *Container, v reflect.Value) error {
+	err, _ := v.Interface().(error)
+	return err
+}
 
 // resultSingle is an explicit value produced by a constructor, optionally
 // with a name.
@@ -124,6 +151,11 @@ func (rs resultSingle) Produces() map[key]struct{} {
 	return map[key]struct{}{
 		{name: rs.Name, t: rs.Type}: {},
 	}
+}
+
+func (rs resultSingle) Extract(c *Container, v reflect.Value) error {
+	c.cache[key{name: rs.Name, t: rs.Type}] = v
+	return nil
 }
 
 // resultObjectField is a single field inside a dig.Out struct.
@@ -204,3 +236,18 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 }
 
 func (ro resultObject) Produces() map[key]struct{} { return ro.produces }
+
+func (ro resultObject) Extract(c *Container, v reflect.Value) error {
+	for _, f := range ro.Fields {
+		if err := f.Result.Extract(c, v.Field(f.FieldIndex)); err != nil {
+			// In reality, this will never fail because none of the fields of
+			// a resultObject can be resultError.
+			panic(fmt.Sprintf(
+				"It looks like you have found a bug in dig. "+
+					"Please file an issue at https://github.com/uber-go/dig/issues/ "+
+					"and provide the following message: "+
+					"result.Extract() encountered an error: %v", err))
+		}
+	}
+	return nil
+}

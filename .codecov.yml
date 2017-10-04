@@ -16,4 +16,4 @@ coverage:
     patch:
       default:
         enabled: yes
-        target: 95
+        target: 70
