@@ -129,13 +129,13 @@ func (rs resultSingle) Produces() map[key]struct{} {
 // resultObjectField is a single field inside a dig.Out struct.
 type resultObjectField struct {
 	// Name of the field in the struct.
-	Name string
+	FieldName string
 
 	// Index of the field in the struct.
 	//
 	// We need to track this separately because not all fields of the struct
 	// map to results.
-	Index int
+	FieldIndex int
 
 	// Result produced by this field.
 	Result result
@@ -195,9 +195,9 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 		}
 
 		ro.Fields = append(ro.Fields, resultObjectField{
-			Name:   f.Name,
-			Index:  i,
-			Result: r,
+			FieldName:  f.Name,
+			FieldIndex: i,
+			Result:     r,
 		})
 	}
 	return ro, nil
