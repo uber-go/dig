@@ -316,7 +316,7 @@ func (c *Container) get(e edge) (reflect.Value, error) {
 		return _noValue, fmt.Errorf("type %v isn't in the container", e.key)
 	}
 
-	if err := c.contains(n.Params.Dependencies()); err != nil {
+	if err := shallowCheckDependencies(c, n.Params); err != nil {
 		if e.optional {
 			return reflect.Zero(e.t), nil
 		}
@@ -399,19 +399,6 @@ func (c *Container) set(k key, v reflect.Value) {
 		fk := key{t: f.Type, name: f.Tag.Get(_nameTag)}
 		c.set(fk, v.Field(i))
 	}
-}
-
-func (c *Container) contains(deps []edge) error {
-	var missing []key
-	for _, d := range deps {
-		if _, ok := c.nodes[d.key]; !ok && !d.optional {
-			missing = append(missing, d.key)
-		}
-	}
-	if len(missing) > 0 {
-		return fmt.Errorf("container is missing: %v", missing)
-	}
-	return nil
 }
 
 func (c *Container) remove(nodes []*node) {
@@ -551,4 +538,20 @@ func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
 	}
 
 	return optional, err
+}
+
+// Checks that all direct dependencies of the provided param are present in
+// the container. Returns an error if not.
+func shallowCheckDependencies(c *Container, p param) error {
+	var missing []key
+	forEachParamSingle(p, func(p paramSingle) {
+		k := key{name: p.Name, t: p.Type}
+		if _, ok := c.nodes[k]; !ok && !p.Optional {
+			missing = append(missing, k)
+		}
+	})
+	if len(missing) > 0 {
+		return fmt.Errorf("container is missing: %v", missing)
+	}
+	return nil
 }
