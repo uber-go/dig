@@ -150,125 +150,28 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 }
 
 func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
-	keys, err := c.getReturnKeys(ctor, ctype)
+	n, err := newNode(ctor, ctype)
 	if err != nil {
-		return errWrapf(err, "unable to collect return types of a constructor")
+		return err
 	}
 
-	nodes := make([]*node, 0, len(keys))
-	for k := range keys {
-		n, err := newNode(k, ctor, ctype)
-		if err != nil {
-			return err
+	for k := range n.Results.Produces() {
+		if _, ok := c.nodes[k]; ok {
+			return fmt.Errorf("%v (%v) provides %v, which is already in the container", ctor, ctype, k)
 		}
-		nodes = append(nodes, n)
 		c.nodes[k] = n
-	}
 
-	for _, n := range nodes {
-		if err := c.isAcyclic(n); err != nil {
-			c.remove(nodes)
-			return errWrapf(err, "introduces a cycle")
+		if err := c.isAcyclic(n.Params, k); err != nil {
+			delete(c.nodes, k)
+			return errWrapf(err, "%v (%v) introduces a cycle", ctor, ctype)
 		}
 	}
 
 	return nil
 }
 
-// Get the return types of a constructor with all the dig.Out returns get expanded.
-func (c *Container) getReturnKeys(
-	ctor interface{},
-	ctype reflect.Type,
-) (map[key]struct{}, error) {
-	// Could pre-compute the size but it's tricky as counter is different
-	// when dig.Out objects are mixed in
-	returnTypes := make(map[key]struct{})
-
-	// Check each return object
-	for i := 0; i < ctype.NumOut(); i++ {
-		outt := ctype.Out(i)
-
-		err := traverseOutTypes(key{t: outt}, func(k key) error {
-			if isError(k.t) {
-				// Don't register errors into the container.
-				return nil
-			}
-
-			// Tons of error checking
-			if IsIn(k.t) {
-				return errors.New("can't provide parameter objects")
-			}
-			if embedsType(k.t, _outPtrType) {
-				return errors.New("can't embed *dig.Out pointers")
-			}
-			if k.t.Kind() == reflect.Ptr {
-				if IsIn(k.t.Elem()) {
-					return errors.New("can't provide pointers to parameter objects")
-				}
-			}
-			if _, ok := returnTypes[k]; ok {
-				return fmt.Errorf("returns multiple %v", k)
-			}
-			if _, ok := c.nodes[k]; ok {
-				return fmt.Errorf("provides %v, which is already in the container", k)
-			}
-
-			returnTypes[k] = struct{}{}
-			return nil
-		})
-		if err != nil {
-			return returnTypes, err
-		}
-	}
-	if len(returnTypes) == 0 {
-		return nil, errors.New("must provide at least one non-error type")
-	}
-
-	return returnTypes, nil
-}
-
-// DFS traverse over all the types and execute the provided function.
-// Types that embed dig.Out get recursed on. Returns the first error encountered.
-func traverseOutTypes(k key, f func(key) error) error {
-	if !IsOut(k.t) {
-		if k.t.Kind() == reflect.Ptr {
-			if IsOut(k.t.Elem()) {
-				return fmt.Errorf("%v is a pointer to dig.Out, use value type instead", k.t)
-			}
-		}
-
-		// call the provided function on non-Out type
-		if err := f(k); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	for i := 0; i < k.t.NumField(); i++ {
-		field := k.t.Field(i)
-		ft := field.Type
-
-		if field.Type == _outType {
-			// do not recurse into dig.Out itself, it will contain digSentinel only
-			continue
-		}
-
-		if field.PkgPath != "" {
-			return fmt.Errorf(
-				"unexported fields not allowed in dig.Out, did you mean to export %q (%v) from %v",
-				field.Name, field.Type, k.t)
-		}
-
-		// keep recursing to traverse all the embedded objects
-		if err := traverseOutTypes(key{t: ft, name: field.Tag.Get(_nameTag)}, f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *Container) isAcyclic(n *node) error {
-	return detectCycles(n.Params, c.nodes, []key{n.key})
+func (c *Container) isAcyclic(p param, k key) error {
+	return detectCycles(p, c.nodes, []key{k})
 }
 
 // Set the value in the cache after a node resolution
@@ -291,33 +194,33 @@ func (c *Container) set(k key, v reflect.Value) {
 	}
 }
 
-func (c *Container) remove(nodes []*node) {
-	for _, n := range nodes {
-		delete(c.nodes, n.key)
-	}
-}
-
 type node struct {
-	key
-
 	ctor  interface{}
 	ctype reflect.Type
 
 	// Type information about constructor parameters.
 	Params paramList
+
+	// Type information about constructor results.
+	Results resultList
 }
 
-func newNode(k key, ctor interface{}, ctype reflect.Type) (*node, error) {
+func newNode(ctor interface{}, ctype reflect.Type) (*node, error) {
 	params, err := newParamList(ctype)
 	if err != nil {
 		return nil, err
 	}
 
+	results, err := newResultList(ctype)
+	if err != nil {
+		return nil, err
+	}
+
 	return &node{
-		key:    k,
-		ctor:   ctor,
-		ctype:  ctype,
-		Params: params,
+		ctor:    ctor,
+		ctype:   ctype,
+		Params:  params,
+		Results: results,
 	}, err
 }
 

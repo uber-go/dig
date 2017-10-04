@@ -920,7 +920,8 @@ func TestCantProvideParameterObjects(t *testing.T) {
 			panic("great sadness")
 		})
 		require.Error(t, err, "provide should fail")
-		require.Contains(t, err.Error(), "can't provide parameter objects")
+		require.Contains(t, err.Error(), "cannot provide parameter objects")
+		assert.Contains(t, err.Error(), "dig.Args embeds a dig.In")
 	})
 
 	t.Run("pointer from constructor", func(t *testing.T) {
@@ -931,7 +932,8 @@ func TestCantProvideParameterObjects(t *testing.T) {
 
 		err := c.Provide(func() (*Args, error) { return args, nil })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "can't provide pointers to parameter objects")
+		assert.Contains(t, err.Error(), "cannot provide parameter objects")
+		assert.Contains(t, err.Error(), "*dig.Args embeds a dig.In")
 	})
 }
 
@@ -1176,7 +1178,9 @@ func TestProvideFailures(t *testing.T) {
 		}
 		err := c.Provide(func() *out { return &out{String: "foo"} })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "dig.out is a pointer to dig.Out")
+		assert.Contains(t, err.Error(),
+			"cannot return a pointer to a result object, use a value instead: "+
+				"*dig.out is a pointer to a struct that embeds dig.Out")
 	})
 
 	t.Run("embedding pointer to out should fail", func(t *testing.T) {
@@ -1190,7 +1194,8 @@ func TestProvideFailures(t *testing.T) {
 
 		err := c.Provide(func() out { return out{String: "foo"} })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "can't embed *dig.Out pointers")
+		assert.Contains(t, err.Error(), "cannot build a result object by embedding *dig.Out, embed dig.Out instead: "+
+			"dig.out embeds *dig.Out")
 	})
 }
 
