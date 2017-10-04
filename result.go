@@ -118,7 +118,7 @@ func (resultList) Extract(*Container, reflect.Value) error {
 		"resultList.Extract() must never be called")
 }
 
-func (rl resultList) ExtractResults(c *Container, values []reflect.Value) error {
+func (rl resultList) ExtractList(c *Container, values []reflect.Value) error {
 	for i, r := range rl.Results {
 		if err := r.Extract(c, values[i]); err != nil {
 			return err

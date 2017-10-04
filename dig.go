@@ -211,7 +211,7 @@ func (n *node) Call(c *Container) error {
 	}
 
 	results := reflect.ValueOf(n.ctor).Call(args)
-	if err := n.Results.ExtractResults(c, results); err != nil {
+	if err := n.Results.ExtractList(c, results); err != nil {
 		return errWrapf(err, "constructor %v failed", n.ctype)
 	}
 
