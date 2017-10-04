@@ -1491,8 +1491,8 @@ func TestInvokeFailures(t *testing.T) {
 		}
 		err := c.Invoke(func(i *in) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "*dig.in is a pointer")
-		assert.Contains(t, err.Error(), "use value type instead")
+		assert.Contains(t, err.Error(), "cannot depend on a pointer to a parameter object, use a value instead")
+		assert.Contains(t, err.Error(), "*dig.in is a pointer to a struct that embeds dig.In")
 	})
 
 	t.Run("embedding in pointer is not supported", func(t *testing.T) {
@@ -1505,8 +1505,8 @@ func TestInvokeFailures(t *testing.T) {
 		}
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot build a parameter object by embedding *dig.In")
 		assert.Contains(t, err.Error(), "dig.in embeds *dig.In")
-		assert.Contains(t, err.Error(), "embed dig.In value instead")
 	})
 
 	t.Run("requesting a value or pointer when other is present", func(t *testing.T) {

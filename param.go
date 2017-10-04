@@ -56,10 +56,12 @@ func newParam(t reflect.Type) (param, error) {
 		return newParamObject(t)
 	case embedsType(t, _inPtrType):
 		return nil, fmt.Errorf(
-			"%v embeds *dig.In which is not supported, embed dig.In value instead", t)
+			"cannot build a parameter object by embedding *dig.In, embed dig.In instead: "+
+				"%v embeds *dig.In", t)
 	case t.Kind() == reflect.Ptr && IsIn(t.Elem()):
 		return nil, fmt.Errorf(
-			"dependency %v is a pointer to dig.In, use value type instead", t)
+			"cannot depend on a pointer to a parameter object, use a value instead: "+
+				"%v is a pointer to a struct that embeds dig.In", t)
 	case IsOut(t) || (t.Kind() == reflect.Ptr && IsOut(t.Elem())) || embedsType(t, _outPtrType):
 		return nil, fmt.Errorf("cannot depend on result objects: %v embeds a dig.Out", t)
 	default:
