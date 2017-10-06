@@ -69,25 +69,56 @@ func newParam(t reflect.Type) (param, error) {
 	}
 }
 
-// Calls the provided function on all paramSingles in the given param tree.
-func forEachParamSingle(param param, f func(paramSingle)) {
-	switch p := param.(type) {
-	case paramList:
-		for _, arg := range p.Params {
-			forEachParamSingle(arg, f)
-		}
+// paramVisitor visits every param in a param tree, allowing tracking state at
+// each level.
+type paramVisitor interface {
+	// Visit is called on the param being visited.
+	//
+	// If Visit returns a non-nil paramVisitor, that paramVisitor visits all
+	// the child params of this param.
+	Visit(param) paramVisitor
+}
+
+// paramVisitorFunc is a paramVisitor that visits all params in a tree with no
+// option of exiting early.
+type paramVisitorFunc func(param)
+
+func (f paramVisitorFunc) Visit(p param) paramVisitor {
+	f(p)
+	return f
+}
+
+// walkParam walks the param tree for the given param with the provided
+// visitor.
+//
+// paramVisitor.Visit will be called on the provided param and if a non-nil
+// paramVisitor is received, this param's descendants will be walked with that
+// visitor.
+//
+// This is very similar to how go/ast.Walk works.
+func walkParam(p param, v paramVisitor) {
+	v = v.Visit(p)
+	if v == nil {
+		return
+	}
+
+	switch par := p.(type) {
 	case paramSingle:
-		f(p)
+		// No sub-results
 	case paramObject:
-		for _, field := range p.Fields {
-			forEachParamSingle(field.Param, f)
+		for _, f := range par.Fields {
+			walkParam(f.Param, v)
+		}
+	case paramList:
+		for _, p := range par.Params {
+			walkParam(p, v)
 		}
 	default:
 		panic(fmt.Sprintf(
 			"It looks like you have found a bug in dig. "+
 				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
 				"and provide the following message: "+
-				"received unknown param type %T", param))
+				"received unknown param type %T", p))
 	}
 }
 
