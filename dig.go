@@ -60,24 +60,18 @@ type InvokeOption interface {
 
 // Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
-	nodes map[key]*node
-	cache map[key]reflect.Value
+	// Constructors for different values.
+	producers map[key][]*node
 
-	// TODO: for advanced use-case, add an index
-	// This will allow retrieval of a single type, without specifying the exact
-	// tag, provided there is only one object of that given type
-	//
-	// It will also allow library owners to create a "default" tag for their
-	// object, in case users want to provide another type with a different name
-	//
-	// index map[reflect.Type]key
+	// Values that have already been generated in the container.
+	values map[key]reflect.Value
 }
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
 	return &Container{
-		nodes: make(map[key]*node),
-		cache: make(map[key]reflect.Value),
+		producers: make(map[key][]*node),
+		values:    make(map[key]reflect.Value),
 	}
 }
 
@@ -166,9 +160,10 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 	}
 
 	for k := range keys {
-		c.nodes[k] = n
+		oldProducers := c.producers[k]
+		c.producers[k] = append(oldProducers, n)
 		if err := c.isAcyclic(n.Params, k); err != nil {
-			delete(c.nodes, k)
+			c.producers[k] = oldProducers
 			return errWrapf(err, "%v (%v) introduces a cycle", ctor, ctype)
 		}
 	}
@@ -264,7 +259,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		return nil
 	}
 
-	if _, ok := cv.c.nodes[k]; ok {
+	if _, ok := cv.c.producers[k]; ok {
 		*cv.err = fmt.Errorf(
 			"cannot provide %v from %v in constructor %v: already in the container",
 			k, path, cv.n.ctype)
@@ -276,7 +271,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 }
 
 func (c *Container) isAcyclic(p param, k key) error {
-	return detectCycles(p, c.nodes, []key{k})
+	return detectCycles(p, c.producers, []key{k})
 }
 
 // node represents a single constructor in the graph.
@@ -346,7 +341,7 @@ func (e errCycleDetected) Error() string {
 	return b.String()
 }
 
-func detectCycles(par param, graph map[key]*node, path []key) error {
+func detectCycles(par param, graph map[key][]*node, path []key) error {
 	var err error
 	walkParam(par, paramVisitorFunc(func(param param) bool {
 		if err != nil {
@@ -366,13 +361,11 @@ func detectCycles(par param, graph map[key]*node, path []key) error {
 			}
 		}
 
-		n, ok := graph[k]
-		if !ok {
-			return true
-		}
-
-		if e := detectCycles(n.Params, graph, append(path, k)); e != nil {
-			err = e
+		for _, n := range graph[k] {
+			if e := detectCycles(n.Params, graph, append(path, k)); e != nil {
+				err = e
+				return false
+			}
 		}
 
 		return true
@@ -409,7 +402,7 @@ func shallowCheckDependencies(c *Container, p param) error {
 		}
 
 		k := key{name: ps.Name, t: ps.Type}
-		if _, ok := c.nodes[k]; !ok && !ps.Optional {
+		if ns := c.producers[k]; len(ns) == 0 && !ps.Optional {
 			missing = append(missing, k)
 		}
 

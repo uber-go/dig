@@ -30,13 +30,15 @@ import (
 func (c *Container) String() string {
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "nodes: {")
-	for k, v := range c.nodes {
-		fmt.Fprintln(b, "\t", k, "->", v)
+	for k, vs := range c.producers {
+		for _, v := range vs {
+			fmt.Fprintln(b, "\t", k, "->", v)
+		}
 	}
 	fmt.Fprintln(b, "}")
 
 	fmt.Fprintln(b, "cache: {")
-	for k, v := range c.cache {
+	for k, v := range c.values {
 		fmt.Fprintln(b, "\t", k, "=>", v)
 	}
 	fmt.Fprintln(b, "}")
