@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -155,12 +156,17 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 		return err
 	}
 
-	for k := range n.Results.Produces() {
-		if _, ok := c.nodes[k]; ok {
-			return fmt.Errorf("%v (%v) provides %v, which is already in the container", ctor, ctype, k)
-		}
-		c.nodes[k] = n
+	keys, err := c.findConnections(n)
+	if err != nil {
+		return err
+	}
 
+	if len(keys) == 0 {
+		return fmt.Errorf("%v must provide at least one non-error type", ctype)
+	}
+
+	for k := range keys {
+		c.nodes[k] = n
 		if err := c.isAcyclic(n.Params, k); err != nil {
 			delete(c.nodes, k)
 			return errWrapf(err, "%v (%v) introduces a cycle", ctor, ctype)
@@ -168,6 +174,78 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 	}
 
 	return nil
+}
+
+func (c *Container) findConnections(n *node) (map[key]struct{}, error) {
+	var err error
+	keyPaths := make(map[key]string)
+	walkResult(n.Results, connectionVisitor{
+		c:    c,
+		n:    n,
+		err:  &err,
+		keys: keyPaths,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	keys := make(map[key]struct{}, len(keyPaths))
+	for k := range keyPaths {
+		keys[k] = struct{}{}
+	}
+	return keys, nil
+}
+
+type connectionVisitor struct {
+	c    *Container
+	n    *node
+	err  *error
+	keys map[key]string
+	path []string
+}
+
+func (cv connectionVisitor) VisitField(f resultObjectField) resultVisitor {
+	cv.path = append(cv.path, f.FieldName)
+	return cv
+}
+
+func (cv connectionVisitor) VisitPosition(i int) resultVisitor {
+	cv.path = append(cv.path, fmt.Sprintf("[%d]", i))
+	return cv
+}
+
+func (cv connectionVisitor) Visit(res result) resultVisitor {
+	// Already failed. Stop looking.
+	if *cv.err != nil {
+		return nil
+	}
+
+	path := strings.Join(cv.path, ".")
+
+	r, ok := res.(resultSingle)
+	if !ok {
+		return cv
+	}
+
+	k := key{name: r.Name, t: r.Type}
+
+	if conflict, ok := cv.keys[k]; ok {
+		*cv.err = fmt.Errorf(
+			"cannot provide %v from %v in constructor %v: already provided by %v",
+			k, path, cv.n.ctype, conflict)
+		return nil
+	}
+
+	if _, ok := cv.c.nodes[k]; ok {
+		*cv.err = fmt.Errorf(
+			"cannot provide %v from %v in constructor %v: already in the container",
+			k, path, cv.n.ctype)
+		return nil
+	}
+
+	cv.keys[k] = path
+	return cv
 }
 
 func (c *Container) isAcyclic(p param, k key) error {

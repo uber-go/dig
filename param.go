@@ -77,6 +77,9 @@ type paramVisitor interface {
 	// If Visit returns a non-nil paramVisitor, that paramVisitor visits all
 	// the child params of this param.
 	Visit(param) paramVisitor
+
+	// We can implement VisitField and VisitPosition like resultVisitor if we
+	// need to track that information in the future.
 }
 
 // paramVisitorFunc is a paramVisitor that visits param in a tree with the

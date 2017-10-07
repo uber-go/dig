@@ -37,21 +37,6 @@ func TestNewResultListErrors(t *testing.T) {
 		err  string
 	}{
 		{
-			desc: "no results",
-			give: func() {},
-			err:  "must provide at least one non-error type",
-		},
-		{
-			desc: "only error",
-			give: func() error { panic("invalid") },
-			err:  "must provide at least one non-error type",
-		},
-		{
-			desc: "empty dig.Out",
-			give: func() struct{ Out } { panic("invalid") },
-			err:  "must provide at least one non-error type",
-		},
-		{
 			desc: "returns dig.In",
 			give: func() struct{ In } { panic("invalid") },
 			err:  "bad result 1: cannot provide parameter objects",
@@ -65,23 +50,6 @@ func TestNewResultListErrors(t *testing.T) {
 				panic("invalid")
 			},
 			err: "bad result 1: cannot provide parameter objects",
-		},
-		{
-			desc: "type conflict",
-			give: func() (io.Reader, io.Writer, io.Reader) { panic("invalid") },
-			err:  "returns multiple io.Reader",
-		},
-		{
-			desc: "name conflict",
-			give: func() struct {
-				Out
-
-				NamedWriter   io.Writer `name:"what"`
-				AnotherWriter io.Writer `name:"what"`
-			} {
-				panic("invalid")
-			},
-			err: "returns multiple io.Writer:what",
 		},
 	}
 
@@ -168,34 +136,6 @@ func TestNewResultObjectErrors(t *testing.T) {
 				Error error
 			}{},
 			err: `cannot return errors from dig.Out, return it from the constructor instead: field "Error" (error)`,
-		},
-		{
-			desc: "type conflict",
-			give: struct {
-				Out
-
-				Reader io.Reader
-				Writer io.Writer
-
-				Nested struct {
-					Out
-
-					AnotherReader io.Reader
-					AnotherWriter io.Writer `name:"conflict-free-writer"`
-				}
-			}{},
-			err: "returns multiple io.Reader",
-		},
-		{
-			desc: "name conflict",
-			give: struct {
-				Out
-
-				Reader        io.Reader
-				NamedWriter   io.Writer `name:"what"`
-				AnotherWriter io.Writer `name:"what"`
-			}{},
-			err: "returns multiple io.Writer:what",
 		},
 		{
 			desc: "nested dig.In",
