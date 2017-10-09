@@ -166,46 +166,45 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		return v, nil
 	}
 
-	n, ok := c.nodes[k]
-	if !ok {
-		// Unlike in the fallback case below, if a user makes an error
-		// requesting an optional value, a good error message ("did you mean
-		// X?") will not be used and we'll return a zero value instead.
-		if ps.Optional {
-			return reflect.Zero(ps.Type), nil
+	if n, ok := c.nodes[k]; ok {
+		if err := shallowCheckDependencies(c, n.Params); err != nil {
+			if ps.Optional {
+				return reflect.Zero(ps.Type), nil
+			}
+			return _noValue, errWrapf(err, "missing dependencies for %v", k)
 		}
 
-		// If the type being asked for is the pointer that is not found,
-		// check if the graph contains the value type element - perhaps the user
-		// accidentally included a splat and vice versa.
-		var typo reflect.Type
-		if ps.Type.Kind() == reflect.Ptr {
-			typo = ps.Type.Elem()
-		} else {
-			typo = reflect.PtrTo(ps.Type)
+		if err := n.Call(c); err != nil {
+			return _noValue, errWrapf(err, "failed to build %v", k)
 		}
 
-		tk := key{t: typo, name: ps.Name}
-		if _, ok := c.nodes[tk]; ok {
-			return _noValue, fmt.Errorf(
-				"type %v is not in the container, did you mean to use %v?", k, tk)
-		}
-
-		return _noValue, fmt.Errorf("type %v isn't in the container", k)
+		return c.cache[k], nil
 	}
 
-	if err := shallowCheckDependencies(c, n.Params); err != nil {
-		if ps.Optional {
-			return reflect.Zero(ps.Type), nil
-		}
-		return _noValue, errWrapf(err, "missing dependencies for %v", k)
+	// Unlike in the fallback case below, if a user makes an error
+	// requesting an optional value, a good error message ("did you mean
+	// X?") will not be used and we'll return a zero value instead.
+	if ps.Optional {
+		return reflect.Zero(ps.Type), nil
 	}
 
-	if err := n.Call(c); err != nil {
-		return _noValue, errWrapf(err, "failed to build %v", k)
+	// If the type being asked for is the pointer that is not found,
+	// check if the graph contains the value type element - perhaps the user
+	// accidentally included a splat and vice versa.
+	var typo reflect.Type
+	if ps.Type.Kind() == reflect.Ptr {
+		typo = ps.Type.Elem()
+	} else {
+		typo = reflect.PtrTo(ps.Type)
 	}
 
-	return c.cache[k], nil
+	tk := key{t: typo, name: ps.Name}
+	if _, ok := c.nodes[tk]; ok {
+		return _noValue, fmt.Errorf(
+			"type %v is not in the container, did you mean to use %v?", k, tk)
+	}
+
+	return _noValue, fmt.Errorf("type %v isn't in the container", k)
 }
 
 // paramObjectField is a single field of a dig.In struct.
