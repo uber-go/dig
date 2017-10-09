@@ -213,28 +213,11 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		return ps.buildNode(k, c, n)
 	}
 
-	if r, ok := c.rules[key{t: ps.Type}]; ok {
+	if r, ok := c.rules[ps.Type]; ok {
 		if k.name != "" {
-			ri := node{
-				ctor:  r.ctor,
-				ctype: r.ctype,
-				Params: paramList{
-					ctype: r.Params.ctype,
-				},
-				Results: resultList{
-					ctype: r.Results.ctype,
-				},
-			}
-
-			// XXX which ones to rename? how?
-			ri.Params.Params = append([]param(nil), r.Params.Params...)
-			ri.Results.produces = make(map[key]struct{})
-			ri.Results.Results = append([]param(nil), r.Results.Results...)
-
-			// TODO: named params -> results
+			return ps.buildNode(k, c, instancedNode(k.name, r))
 		}
-
-		return ps.buildNode(c, r)
+		// XXX probably not useful?  return ps.buildNode(c, r)
 	}
 
 	// Unlike in the fallback case below, if a user makes an error
