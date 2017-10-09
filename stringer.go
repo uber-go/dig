@@ -41,6 +41,12 @@ func (c *Container) String() string {
 	}
 	fmt.Fprintln(b, "}")
 
+	fmt.Fprintln(b, "rules: {")
+	for k, v := range c.rules {
+		fmt.Fprintln(b, "\t", k, "->", v)
+	}
+	fmt.Fprintln(b, "}")
+
 	return b.String()
 }
 

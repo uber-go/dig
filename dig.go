@@ -61,6 +61,7 @@ type InvokeOption interface {
 type Container struct {
 	nodes map[key]*node
 	cache map[key]reflect.Value
+	rules map[reflect.Type]*node
 
 	// TODO: for advanced use-case, add an index
 	// This will allow retrieval of a single type, without specifying the exact
@@ -77,6 +78,7 @@ func New(opts ...Option) *Container {
 	return &Container{
 		nodes: make(map[key]*node),
 		cache: make(map[key]reflect.Value),
+		rules: make(map[reflect.Type]*node),
 	}
 }
 
@@ -106,6 +108,21 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	}
 	if err := c.provide(constructor, ctype); err != nil {
 		return errWrapf(err, "can't provide %v", ctype)
+	}
+	return nil
+}
+
+// ProvideRule XXX probably options for #reasons
+func (c *Container) ProvideRule(constructor interface{}) error {
+	ctype := reflect.TypeOf(constructor)
+	if ctype == nil {
+		return errors.New("can't provide an untyped nil")
+	}
+	if ctype.Kind() != reflect.Func {
+		return fmt.Errorf("must provide rule constructor function, got %v (type %v)", constructor, ctype)
+	}
+	if err := c.provideRule(constructor, ctype); err != nil {
+		return errWrapf(err, "can't provide rule %v", ctype)
 	}
 	return nil
 }
@@ -165,6 +182,27 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 			delete(c.nodes, k)
 			return errWrapf(err, "%v (%v) introduces a cycle", ctor, ctype)
 		}
+	}
+
+	return nil
+}
+
+func (c *Container) provideRule(ctor interface{}, ctype reflect.Type) error {
+	n, err := newNode(ctor, ctype)
+	if err != nil {
+		return err
+	}
+
+	for k := range n.Results.Produces() {
+		if k.name != "" {
+			return fmt.Errorf("%v (%v) provides rule %v, named rule results not supported", ctor, ctype, k)
+		}
+		if _, ok := c.rules[k.t]; ok {
+			return fmt.Errorf("%v (%v) provides rule %v, which is already in the container", ctor, ctype, k)
+		}
+		c.rules[k.t] = n
+
+		// XXX do we need to take rules into cycle consideration?
 	}
 
 	return nil
