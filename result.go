@@ -93,12 +93,8 @@ func newResultList(ctype reflect.Type) (resultList, error) {
 			return rl, errWrapf(err, "bad result %d", i+1)
 		}
 		rl.Results[i] = r
-
-		for k := range r.Produces() {
-			if _, ok := rl.produces[k]; ok {
-				return rl, fmt.Errorf("returns multiple %v", k)
-			}
-			rl.produces[k] = struct{}{}
+		if err := rl.addProduces(r); err != nil {
+			return rl, err
 		}
 	}
 
@@ -107,6 +103,16 @@ func newResultList(ctype reflect.Type) (resultList, error) {
 	}
 
 	return rl, nil
+}
+
+func (rl resultList) addProduces(r result) error {
+	for k := range r.Produces() {
+		if _, ok := rl.produces[k]; ok {
+			return fmt.Errorf("returns multiple %v", k)
+		}
+		rl.produces[k] = struct{}{}
+	}
+	return nil
 }
 
 func (rl resultList) Produces() map[key]struct{} { return rl.produces }
