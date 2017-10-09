@@ -80,6 +80,73 @@ type resultList struct {
 	Results []result
 }
 
+func instancedResultList(name string, rl resultList) resultList {
+	rl2 := resultList{
+		ctype:   rl.ctype,
+		Results: make([]result, len(rl.Results)),
+	}
+	rl2.produces = make(map[key]struct{})
+	for i, r := range rl.Results {
+		rl2.Results[i] = instancedResult(name, r)
+		if err := rl2.addProduces(r); err != nil {
+			// XXX is this likely enough to thread errors around through result
+			// instantiation? If we already were able to pass newResultList the
+			// first time, how could we now have a novel key collision? I mean
+			// we could contrive scenarios where a user has already named a T
+			// result, but also provides an unnamed (to be instanced) T
+			// result... and then we happen to instance that rule under the
+			// same name...
+			panic(err)
+		}
+	}
+
+	return rl2
+}
+
+func instancedResult(name string, result result) result {
+	switch r := result.(type) {
+	case resultSingle:
+		if r.Name == "" {
+			r.Name = name
+		}
+		return r
+
+	case resultList:
+		return instancedResultList(name, r)
+
+	case resultObject:
+		r = resultObject{
+			Type:     r.Type,
+			Fields:   append([]resultObjectField(nil), r.Fields...),
+			produces: make(map[key]struct{}),
+		}
+		for i := range r.Fields {
+			fr := r.Fields[i].Result
+			fr = instancedResult(name, fr)
+			r.Fields[i].Result = fr
+			// TODO: dedupe logic with newResultObject and resultList.addProduces
+			for k := range fr.Produces() {
+				if _, ok := r.produces[k]; ok {
+					// XXX same "Should this panic?" note as instancedResultList
+					panic(fmt.Errorf("returns multiple %v", k))
+				}
+				r.produces[k] = struct{}{}
+			}
+		}
+		return r
+
+	case resultError:
+		return r
+
+	default:
+		panic(fmt.Sprintf(
+			"It looks like you have found a bug in dig. "+
+				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
+				"and provide the following message: "+
+				"received unknown result type %T", result))
+	}
+}
+
 func newResultList(ctype reflect.Type) (resultList, error) {
 	rl := resultList{
 		ctype:    ctype,

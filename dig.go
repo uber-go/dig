@@ -204,6 +204,15 @@ func newNode(ctor interface{}, ctype reflect.Type) (*node, error) {
 	}, err
 }
 
+func instancedNode(name string, n *node) *node {
+	return &node{
+		ctor:    n.ctor,
+		ctype:   n.ctype,
+		Params:  instancedParamList(name, n.Params),
+		Results: instancedResultList(name, n.Results),
+	}
+}
+
 func (n *node) Call(c *Container) error {
 	args, err := n.Params.BuildList(c)
 	if err != nil {

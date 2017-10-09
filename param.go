@@ -91,6 +91,47 @@ func forEachParamSingle(param param, f func(paramSingle)) {
 	}
 }
 
+func instancedParamList(name string, pl paramList) paramList {
+	pl2 := paramList{
+		ctype:  pl.ctype,
+		Params: make([]param, len(pl.Params)),
+	}
+	for i, p := range pl.Params {
+		pl2.Params[i] = instancedParam(name, p)
+	}
+	return pl2
+}
+
+func instancedParam(name string, param param) param {
+	switch p := param.(type) {
+	case paramSingle:
+		if p.Name == "" {
+			p.Name = name
+		}
+		return p
+
+	case paramList:
+		return instancedParamList(name, p)
+
+	case paramObject:
+		p = paramObject{
+			Type:   p.Type,
+			Fields: append([]paramObjectField(nil), p.Fields...),
+		}
+		for i := range p.Fields {
+			p.Fields[i].Param = instancedParam(name, p.Fields[i].Param)
+		}
+		return p
+
+	default:
+		panic(fmt.Sprintf(
+			"It looks like you have found a bug in dig. "+
+				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
+				"and provide the following message: "+
+				"received unknown param type %T", param))
+	}
+}
+
 // paramList holds all arguments of the constructor as params.
 //
 // NOTE: Build() MUST NOT be called on paramList. Instead, BuildList
