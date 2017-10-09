@@ -1671,8 +1671,11 @@ func TestInvokeFailures(t *testing.T) {
 	})
 }
 
-func TestProvideRuleXXX(t *testing.T) {
-	// XXX rename and/or subsume into other suites above
+func TestProvideRule_PoC(t *testing.T) {
+	// XXX this test is just a proof on concept, I haven't yet grokked the
+	// layout of the pre-existing test suite, but it seems like if this feature
+	// sticks, it should be tested in situ within the above suite, rather than
+	// being standalone.
 
 	c := New()
 
@@ -1688,6 +1691,8 @@ func TestProvideRuleXXX(t *testing.T) {
 	// - static provide, rather than wrap it in a nil-adic func
 	// - named provide, rather than need to create a struct, just to name some
 	//   piece of static data
+	// - further, how about some sort of collection support, like providing
+	//   some []S and a func(S) T should provide a []T.
 	type rawStuff struct {
 		Out
 		A []byte `name:"a"`

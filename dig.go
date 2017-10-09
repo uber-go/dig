@@ -113,6 +113,10 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 }
 
 // ProvideRule XXX probably options for #reasons
+//
+// XXX but maybe, this should just be some ProvideOption rather than a separate
+// toplevel api? How about `c.Provide(func(S) T, dig.ProvideRule)` (where
+// ProvideRule would be some ProvideOption sentinel?)
 func (c *Container) ProvideRule(constructor interface{}) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {
