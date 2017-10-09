@@ -22,6 +22,7 @@ package dig
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -1668,4 +1669,55 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), ": great sadness")
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
+}
+
+func TestProvideRuleXXX(t *testing.T) {
+	// XXX rename and/or subsume into other suites above
+
+	c := New()
+
+	type someData map[string]interface{}
+
+	require.NoError(t, c.ProvideRule(func(data []byte) (someData, error) {
+		var res someData
+		err := json.Unmarshal(data, &res)
+		return res, err
+	}))
+
+	// XXX would be nice to have any/all of :
+	// - static provide, rather than wrap it in a nil-adic func
+	// - named provide, rather than need to create a struct, just to name some
+	//   piece of static data
+	type rawStuff struct {
+		Out
+		A []byte `name:"a"`
+		B []byte `name:"b"`
+		C []byte `name:"c"`
+	}
+	require.NoError(t, c.Provide(func() rawStuff {
+		return rawStuff{
+			A: []byte(`{"a":42}`),
+			B: []byte(`{"b":5}`),
+			C: []byte(`{"c":13}`),
+		}
+	}))
+
+	require.NoError(t, c.Invoke(func(s struct {
+		In
+		A someData `name:"a"`
+		C someData `name:"c"`
+	}) {
+		assert.Equal(t, float64(42), s.A["a"])
+		assert.Equal(t, float64(13), s.C["c"])
+	}))
+
+	// XXX would like to assert that we didn't instantiate over B
+
+	// TODO: other ideas
+	// - type FilePath string, with a os.Open and/or ioutil.ReadAll as a
+	//   rule... but connecting os.Open and ioutil.ReadAll actually points out
+	//   a lacking in the current dep-solving: concrete result as an interface
+	//   param.
+	// - database connection constructor, over a database connection config
+	//   type
 }
