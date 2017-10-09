@@ -167,18 +167,7 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 	}
 
 	if n, ok := c.nodes[k]; ok {
-		if err := shallowCheckDependencies(c, n.Params); err != nil {
-			if ps.Optional {
-				return reflect.Zero(ps.Type), nil
-			}
-			return _noValue, errWrapf(err, "missing dependencies for %v", k)
-		}
-
-		if err := n.Call(c); err != nil {
-			return _noValue, errWrapf(err, "failed to build %v", k)
-		}
-
-		return c.cache[k], nil
+		return ps.buildNode(k, c, n)
 	}
 
 	// Unlike in the fallback case below, if a user makes an error
@@ -205,6 +194,21 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 	}
 
 	return _noValue, fmt.Errorf("type %v isn't in the container", k)
+}
+
+func (ps paramSingle) buildNode(k key, c *Container, n *node) (reflect.Value, error) {
+	if err := shallowCheckDependencies(c, n.Params); err != nil {
+		if ps.Optional {
+			return reflect.Zero(ps.Type), nil
+		}
+		return _noValue, errWrapf(err, "missing dependencies for %v", k)
+	}
+
+	if err := n.Call(c); err != nil {
+		return _noValue, errWrapf(err, "failed to build %v", k)
+	}
+
+	return c.cache[k], nil
 }
 
 // paramObjectField is a single field of a dig.In struct.
