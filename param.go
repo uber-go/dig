@@ -195,6 +195,8 @@ func (pl paramList) BuildList(c *Container) ([]reflect.Value, error) {
 //
 // This object must be present in the graph as-is unless it's specified as
 // optional.
+//
+// XXX rules
 type paramSingle struct {
 	Name     string
 	Optional bool
@@ -209,6 +211,30 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 
 	if n, ok := c.nodes[k]; ok {
 		return ps.buildNode(k, c, n)
+	}
+
+	if r, ok := c.rules[key{t: ps.Type}]; ok {
+		if k.name != "" {
+			ri := node{
+				ctor:  r.ctor,
+				ctype: r.ctype,
+				Params: paramList{
+					ctype: r.Params.ctype,
+				},
+				Results: resultList{
+					ctype: r.Results.ctype,
+				},
+			}
+
+			// XXX which ones to rename? how?
+			ri.Params.Params = append([]param(nil), r.Params.Params...)
+			ri.Results.produces = make(map[key]struct{})
+			ri.Results.Results = append([]param(nil), r.Results.Results...)
+
+			// TODO: named params -> results
+		}
+
+		return ps.buildNode(c, r)
 	}
 
 	// Unlike in the fallback case below, if a user makes an error
