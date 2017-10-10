@@ -156,3 +156,147 @@ func TestNewResultObjectErrors(t *testing.T) {
 		})
 	}
 }
+
+type fakeResultVisit struct {
+	Visit         result
+	VisitField    *resultObjectField
+	VisitPosition int
+	Return        fakeResultVisits
+}
+
+func (fv fakeResultVisit) String() string {
+	switch {
+	case fv.Visit != nil:
+		return fmt.Sprintf("Visit(%#v) -> %v", fv.Visit, fv.Return)
+	case fv.VisitField != nil:
+		return fmt.Sprintf("VisitField(%#v) -> %v", *fv.VisitField, fv.Return)
+	default:
+		return fmt.Sprintf("VisitPosition(%v) -> %v", fv.VisitPosition, fv.Return)
+	}
+}
+
+type fakeResultVisits []fakeResultVisit
+
+func (vs fakeResultVisits) Visitor(t *testing.T) resultVisitor {
+	return &fakeResultVisitor{t: t, visits: vs}
+}
+
+type fakeResultVisitor struct {
+	t      *testing.T
+	visits fakeResultVisits
+}
+
+func (fv *fakeResultVisitor) popNext(call string) fakeResultVisit {
+	if len(fv.visits) == 0 {
+		fv.t.Fatalf("received unexpected call %v: no more calls were expected", call)
+	}
+
+	visit := fv.visits[0]
+	fv.visits = fv.visits[1:]
+	return visit
+}
+
+func (fv *fakeResultVisitor) Visit(r result) resultVisitor {
+	v := fv.popNext(fmt.Sprintf("Visit(%#v)", r))
+	if !reflect.DeepEqual(r, v.Visit) {
+		fv.t.Fatalf("received unexpected call Visit(%#v)\nexpected %v", r, v)
+	}
+	return &fakeResultVisitor{t: fv.t, visits: v.Return}
+}
+
+func (fv *fakeResultVisitor) VisitField(f resultObjectField) resultVisitor {
+	v := fv.popNext(fmt.Sprintf("VisitField(%#v)", f))
+	if v.VisitField == nil || !reflect.DeepEqual(f, *v.VisitField) {
+		fv.t.Fatalf("received unexpected call VisitField(%#v)\nexpected %v", f, v)
+	}
+	return &fakeResultVisitor{t: fv.t, visits: v.Return}
+}
+
+func (fv *fakeResultVisitor) VisitPosition(i int) resultVisitor {
+	v := fv.popNext(fmt.Sprintf("VisitPosition(%v)", i))
+	if i != v.VisitPosition {
+		fv.t.Fatalf("received unexpected call VisitPosition(%v)\nexpected %v", i, v)
+	}
+	return &fakeResultVisitor{t: fv.t, visits: v.Return}
+}
+
+func TestWalkResult(t *testing.T) {
+	t.Run("invalid result type", func(t *testing.T) {
+		type badResult struct{ result }
+		visitor := fakeResultVisits{
+			{Visit: badResult{}, Return: fakeResultVisits{}},
+		}.Visitor(t)
+		assert.Panics(t,
+			func() {
+				walkResult(badResult{}, visitor)
+			})
+	})
+
+	t.Run("resultObject ordering", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		type type4 struct{}
+
+		typ := reflect.TypeOf(struct {
+			Out
+
+			T1 type1
+			T2 type2
+
+			Nested struct {
+				Out
+
+				T3 type3
+				T4 type4
+			}
+		}{})
+
+		ro, err := newResultObject(typ)
+		require.NoError(t, err)
+
+		v := fakeResultVisits{
+			{
+				Visit: ro,
+				Return: fakeResultVisits{
+					{
+						VisitField: &ro.Fields[0],
+						Return: fakeResultVisits{
+							{Visit: ro.Fields[0].Result},
+						},
+					},
+					{
+						VisitField: &ro.Fields[1],
+						Return: fakeResultVisits{
+							{Visit: ro.Fields[1].Result},
+						},
+					},
+					{
+						VisitField: &ro.Fields[2],
+						Return: fakeResultVisits{
+							{
+								Visit: ro.Fields[2].Result,
+								Return: fakeResultVisits{
+									{
+										VisitField: &ro.Fields[2].Result.(resultObject).Fields[0],
+										Return: fakeResultVisits{
+											{Visit: ro.Fields[2].Result.(resultObject).Fields[0].Result},
+										},
+									},
+									{
+										VisitField: &ro.Fields[2].Result.(resultObject).Fields[1],
+										Return: fakeResultVisits{
+											{Visit: ro.Fields[2].Result.(resultObject).Fields[1].Result},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}.Visitor(t)
+
+		walkResult(ro, v)
+	})
+}
