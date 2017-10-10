@@ -60,7 +60,8 @@ type InvokeOption interface {
 
 // Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
-	// Constructors for different values.
+	// Mapping from key to all the nodes that can produce a value for that
+	// key.
 	producers map[key][]*node
 
 	// Values that have already been generated in the container.
@@ -274,12 +275,17 @@ func (c *Container) isAcyclic(p param, k key) error {
 	return detectCycles(p, c.producers, []key{k})
 }
 
-// node represents a single constructor in the graph.
+// node is a node in the dependency graph. Each node maps to a single
+// constructor provided by the user.
+//
+// Nodes can produce zero or more values that they store into the container.
+// For the Provide path, we verify that nodes produce at least one value,
+// otherwise the function will never be called.
 type node struct {
 	ctor  interface{}
 	ctype reflect.Type
 
-	// Whether this constructor was already run.
+	// Whether the constructor owned by this node was already called.
 	called bool
 
 	// Type information about constructor parameters.
@@ -308,6 +314,8 @@ func newNode(ctor interface{}, ctype reflect.Type) (*node, error) {
 	}, err
 }
 
+// Call calls this node's constructor if it hasn't already been called and
+// injects any values produced by it into the provided container.
 func (n *node) Call(c *Container) error {
 	if n.called {
 		return nil
