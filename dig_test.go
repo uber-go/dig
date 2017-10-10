@@ -1674,3 +1674,17 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
 }
+
+func TestNodeAlreadyCalled(t *testing.T) {
+	type type1 struct{}
+	f := func() type1 { return type1{} }
+
+	n, err := newNode(f, reflect.TypeOf(f))
+	require.NoError(t, err, "failed to build node")
+	require.False(t, n.called, "node must not have been called")
+
+	c := New()
+	require.NoError(t, n.Call(c), "invoke failed")
+	require.True(t, n.called, "node must be called")
+	require.NoError(t, n.Call(c), "calling again should be okay")
+}
