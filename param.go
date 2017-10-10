@@ -79,13 +79,16 @@ type paramVisitor interface {
 	Visit(param) paramVisitor
 }
 
-// paramVisitorFunc is a paramVisitor that visits all params in a tree with no
-// option of exiting early.
-type paramVisitorFunc func(param)
+// paramVisitorFunc is a paramVisitor that visits param in a tree with the
+// return value deciding whether the descendants of this param should be
+// recursed into.
+type paramVisitorFunc func(param) (recurse bool)
 
 func (f paramVisitorFunc) Visit(p param) paramVisitor {
-	f(p)
-	return f
+	if f(p) {
+		return f
+	}
+	return nil
 }
 
 // walkParam walks the param tree for the given param with the provided

@@ -234,32 +234,34 @@ func (e errCycleDetected) Error() string {
 
 func detectCycles(par param, graph map[key]*node, path []key) error {
 	var err error
-	walkParam(par, paramVisitorFunc(func(param param) {
+	walkParam(par, paramVisitorFunc(func(param param) bool {
 		if err != nil {
-			return
+			return false
 		}
 
 		p, ok := param.(paramSingle)
 		if !ok {
-			return
+			return true
 		}
 
 		k := key{name: p.Name, t: p.Type}
 		for _, p := range path {
 			if p == k {
 				err = errCycleDetected{Path: path, Key: k}
-				return
+				return false
 			}
 		}
 
 		n, ok := graph[k]
 		if !ok {
-			return
+			return true
 		}
 
 		if e := detectCycles(n.Params, graph, append(path, k)); e != nil {
 			err = e
 		}
+
+		return true
 	}))
 
 	return err
@@ -286,16 +288,18 @@ func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
 // the container. Returns an error if not.
 func shallowCheckDependencies(c *Container, p param) error {
 	var missing []key
-	walkParam(p, paramVisitorFunc(func(p param) {
+	walkParam(p, paramVisitorFunc(func(p param) bool {
 		ps, ok := p.(paramSingle)
 		if !ok {
-			return
+			return true
 		}
 
 		k := key{name: ps.Name, t: ps.Type}
 		if _, ok := c.nodes[k]; !ok && !ps.Optional {
 			missing = append(missing, k)
 		}
+
+		return true
 	}))
 
 	if len(missing) > 0 {
