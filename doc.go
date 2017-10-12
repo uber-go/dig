@@ -228,7 +228,7 @@
 // `name:".."` to have the corresponding value added to the graph under the
 // specified name.
 //
-//   type ConnectionResult {
+//   type ConnectionResult struct {
 //     dig.Out
 //
 //     ReadWrite *sql.DB `name:"rw"`
