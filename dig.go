@@ -232,43 +232,39 @@ func (e errCycleDetected) Error() string {
 	return b.String()
 }
 
-func detectCycles(param param, graph map[key]*node, path []key) error {
-	switch p := param.(type) {
-	case paramList:
-		for _, p := range p.Params {
-			if err := detectCycles(p, graph, path); err != nil {
-				return err
-			}
+func detectCycles(par param, graph map[key]*node, path []key) error {
+	var err error
+	walkParam(par, paramVisitorFunc(func(param param) bool {
+		if err != nil {
+			return false
 		}
-	case paramSingle:
+
+		p, ok := param.(paramSingle)
+		if !ok {
+			return true
+		}
+
 		k := key{name: p.Name, t: p.Type}
 		for _, p := range path {
 			if p == k {
-				return errCycleDetected{Path: path, Key: k}
+				err = errCycleDetected{Path: path, Key: k}
+				return false
 			}
 		}
-		path = append(path, k)
 
 		n, ok := graph[k]
 		if !ok {
-			return nil
+			return true
 		}
 
-		return detectCycles(n.Params, graph, path)
-	case paramObject:
-		for _, f := range p.Fields {
-			if err := detectCycles(f.Param, graph, path); err != nil {
-				return err
-			}
+		if e := detectCycles(n.Params, graph, append(path, k)); e != nil {
+			err = e
 		}
-	default:
-		panic(fmt.Sprintf(
-			"It looks like you have found a bug in dig. "+
-				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
-				"and provide the following message: "+
-				"received unknown param type %T", param))
-	}
-	return nil
+
+		return true
+	}))
+
+	return err
 }
 
 // Checks if a field of an In struct is optional.
@@ -292,12 +288,20 @@ func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
 // the container. Returns an error if not.
 func shallowCheckDependencies(c *Container, p param) error {
 	var missing []key
-	forEachParamSingle(p, func(p paramSingle) {
-		k := key{name: p.Name, t: p.Type}
-		if _, ok := c.nodes[k]; !ok && !p.Optional {
+	walkParam(p, paramVisitorFunc(func(p param) bool {
+		ps, ok := p.(paramSingle)
+		if !ok {
+			return true
+		}
+
+		k := key{name: ps.Name, t: ps.Type}
+		if _, ok := c.nodes[k]; !ok && !ps.Optional {
 			missing = append(missing, k)
 		}
-	})
+
+		return true
+	}))
+
 	if len(missing) > 0 {
 		return fmt.Errorf("container is missing: %v", missing)
 	}

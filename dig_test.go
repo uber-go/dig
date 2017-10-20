@@ -1009,6 +1009,7 @@ func TestProvideCycleFails(t *testing.T) {
 			In
 
 			B B
+			W io.Writer
 		}
 		newC := func(CParams) C { return C{} }
 
