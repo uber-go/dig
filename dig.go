@@ -279,9 +279,13 @@ func (c *Container) isAcyclic(p param, k key) error {
 	return detectCycles(p, c.nodes, []key{k})
 }
 
+// node represents a single constructor in the graph.
 type node struct {
 	ctor  interface{}
 	ctype reflect.Type
+
+	// Whether this constructor was already run.
+	called bool
 
 	// Type information about constructor parameters.
 	Params paramList
@@ -310,6 +314,10 @@ func newNode(ctor interface{}, ctype reflect.Type) (*node, error) {
 }
 
 func (n *node) Call(c *Container) error {
+	if n.called {
+		return nil
+	}
+
 	args, err := n.Params.BuildList(c)
 	if err != nil {
 		return errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
@@ -320,6 +328,7 @@ func (n *node) Call(c *Container) error {
 		return errWrapf(err, "constructor %v failed", n.ctype)
 	}
 
+	n.called = true
 	return nil
 }
 
