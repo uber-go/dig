@@ -24,9 +24,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -45,8 +47,12 @@ type key struct {
 // Option configures a Container. It's included for future functionality;
 // currently, there are no concrete implementations.
 type Option interface {
-	unimplemented()
+	applyOption(*Container)
 }
+
+type optionFunc func(*Container)
+
+func (f optionFunc) applyOption(c *Container) { f(c) }
 
 // A ProvideOption modifies the default behavior of Provide. It's included for
 // future functionality; currently, there are no concrete implementations.
@@ -71,15 +77,33 @@ type Container struct {
 
 	// Values groups that have already been generated in the container.
 	groups map[key][]reflect.Value
+
+	// Source of randomness.
+	rand *rand.Rand
 }
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
-	return &Container{
+	c := &Container{
 		providers: make(map[key][]*node),
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
+		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
+
+	for _, opt := range opts {
+		opt.applyOption(c)
+	}
+	return c
+}
+
+// Changes the source of randomness for the container.
+//
+// This will help provide determinism during tests.
+func setRand(r *rand.Rand) Option {
+	return optionFunc(func(c *Container) {
+		c.rand = r
+	})
 }
 
 // Provide teaches the container how to build values of one or more types and

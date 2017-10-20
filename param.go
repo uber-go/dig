@@ -34,8 +34,9 @@ import (
 //  paramObject   dig.In struct where each field in the struct can be another
 //                param.
 //  paramGroupedSlice
-//                A slice consuming a value group. This will receive alle the
-//                values grouped under that name.
+//                A slice consuming a value group. This will receive all
+//                values produced with a `group:".."` tag with the same name
+//                as a slice.
 type param interface {
 	fmt.Stringer
 
@@ -374,7 +375,7 @@ func (pt paramGroupedSlice) Build(c *Container) (reflect.Value, error) {
 	items := c.groups[k]
 
 	// shuffle the list so users don't rely on the ordering of grouped values
-	items = shuffledCopy(items)
+	items = shuffledCopy(c.rand, items)
 
 	result := reflect.MakeSlice(pt.Type, len(items), len(items))
 	for i, v := range items {
@@ -383,9 +384,8 @@ func (pt paramGroupedSlice) Build(c *Container) (reflect.Value, error) {
 	return result, nil
 }
 
-func shuffledCopy(items []reflect.Value) []reflect.Value {
+func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
 	newItems := make([]reflect.Value, len(items))
-	// TODO(abg): Inject rand to get some determinism during tests.
 	for i, j := range rand.Perm(len(items)) {
 		newItems[i] = items[j]
 	}
