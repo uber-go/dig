@@ -156,7 +156,7 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 		return err
 	}
 
-	keys, err := c.findConnections(n)
+	keys, err := c.findAndValidateResults(n)
 	if err != nil {
 		return err
 	}
@@ -176,14 +176,15 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 	return nil
 }
 
-func (c *Container) findConnections(n *node) (map[key]struct{}, error) {
+// Builds a collection of all result types produced by this node.
+func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 	var err error
 	keyPaths := make(map[key]string)
 	walkResult(n.Results, connectionVisitor{
-		c:    c,
-		n:    n,
-		err:  &err,
-		keys: keyPaths,
+		c:        c,
+		n:        n,
+		err:      &err,
+		keyPaths: keyPaths,
 	})
 
 	if err != nil {
