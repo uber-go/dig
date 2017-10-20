@@ -78,8 +78,8 @@ type paramVisitor interface {
 	// the child params of this param.
 	Visit(param) paramVisitor
 
-	// We can implement VisitField and VisitPosition like resultVisitor if we
-	// need to track that information in the future.
+	// We can implement AnnotateWithField and AnnotateWithPosition like
+	// resultVisitor if we need to track that information in the future.
 }
 
 // paramVisitorFunc is a paramVisitor that visits param in a tree with the

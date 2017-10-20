@@ -79,25 +79,25 @@ type resultVisitor interface {
 	// the child results of this result.
 	Visit(result) resultVisitor
 
-	// VisitField is called on each field of a resultObject after visiting it
-	// but before walking its descendants.
+	// AnnotateWithField is called on each field of a resultObject after
+	// visiting it but before walking its descendants.
 	//
 	// The same resultVisitor is used for all fields: the one returned upon
 	// visiting the resultObject.
 	//
-	// For each visited field, if VisitField returns a non-nil resultVisitor,
-	// it will be used to walk the result of that field.
-	VisitField(resultObjectField) resultVisitor
+	// For each visited field, if AnnotateWithField returns a non-nil
+	// resultVisitor, it will be used to walk the result of that field.
+	AnnotateWithField(resultObjectField) resultVisitor
 
-	// VisitPosition is called with the index of each result of a resultList
-	// after vising it but before walking its descendants.
+	// AnnotateWithPosition is called with the index of each result of a
+	// resultList after vising it but before walking its descendants.
 	//
 	// The same resultVisitor is used for all results: the one returned upon
 	// visiting the resultList.
 	//
-	// For each position, if VisitPosition returns a non-nil resultVisitor, it
-	// will be used to walk the result at that index.
-	VisitPosition(idx int) resultVisitor
+	// For each position, if AnnotateWithPosition returns a non-nil
+	// resultVisitor, it will be used to walk the result at that index.
+	AnnotateWithPosition(idx int) resultVisitor
 }
 
 // walkResult walks the result tree for the given result with the provided
@@ -105,9 +105,9 @@ type resultVisitor interface {
 //
 // resultVisitor.Visit will be called on the provided result and if a non-nil
 // resultVisitor is received, it will be used to walk its descendants. If a
-// resultObject or resultList was visited, VisitField and VisitPosition
-// respectively will be called before visiting the descendants of that
-// resultObject/resultList.
+// resultObject or resultList was visited, AnnotateWithField and
+// AnnotateWithPosition respectively will be called before visiting the
+// descendants of that resultObject/resultList.
 //
 // This is very similar to how go/ast.Walk works.
 func walkResult(r result, v resultVisitor) {
@@ -122,14 +122,14 @@ func walkResult(r result, v resultVisitor) {
 	case resultObject:
 		w := v
 		for _, f := range res.Fields {
-			if v := w.VisitField(f); v != nil {
+			if v := w.AnnotateWithField(f); v != nil {
 				walkResult(f.Result, v)
 			}
 		}
 	case resultList:
 		w := v
 		for i, r := range res.Results {
-			if v := w.VisitPosition(i); v != nil {
+			if v := w.AnnotateWithPosition(i); v != nil {
 				walkResult(r, v)
 			}
 		}

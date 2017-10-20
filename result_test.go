@@ -159,8 +159,8 @@ func TestNewResultObjectErrors(t *testing.T) {
 
 type fakeResultVisit struct {
 	Visit         result
-	VisitField    *resultObjectField
-	VisitPosition int
+	AnnotateWithField    *resultObjectField
+	AnnotateWithPosition int
 	Return        fakeResultVisits
 }
 
@@ -168,10 +168,10 @@ func (fv fakeResultVisit) String() string {
 	switch {
 	case fv.Visit != nil:
 		return fmt.Sprintf("Visit(%#v) -> %v", fv.Visit, fv.Return)
-	case fv.VisitField != nil:
-		return fmt.Sprintf("VisitField(%#v) -> %v", *fv.VisitField, fv.Return)
+	case fv.AnnotateWithField != nil:
+		return fmt.Sprintf("AnnotateWithField(%#v) -> %v", *fv.AnnotateWithField, fv.Return)
 	default:
-		return fmt.Sprintf("VisitPosition(%v) -> %v", fv.VisitPosition, fv.Return)
+		return fmt.Sprintf("AnnotateWithPosition(%v) -> %v", fv.AnnotateWithPosition, fv.Return)
 	}
 }
 
@@ -204,18 +204,18 @@ func (fv *fakeResultVisitor) Visit(r result) resultVisitor {
 	return &fakeResultVisitor{t: fv.t, visits: v.Return}
 }
 
-func (fv *fakeResultVisitor) VisitField(f resultObjectField) resultVisitor {
-	v := fv.popNext(fmt.Sprintf("VisitField(%#v)", f))
-	if v.VisitField == nil || !reflect.DeepEqual(f, *v.VisitField) {
-		fv.t.Fatalf("received unexpected call VisitField(%#v)\nexpected %v", f, v)
+func (fv *fakeResultVisitor) AnnotateWithField(f resultObjectField) resultVisitor {
+	v := fv.popNext(fmt.Sprintf("AnnotateWithField(%#v)", f))
+	if v.AnnotateWithField == nil || !reflect.DeepEqual(f, *v.AnnotateWithField) {
+		fv.t.Fatalf("received unexpected call AnnotateWithField(%#v)\nexpected %v", f, v)
 	}
 	return &fakeResultVisitor{t: fv.t, visits: v.Return}
 }
 
-func (fv *fakeResultVisitor) VisitPosition(i int) resultVisitor {
-	v := fv.popNext(fmt.Sprintf("VisitPosition(%v)", i))
-	if i != v.VisitPosition {
-		fv.t.Fatalf("received unexpected call VisitPosition(%v)\nexpected %v", i, v)
+func (fv *fakeResultVisitor) AnnotateWithPosition(i int) resultVisitor {
+	v := fv.popNext(fmt.Sprintf("AnnotateWithPosition(%v)", i))
+	if i != v.AnnotateWithPosition {
+		fv.t.Fatalf("received unexpected call AnnotateWithPosition(%v)\nexpected %v", i, v)
 	}
 	return &fakeResultVisitor{t: fv.t, visits: v.Return}
 }
@@ -260,31 +260,31 @@ func TestWalkResult(t *testing.T) {
 				Visit: ro,
 				Return: fakeResultVisits{
 					{
-						VisitField: &ro.Fields[0],
+						AnnotateWithField: &ro.Fields[0],
 						Return: fakeResultVisits{
 							{Visit: ro.Fields[0].Result},
 						},
 					},
 					{
-						VisitField: &ro.Fields[1],
+						AnnotateWithField: &ro.Fields[1],
 						Return: fakeResultVisits{
 							{Visit: ro.Fields[1].Result},
 						},
 					},
 					{
-						VisitField: &ro.Fields[2],
+						AnnotateWithField: &ro.Fields[2],
 						Return: fakeResultVisits{
 							{
 								Visit: ro.Fields[2].Result,
 								Return: fakeResultVisits{
 									{
-										VisitField: &ro.Fields[2].Result.(resultObject).Fields[0],
+										AnnotateWithField: &ro.Fields[2].Result.(resultObject).Fields[0],
 										Return: fakeResultVisits{
 											{Visit: ro.Fields[2].Result.(resultObject).Fields[0].Result},
 										},
 									},
 									{
-										VisitField: &ro.Fields[2].Result.(resultObject).Fields[1],
+										AnnotateWithField: &ro.Fields[2].Result.(resultObject).Fields[1],
 										Return: fakeResultVisits{
 											{Visit: ro.Fields[2].Result.(resultObject).Fields[1].Result},
 										},

@@ -232,12 +232,12 @@ type connectionVisitor struct {
 	currentResultPath []string
 }
 
-func (cv connectionVisitor) VisitField(f resultObjectField) resultVisitor {
+func (cv connectionVisitor) AnnotateWithField(f resultObjectField) resultVisitor {
 	cv.currentResultPath = append(cv.currentResultPath, f.FieldName)
 	return cv
 }
 
-func (cv connectionVisitor) VisitPosition(i int) resultVisitor {
+func (cv connectionVisitor) AnnotateWithPosition(i int) resultVisitor {
 	cv.currentResultPath = append(cv.currentResultPath, fmt.Sprintf("[%d]", i))
 	return cv
 }
