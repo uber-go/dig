@@ -198,21 +198,47 @@ func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 	return keys, nil
 }
 
+// Visits the results of a node and compiles a collection of all the keys
+// produced by that node.
 type connectionVisitor struct {
-	c    *Container
-	n    *node
-	err  *error
-	keys map[key]string
-	path []string
+	c *Container
+	n *node
+
+	// If this points to a non-nil value, we've already encountered an error
+	// and should stop traversing.
+	err *error
+
+	// Map of keys provided to path that provided this. The path is a string
+	// documenting which positional return value or dig.Out attribute is
+	// providing this particular key.
+	//
+	// For example, "[0].Foo" indicates that the value was provided by the Foo
+	// attribute of the dig.Out returned as the first result of the
+	// constructor.
+	keyPaths map[key]string
+
+	// We track the path to the current result here. For example, this will
+	// be, ["[1]", "Foo", "Bar"] when we're visiting Bar in,
+	//
+	//   func() (io.Writer, struct {
+	//     dig.Out
+	//
+	//     Foo struct {
+	//       dig.Out
+	//
+	//       Bar io.Reader
+	//     }
+	//   })
+	currentResultPath []string
 }
 
 func (cv connectionVisitor) VisitField(f resultObjectField) resultVisitor {
-	cv.path = append(cv.path, f.FieldName)
+	cv.currentResultPath = append(cv.currentResultPath, f.FieldName)
 	return cv
 }
 
 func (cv connectionVisitor) VisitPosition(i int) resultVisitor {
-	cv.path = append(cv.path, fmt.Sprintf("[%d]", i))
+	cv.currentResultPath = append(cv.currentResultPath, fmt.Sprintf("[%d]", i))
 	return cv
 }
 
@@ -222,7 +248,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		return nil
 	}
 
-	path := strings.Join(cv.path, ".")
+	path := strings.Join(cv.currentResultPath, ".")
 
 	r, ok := res.(resultSingle)
 	if !ok {
@@ -231,7 +257,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 
 	k := key{name: r.Name, t: r.Type}
 
-	if conflict, ok := cv.keys[k]; ok {
+	if conflict, ok := cv.keyPaths[k]; ok {
 		*cv.err = fmt.Errorf(
 			"cannot provide %v from %v in constructor %v: already provided by %v",
 			k, path, cv.n.ctype, conflict)
@@ -245,7 +271,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		return nil
 	}
 
-	cv.keys[k] = path
+	cv.keyPaths[k] = path
 	return cv
 }
 
