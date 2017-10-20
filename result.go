@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 )
@@ -285,8 +286,11 @@ func newResultObjectField(t reflect.Type, idx int, f reflect.StructField) (resul
 			f.Name, f.Type, t)
 
 	case f.Tag.Get(_groupTag) != "":
-		// TODO(abg): Verify that a name or optional was not specified.
-		r = newResultGrouped(f.Tag.Get(_groupTag), f.Type)
+		var err error
+		r, err = newResultGrouped(t, f)
+		if err != nil {
+			return rof, errWrapf(err, "bad field %q of %v", f.Name, t)
+		}
 
 	default:
 		var err error
@@ -319,12 +323,21 @@ type resultGrouped struct {
 	Type reflect.Type
 }
 
-// newResultGrouped builds a new resultGrouped with the provided name and
-// type.
-//
-// The type MUST be a slice type.
-func newResultGrouped(group string, t reflect.Type) resultGrouped {
-	return resultGrouped{Group: group, Type: t}
+// newResultGrouped(f) builds a new resultGrouped from the provided field.
+func newResultGrouped(parent reflect.Type, f reflect.StructField) (resultGrouped, error) {
+	rg := resultGrouped{Group: f.Tag.Get(_groupTag), Type: f.Type}
+
+	name := f.Tag.Get(_nameTag)
+	optional, _ := isFieldOptional(parent, f)
+	switch {
+	case name != "":
+		return rg, fmt.Errorf(
+			"cannot use named values with value groups: name:%q provided with group:%q", name, rg.Group)
+	case optional:
+		return rg, errors.New("cannot mark value groups as optional")
+	}
+
+	return rg, nil
 }
 
 func (rt resultGrouped) Extract(c *Container, v reflect.Value) error {
