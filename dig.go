@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -155,12 +156,17 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 		return err
 	}
 
-	for k := range n.Results.Produces() {
-		if _, ok := c.nodes[k]; ok {
-			return fmt.Errorf("%v (%v) provides %v, which is already in the container", ctor, ctype, k)
-		}
-		c.nodes[k] = n
+	keys, err := c.findAndValidateResults(n)
+	if err != nil {
+		return err
+	}
 
+	if len(keys) == 0 {
+		return fmt.Errorf("%v must provide at least one non-error type", ctype)
+	}
+
+	for k := range keys {
+		c.nodes[k] = n
 		if err := c.isAcyclic(n.Params, k); err != nil {
 			delete(c.nodes, k)
 			return errWrapf(err, "%v (%v) introduces a cycle", ctor, ctype)
@@ -168,6 +174,105 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 	}
 
 	return nil
+}
+
+// Builds a collection of all result types produced by this node.
+func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
+	var err error
+	keyPaths := make(map[key]string)
+	walkResult(n.Results, connectionVisitor{
+		c:        c,
+		n:        n,
+		err:      &err,
+		keyPaths: keyPaths,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	keys := make(map[key]struct{}, len(keyPaths))
+	for k := range keyPaths {
+		keys[k] = struct{}{}
+	}
+	return keys, nil
+}
+
+// Visits the results of a node and compiles a collection of all the keys
+// produced by that node.
+type connectionVisitor struct {
+	c *Container
+	n *node
+
+	// If this points to a non-nil value, we've already encountered an error
+	// and should stop traversing.
+	err *error
+
+	// Map of keys provided to path that provided this. The path is a string
+	// documenting which positional return value or dig.Out attribute is
+	// providing this particular key.
+	//
+	// For example, "[0].Foo" indicates that the value was provided by the Foo
+	// attribute of the dig.Out returned as the first result of the
+	// constructor.
+	keyPaths map[key]string
+
+	// We track the path to the current result here. For example, this will
+	// be, ["[1]", "Foo", "Bar"] when we're visiting Bar in,
+	//
+	//   func() (io.Writer, struct {
+	//     dig.Out
+	//
+	//     Foo struct {
+	//       dig.Out
+	//
+	//       Bar io.Reader
+	//     }
+	//   })
+	currentResultPath []string
+}
+
+func (cv connectionVisitor) AnnotateWithField(f resultObjectField) resultVisitor {
+	cv.currentResultPath = append(cv.currentResultPath, f.FieldName)
+	return cv
+}
+
+func (cv connectionVisitor) AnnotateWithPosition(i int) resultVisitor {
+	cv.currentResultPath = append(cv.currentResultPath, fmt.Sprintf("[%d]", i))
+	return cv
+}
+
+func (cv connectionVisitor) Visit(res result) resultVisitor {
+	// Already failed. Stop looking.
+	if *cv.err != nil {
+		return nil
+	}
+
+	path := strings.Join(cv.currentResultPath, ".")
+
+	r, ok := res.(resultSingle)
+	if !ok {
+		return cv
+	}
+
+	k := key{name: r.Name, t: r.Type}
+
+	if conflict, ok := cv.keyPaths[k]; ok {
+		*cv.err = fmt.Errorf(
+			"cannot provide %v from %v in constructor %v: already provided by %v",
+			k, path, cv.n.ctype, conflict)
+		return nil
+	}
+
+	if _, ok := cv.c.nodes[k]; ok {
+		*cv.err = fmt.Errorf(
+			"cannot provide %v from %v in constructor %v: already in the container",
+			k, path, cv.n.ctype)
+		return nil
+	}
+
+	cv.keyPaths[k] = path
+	return cv
 }
 
 func (c *Container) isAcyclic(p param, k key) error {

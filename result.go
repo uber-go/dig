@@ -39,8 +39,6 @@ type result interface {
 	//
 	// This MAY panic if the result does not consume a single value.
 	Extract(*Container, reflect.Value) error
-
-	Produces() map[key]struct{}
 }
 
 var (
@@ -72,19 +70,89 @@ func newResult(t reflect.Type) (result, error) {
 	}
 }
 
+// resultVisitor visits every result in a result tree, allowing tracking state
+// at each level.
+type resultVisitor interface {
+	// Visit is called on the result being visited.
+	//
+	// If Visit returns a non-nil resultVisitor, that resultVisitor visits all
+	// the child results of this result.
+	Visit(result) resultVisitor
+
+	// AnnotateWithField is called on each field of a resultObject after
+	// visiting it but before walking its descendants.
+	//
+	// The same resultVisitor is used for all fields: the one returned upon
+	// visiting the resultObject.
+	//
+	// For each visited field, if AnnotateWithField returns a non-nil
+	// resultVisitor, it will be used to walk the result of that field.
+	AnnotateWithField(resultObjectField) resultVisitor
+
+	// AnnotateWithPosition is called with the index of each result of a
+	// resultList after vising it but before walking its descendants.
+	//
+	// The same resultVisitor is used for all results: the one returned upon
+	// visiting the resultList.
+	//
+	// For each position, if AnnotateWithPosition returns a non-nil
+	// resultVisitor, it will be used to walk the result at that index.
+	AnnotateWithPosition(idx int) resultVisitor
+}
+
+// walkResult walks the result tree for the given result with the provided
+// visitor.
+//
+// resultVisitor.Visit will be called on the provided result and if a non-nil
+// resultVisitor is received, it will be used to walk its descendants. If a
+// resultObject or resultList was visited, AnnotateWithField and
+// AnnotateWithPosition respectively will be called before visiting the
+// descendants of that resultObject/resultList.
+//
+// This is very similar to how go/ast.Walk works.
+func walkResult(r result, v resultVisitor) {
+	v = v.Visit(r)
+	if v == nil {
+		return
+	}
+
+	switch res := r.(type) {
+	case resultSingle, resultError:
+		// No sub-results
+	case resultObject:
+		w := v
+		for _, f := range res.Fields {
+			if v := w.AnnotateWithField(f); v != nil {
+				walkResult(f.Result, v)
+			}
+		}
+	case resultList:
+		w := v
+		for i, r := range res.Results {
+			if v := w.AnnotateWithPosition(i); v != nil {
+				walkResult(r, v)
+			}
+		}
+	default:
+		panic(fmt.Sprintf(
+			"It looks like you have found a bug in dig. "+
+				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
+				"and provide the following message: "+
+				"received unknown result type %T", res))
+	}
+}
+
 // resultList holds all values returned by the constructor as results.
 type resultList struct {
-	ctype    reflect.Type
-	produces map[key]struct{}
+	ctype reflect.Type
 
 	Results []result
 }
 
 func newResultList(ctype reflect.Type) (resultList, error) {
 	rl := resultList{
-		ctype:    ctype,
-		Results:  make([]result, ctype.NumOut()),
-		produces: make(map[key]struct{}),
+		ctype:   ctype,
+		Results: make([]result, ctype.NumOut()),
 	}
 
 	for i := 0; i < ctype.NumOut(); i++ {
@@ -93,23 +161,10 @@ func newResultList(ctype reflect.Type) (resultList, error) {
 			return rl, errWrapf(err, "bad result %d", i+1)
 		}
 		rl.Results[i] = r
-
-		for k := range r.Produces() {
-			if _, ok := rl.produces[k]; ok {
-				return rl, fmt.Errorf("returns multiple %v", k)
-			}
-			rl.produces[k] = struct{}{}
-		}
-	}
-
-	if len(rl.produces) == 0 {
-		return rl, fmt.Errorf("%v must provide at least one non-error type", ctype)
 	}
 
 	return rl, nil
 }
-
-func (rl resultList) Produces() map[key]struct{} { return rl.produces }
 
 func (resultList) Extract(*Container, reflect.Value) error {
 	panic("It looks like you have found a bug in dig. " +
@@ -130,9 +185,6 @@ func (rl resultList) ExtractList(c *Container, values []reflect.Value) error {
 // resultError is an error returned by a constructor.
 type resultError struct{}
 
-// resultError doesn't produce anything
-func (resultError) Produces() map[key]struct{} { return nil }
-
 func (resultError) Extract(_ *Container, v reflect.Value) error {
 	err, _ := v.Interface().(error)
 	return err
@@ -145,12 +197,6 @@ func (resultError) Extract(_ *Container, v reflect.Value) error {
 type resultSingle struct {
 	Name string
 	Type reflect.Type
-}
-
-func (rs resultSingle) Produces() map[key]struct{} {
-	return map[key]struct{}{
-		{name: rs.Name, t: rs.Type}: {},
-	}
 }
 
 func (rs resultSingle) Extract(c *Container, v reflect.Value) error {
@@ -178,14 +224,12 @@ type resultObjectField struct {
 // This object is not added to the graph. Its fields are interpreted as
 // results and added to the graph if needed.
 type resultObject struct {
-	produces map[key]struct{}
-
 	Type   reflect.Type
 	Fields []resultObjectField
 }
 
 func newResultObject(t reflect.Type) (resultObject, error) {
-	ro := resultObject{Type: t, produces: make(map[key]struct{})}
+	ro := resultObject{Type: t}
 
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -219,13 +263,6 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 			r = rs
 		}
 
-		for k := range r.Produces() {
-			if _, ok := ro.produces[k]; ok {
-				return ro, fmt.Errorf("returns multiple %v", k)
-			}
-			ro.produces[k] = struct{}{}
-		}
-
 		ro.Fields = append(ro.Fields, resultObjectField{
 			FieldName:  f.Name,
 			FieldIndex: i,
@@ -234,8 +271,6 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 	}
 	return ro, nil
 }
-
-func (ro resultObject) Produces() map[key]struct{} { return ro.produces }
 
 func (ro resultObject) Extract(c *Container, v reflect.Value) error {
 	for _, f := range ro.Fields {

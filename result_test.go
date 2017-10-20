@@ -37,21 +37,6 @@ func TestNewResultListErrors(t *testing.T) {
 		err  string
 	}{
 		{
-			desc: "no results",
-			give: func() {},
-			err:  "must provide at least one non-error type",
-		},
-		{
-			desc: "only error",
-			give: func() error { panic("invalid") },
-			err:  "must provide at least one non-error type",
-		},
-		{
-			desc: "empty dig.Out",
-			give: func() struct{ Out } { panic("invalid") },
-			err:  "must provide at least one non-error type",
-		},
-		{
 			desc: "returns dig.In",
 			give: func() struct{ In } { panic("invalid") },
 			err:  "bad result 1: cannot provide parameter objects",
@@ -65,23 +50,6 @@ func TestNewResultListErrors(t *testing.T) {
 				panic("invalid")
 			},
 			err: "bad result 1: cannot provide parameter objects",
-		},
-		{
-			desc: "type conflict",
-			give: func() (io.Reader, io.Writer, io.Reader) { panic("invalid") },
-			err:  "returns multiple io.Reader",
-		},
-		{
-			desc: "name conflict",
-			give: func() struct {
-				Out
-
-				NamedWriter   io.Writer `name:"what"`
-				AnotherWriter io.Writer `name:"what"`
-			} {
-				panic("invalid")
-			},
-			err: "returns multiple io.Writer:what",
 		},
 	}
 
@@ -170,34 +138,6 @@ func TestNewResultObjectErrors(t *testing.T) {
 			err: `cannot return errors from dig.Out, return it from the constructor instead: field "Error" (error)`,
 		},
 		{
-			desc: "type conflict",
-			give: struct {
-				Out
-
-				Reader io.Reader
-				Writer io.Writer
-
-				Nested struct {
-					Out
-
-					AnotherReader io.Reader
-					AnotherWriter io.Writer `name:"conflict-free-writer"`
-				}
-			}{},
-			err: "returns multiple io.Reader",
-		},
-		{
-			desc: "name conflict",
-			give: struct {
-				Out
-
-				Reader        io.Reader
-				NamedWriter   io.Writer `name:"what"`
-				AnotherWriter io.Writer `name:"what"`
-			}{},
-			err: "returns multiple io.Writer:what",
-		},
-		{
 			desc: "nested dig.In",
 			give: struct {
 				Out
@@ -215,4 +155,148 @@ func TestNewResultObjectErrors(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.err)
 		})
 	}
+}
+
+type fakeResultVisit struct {
+	Visit         result
+	AnnotateWithField    *resultObjectField
+	AnnotateWithPosition int
+	Return        fakeResultVisits
+}
+
+func (fv fakeResultVisit) String() string {
+	switch {
+	case fv.Visit != nil:
+		return fmt.Sprintf("Visit(%#v) -> %v", fv.Visit, fv.Return)
+	case fv.AnnotateWithField != nil:
+		return fmt.Sprintf("AnnotateWithField(%#v) -> %v", *fv.AnnotateWithField, fv.Return)
+	default:
+		return fmt.Sprintf("AnnotateWithPosition(%v) -> %v", fv.AnnotateWithPosition, fv.Return)
+	}
+}
+
+type fakeResultVisits []fakeResultVisit
+
+func (vs fakeResultVisits) Visitor(t *testing.T) resultVisitor {
+	return &fakeResultVisitor{t: t, visits: vs}
+}
+
+type fakeResultVisitor struct {
+	t      *testing.T
+	visits fakeResultVisits
+}
+
+func (fv *fakeResultVisitor) popNext(call string) fakeResultVisit {
+	if len(fv.visits) == 0 {
+		fv.t.Fatalf("received unexpected call %v: no more calls were expected", call)
+	}
+
+	visit := fv.visits[0]
+	fv.visits = fv.visits[1:]
+	return visit
+}
+
+func (fv *fakeResultVisitor) Visit(r result) resultVisitor {
+	v := fv.popNext(fmt.Sprintf("Visit(%#v)", r))
+	if !reflect.DeepEqual(r, v.Visit) {
+		fv.t.Fatalf("received unexpected call Visit(%#v)\nexpected %v", r, v)
+	}
+	return &fakeResultVisitor{t: fv.t, visits: v.Return}
+}
+
+func (fv *fakeResultVisitor) AnnotateWithField(f resultObjectField) resultVisitor {
+	v := fv.popNext(fmt.Sprintf("AnnotateWithField(%#v)", f))
+	if v.AnnotateWithField == nil || !reflect.DeepEqual(f, *v.AnnotateWithField) {
+		fv.t.Fatalf("received unexpected call AnnotateWithField(%#v)\nexpected %v", f, v)
+	}
+	return &fakeResultVisitor{t: fv.t, visits: v.Return}
+}
+
+func (fv *fakeResultVisitor) AnnotateWithPosition(i int) resultVisitor {
+	v := fv.popNext(fmt.Sprintf("AnnotateWithPosition(%v)", i))
+	if i != v.AnnotateWithPosition {
+		fv.t.Fatalf("received unexpected call AnnotateWithPosition(%v)\nexpected %v", i, v)
+	}
+	return &fakeResultVisitor{t: fv.t, visits: v.Return}
+}
+
+func TestWalkResult(t *testing.T) {
+	t.Run("invalid result type", func(t *testing.T) {
+		type badResult struct{ result }
+		visitor := fakeResultVisits{
+			{Visit: badResult{}, Return: fakeResultVisits{}},
+		}.Visitor(t)
+		assert.Panics(t,
+			func() {
+				walkResult(badResult{}, visitor)
+			})
+	})
+
+	t.Run("resultObject ordering", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		type type4 struct{}
+
+		typ := reflect.TypeOf(struct {
+			Out
+
+			T1 type1
+			T2 type2
+
+			Nested struct {
+				Out
+
+				T3 type3
+				T4 type4
+			}
+		}{})
+
+		ro, err := newResultObject(typ)
+		require.NoError(t, err)
+
+		v := fakeResultVisits{
+			{
+				Visit: ro,
+				Return: fakeResultVisits{
+					{
+						AnnotateWithField: &ro.Fields[0],
+						Return: fakeResultVisits{
+							{Visit: ro.Fields[0].Result},
+						},
+					},
+					{
+						AnnotateWithField: &ro.Fields[1],
+						Return: fakeResultVisits{
+							{Visit: ro.Fields[1].Result},
+						},
+					},
+					{
+						AnnotateWithField: &ro.Fields[2],
+						Return: fakeResultVisits{
+							{
+								Visit: ro.Fields[2].Result,
+								Return: fakeResultVisits{
+									{
+										AnnotateWithField: &ro.Fields[2].Result.(resultObject).Fields[0],
+										Return: fakeResultVisits{
+											{Visit: ro.Fields[2].Result.(resultObject).Fields[0].Result},
+										},
+									},
+									{
+										AnnotateWithField: &ro.Fields[2].Result.(resultObject).Fields[1],
+										Return: fakeResultVisits{
+											{Visit: ro.Fields[2].Result.(resultObject).Fields[1].Result},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}.Visitor(t)
+
+		walkResult(ro, v)
+	})
 }
