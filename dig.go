@@ -39,7 +39,9 @@ const (
 
 // Unique identification of an object in the graph.
 type key struct {
-	t     reflect.Type
+	t reflect.Type
+
+	// Only one of name or group will be set.
 	name  string
 	group string
 }

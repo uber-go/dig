@@ -213,21 +213,6 @@ func (rs resultSingle) Extract(rr resultReceiver, v reflect.Value) {
 	rr.SubmitValue(rs.Name, rs.Type, v)
 }
 
-// resultObjectField is a single field inside a dig.Out struct.
-type resultObjectField struct {
-	// Name of the field in the struct.
-	FieldName string
-
-	// Index of the field in the struct.
-	//
-	// We need to track this separately because not all fields of the struct
-	// map to results.
-	FieldIndex int
-
-	// Result produced by this field.
-	Result result
-}
-
 // resultObject is a dig.Out struct where each field is another result.
 //
 // This object is not added to the graph. Its fields are interpreted as
@@ -247,43 +232,12 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 			continue
 		}
 
-		if f.PkgPath != "" {
-			return ro, fmt.Errorf(
-				"unexported fields not allowed in dig.Out, did you mean to export %q (%v) from %v?",
-				f.Name, f.Type, t)
+		rof, err := newResultObjectField(t, i, f)
+		if err != nil {
+			return ro, err
 		}
 
-		if isError(f.Type) {
-			return ro, fmt.Errorf(
-				"cannot return errors from dig.Out, return it from the constructor instead: "+
-					"field %q (%v) of %v is an error field",
-				f.Name, f.Type, t)
-		}
-
-		var r result
-		if group := f.Tag.Get(_groupTag); group != "" {
-			// TODO(abg): Verify that a name or optional was not specified.
-			r = newResultGrouped(group, f.Type)
-		} else {
-			var err error
-			r, err = newResult(f.Type)
-			if err != nil {
-				return ro, errWrapf(err, "bad field %q of %v", f.Name, t)
-			}
-
-			name := f.Tag.Get(_nameTag)
-			if rs, ok := r.(resultSingle); ok {
-				// field tags apply only if the result is "simple"
-				rs.Name = name
-				r = rs
-			}
-		}
-
-		ro.Fields = append(ro.Fields, resultObjectField{
-			FieldName:  f.Name,
-			FieldIndex: i,
-			Result:     r,
-		})
+		ro.Fields = append(ro.Fields, rof)
 	}
 	return ro, nil
 }
@@ -292,6 +246,65 @@ func (ro resultObject) Extract(rr resultReceiver, v reflect.Value) {
 	for _, f := range ro.Fields {
 		f.Result.Extract(rr, v.Field(f.FieldIndex))
 	}
+}
+
+// resultObjectField is a single field inside a dig.Out struct.
+type resultObjectField struct {
+	// Name of the field in the struct.
+	FieldName string
+
+	// Index of the field in the struct.
+	//
+	// We need to track this separately because not all fields of the struct
+	// map to results.
+	FieldIndex int
+
+	// Result produced by this field.
+	Result result
+}
+
+// newResultObjectField(t, i, f) builds a resultObjectField from the field f
+// of struct t.
+func newResultObjectField(t reflect.Type, idx int, f reflect.StructField) (resultObjectField, error) {
+	rof := resultObjectField{
+		FieldName:  f.Name,
+		FieldIndex: idx,
+	}
+
+	var r result
+	switch {
+	case f.PkgPath != "":
+		return rof, fmt.Errorf(
+			"unexported fields not allowed in dig.Out, did you mean to export %q (%v) from %v?",
+			f.Name, f.Type, t)
+
+	case isError(f.Type):
+		return rof, fmt.Errorf(
+			"cannot return errors from dig.Out, return it from the constructor instead: "+
+				"field %q (%v) of %v is an error field",
+			f.Name, f.Type, t)
+
+	case f.Tag.Get(_groupTag) != "":
+		// TODO(abg): Verify that a name or optional was not specified.
+		r = newResultGrouped(f.Tag.Get(_groupTag), f.Type)
+
+	default:
+		var err error
+		r, err = newResult(f.Type)
+		if err != nil {
+			return rof, errWrapf(err, "bad field %q of %v", f.Name, t)
+		}
+
+		name := f.Tag.Get(_nameTag)
+		if rs, ok := r.(resultSingle); ok {
+			// field tags apply only if the result is "simple"
+			rs.Name = name
+			r = rs
+		}
+	}
+
+	rof.Result = r
+	return rof, nil
 }
 
 // resultGrouped is a value produced by a constructor that is part of a result
