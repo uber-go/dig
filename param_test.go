@@ -114,6 +114,6 @@ func TestParamObjectFailure(t *testing.T) {
 		_, err := newParamObject(reflect.TypeOf(in{}))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
-			`unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A) from dig.in?`)
+			`bad field "a2" of dig.in: unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A)`)
 	})
 }

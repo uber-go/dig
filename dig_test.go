@@ -1539,7 +1539,8 @@ func TestInvokeFailures(t *testing.T) {
 		}
 		err := c.Invoke(func(p param) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), `did you mean to export "string" (string) from dig.param?`)
+		assert.Contains(t, err.Error(),
+			`bad argument 1: bad field "string" of dig.param: unexported fields not allowed in dig.In, did you mean to export "string" (string)`)
 	})
 
 	t.Run("pointer in dependency is not supported", func(t *testing.T) {

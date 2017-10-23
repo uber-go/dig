@@ -429,7 +429,7 @@ func detectCycles(par param, graph map[key][]*node, path []key) error {
 }
 
 // Checks if a field of an In struct is optional.
-func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
+func isFieldOptional(f reflect.StructField) (bool, error) {
 	tag := f.Tag.Get(_optionalTag)
 	if tag == "" {
 		return false, nil
@@ -438,8 +438,8 @@ func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
 	optional, err := strconv.ParseBool(tag)
 	if err != nil {
 		err = errWrapf(err,
-			"invalid value %q for %q tag on field %v of %v",
-			tag, _optionalTag, f.Name, parent)
+			"invalid value %q for %q tag on field %v",
+			tag, _optionalTag, f.Name)
 	}
 
 	return optional, err

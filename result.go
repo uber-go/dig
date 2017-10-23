@@ -233,9 +233,9 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 			continue
 		}
 
-		rof, err := newResultObjectField(t, i, f)
+		rof, err := newResultObjectField(i, f)
 		if err != nil {
-			return ro, err
+			return ro, errWrapf(err, "bad field %q of %v", f.Name, t)
 		}
 
 		ro.Fields = append(ro.Fields, rof)
@@ -264,9 +264,9 @@ type resultObjectField struct {
 	Result result
 }
 
-// newResultObjectField(t, i, f) builds a resultObjectField from the field f
-// of struct t.
-func newResultObjectField(t reflect.Type, idx int, f reflect.StructField) (resultObjectField, error) {
+// newResultObjectField(i, f) builds a resultObjectField from the field f at
+// index i.
+func newResultObjectField(idx int, f reflect.StructField) (resultObjectField, error) {
 	rof := resultObjectField{
 		FieldName:  f.Name,
 		FieldIndex: idx,
@@ -276,35 +276,33 @@ func newResultObjectField(t reflect.Type, idx int, f reflect.StructField) (resul
 	switch {
 	case f.PkgPath != "":
 		return rof, fmt.Errorf(
-			"unexported fields not allowed in dig.Out, did you mean to export %q (%v) from %v?",
-			f.Name, f.Type, t)
+			"unexported fields not allowed in dig.Out, did you mean to export %q (%v)?", f.Name, f.Type)
 
 	case isError(f.Type):
 		return rof, fmt.Errorf(
 			"cannot return errors from dig.Out, return it from the constructor instead: "+
-				"field %q (%v) of %v is an error field",
-			f.Name, f.Type, t)
+				"field %q (%v) is an error field",
+			f.Name, f.Type)
 
 	case f.Tag.Get(_groupTag) != "":
 		var err error
-		r, err = newResultGrouped(t, f)
+		r, err = newResultGrouped(f)
 		if err != nil {
-			return rof, errWrapf(err, "bad field %q of %v", f.Name, t)
+			return rof, err
 		}
 
 	default:
 		var err error
 		r, err = newResult(f.Type)
 		if err != nil {
-			return rof, errWrapf(err, "bad field %q of %v", f.Name, t)
+			return rof, err
 		}
+	}
 
-		name := f.Tag.Get(_nameTag)
-		if rs, ok := r.(resultSingle); ok {
-			// field tags apply only if the result is "simple"
-			rs.Name = name
-			r = rs
-		}
+	if rs, ok := r.(resultSingle); ok {
+		// Field tags apply only if the result is "simple"
+		rs.Name = f.Tag.Get(_nameTag)
+		r = rs
 	}
 
 	rof.Result = r
@@ -324,11 +322,11 @@ type resultGrouped struct {
 }
 
 // newResultGrouped(f) builds a new resultGrouped from the provided field.
-func newResultGrouped(parent reflect.Type, f reflect.StructField) (resultGrouped, error) {
+func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	rg := resultGrouped{Group: f.Tag.Get(_groupTag), Type: f.Type}
 
 	name := f.Tag.Get(_nameTag)
-	optional, _ := isFieldOptional(parent, f)
+	optional, _ := isFieldOptional(f)
 	switch {
 	case name != "":
 		return rg, fmt.Errorf(
