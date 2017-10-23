@@ -203,7 +203,7 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		return v, nil
 	}
 
-	nodes := c.producers[k]
+	nodes := c.providers[k]
 	if len(nodes) == 0 {
 		// Unlike in the fallback case below, if a user makes an error
 		// requesting an optional value, a good error message ("did you mean
@@ -223,7 +223,7 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		}
 
 		tk := key{t: typo, name: ps.Name}
-		if _, ok := c.producers[tk]; ok {
+		if _, ok := c.providers[tk]; ok {
 			return _noValue, fmt.Errorf(
 				"type %v is not in the container, did you mean to use %v?", k, tk)
 		}

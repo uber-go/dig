@@ -60,9 +60,9 @@ type InvokeOption interface {
 
 // Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
-	// Mapping from key to all the nodes that can produce a value for that
+	// Mapping from key to all the nodes that can provide a value for that
 	// key.
-	producers map[key][]*node
+	providers map[key][]*node
 
 	// Values that have already been generated in the container.
 	values map[key]reflect.Value
@@ -71,7 +71,7 @@ type Container struct {
 // New constructs a Container.
 func New(opts ...Option) *Container {
 	return &Container{
-		producers: make(map[key][]*node),
+		providers: make(map[key][]*node),
 		values:    make(map[key]reflect.Value),
 	}
 }
@@ -161,10 +161,10 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 	}
 
 	for k := range keys {
-		oldProducers := c.producers[k]
-		c.producers[k] = append(oldProducers, n)
+		oldProducers := c.providers[k]
+		c.providers[k] = append(oldProducers, n)
 		if err := c.isAcyclic(n.Params, k); err != nil {
-			c.producers[k] = oldProducers
+			c.providers[k] = oldProducers
 			return errWrapf(err, "%v (%v) introduces a cycle", ctor, ctype)
 		}
 	}
@@ -260,7 +260,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		return nil
 	}
 
-	if _, ok := cv.c.producers[k]; ok {
+	if _, ok := cv.c.providers[k]; ok {
 		*cv.err = fmt.Errorf(
 			"cannot provide %v from %v in constructor %v: already in the container",
 			k, path, cv.n.ctype)
@@ -272,7 +272,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 }
 
 func (c *Container) isAcyclic(p param, k key) error {
-	return detectCycles(p, c.producers, []key{k})
+	return detectCycles(p, c.providers, []key{k})
 }
 
 // node is a node in the dependency graph. Each node maps to a single
@@ -410,7 +410,7 @@ func shallowCheckDependencies(c *Container, p param) error {
 		}
 
 		k := key{name: ps.Name, t: ps.Type}
-		if ns := c.producers[k]; len(ns) == 0 && !ps.Optional {
+		if ns := c.providers[k]; len(ns) == 0 && !ps.Optional {
 			missing = append(missing, k)
 		}
 

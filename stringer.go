@@ -30,7 +30,7 @@ import (
 func (c *Container) String() string {
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "nodes: {")
-	for k, vs := range c.producers {
+	for k, vs := range c.providers {
 		for _, v := range vs {
 			fmt.Fprintln(b, "\t", k, "->", v)
 		}
