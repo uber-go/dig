@@ -200,7 +200,7 @@ type resultSingle struct {
 }
 
 func (rs resultSingle) Extract(c *Container, v reflect.Value) error {
-	c.cache[key{name: rs.Name, t: rs.Type}] = v
+	c.values[key{name: rs.Name, t: rs.Type}] = v
 	return nil
 }
 

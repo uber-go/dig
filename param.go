@@ -199,12 +199,12 @@ type paramSingle struct {
 
 func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 	k := key{name: ps.Name, t: ps.Type}
-	if v, ok := c.cache[k]; ok {
+	if v, ok := c.values[k]; ok {
 		return v, nil
 	}
 
-	n, ok := c.nodes[k]
-	if !ok {
+	nodes := c.providers[k]
+	if len(nodes) == 0 {
 		// Unlike in the fallback case below, if a user makes an error
 		// requesting an optional value, a good error message ("did you mean
 		// X?") will not be used and we'll return a zero value instead.
@@ -223,7 +223,7 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		}
 
 		tk := key{t: typo, name: ps.Name}
-		if _, ok := c.nodes[tk]; ok {
+		if _, ok := c.providers[tk]; ok {
 			return _noValue, fmt.Errorf(
 				"type %v is not in the container, did you mean to use %v?", k, tk)
 		}
@@ -231,18 +231,20 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		return _noValue, fmt.Errorf("type %v isn't in the container", k)
 	}
 
-	if err := shallowCheckDependencies(c, n.Params); err != nil {
-		if ps.Optional {
-			return reflect.Zero(ps.Type), nil
+	for _, n := range nodes {
+		if err := shallowCheckDependencies(c, n.Params); err != nil {
+			if ps.Optional {
+				return reflect.Zero(ps.Type), nil
+			}
+			return _noValue, errWrapf(err, "missing dependencies for %v", k)
 		}
-		return _noValue, errWrapf(err, "missing dependencies for %v", k)
+
+		if err := n.Call(c); err != nil {
+			return _noValue, errWrapf(err, "failed to build %v", k)
+		}
 	}
 
-	if err := n.Call(c); err != nil {
-		return _noValue, errWrapf(err, "failed to build %v", k)
-	}
-
-	return c.cache[k], nil
+	return c.values[k], nil
 }
 
 // paramObjectField is a single field of a dig.In struct.
