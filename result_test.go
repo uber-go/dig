@@ -68,7 +68,7 @@ func TestResultListExtractFails(t *testing.T) {
 	}))
 	require.NoError(t, err)
 	assert.Panics(t, func() {
-		rl.Extract(New(), reflect.ValueOf("irrelevant"))
+		rl.Extract(newStagingReceiver(), reflect.ValueOf("irrelevant"))
 	})
 }
 
@@ -158,10 +158,10 @@ func TestNewResultObjectErrors(t *testing.T) {
 }
 
 type fakeResultVisit struct {
-	Visit         result
+	Visit                result
 	AnnotateWithField    *resultObjectField
 	AnnotateWithPosition int
-	Return        fakeResultVisits
+	Return               fakeResultVisits
 }
 
 func (fv fakeResultVisit) String() string {
