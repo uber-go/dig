@@ -35,10 +35,19 @@ import (
 //                 another result.
 type result interface {
 	// Extracts the values for this result from the provided value and
-	// stores them in the container.
+	// stores them into the provided resultReceiver.
 	//
 	// This MAY panic if the result does not consume a single value.
-	Extract(*Container, reflect.Value) error
+	Extract(resultReceiver, reflect.Value)
+}
+
+// resultReceiver receives the values or failures produced by constructors.
+type resultReceiver interface {
+	// Notifies the receiver that the constructor failed with the given error.
+	SubmitError(error)
+
+	// Submits a new value to the receiver.
+	SubmitValue(name string, t reflect.Type, v reflect.Value)
 }
 
 var (
@@ -166,28 +175,26 @@ func newResultList(ctype reflect.Type) (resultList, error) {
 	return rl, nil
 }
 
-func (resultList) Extract(*Container, reflect.Value) error {
+func (resultList) Extract(resultReceiver, reflect.Value) {
 	panic("It looks like you have found a bug in dig. " +
 		"Please file an issue at https://github.com/uber-go/dig/issues/ " +
 		"and provide the following message: " +
 		"resultList.Extract() must never be called")
 }
 
-func (rl resultList) ExtractList(c *Container, values []reflect.Value) error {
+func (rl resultList) ExtractList(rr resultReceiver, values []reflect.Value) {
 	for i, r := range rl.Results {
-		if err := r.Extract(c, values[i]); err != nil {
-			return err
-		}
+		r.Extract(rr, values[i])
 	}
-	return nil
 }
 
 // resultError is an error returned by a constructor.
 type resultError struct{}
 
-func (resultError) Extract(_ *Container, v reflect.Value) error {
-	err, _ := v.Interface().(error)
-	return err
+func (resultError) Extract(rr resultReceiver, v reflect.Value) {
+	if err, _ := v.Interface().(error); err != nil {
+		rr.SubmitError(err)
+	}
 }
 
 // resultSingle is an explicit value produced by a constructor, optionally
@@ -199,9 +206,8 @@ type resultSingle struct {
 	Type reflect.Type
 }
 
-func (rs resultSingle) Extract(c *Container, v reflect.Value) error {
-	c.values[key{name: rs.Name, t: rs.Type}] = v
-	return nil
+func (rs resultSingle) Extract(rr resultReceiver, v reflect.Value) {
+	rr.SubmitValue(rs.Name, rs.Type, v)
 }
 
 // resultObjectField is a single field inside a dig.Out struct.
@@ -272,17 +278,8 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 	return ro, nil
 }
 
-func (ro resultObject) Extract(c *Container, v reflect.Value) error {
+func (ro resultObject) Extract(rr resultReceiver, v reflect.Value) {
 	for _, f := range ro.Fields {
-		if err := f.Result.Extract(c, v.Field(f.FieldIndex)); err != nil {
-			// In reality, this will never fail because none of the fields of
-			// a resultObject can be resultError.
-			panic(fmt.Sprintf(
-				"It looks like you have found a bug in dig. "+
-					"Please file an issue at https://github.com/uber-go/dig/issues/ "+
-					"and provide the following message: "+
-					"result.Extract() encountered an error: %v", err))
-		}
+		f.Result.Extract(rr, v.Field(f.FieldIndex))
 	}
-	return nil
 }

@@ -326,8 +326,11 @@ func (n *node) Call(c *Container) error {
 		return errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
 	}
 
+	receiver := newStagingReceiver()
 	results := reflect.ValueOf(n.ctor).Call(args)
-	if err := n.Results.ExtractList(c, results); err != nil {
+	n.Results.ExtractList(receiver, results)
+
+	if err := receiver.Commit(c); err != nil {
 		return errWrapf(err, "constructor %v failed", n.ctype)
 	}
 
@@ -420,5 +423,40 @@ func shallowCheckDependencies(c *Container, p param) error {
 	if len(missing) > 0 {
 		return fmt.Errorf("container is missing: %v", missing)
 	}
+	return nil
+}
+
+type stagingReceiver struct {
+	err    error
+	values map[key]reflect.Value
+}
+
+func newStagingReceiver() *stagingReceiver {
+	return &stagingReceiver{values: make(map[key]reflect.Value)}
+}
+
+func (sr *stagingReceiver) SubmitError(err error) {
+	// record failure only if we haven't already failed
+	if sr.err == nil {
+		sr.err = err
+	}
+}
+
+func (sr *stagingReceiver) SubmitValue(name string, t reflect.Type, v reflect.Value) {
+	sr.values[key{t: t, name: name}] = v
+}
+
+// Commit commits the received results to the provided container.
+//
+// If the resultReceiver failed, no changes are committed to the container.
+func (sr *stagingReceiver) Commit(c *Container) error {
+	if sr.err != nil {
+		return sr.err
+	}
+
+	for k, v := range sr.values {
+		c.values[k] = v
+	}
+
 	return nil
 }

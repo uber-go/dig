@@ -1688,3 +1688,20 @@ func TestNodeAlreadyCalled(t *testing.T) {
 	require.True(t, n.called, "node must be called")
 	require.NoError(t, n.Call(c), "calling again should be okay")
 }
+
+func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {
+	type type1 struct{}
+
+	c := New()
+	require.NoError(t, c.Provide(func() (type1, error) {
+		return type1{}, errors.New("great sadness")
+	}), "provide failed")
+
+	require.Error(t, c.Invoke(func(type1) {
+		require.FailNow(t, "first invoke must not call the function")
+	}), "first invoke must fail")
+
+	require.Error(t, c.Invoke(func(type1) {
+		require.FailNow(t, "second invoke must not call the function")
+	}), "second invoke must fail")
+}
