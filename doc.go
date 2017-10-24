@@ -293,7 +293,7 @@
 //   }
 //
 // Any number of constructors may provide values to this named collection.
-// Other contsructors can request all values for this collection by requesting
+// Other constructors can request all values for this collection by requesting
 // a slice tagged with `group:".."`. This will execute all constructors that
 // provide a value to that group in an unspecified order.
 //
