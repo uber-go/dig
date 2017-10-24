@@ -472,10 +472,14 @@ func shallowCheckDependencies(c *Container, p param) error {
 type stagingReceiver struct {
 	err    error
 	values map[key]reflect.Value
+	groups map[key][]reflect.Value
 }
 
 func newStagingReceiver() *stagingReceiver {
-	return &stagingReceiver{values: make(map[key]reflect.Value)}
+	return &stagingReceiver{
+		values: make(map[key]reflect.Value),
+		groups: make(map[key][]reflect.Value),
+	}
 }
 
 func (sr *stagingReceiver) SubmitError(err error) {
@@ -489,6 +493,11 @@ func (sr *stagingReceiver) SubmitValue(name string, t reflect.Type, v reflect.Va
 	sr.values[key{t: t, name: name}] = v
 }
 
+func (sr *stagingReceiver) SubmitGroupValue(group string, t reflect.Type, v reflect.Value) {
+	k := key{t: t, group: group}
+	sr.groups[k] = append(sr.groups[k], v)
+}
+
 // Commit commits the received results to the provided container.
 //
 // If the resultReceiver failed, no changes are committed to the container.
@@ -499,6 +508,10 @@ func (sr *stagingReceiver) Commit(c *Container) error {
 
 	for k, v := range sr.values {
 		c.values[k] = v
+	}
+
+	for k, vs := range sr.groups {
+		c.groups[k] = append(c.groups[k], vs...)
 	}
 
 	return nil

@@ -51,6 +51,9 @@ type resultReceiver interface {
 
 	// Submits a new value to the receiver.
 	SubmitValue(name string, t reflect.Type, v reflect.Value)
+
+	// Submits a new value to a value group.
+	SubmitGroupValue(group string, t reflect.Type, v reflect.Value)
 }
 
 var (
@@ -338,8 +341,6 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	return rg, nil
 }
 
-func (rt resultGrouped) Extract(c *Container, v reflect.Value) error {
-	k := key{group: rt.Group, t: rt.Type}
-	c.groups[k] = append(c.groups[k], v)
-	return nil
+func (rt resultGrouped) Extract(rr resultReceiver, v reflect.Value) {
+	rr.SubmitGroupValue(rt.Group, rt.Type, v)
 }
