@@ -378,7 +378,7 @@ func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
 	switch {
 	case f.Type.Kind() != reflect.Slice:
 		return pg, fmt.Errorf("value groups may be consumed as slices only: "+
-			"field %q (%T) is not a slice", f.Name, f.Type)
+			"field %q (%v) is not a slice", f.Name, f.Type)
 	case name != "":
 		return pg, fmt.Errorf(
 			"cannot use named values with value groups: name:%q provided with group:%q", name, pg.Group)

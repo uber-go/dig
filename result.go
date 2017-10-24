@@ -332,7 +332,7 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 		return rg, fmt.Errorf(
 			"cannot use named values with value groups: name:%q provided with group:%q", name, rg.Group)
 	case optional:
-		return rg, errors.New("cannot mark value groups as optional")
+		return rg, errors.New("value groups cannot be optional")
 	}
 
 	return rg, nil

@@ -146,6 +146,25 @@ func TestNewResultObjectErrors(t *testing.T) {
 			}{},
 			err: `bad field "Nested"`,
 		},
+		{
+			desc: "group with name should fail",
+			give: struct {
+				Out
+
+				Foo string `group:"foo" name:"bar"`
+			}{},
+			err: "cannot use named values with value groups: " +
+				`name:"bar" provided with group:"foo"`,
+		},
+		{
+			desc: "group marked as optional",
+			give: struct {
+				Out
+
+				Foo string `group:"foo" optional:"true"`
+			}{},
+			err: "value groups cannot be optional",
+		},
 	}
 
 	for _, tt := range tests {
