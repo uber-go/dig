@@ -56,11 +56,15 @@ func (n *node) String() string {
 }
 
 func (k key) String() string {
+	// ~tally.Scope means optional
+	// ~tally.Scope:foo means named optional
+	// [io.Reader]:foo refers to a group of io.Readers called 'foo'
+
 	if k.name != "" {
 		return fmt.Sprintf("%v:%s", k.t, k.name)
 	}
 	if k.group != "" {
-		return fmt.Sprintf("%v:[]%s", k.t, k.group)
+		return fmt.Sprintf("[%v]:%s", k.t, k.group)
 	}
 	return k.t.String()
 }
@@ -97,5 +101,7 @@ func (op paramObject) String() string {
 }
 
 func (pt paramGroupedSlice) String() string {
-	return fmt.Sprintf("%v:[]%v", pt.Type.Elem(), pt.Group)
+	// [io.Reader]:foo refers to a group of io.Readers called 'foo'
+
+	return fmt.Sprintf("[%v]:%v", pt.Type.Elem(), pt.Group)
 }

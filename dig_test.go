@@ -1054,7 +1054,7 @@ func TestGroups(t *testing.T) {
 			require.FailNow(t, "this function must not be called")
 		})
 		require.Error(t, err, "expected failure")
-		assert.Contains(t, err.Error(), "failed to build string:[]x: ")
+		assert.Contains(t, err.Error(), "failed to build [string]:x")
 		assert.Equal(t, gaveErr, RootCause(err))
 	})
 }
