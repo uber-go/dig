@@ -2012,6 +2012,37 @@ func TestInvokeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), ": great sadness")
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
 	})
+
+	t.Run("unmet dependency of a group value", func(t *testing.T) {
+		c := New()
+
+		type A struct{}
+		type B struct{}
+
+		type out struct {
+			Out
+
+			B B `group:"b"`
+		}
+
+		require.NoError(t, c.Provide(func(A) out {
+			require.FailNow(t, "must not be called")
+			return out{}
+		}))
+
+		type in struct {
+			In
+
+			Bs []B `group:"b"`
+		}
+
+		err := c.Invoke(func(in) {
+			require.FailNow(t, "must not be called")
+		})
+		require.Error(t, err, "expected failure")
+		assert.Contains(t, err.Error(), "could not get field Bs of dig.in: failed to build [dig.B]:b")
+		assert.Contains(t, err.Error(), "type dig.A isn't in the container")
+	})
 }
 
 func TestNodeAlreadyCalled(t *testing.T) {
