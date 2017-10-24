@@ -37,7 +37,7 @@ func (c *Container) String() string {
 	}
 	fmt.Fprintln(b, "}")
 
-	fmt.Fprintln(b, "cache: {")
+	fmt.Fprintln(b, "values: {")
 	for k, v := range c.values {
 		fmt.Fprintln(b, "\t", k, "=>", v)
 	}

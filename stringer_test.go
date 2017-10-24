@@ -21,8 +21,7 @@
 package dig
 
 import (
-	"bytes"
-	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,35 +29,80 @@ import (
 )
 
 func TestStringer(t *testing.T) {
-	t.Parallel()
-
-	c := New()
 	type A struct{}
 	type B struct{}
 	type C struct{}
 	type D struct{}
-	type param struct {
+
+	type in struct {
 		In
-		*D `name:"foo" optional:"true"`
+
+		A A `name:"foo"`
+		B B `optional:"true"`
+		C C `name:"bar" optional:"true"`
+
+		Strings []string `group:"baz"`
 	}
-	require.NoError(t, c.Provide(func(p param) (*A, *B) { return &A{}, &B{} }))
-	require.NoError(t, c.Provide(func(*B) *C { return &C{} }))
-	require.NoError(t, c.Invoke(func(a *A) {}))
 
-	b := &bytes.Buffer{}
-	fmt.Fprintln(b, c)
-	s := b.String()
+	type out struct {
+		Out
 
-	// all nodes are in the graph
-	assert.Contains(t, s, "*dig.A -> deps: [~*dig.D:foo]")
-	assert.Contains(t, s, "*dig.B -> deps: [~*dig.D:foo]")
-	assert.Contains(t, s, "*dig.C -> deps: [*dig.B]")
+		A A `name:"foo"`
+		C C `name:"bar"`
+	}
 
-	// constructors
-	assert.Contains(t, s, "func(dig.param) (*dig.A, *dig.B)")
-	assert.Contains(t, s, "func(*dig.B) *dig.C")
+	type stringOut struct {
+		Out
 
-	// cache
-	assert.Contains(t, s, "*dig.A =>")
-	assert.Contains(t, s, "*dig.B =>")
+		S string `group:"baz"`
+	}
+
+	c := New(setRand(rand.New(rand.NewSource(0))))
+
+	require.NoError(t, c.Provide(func(i in) D {
+		assert.Equal(t, []string{"bar", "baz", "foo"}, i.Strings)
+		return D{}
+	}))
+
+	require.NoError(t, c.Provide(func() out {
+		return out{
+			A: A{},
+			C: C{},
+		}
+	}))
+
+	require.NoError(t, c.Provide(func() A { return A{} }))
+	require.NoError(t, c.Provide(func() B { return B{} }))
+	require.NoError(t, c.Provide(func() C { return C{} }))
+
+	require.NoError(t, c.Provide(func(A) stringOut { return stringOut{S: "foo"} }))
+	require.NoError(t, c.Provide(func(B) stringOut { return stringOut{S: "bar"} }))
+	require.NoError(t, c.Provide(func(C) stringOut { return stringOut{S: "baz"} }))
+
+	require.NoError(t, c.Invoke(func(D) {
+	}))
+
+	s := c.String()
+
+	// All nodes
+	assert.Contains(t, s, "dig.A:foo -> deps: []")
+	assert.Contains(t, s, "dig.A -> deps: []")
+	assert.Contains(t, s, "dig.B -> deps: []")
+	assert.Contains(t, s, "dig.C -> deps: []")
+	assert.Contains(t, s, "dig.C:bar -> deps: []")
+	assert.Contains(t, s, "dig.D -> deps: [dig.A:foo ~dig.B ~dig.C:bar [string]:baz]")
+	assert.Contains(t, s, "[string]:baz -> deps: [dig.A]")
+	assert.Contains(t, s, "[string]:baz -> deps: [dig.B]")
+	assert.Contains(t, s, "[string]:baz -> deps: [dig.C]")
+
+	// Values
+	assert.Contains(t, s, "dig.A => {}")
+	assert.Contains(t, s, "dig.B => {}")
+	assert.Contains(t, s, "dig.C => {}")
+	assert.Contains(t, s, "dig.D => {}")
+	assert.Contains(t, s, "dig.A:foo => {}")
+	assert.Contains(t, s, "dig.C:bar => {}")
+	assert.Contains(t, s, "[string]:baz => foo")
+	assert.Contains(t, s, "[string]:baz => bar")
+	assert.Contains(t, s, "[string]:baz => baz")
 }
