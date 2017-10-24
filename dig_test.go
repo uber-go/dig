@@ -1297,6 +1297,69 @@ func TestProvideCycleFails(t *testing.T) {
 		assert.Contains(t, err.Error(), "introduces a cycle")
 	})
 
+	t.Run("group based cycle", func(t *testing.T) {
+		type D struct{}
+
+		type outA struct {
+			Out
+
+			Foo string `group:"foo"`
+			Bar int    `group:"bar"`
+		}
+		newA := func() outA {
+			require.FailNow(t, "must not be called")
+			return outA{}
+		}
+
+		type outB struct {
+			Out
+
+			Foo string `group:"foo"`
+		}
+		newB := func(*D) outB {
+			require.FailNow(t, "must not be called")
+			return outB{}
+		}
+
+		type inC struct {
+			In
+
+			Foos []string `group:"foo"`
+		}
+
+		type outC struct {
+			Out
+
+			Bar int `group:"bar"`
+		}
+
+		newC := func(i inC) outC {
+			require.FailNow(t, "must not be called")
+			return outC{}
+		}
+
+		type inD struct {
+			In
+
+			Bars []int `group:"bar"`
+		}
+
+		newD := func(inD) *D {
+			require.FailNow(t, "must not be called")
+			return nil
+		}
+
+		c := New()
+		require.NoError(t, c.Provide(newA))
+		require.NoError(t, c.Provide(newB))
+		require.NoError(t, c.Provide(newC))
+
+		err := c.Provide(newD)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(),
+			"introduces a cycle: *dig.D -> [int]:bar -> [string]:foo -> *dig.D")
+	})
+
 	t.Run("detectCycles invalid param", func(t *testing.T) {
 		type badParam struct{ param }
 

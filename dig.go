@@ -21,7 +21,6 @@
 package dig
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -382,12 +381,12 @@ type errCycleDetected struct {
 }
 
 func (e errCycleDetected) Error() string {
-	b := new(bytes.Buffer)
-	for _, k := range e.Path {
-		fmt.Fprintf(b, "%v ->", k.t)
+	items := make([]string, len(e.Path)+1)
+	for i, k := range e.Path {
+		items[i] = fmt.Sprint(k)
 	}
-	fmt.Fprintf(b, "%v", e.Key.t)
-	return b.String()
+	items[len(items)-1] = fmt.Sprint(e.Key)
+	return strings.Join(items, " -> ")
 }
 
 func detectCycles(par param, graph map[key][]*node, path []key) error {
