@@ -385,7 +385,7 @@ func (e errCycleDetected) Error() string {
 	for i, k := range e.Path {
 		items[i] = fmt.Sprint(k)
 	}
-	items[len(items)-1] = fmt.Sprint(e.Key)
+	items[len(e.Path)] = fmt.Sprint(e.Key)
 	return strings.Join(items, " -> ")
 }
 
