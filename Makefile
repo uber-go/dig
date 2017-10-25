@@ -11,16 +11,8 @@ dependencies:
 	@echo "Installing Glide and locked dependencies..."
 	glide --version || go get -u -f github.com/Masterminds/glide
 	glide install
-	@$(call label,Installing md-to-godoc...)
-	$(ECHO_V)go install ./vendor/github.com/sectioneight/md-to-godoc
 	@echo "Installing uber-license tool..."
 	update-license || go get -u -f go.uber.org/tools/update-license
-ifdef SHOULD_LINT
-	@echo "Installing golint..."
-	go install ./vendor/github.com/golang/lint/golint
-else
-	@echo "Not installing golint, since we don't expect to lint on" $(GO_VERSION)
-endif
 
 .PHONY: lint
 lint:
