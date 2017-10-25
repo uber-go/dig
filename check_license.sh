@@ -2,9 +2,6 @@
 
 set -eo pipefail
 
-DIR="$(cd "$(dirname "${0}")/.." && pwd)"
-cd "${DIR}"
-
 run_update_license() {
   # doing this because of SC2046 warning
   for file in $(find . -name '*.go' | grep -v \.\/vendor); do

@@ -1,27 +1,17 @@
-hash: fdd7122108d34cf543d2dd819f2c794d94d44245ab0ac8ff298a7720a5b93976
-updated: 2017-07-31T11:25:37.451934681-07:00
+hash: b6270b9f130f8c89f82156ca8d44cb16a3311c7a04746f2805f02c2f72bb58ec
+updated: 2017-10-25T09:30:43.315666535-07:00
 imports: []
 testImports:
 - name: github.com/davecgh/go-spew
-  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
   subpackages:
   - spew
-- name: github.com/golang/lint
-  version: c5fb716d6688a859aae56d26d3e6070808df29f7
-  subpackages:
-  - golint
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
-- name: github.com/sectioneight/md-to-godoc
-  version: 79157ff08f1acd5c5b1d13d71c0adb7908dbb8a2
 - name: github.com/stretchr/testify
-  version: 05e8a0eda380579888eb53c394909df027f06991
+  version: d77da356e56a7428ad25149ca77381849a6a5232
   subpackages:
   - assert
   - require
-- name: golang.org/x/tools
-  version: bc6db94186c03835daa5c1c679fba599dc1f3b79
-  subpackages:
-  - cover
