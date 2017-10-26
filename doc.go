@@ -288,7 +288,7 @@
 //     ..
 //   }
 //
-//   func NewEchoHanlder() HandlerResult {
+//   func NewEchoHandler() HandlerResult {
 //     ..
 //   }
 //
