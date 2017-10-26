@@ -381,7 +381,7 @@ func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
 			"field %q (%v) is not a slice", f.Name, f.Type)
 	case name != "":
 		return pg, fmt.Errorf(
-			"cannot use named values with value groups: name:%q provided with group:%q", name, pg.Group)
+			"cannot use named values with value groups: name:%q requested with group:%q", name, pg.Group)
 
 	case optional:
 		return pg, errors.New("value groups cannot be optional")

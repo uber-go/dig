@@ -142,7 +142,7 @@ func TestParamGroupSliceErrors(t *testing.T) {
 				Foo []string `group:"foo" name:"bar"`
 			}{},
 			wantErr: "cannot use named values with value groups: " +
-				`name:"bar" provided with group:"foo"`,
+				`name:"bar" requested with group:"foo"`,
 		},
 		{
 			desc: "cannot be optional",
