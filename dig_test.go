@@ -1492,7 +1492,7 @@ func TestProvideFailures(t *testing.T) {
 		require.Error(t, err, "expected error on the second provide")
 		assert.Contains(t, err.Error(),
 			"cannot provide *dig.A:foo from [0].A in constructor func() dig.ret2: "+
-				"already in the container")
+				"already provided by [func() dig.ret1]")
 	})
 
 	t.Run("out with unexported field should error", func(t *testing.T) {

@@ -288,10 +288,15 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 			return nil
 		}
 
-		if _, ok := cv.c.providers[k]; ok {
+		if ps := cv.c.providers[k]; len(ps) > 0 {
+			csigs := make([]string, len(ps))
+			for i, p := range ps {
+				csigs[i] = fmt.Sprint(p.ctype)
+			}
+
 			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v in constructor %v: already in the container",
-				k, path, cv.n.ctype)
+				"cannot provide %v from %v in constructor %v: already provided by %v",
+				k, path, cv.n.ctype, csigs)
 			return nil
 		}
 
