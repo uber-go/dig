@@ -37,9 +37,14 @@ func (c *Container) String() string {
 	}
 	fmt.Fprintln(b, "}")
 
-	fmt.Fprintln(b, "cache: {")
+	fmt.Fprintln(b, "values: {")
 	for k, v := range c.values {
 		fmt.Fprintln(b, "\t", k, "=>", v)
+	}
+	for k, vs := range c.groups {
+		for _, v := range vs {
+			fmt.Fprintln(b, "\t", k, "=>", v)
+		}
 	}
 	fmt.Fprintln(b, "}")
 
@@ -51,8 +56,15 @@ func (n *node) String() string {
 }
 
 func (k key) String() string {
+	// ~tally.Scope means optional
+	// ~tally.Scope:foo means named optional
+	// [io.Reader]:foo refers to a group of io.Readers called 'foo'
+
 	if k.name != "" {
 		return fmt.Sprintf("%v:%s", k.t, k.name)
+	}
+	if k.group != "" {
+		return fmt.Sprintf("[%v]:%s", k.t, k.group)
 	}
 	return k.t.String()
 }
@@ -86,4 +98,10 @@ func (op paramObject) String() string {
 		fields[i] = f.Param.String()
 	}
 	return strings.Join(fields, " ")
+}
+
+func (pt paramGroupedSlice) String() string {
+	// [io.Reader]:foo refers to a group of io.Readers called 'foo'
+
+	return fmt.Sprintf("[%v]:%v", pt.Type.Elem(), pt.Group)
 }

@@ -21,30 +21,39 @@
 package dig
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
 	_optionalTag = "optional"
 	_nameTag     = "name"
+	_groupTag    = "group"
 )
 
 // Unique identification of an object in the graph.
 type key struct {
-	t    reflect.Type
-	name string
+	t reflect.Type
+
+	// Only one of name or group will be set.
+	name  string
+	group string
 }
 
 // Option configures a Container. It's included for future functionality;
 // currently, there are no concrete implementations.
 type Option interface {
-	unimplemented()
+	applyOption(*Container)
 }
+
+type optionFunc func(*Container)
+
+func (f optionFunc) applyOption(c *Container) { f(c) }
 
 // A ProvideOption modifies the default behavior of Provide. It's included for
 // future functionality; currently, there are no concrete implementations.
@@ -66,14 +75,36 @@ type Container struct {
 
 	// Values that have already been generated in the container.
 	values map[key]reflect.Value
+
+	// Values groups that have already been generated in the container.
+	groups map[key][]reflect.Value
+
+	// Source of randomness.
+	rand *rand.Rand
 }
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
-	return &Container{
+	c := &Container{
 		providers: make(map[key][]*node),
 		values:    make(map[key]reflect.Value),
+		groups:    make(map[key][]reflect.Value),
+		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
+
+	for _, opt := range opts {
+		opt.applyOption(c)
+	}
+	return c
+}
+
+// Changes the source of randomness for the container.
+//
+// This will help provide determinism during tests.
+func setRand(r *rand.Rand) Option {
+	return optionFunc(func(c *Container) {
+		c.rand = r
+	})
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -246,28 +277,39 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 
 	path := strings.Join(cv.currentResultPath, ".")
 
-	r, ok := res.(resultSingle)
-	if !ok {
-		return cv
+	switch r := res.(type) {
+	case resultSingle:
+		k := key{name: r.Name, t: r.Type}
+
+		if conflict, ok := cv.keyPaths[k]; ok {
+			*cv.err = fmt.Errorf(
+				"cannot provide %v from %v in constructor %v: already provided by %v",
+				k, path, cv.n.ctype, conflict)
+			return nil
+		}
+
+		if ps := cv.c.providers[k]; len(ps) > 0 {
+			csigs := make([]string, len(ps))
+			for i, p := range ps {
+				csigs[i] = fmt.Sprint(p.ctype)
+			}
+
+			*cv.err = fmt.Errorf(
+				"cannot provide %v from %v in constructor %v: already provided by %v",
+				k, path, cv.n.ctype, csigs)
+			return nil
+		}
+
+		cv.keyPaths[k] = path
+
+	case resultGrouped:
+		// we don't really care about the path for this since conflicts are
+		// okay for group results. We'll track it for the sake of having a
+		// value there.
+		k := key{group: r.Group, t: r.Type}
+		cv.keyPaths[k] = path
 	}
 
-	k := key{name: r.Name, t: r.Type}
-
-	if conflict, ok := cv.keyPaths[k]; ok {
-		*cv.err = fmt.Errorf(
-			"cannot provide %v from %v in constructor %v: already provided by %v",
-			k, path, cv.n.ctype, conflict)
-		return nil
-	}
-
-	if _, ok := cv.c.providers[k]; ok {
-		*cv.err = fmt.Errorf(
-			"cannot provide %v from %v in constructor %v: already in the container",
-			k, path, cv.n.ctype)
-		return nil
-	}
-
-	cv.keyPaths[k] = path
 	return cv
 }
 
@@ -344,12 +386,12 @@ type errCycleDetected struct {
 }
 
 func (e errCycleDetected) Error() string {
-	b := new(bytes.Buffer)
-	for _, k := range e.Path {
-		fmt.Fprintf(b, "%v ->", k.t)
+	items := make([]string, len(e.Path)+1)
+	for i, k := range e.Path {
+		items[i] = fmt.Sprint(k)
 	}
-	fmt.Fprintf(b, "%v", e.Key.t)
-	return b.String()
+	items[len(e.Path)] = fmt.Sprint(e.Key)
+	return strings.Join(items, " -> ")
 }
 
 func detectCycles(par param, graph map[key][]*node, path []key) error {
@@ -359,12 +401,17 @@ func detectCycles(par param, graph map[key][]*node, path []key) error {
 			return false
 		}
 
-		p, ok := param.(paramSingle)
-		if !ok {
+		var k key
+		switch p := param.(type) {
+		case paramSingle:
+			k = key{name: p.Name, t: p.Type}
+		case paramGroupedSlice:
+			// NOTE: The key uses the element type, not the slice type.
+			k = key{group: p.Group, t: p.Type.Elem()}
+		default:
 			return true
 		}
 
-		k := key{name: p.Name, t: p.Type}
 		for _, p := range path {
 			if p == k {
 				err = errCycleDetected{Path: path, Key: k}
@@ -386,7 +433,7 @@ func detectCycles(par param, graph map[key][]*node, path []key) error {
 }
 
 // Checks if a field of an In struct is optional.
-func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
+func isFieldOptional(f reflect.StructField) (bool, error) {
 	tag := f.Tag.Get(_optionalTag)
 	if tag == "" {
 		return false, nil
@@ -395,8 +442,8 @@ func isFieldOptional(parent reflect.Type, f reflect.StructField) (bool, error) {
 	optional, err := strconv.ParseBool(tag)
 	if err != nil {
 		err = errWrapf(err,
-			"invalid value %q for %q tag on field %v of %v",
-			tag, _optionalTag, f.Name, parent)
+			"invalid value %q for %q tag on field %v",
+			tag, _optionalTag, f.Name)
 	}
 
 	return optional, err
@@ -429,10 +476,14 @@ func shallowCheckDependencies(c *Container, p param) error {
 type stagingReceiver struct {
 	err    error
 	values map[key]reflect.Value
+	groups map[key][]reflect.Value
 }
 
 func newStagingReceiver() *stagingReceiver {
-	return &stagingReceiver{values: make(map[key]reflect.Value)}
+	return &stagingReceiver{
+		values: make(map[key]reflect.Value),
+		groups: make(map[key][]reflect.Value),
+	}
 }
 
 func (sr *stagingReceiver) SubmitError(err error) {
@@ -446,6 +497,11 @@ func (sr *stagingReceiver) SubmitValue(name string, t reflect.Type, v reflect.Va
 	sr.values[key{t: t, name: name}] = v
 }
 
+func (sr *stagingReceiver) SubmitGroupValue(group string, t reflect.Type, v reflect.Value) {
+	k := key{t: t, group: group}
+	sr.groups[k] = append(sr.groups[k], v)
+}
+
 // Commit commits the received results to the provided container.
 //
 // If the resultReceiver failed, no changes are committed to the container.
@@ -456,6 +512,10 @@ func (sr *stagingReceiver) Commit(c *Container) error {
 
 	for k, v := range sr.values {
 		c.values[k] = v
+	}
+
+	for k, vs := range sr.groups {
+		c.groups[k] = append(c.groups[k], vs...)
 	}
 
 	return nil

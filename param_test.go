@@ -114,6 +114,52 @@ func TestParamObjectFailure(t *testing.T) {
 		_, err := newParamObject(reflect.TypeOf(in{}))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
-			`unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A) from dig.in?`)
+			`bad field "a2" of dig.in: unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A)`)
 	})
+}
+
+func TestParamGroupSliceErrors(t *testing.T) {
+	tests := []struct {
+		desc    string
+		shape   interface{}
+		wantErr string
+	}{
+		{
+			desc: "non-slice type are disallowed",
+			shape: struct {
+				In
+
+				Foo string `group:"foo"`
+			}{},
+			wantErr: "value groups may be consumed as slices only: " +
+				`field "Foo" (string) is not a slice`,
+		},
+		{
+			desc: "cannot provide name for a group",
+			shape: struct {
+				In
+
+				Foo []string `group:"foo" name:"bar"`
+			}{},
+			wantErr: "cannot use named values with value groups: " +
+				`name:"bar" requested with group:"foo"`,
+		},
+		{
+			desc: "cannot be optional",
+			shape: struct {
+				In
+
+				Foo []string `group:"foo" optional:"true"`
+			}{},
+			wantErr: "value groups cannot be optional",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			_, err := newParamObject(reflect.TypeOf(tt.shape))
+			require.Error(t, err, "expected failure")
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
 }

@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"reflect"
 	"testing"
@@ -781,7 +782,281 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.Error(t, err, "invoking with B param should error out")
 		assert.Contains(t, err.Error(), "B isn't in the container")
 	})
+}
 
+func TestGroups(t *testing.T) {
+	t.Run("empty slice received without provides", func(t *testing.T) {
+		c := New()
+
+		type in struct {
+			In
+
+			Values []int `group:"foo"`
+		}
+
+		require.NoError(t, c.Invoke(func(i in) {
+			require.Empty(t, i.Values)
+		}), "failed to invoke")
+	})
+
+	t.Run("values are provided", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			Out
+
+			Value int `group:"val"`
+		}
+
+		provide := func(i int) {
+			require.NoError(t, c.Provide(func() out {
+				return out{Value: i}
+			}), "failed to provide ")
+		}
+
+		provide(1)
+		provide(2)
+		provide(3)
+
+		type in struct {
+			In
+
+			Values []int `group:"val"`
+		}
+
+		require.NoError(t, c.Invoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Values)
+		}), "invoke failed")
+	})
+
+	t.Run("constructor is called at most once", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			Out
+
+			Result string `group:"s"`
+		}
+
+		calls := make(map[string]int)
+
+		provide := func(i string) {
+			require.NoError(t, c.Provide(func() out {
+				calls[i]++
+				return out{Result: i}
+			}), "failed to provide")
+		}
+
+		provide("foo")
+		provide("bar")
+		provide("baz")
+
+		type in struct {
+			In
+
+			Results []string `group:"s"`
+		}
+
+		// Expected value of in.Results in consecutive calls.
+		expected := [][]string{
+			{"bar", "baz", "foo"},
+			{"foo", "baz", "bar"},
+			{"baz", "bar", "foo"},
+			{"bar", "foo", "baz"},
+		}
+
+		for i, want := range expected {
+			require.NoError(t, c.Invoke(func(i in) {
+				require.Equal(t, want, i.Results)
+			}), "invoke %d failed", i)
+		}
+
+		for s, v := range calls {
+			assert.Equal(t, 1, v, "constructor for %q called too many times", s)
+		}
+	})
+
+	t.Run("consume groups in constructor", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			Out
+
+			Result []string `group:"hi"`
+		}
+
+		provideStrings := func(strings ...string) {
+			require.NoError(t, c.Provide(func() out {
+				return out{Result: strings}
+			}), "failed to provide")
+		}
+
+		provideStrings("1", "2")
+		provideStrings("3", "4", "5")
+		provideStrings("6")
+		provideStrings("7", "8", "9", "10")
+
+		type setParams struct {
+			In
+
+			Strings [][]string `group:"hi"`
+		}
+		require.NoError(t, c.Provide(func(p setParams) map[string]struct{} {
+			m := make(map[string]struct{})
+			for _, ss := range p.Strings {
+				for _, s := range ss {
+					m[s] = struct{}{}
+				}
+			}
+			return m
+		}), "failed to provide set constructor")
+
+		require.NoError(t, c.Invoke(func(got map[string]struct{}) {
+			assert.Equal(t, map[string]struct{}{
+				"1": {}, "2": {}, "3": {}, "4": {}, "5": {},
+				"6": {}, "7": {}, "8": {}, "9": {}, "10": {},
+			}, got)
+		}), "failed to invoke")
+	})
+
+	t.Run("provide multiple values", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		type outInt struct {
+			Out
+			Int int `group:"foo"`
+		}
+
+		provideInt := func(i int) {
+			require.NoError(t, c.Provide(func() (outInt, error) {
+				return outInt{Int: i}, nil
+			}), "failed to provide int")
+		}
+
+		type outString struct {
+			Out
+			String string `group:"foo"`
+		}
+
+		provideString := func(s string) {
+			require.NoError(t, c.Provide(func() outString {
+				return outString{String: s}
+			}), "failed to provide string")
+		}
+
+		type outBoth struct {
+			Out
+
+			Int    int    `group:"foo"`
+			String string `group:"foo"`
+		}
+
+		provideBoth := func(i int, s string) {
+			require.NoError(t, c.Provide(func() (outBoth, error) {
+				return outBoth{Int: i, String: s}, nil
+			}), "failed to provide both")
+		}
+
+		provideInt(1)
+		provideString("foo")
+		provideBoth(2, "bar")
+		provideString("baz")
+		provideInt(3)
+		provideBoth(4, "qux")
+		provideBoth(5, "quux")
+		provideInt(6)
+		provideInt(7)
+
+		type in struct {
+			In
+
+			Ints    []int    `group:"foo"`
+			Strings []string `group:"foo"`
+		}
+
+		require.NoError(t, c.Invoke(func(got in) {
+			assert.Equal(t, in{
+				Ints:    []int{5, 3, 4, 1, 6, 7, 2},
+				Strings: []string{"foo", "bar", "baz", "quux", "qux"},
+			}, got)
+		}), "failed to invoke")
+	})
+
+	t.Run("duplicate values are supported", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			Out
+
+			Result string `group:"s"`
+		}
+
+		provide := func(i string) {
+			require.NoError(t, c.Provide(func() out {
+				return out{Result: i}
+			}), "failed to provide")
+		}
+
+		provide("a")
+		provide("b")
+		provide("c")
+		provide("a")
+		provide("d")
+		provide("d")
+		provide("a")
+		provide("e")
+
+		type stringSlice []string
+
+		type in struct {
+			In
+
+			Strings stringSlice `group:"s"`
+		}
+
+		require.NoError(t, c.Invoke(func(i in) {
+			assert.Equal(t,
+				stringSlice{"d", "c", "a", "a", "d", "e", "b", "a"},
+				i.Strings)
+		}), "failed to invoke")
+	})
+
+	t.Run("failure to build a grouped value fails everything", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			Out
+
+			Result string `group:"x"`
+		}
+
+		require.NoError(t, c.Provide(func() (out, error) {
+			return out{Result: "foo"}, nil
+		}), "failed to provide")
+
+		var gaveErr error
+		require.NoError(t, c.Provide(func() (out, error) {
+			gaveErr = errors.New("great sadness")
+			return out{}, gaveErr
+		}), "failed to provide")
+
+		require.NoError(t, c.Provide(func() out {
+			return out{Result: "bar"}
+		}), "failed to provide")
+
+		type in struct {
+			In
+
+			Strings []string `group:"x"`
+		}
+
+		err := c.Invoke(func(i in) {
+			require.FailNow(t, "this function must not be called")
+		})
+		require.Error(t, err, "expected failure")
+		assert.Contains(t, err.Error(), "failed to build [string]:x")
+		assert.Equal(t, gaveErr, RootCause(err))
+	})
 }
 
 // --- END OF END TO END TESTS
@@ -1022,6 +1297,69 @@ func TestProvideCycleFails(t *testing.T) {
 		assert.Contains(t, err.Error(), "introduces a cycle")
 	})
 
+	t.Run("group based cycle", func(t *testing.T) {
+		type D struct{}
+
+		type outA struct {
+			Out
+
+			Foo string `group:"foo"`
+			Bar int    `group:"bar"`
+		}
+		newA := func() outA {
+			require.FailNow(t, "must not be called")
+			return outA{}
+		}
+
+		type outB struct {
+			Out
+
+			Foo string `group:"foo"`
+		}
+		newB := func(*D) outB {
+			require.FailNow(t, "must not be called")
+			return outB{}
+		}
+
+		type inC struct {
+			In
+
+			Foos []string `group:"foo"`
+		}
+
+		type outC struct {
+			Out
+
+			Bar int `group:"bar"`
+		}
+
+		newC := func(i inC) outC {
+			require.FailNow(t, "must not be called")
+			return outC{}
+		}
+
+		type inD struct {
+			In
+
+			Bars []int `group:"bar"`
+		}
+
+		newD := func(inD) *D {
+			require.FailNow(t, "must not be called")
+			return nil
+		}
+
+		c := New()
+		require.NoError(t, c.Provide(newA))
+		require.NoError(t, c.Provide(newB))
+		require.NoError(t, c.Provide(newC))
+
+		err := c.Provide(newD)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(),
+			"introduces a cycle: *dig.D -> [int]:bar -> [string]:foo -> *dig.D")
+	})
+
 	t.Run("detectCycles invalid param", func(t *testing.T) {
 		type badParam struct{ param }
 
@@ -1154,7 +1492,7 @@ func TestProvideFailures(t *testing.T) {
 		require.Error(t, err, "expected error on the second provide")
 		assert.Contains(t, err.Error(),
 			"cannot provide *dig.A:foo from [0].A in constructor func() dig.ret2: "+
-				"already in the container")
+				"already provided by [func() dig.ret1]")
 	})
 
 	t.Run("out with unexported field should error", func(t *testing.T) {
@@ -1488,7 +1826,8 @@ func TestInvokeFailures(t *testing.T) {
 		}
 		err := c.Invoke(func(p param) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), `did you mean to export "string" (string) from dig.param?`)
+		assert.Contains(t, err.Error(),
+			`bad argument 1: bad field "string" of dig.param: unexported fields not allowed in dig.In, did you mean to export "string" (string)`)
 	})
 
 	t.Run("pointer in dependency is not supported", func(t *testing.T) {
@@ -1672,6 +2011,37 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err, "expected Invoke error")
 		assert.Contains(t, err.Error(), ": great sadness")
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
+	})
+
+	t.Run("unmet dependency of a group value", func(t *testing.T) {
+		c := New()
+
+		type A struct{}
+		type B struct{}
+
+		type out struct {
+			Out
+
+			B B `group:"b"`
+		}
+
+		require.NoError(t, c.Provide(func(A) out {
+			require.FailNow(t, "must not be called")
+			return out{}
+		}))
+
+		type in struct {
+			In
+
+			Bs []B `group:"b"`
+		}
+
+		err := c.Invoke(func(in) {
+			require.FailNow(t, "must not be called")
+		})
+		require.Error(t, err, "expected failure")
+		assert.Contains(t, err.Error(), "could not get field Bs of dig.in: failed to build [dig.B]:b")
+		assert.Contains(t, err.Error(), "type dig.A isn't in the container")
 	})
 }
 

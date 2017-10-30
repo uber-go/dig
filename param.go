@@ -21,7 +21,9 @@
 package dig
 
 import (
+	"errors"
 	"fmt"
+	"math/rand"
 	"reflect"
 )
 
@@ -32,6 +34,10 @@ import (
 //  paramSingle   An explicitly requested type.
 //  paramObject   dig.In struct where each field in the struct can be another
 //                param.
+//  paramGroupedSlice
+//                A slice consuming a value group. This will receive all
+//                values produced with a `group:".."` tag with the same name
+//                as a slice.
 type param interface {
 	fmt.Stringer
 
@@ -46,6 +52,7 @@ var (
 	_ param = paramSingle{}
 	_ param = paramObject{}
 	_ param = paramList{}
+	_ param = paramGroupedSlice{}
 )
 
 // newParam builds a param from the given type. If the provided type is a
@@ -109,7 +116,7 @@ func walkParam(p param, v paramVisitor) {
 	}
 
 	switch par := p.(type) {
-	case paramSingle:
+	case paramSingle, paramGroupedSlice:
 		// No sub-results
 	case paramObject:
 		for _, f := range par.Fields {
@@ -247,21 +254,6 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 	return c.values[k], nil
 }
 
-// paramObjectField is a single field of a dig.In struct.
-type paramObjectField struct {
-	// Name of the field in the struct.
-	FieldName string
-
-	// Index of this field in the target struct.
-	//
-	// We need to track this separately because not all fields of the
-	// struct map to params.
-	FieldIndex int
-
-	// The dependency requested by this field.
-	Param param
-}
-
 // paramObject is a dig.In struct where each field is another param.
 //
 // This object is not expected in the graph as-is.
@@ -282,36 +274,14 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 			continue
 		}
 
-		if f.PkgPath != "" {
-			return po, fmt.Errorf(
-				"unexported fields not allowed in dig.In, did you mean to export %q (%v) from %v?",
-				f.Name, f.Type, t)
-		}
-
-		p, err := newParam(f.Type)
+		pof, err := newParamObjectField(i, f)
 		if err != nil {
 			return po, errWrapf(err, "bad field %q of %v", f.Name, t)
 		}
 
-		name := f.Tag.Get(_nameTag)
-		optional, err := isFieldOptional(t, f)
-		if err != nil {
-			return po, err
-		}
-
-		if ps, ok := p.(paramSingle); ok {
-			// Field tags apply only if the field is "simple"
-			ps.Name = name
-			ps.Optional = optional
-			p = ps
-		}
-
-		po.Fields = append(po.Fields, paramObjectField{
-			FieldName:  f.Name,
-			FieldIndex: i,
-			Param:      p,
-		})
+		po.Fields = append(po.Fields, pof)
 	}
+
 	return po, nil
 }
 
@@ -325,4 +295,127 @@ func (po paramObject) Build(c *Container) (reflect.Value, error) {
 		dest.Field(f.FieldIndex).Set(v)
 	}
 	return dest, nil
+}
+
+// paramObjectField is a single field of a dig.In struct.
+type paramObjectField struct {
+	// Name of the field in the struct.
+	FieldName string
+
+	// Index of this field in the target struct.
+	//
+	// We need to track this separately because not all fields of the
+	// struct map to params.
+	FieldIndex int
+
+	// The dependency requested by this field.
+	Param param
+}
+
+func newParamObjectField(idx int, f reflect.StructField) (paramObjectField, error) {
+	pof := paramObjectField{
+		FieldName:  f.Name,
+		FieldIndex: idx,
+	}
+
+	var p param
+	switch {
+	case f.PkgPath != "":
+		return pof, fmt.Errorf(
+			"unexported fields not allowed in dig.In, did you mean to export %q (%v)?",
+			f.Name, f.Type)
+
+	case f.Tag.Get(_groupTag) != "":
+		var err error
+		p, err = newParamGroupedSlice(f)
+		if err != nil {
+			return pof, err
+		}
+
+	default:
+		var err error
+		p, err = newParam(f.Type)
+		if err != nil {
+			return pof, err
+		}
+	}
+
+	if ps, ok := p.(paramSingle); ok {
+		ps.Name = f.Tag.Get(_nameTag)
+
+		var err error
+		ps.Optional, err = isFieldOptional(f)
+		if err != nil {
+			return pof, err
+		}
+
+		p = ps
+	}
+
+	pof.Param = p
+	return pof, nil
+}
+
+// paramGroupedSlice is a param which produces a slice of values with the same
+// group name.
+type paramGroupedSlice struct {
+	// Name of the group as specified in the `group:".."` tag.
+	Group string
+
+	// Type of the slice.
+	Type reflect.Type
+}
+
+// newParamGroupedSlice builds a paramGroupedSlice from the provided type with
+// the given name.
+//
+// The type MUST be a slice type.
+func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
+	pg := paramGroupedSlice{Group: f.Tag.Get(_groupTag), Type: f.Type}
+
+	name := f.Tag.Get(_nameTag)
+	optional, _ := isFieldOptional(f)
+	switch {
+	case f.Type.Kind() != reflect.Slice:
+		return pg, fmt.Errorf("value groups may be consumed as slices only: "+
+			"field %q (%v) is not a slice", f.Name, f.Type)
+	case name != "":
+		return pg, fmt.Errorf(
+			"cannot use named values with value groups: name:%q requested with group:%q", name, pg.Group)
+
+	case optional:
+		return pg, errors.New("value groups cannot be optional")
+	}
+
+	return pg, nil
+}
+
+func (pt paramGroupedSlice) Build(c *Container) (reflect.Value, error) {
+	k := key{group: pt.Group, t: pt.Type.Elem()}
+
+	for _, n := range c.providers[k] {
+		if err := n.Call(c); err != nil {
+			// TODO: better message
+			return _noValue, errWrapf(err, "failed to build %v", k)
+		}
+	}
+
+	items := c.groups[k]
+
+	// shuffle the list so users don't rely on the ordering of grouped values
+	items = shuffledCopy(c.rand, items)
+
+	result := reflect.MakeSlice(pt.Type, len(items), len(items))
+	for i, v := range items {
+		result.Index(i).Set(v)
+	}
+	return result, nil
+}
+
+func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
+	newItems := make([]reflect.Value, len(items))
+	for i, j := range rand.Perm(len(items)) {
+		newItems[i] = items[j]
+	}
+	return newItems
 }

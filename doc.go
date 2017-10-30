@@ -267,4 +267,50 @@
 //     }
 //     // ...
 //   }
+//
+// Value Groups
+//
+// Dig provides value groups to allow producing and consuming many values of
+// the same type. Value groups allow constructors to send values to a named,
+// unordered collection in the container. Other constructors can request all
+// values in this collection as a slice.
+//
+// Constructors can send values into value groups by returning a dig.Out
+// struct tagged with `group:".."`.
+//
+//   type HandlerResult struct {
+//     dig.Out
+//
+//     Handler Handler `group:"server"`
+//   }
+//
+//   func NewHelloHandler() HandlerResult {
+//     ..
+//   }
+//
+//   func NewEchoHandler() HandlerResult {
+//     ..
+//   }
+//
+// Any number of constructors may provide values to this named collection.
+// Other constructors can request all values for this collection by requesting
+// a slice tagged with `group:".."`. This will execute all constructors that
+// provide a value to that group in an unspecified order.
+//
+//   type ServerParams struct {
+//     dig.In
+//
+//     Handlers []Handler `group:"server"`
+//   }
+//
+//   func NewServer(p ServerParams) *Server {
+//     server := newServer()
+//     for _, h := range p.Handlers {
+//       server.Register(h)
+//     }
+//     return server
+//   }
+//
+// Note that values in a value group are unordered. Dig makes no guarantees
+// about the order in which these values will be produced.
 package dig
