@@ -56,15 +56,11 @@ func (n *node) String() string {
 }
 
 func (k key) String() string {
-	// ~tally.Scope means optional
-	// ~tally.Scope:foo means named optional
-	// [io.Reader]:foo refers to a group of io.Readers called 'foo'
-
 	if k.name != "" {
-		return fmt.Sprintf("%v:%s", k.t, k.name)
+		return fmt.Sprintf("%v[name=%q]", k.t, k.name)
 	}
 	if k.group != "" {
-		return fmt.Sprintf("[%v]:%s", k.t, k.group)
+		return fmt.Sprintf("%v[group=%q]", k.t, k.group)
 	}
 	return k.t.String()
 }
@@ -78,18 +74,22 @@ func (pl paramList) String() string {
 }
 
 func (sp paramSingle) String() string {
-	// ~tally.Scope means optional
-	// ~tally.Scope:foo means named optional
+	// tally.Scope[optional] means optional
+	// tally.Scope[optional, name="foo"] means named optional
 
-	var prefix, suffix string
+	var opts []string
 	if sp.Optional {
-		prefix = "~"
+		opts = append(opts, "optional")
 	}
 	if sp.Name != "" {
-		suffix = ":" + sp.Name
+		opts = append(opts, fmt.Sprintf("name=%q", sp.Name))
 	}
 
-	return fmt.Sprintf("%s%v%s", prefix, sp.Type, suffix)
+	if len(opts) == 0 {
+		return fmt.Sprint(sp.Type)
+	}
+
+	return fmt.Sprintf("%v[%v]", sp.Type, strings.Join(opts, ", "))
 }
 
 func (op paramObject) String() string {
@@ -101,7 +101,6 @@ func (op paramObject) String() string {
 }
 
 func (pt paramGroupedSlice) String() string {
-	// [io.Reader]:foo refers to a group of io.Readers called 'foo'
-
-	return fmt.Sprintf("[%v]:%v", pt.Type.Elem(), pt.Group)
+	// io.Reader[group="foo"] refers to a group of io.Readers called 'foo'
+	return fmt.Sprintf("%v[group=%q]", pt.Type.Elem(), pt.Group)
 }
