@@ -567,10 +567,10 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		require.NoError(t, c.Provide(func() retUno {
 			return retUno{A: A{1}}
-		}), "should be able to provide A:uno")
+		}), `should be able to provide A[name="uno"]`)
 		require.NoError(t, c.Provide(func(p param) retDos {
 			return retDos{A: A{2}}
-		}), "A:dos should be able to rely on A:uno")
+		}), `A[name="dos"] should be able to rely on A[name="uno"]`)
 		require.NoError(t, c.Invoke(func(p paramBoth) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
@@ -1054,7 +1054,7 @@ func TestGroups(t *testing.T) {
 			require.FailNow(t, "this function must not be called")
 		})
 		require.Error(t, err, "expected failure")
-		assert.Contains(t, err.Error(), "failed to build [string]:x")
+		assert.Contains(t, err.Error(), `failed to build string[group="x"]`)
 		assert.Equal(t, gaveErr, RootCause(err))
 	})
 }
@@ -1357,7 +1357,7 @@ func TestProvideCycleFails(t *testing.T) {
 		err := c.Provide(newD)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
-			"introduces a cycle: *dig.D -> [int]:bar -> [string]:foo -> *dig.D")
+			`introduces a cycle: *dig.D -> int[group="bar"] -> string[group="foo"] -> *dig.D`)
 	})
 
 	t.Run("detectCycles invalid param", func(t *testing.T) {
@@ -1491,7 +1491,7 @@ func TestProvideFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected error on the second provide")
 		assert.Contains(t, err.Error(),
-			"cannot provide *dig.A:foo from [0].A in constructor func() dig.ret2: "+
+			`cannot provide *dig.A[name="foo"] from [0].A in constructor func() dig.ret2: `+
 				"already provided by [func() dig.ret1]")
 	})
 
@@ -1597,7 +1597,7 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "invoke should fail")
 		assert.Contains(t, err.Error(), "could not get field Buffer of dig.param")
-		assert.Contains(t, err.Error(), "type *bytes.Buffer:foo isn't in the container")
+		assert.Contains(t, err.Error(), `type *bytes.Buffer[name="foo"] isn't in the container`)
 	})
 
 	t.Run("unmet constructor dependency", func(t *testing.T) {
@@ -1763,7 +1763,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.NoError(t, c.Invoke(func(param1) {}))
 		err := c.Invoke(func(param2) {})
 		require.Error(t, err, "provide should return error since cases don't match")
-		assert.Contains(t, err.Error(), "dig.A:camelcase isn't in the container")
+		assert.Contains(t, err.Error(), `dig.A[name="camelcase"] isn't in the container`)
 	})
 
 	t.Run("in unexported member gets an error", func(t *testing.T) {
@@ -1911,7 +1911,7 @@ func TestInvokeFailures(t *testing.T) {
 					*A `name:"hello"`
 				}) {
 				},
-				errContains: "*dig.A:hello is not in the container, did you mean to use dig.A:hello?",
+				errContains: `*dig.A[name="hello"] is not in the container, did you mean to use dig.A[name="hello"]?`,
 			},
 		}
 
@@ -2040,7 +2040,7 @@ func TestInvokeFailures(t *testing.T) {
 			require.FailNow(t, "must not be called")
 		})
 		require.Error(t, err, "expected failure")
-		assert.Contains(t, err.Error(), "could not get field Bs of dig.in: failed to build [dig.B]:b")
+		assert.Contains(t, err.Error(), `could not get field Bs of dig.in: failed to build dig.B[group="b"]`)
 		assert.Contains(t, err.Error(), "type dig.A isn't in the container")
 	})
 }
