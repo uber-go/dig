@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.0 (unreleased)
+
+- No changes yet.
+
 ## v1.2.0 (2017-11-07)
 
 - `dig.In` and `dig.Out` now support value groups, making it possible to
