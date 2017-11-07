@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.2.0 (unreleased)
+## v1.2.0 (2017-11-07)
 
 - `dig.In` and `dig.Out` now support value groups, making it possible to
   produce many values of the same type from different constructors. See package
