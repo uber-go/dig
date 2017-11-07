@@ -270,7 +270,7 @@
 //
 // Value Groups
 //
-//   Added in Dig 1.2
+// Added in Dig 1.2.
 //
 // Dig provides value groups to allow producing and consuming many values of
 // the same type. Value groups allow constructors to send values to a named,
