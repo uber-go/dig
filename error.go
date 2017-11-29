@@ -22,18 +22,14 @@ package dig
 
 import "fmt"
 
-// wrappedError is a wrapper around error that tracks the root cause of the
-// error.
+// Errors which know their underlying cause should implement this interface to
+// be compatible with RootCause.
 //
-// The root cause will be retained between errWrapf calls and retrievable by
-// using RootCause.
-type wrappedError struct {
-	rootCause error
-	err       error
-}
-
-func (e wrappedError) Error() string {
-	return e.err.Error()
+// We use an unexported "cause" method instead of "Cause" because we don't
+// want dig-internal causes to be confused with the cause of the user-provided
+// errors. (For example, if the users are using github.com/pkg/errors.)
+type causer interface {
+	cause() error
 }
 
 // RootCause returns the original error that caused the provided dig failure.
@@ -41,25 +37,22 @@ func (e wrappedError) Error() string {
 // RootCause may be used on errors returned by Invoke to get the original
 // error returned by a constructor or invoked function.
 func RootCause(err error) error {
-	if we, ok := err.(wrappedError); ok {
-		return we.rootCause
+	for {
+		if e, ok := err.(causer); ok {
+			err = e.cause()
+		} else {
+			return err
+		}
 	}
-	return err
 }
 
 // errWrapf wraps an existing error with more contextual information.
 //
-// The message for the returned error is the provided error prepended with the
-// provided message, separated by a ":".
-//
-// The given error is treated as the root cause of the returned error,
-// retrievable by using RootCause. If the provided error knew its root
-// cause, that knowledge is retained in the returned error.
+// The given error is treated as the cause of the returned error (see causer).
 //
 //   RootCause(errWrapf(errWrapf(err, ...), ...)) == err
 //
-// Use errWrapf in the rest of dig in place of fmt.Errorf if the message ends
-// with ": <original error>".
+// Use errWrapf instead of fmt.Errorf if the message ends with ": <original error>".
 func errWrapf(err error, msg string, args ...interface{}) error {
 	if err == nil {
 		return nil
@@ -69,8 +62,16 @@ func errWrapf(err error, msg string, args ...interface{}) error {
 		msg = fmt.Sprintf(msg, args...)
 	}
 
-	return wrappedError{
-		rootCause: RootCause(err),
-		err:       fmt.Errorf("%v: %v", msg, err),
-	}
+	return wrappedError{err: err, msg: msg}
+}
+
+type wrappedError struct {
+	err error
+	msg string
+}
+
+func (e wrappedError) cause() error { return e.err }
+
+func (e wrappedError) Error() string {
+	return fmt.Sprintf("%v: %v", e.msg, e.err)
 }
