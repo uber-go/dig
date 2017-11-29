@@ -28,6 +28,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/dig/internal/digreflect"
 )
 
 const (
@@ -131,7 +133,7 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	if ctype.Kind() != reflect.Func {
 		return fmt.Errorf("must provide constructor function, got %v (type %v)", constructor, ctype)
 	}
-	if err := c.provide(constructor, ctype); err != nil {
+	if err := c.provide(constructor); err != nil {
 		return errWrapf(err, "can't provide %v", ctype)
 	}
 	return nil
@@ -176,8 +178,8 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
-func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
-	n, err := newNode(ctor, ctype)
+func (c *Container) provide(ctor interface{}) error {
+	n, err := newNode(ctor)
 	if err != nil {
 		return err
 	}
@@ -187,6 +189,7 @@ func (c *Container) provide(ctor interface{}, ctype reflect.Type) error {
 		return err
 	}
 
+	ctype := reflect.TypeOf(ctor)
 	if len(keys) == 0 {
 		return fmt.Errorf("%v must provide at least one non-error type", ctype)
 	}
@@ -326,6 +329,7 @@ func (c *Container) isAcyclic(p param, k key) error {
 type node struct {
 	ctor  interface{}
 	ctype reflect.Type
+	Func  *digreflect.Func
 
 	// Whether the constructor owned by this node was already called.
 	called bool
@@ -337,7 +341,9 @@ type node struct {
 	Results resultList
 }
 
-func newNode(ctor interface{}, ctype reflect.Type) (*node, error) {
+func newNode(ctor interface{}) (*node, error) {
+	ctype := reflect.TypeOf(ctor)
+
 	params, err := newParamList(ctype)
 	if err != nil {
 		return nil, err
@@ -351,6 +357,7 @@ func newNode(ctor interface{}, ctype reflect.Type) (*node, error) {
 	return &node{
 		ctor:    ctor,
 		ctype:   ctype,
+		Func:    digreflect.InspectFunc(ctor),
 		Params:  params,
 		Results: results,
 	}, err
