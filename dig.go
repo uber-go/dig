@@ -134,7 +134,10 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 		return fmt.Errorf("must provide constructor function, got %v (type %v)", constructor, ctype)
 	}
 	if err := c.provide(constructor); err != nil {
-		return errWrapf(err, "can't provide %v", ctype)
+		return errProvide{
+			Func:   digreflect.InspectFunc(constructor),
+			Reason: err,
+		}
 	}
 	return nil
 }

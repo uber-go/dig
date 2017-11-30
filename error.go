@@ -20,7 +20,11 @@
 
 package dig
 
-import "fmt"
+import (
+	"fmt"
+
+	"go.uber.org/dig/internal/digreflect"
+)
 
 // Errors which know their underlying cause should implement this interface to
 // be compatible with RootCause.
@@ -74,4 +78,17 @@ func (e wrappedError) cause() error { return e.err }
 
 func (e wrappedError) Error() string {
 	return fmt.Sprintf("%v: %v", e.msg, e.err)
+}
+
+// errProvide is returned when a constructor could not be Provided into the
+// container.
+type errProvide struct {
+	Func   *digreflect.Func
+	Reason error
+}
+
+func (e errProvide) cause() error { return e.Reason }
+
+func (e errProvide) Error() string {
+	return fmt.Sprintf("function %v cannot be provided: %v", e.Func, e.Reason)
 }
