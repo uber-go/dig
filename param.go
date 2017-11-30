@@ -188,7 +188,7 @@ func (pl paramList) BuildList(c *Container) ([]reflect.Value, error) {
 		var err error
 		args[i], err = p.Build(c)
 		if err != nil {
-			return nil, errWrapf(err, "could not build argument %d for constructor %v", i, pl.ctype)
+			return nil, err
 		}
 	}
 	return args, nil
@@ -247,7 +247,7 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 		}
 
 		if err := n.Call(c); err != nil {
-			return _noValue, errWrapf(err, "failed to build %v", k)
+			return _noValue, errParamSingleFailed{Key: k, Reason: err}
 		}
 	}
 
@@ -288,9 +288,9 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 func (po paramObject) Build(c *Container) (reflect.Value, error) {
 	dest := reflect.New(po.Type).Elem()
 	for _, f := range po.Fields {
-		v, err := f.Param.Build(c)
+		v, err := f.Build(c)
 		if err != nil {
-			return v, errWrapf(err, "could not get field %v of %v", f.FieldName, po.Type)
+			return dest, err
 		}
 		dest.Field(f.FieldIndex).Set(v)
 	}
@@ -356,6 +356,14 @@ func newParamObjectField(idx int, f reflect.StructField) (paramObjectField, erro
 	return pof, nil
 }
 
+func (pof paramObjectField) Build(c *Container) (reflect.Value, error) {
+	v, err := pof.Param.Build(c)
+	if err != nil {
+		return v, err
+	}
+	return v, nil
+}
+
 // paramGroupedSlice is a param which produces a slice of values with the same
 // group name.
 type paramGroupedSlice struct {
@@ -395,8 +403,7 @@ func (pt paramGroupedSlice) Build(c *Container) (reflect.Value, error) {
 
 	for _, n := range c.providers[k] {
 		if err := n.Call(c); err != nil {
-			// TODO: better message
-			return _noValue, errWrapf(err, "failed to build %v", k)
+			return _noValue, errParamGroupFailed{Key: k, Reason: err}
 		}
 	}
 

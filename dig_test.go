@@ -1054,7 +1054,7 @@ func TestGroups(t *testing.T) {
 			require.FailNow(t, "this function must not be called")
 		})
 		require.Error(t, err, "expected failure")
-		assert.Contains(t, err.Error(), `failed to build string[group="x"]`)
+		assert.Contains(t, err.Error(), `could not build value group string[group="x"]`)
 		assert.Equal(t, gaveErr, RootCause(err))
 	})
 }
@@ -1581,7 +1581,6 @@ func TestInvokeFailures(t *testing.T) {
 		})
 
 		require.Error(t, err, "expected invoke error")
-		require.Contains(t, err.Error(), "could not get field T2")
 		require.Contains(t, err.Error(), "dig.type2 isn't in the container")
 	})
 
@@ -1596,7 +1595,6 @@ func TestInvokeFailures(t *testing.T) {
 			t.Fatal("function should not be called")
 		})
 		require.Error(t, err, "invoke should fail")
-		assert.Contains(t, err.Error(), "could not get field Buffer of dig.param")
 		assert.Contains(t, err.Error(), `type *bytes.Buffer[name="foo"] isn't in the container`)
 	})
 
@@ -2041,8 +2039,8 @@ func TestInvokeFailures(t *testing.T) {
 			require.FailNow(t, "must not be called")
 		})
 		require.Error(t, err, "expected failure")
-		assert.Contains(t, err.Error(), `could not get field Bs of dig.in: failed to build dig.B[group="b"]`)
 		assert.Contains(t, err.Error(), "type dig.A isn't in the container")
+		assert.Contains(t, err.Error(), `could not build value group dig.B[group="b"]`)
 	})
 }
 
