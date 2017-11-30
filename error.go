@@ -118,3 +118,28 @@ func (e errArgumentsFailed) cause() error { return e.Reason }
 func (e errArgumentsFailed) Error() string {
 	return fmt.Sprintf("could not build arguments for function %v: %v", e.Func, e.Reason)
 }
+
+// errParamSingleFailed is returned when a paramSingle could not be built.
+type errParamSingleFailed struct {
+	Key    key
+	Reason error
+}
+
+func (e errParamSingleFailed) cause() error { return e.Reason }
+
+func (e errParamSingleFailed) Error() string {
+	return fmt.Sprintf("failed to build %v: %v", e.Key, e.Reason)
+}
+
+// errParamGroupFailed is returned when a value group cannot be built because
+// any of the values in the group failed to build.
+type errParamGroupFailed struct {
+	Key    key
+	Reason error
+}
+
+func (e errParamGroupFailed) cause() error { return e.Reason }
+
+func (e errParamGroupFailed) Error() string {
+	return fmt.Sprintf("could not build value group %v: %v", e.Key, e.Reason)
+}
