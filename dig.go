@@ -164,6 +164,10 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return err
 	}
 
+	if err := shallowCheckDependencies(c, pl); err != nil {
+		return errWrapf(err, "missing dependencies for function %v", digreflect.InspectFunc(function))
+	}
+
 	args, err := pl.BuildList(c)
 	if err != nil {
 		return errArgumentsFailed{
