@@ -1470,9 +1470,7 @@ func TestProvideFailures(t *testing.T) {
 			}
 		})
 		require.Error(t, err, "provide must return error")
-		require.Contains(t, err.Error(),
-			"cannot provide dig.A from [0].A2 in constructor func() dig.ret: "+
-				"already provided by [0].A1")
+		assert.Contains(t, err.Error(), `cannot provide dig.A from [0].A2: already provided by [0].A1`)
 	})
 
 	t.Run("provide multiple instances with the same name", func(t *testing.T) {
@@ -1493,9 +1491,8 @@ func TestProvideFailures(t *testing.T) {
 			return ret2{A: &A{}}
 		})
 		require.Error(t, err, "expected error on the second provide")
-		assert.Contains(t, err.Error(),
-			`cannot provide *dig.A[name="foo"] from [0].A in constructor func() dig.ret2: `+
-				"already provided by [func() dig.ret1]")
+		assert.Contains(t, err.Error(), `cannot provide *dig.A[name="foo"] from [0].A: `+
+			`already provided by "go.uber.org/dig".TestProvideFailures`)
 	})
 
 	t.Run("out with unexported field should error", func(t *testing.T) {
