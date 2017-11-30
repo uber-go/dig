@@ -383,7 +383,7 @@ func (n *node) Call(c *Container) error {
 	n.Results.ExtractList(receiver, results)
 
 	if err := receiver.Commit(c); err != nil {
-		return errWrapf(err, "constructor %v failed", n.ctype)
+		return errConstructorFailed{Func: n.Func, Reason: err}
 	}
 
 	n.called = true

@@ -92,3 +92,16 @@ func (e errProvide) cause() error { return e.Reason }
 func (e errProvide) Error() string {
 	return fmt.Sprintf("function %v cannot be provided: %v", e.Func, e.Reason)
 }
+
+// errConstructorFailed is returned when a user-provided constructor failed
+// with a non-nil error.
+type errConstructorFailed struct {
+	Func   *digreflect.Func
+	Reason error
+}
+
+func (e errConstructorFailed) cause() error { return e.Reason }
+
+func (e errConstructorFailed) Error() string {
+	return fmt.Sprintf("function %v returned a non-nil error: %v", e.Func, e.Reason)
+}
