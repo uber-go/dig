@@ -1728,7 +1728,7 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected invoke error")
 		assert.Contains(t, err.Error(), "couldn't get arguments for constructor", "unexpected error text")
-		assert.Contains(t, err.Error(), ": failed", "unexpected error text")
+		assert.Contains(t, err.Error(), `returned a non-nil error: failed`)
 		assert.Equal(t, errFailed, RootCause(err), "root cause must match")
 	})
 
