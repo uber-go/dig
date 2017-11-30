@@ -1564,7 +1564,11 @@ func TestInvokeFailures(t *testing.T) {
 
 	t.Run("unmet dependency", func(t *testing.T) {
 		c := New()
-		assert.Error(t, c.Invoke(func(*bytes.Buffer) {}))
+
+		err := c.Invoke(func(*bytes.Buffer) {})
+		require.Error(t, err, "expected failure")
+		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig".TestInvokeFailures`)
+		assert.Contains(t, err.Error(), "type *bytes.Buffer is not in the container, did you mean to Provide it?")
 	})
 
 	t.Run("unmet required dependency", func(t *testing.T) {
@@ -1584,7 +1588,8 @@ func TestInvokeFailures(t *testing.T) {
 		})
 
 		require.Error(t, err, "expected invoke error")
-		require.Contains(t, err.Error(), "type *dig.type2 is not in the container, did you mean to Provide it?")
+		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig".TestInvokeFailures`)
+		assert.Contains(t, err.Error(), "type *dig.type2 is not in the container, did you mean to Provide it?")
 	})
 
 	t.Run("unmet named dependency", func(t *testing.T) {
@@ -1598,6 +1603,7 @@ func TestInvokeFailures(t *testing.T) {
 			t.Fatal("function should not be called")
 		})
 		require.Error(t, err, "invoke should fail")
+		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig".TestInvokeFailures`)
 		assert.Contains(t, err.Error(), `type *bytes.Buffer[name="foo"] is not in the container`)
 	})
 
