@@ -21,7 +21,9 @@
 package dig
 
 import (
+	"bytes"
 	"fmt"
+	"reflect"
 
 	"go.uber.org/dig/internal/digreflect"
 )
@@ -142,4 +144,60 @@ func (e errParamGroupFailed) cause() error { return e.Reason }
 
 func (e errParamGroupFailed) Error() string {
 	return fmt.Sprintf("could not build value group %v: %v", e.Key, e.Reason)
+}
+
+// errMissingType is returned when a single value that was expected in the
+// container was not available.
+type errMissingType struct {
+	Key key
+
+	// If set, we'll include a suggestion of what the user probably meant.
+	//
+	// So in addition to "cannot find X", we can tell them "did you mean *X?".
+	Typo *key
+}
+
+func newErrMissingType(c *Container, k key) errMissingType {
+	// If the type being asked for is the pointer that is not found, check if
+	// the graph contains the value type element - perhaps the user
+	// accidentally included a splat and vice versa.
+	var typo reflect.Type
+	if k.t.Kind() == reflect.Ptr {
+		typo = k.t.Elem()
+	} else {
+		typo = reflect.PtrTo(k.t)
+	}
+
+	// TODO(abg): If the requested type is an interface, look for
+	// implementations of that interface.
+
+	err := errMissingType{Key: k}
+
+	typoK := k
+	typoK.t = typo
+	if len(c.providers[typoK]) > 0 {
+		err.Typo = &typoK
+	}
+
+	return err
+}
+
+func (e errMissingType) Error() string {
+	// Sample messages:
+	//
+	//   type io.Reader is not in the container, did you mean to Provide it?
+	//   type bytes.Buffer is not in the container, did you mean to use *bytes.Buffer?
+	//   type *foo[name="bar"] is not in the container, did you mean to use foo[name="bar"]?
+
+	b := new(bytes.Buffer)
+
+	fmt.Fprintf(b, "type %v is not in the container", e.Key)
+
+	if e.Typo != nil {
+		fmt.Fprintf(b, ", did you mean to use %v?", *e.Typo)
+	} else {
+		fmt.Fprint(b, ", did you mean to Provide it?")
+	}
+
+	return b.String()
 }
