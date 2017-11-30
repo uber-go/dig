@@ -105,3 +105,16 @@ func (e errConstructorFailed) cause() error { return e.Reason }
 func (e errConstructorFailed) Error() string {
 	return fmt.Sprintf("function %v returned a non-nil error: %v", e.Func, e.Reason)
 }
+
+// errArgumentsFailed is returned when a function could not be run because one
+// of its dependencies failed to build for any reason.
+type errArgumentsFailed struct {
+	Func   *digreflect.Func
+	Reason error
+}
+
+func (e errArgumentsFailed) cause() error { return e.Reason }
+
+func (e errArgumentsFailed) Error() string {
+	return fmt.Sprintf("could not build arguments for function %v: %v", e.Func, e.Reason)
+}

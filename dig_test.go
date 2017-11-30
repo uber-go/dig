@@ -1727,7 +1727,8 @@ func TestInvokeFailures(t *testing.T) {
 			panic("shouldn't execute invoked function")
 		})
 		require.Error(t, err, "expected invoke error")
-		assert.Contains(t, err.Error(), "couldn't get arguments for constructor", "unexpected error text")
+		assert.Contains(t, err.Error(),
+			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.func`)
 		assert.Contains(t, err.Error(), `returned a non-nil error: failed`)
 		assert.Equal(t, errFailed, RootCause(err), "root cause must match")
 	})
