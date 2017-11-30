@@ -201,3 +201,27 @@ func (e errMissingType) Error() string {
 
 	return b.String()
 }
+
+// errMissingManyTypes combines multiple errMissingType errors.
+type errMissingManyTypes []errMissingType // length must be non-zero
+
+func (e errMissingManyTypes) Error() string {
+	if len(e) == 1 {
+		return e[0].Error()
+	}
+
+	b := new(bytes.Buffer)
+
+	b.WriteString("the following types are not in the container: ")
+	for i, err := range e {
+		if i > 0 {
+			b.WriteString("; ")
+		}
+		fmt.Fprintf(b, "%v", err.Key)
+		if err.Typo != nil {
+			fmt.Fprintf(b, " (did you mean %v?)", *err.Typo)
+		}
+	}
+
+	return b.String()
+}

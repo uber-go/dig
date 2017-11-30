@@ -1624,9 +1624,34 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "invoke must fail")
 		require.Contains(t, err.Error(), "missing dependencies for *dig.type3")
-		require.Contains(t, err.Error(), "container is missing: [*dig.type1]")
+		require.Contains(t, err.Error(), "*dig.type1 is not in the container")
 		// We don't expect type2 to be mentioned in the list because it's
 		// optional
+	})
+
+	t.Run("multiple unmet constructor dependencies", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+
+		c := New()
+
+		require.NoError(t, c.Provide(func() type2 {
+			panic("function must not be called")
+		}), "provide should not fail")
+
+		require.NoError(t, c.Provide(func(type1, *type2) type3 {
+			panic("function must not be called")
+		}), "provide should not fail")
+
+		err := c.Invoke(func(type3) {
+			t.Fatal("function must not be called")
+		})
+
+		require.Error(t, err, "invoke must fail")
+		assert.Contains(t, err.Error(), "missing dependencies for dig.type3: "+
+			"the following types are not in the container: "+
+			"dig.type1; *dig.type2 (did you mean dig.type2?)")
 	})
 
 	t.Run("invalid optional tag", func(t *testing.T) {
