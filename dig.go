@@ -296,20 +296,20 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 
 		if conflict, ok := cv.keyPaths[k]; ok {
 			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v in constructor %v: already provided by %v",
-				k, path, cv.n.ctype, conflict)
+				"cannot provide %v from %v: already provided by %v",
+				k, path, conflict)
 			return nil
 		}
 
 		if ps := cv.c.providers[k]; len(ps) > 0 {
-			csigs := make([]string, len(ps))
+			cons := make([]string, len(ps))
 			for i, p := range ps {
-				csigs[i] = fmt.Sprint(p.ctype)
+				cons[i] = fmt.Sprint(p.Func)
 			}
 
 			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v in constructor %v: already provided by %v",
-				k, path, cv.n.ctype, csigs)
+				"cannot provide %v from %v: already provided by %v",
+				k, path, strings.Join(cons, "; "))
 			return nil
 		}
 
