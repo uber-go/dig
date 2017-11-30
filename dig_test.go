@@ -1256,7 +1256,11 @@ func TestProvideCycleFails(t *testing.T) {
 		assert.NoError(t, c.Provide(newB))
 		err := c.Provide(newC)
 		require.Error(t, err, "expected error when introducing cycle")
-		require.Contains(t, err.Error(), "cycle")
+		assert.Contains(t, err.Error(), "this function introduces a cycle:")
+		assert.Contains(t, err.Error(), `*dig.C provided by "go.uber.org/dig".TestProvideCycleFails`)
+		assert.Contains(t, err.Error(), `depends on *dig.B provided by "go.uber.org/dig".TestProvideCycleFails`)
+		assert.Contains(t, err.Error(), `depends on *dig.A provided by "go.uber.org/dig".TestProvideCycleFails`)
+		assert.Contains(t, err.Error(), `depends on *dig.C provided by "go.uber.org/dig".TestProvideCycleFails`)
 	})
 
 	t.Run("dig.In based cycle", func(t *testing.T) {
@@ -1294,7 +1298,11 @@ func TestProvideCycleFails(t *testing.T) {
 
 		err := c.Provide(newC)
 		require.Error(t, err, "expected error when introducing cycle")
-		assert.Contains(t, err.Error(), "introduces a cycle")
+		assert.Contains(t, err.Error(), "this function introduces a cycle:")
+		assert.Contains(t, err.Error(), `dig.C provided by "go.uber.org/dig".TestProvideCycleFails`)
+		assert.Contains(t, err.Error(), `depends on dig.B provided by "go.uber.org/dig".TestProvideCycleFails`)
+		assert.Contains(t, err.Error(), `depends on dig.A provided by "go.uber.org/dig".TestProvideCycleFails`)
+		assert.Contains(t, err.Error(), `depends on dig.C provided by "go.uber.org/dig".TestProvideCycleFails`)
 	})
 
 	t.Run("group based cycle", func(t *testing.T) {
@@ -1356,16 +1364,11 @@ func TestProvideCycleFails(t *testing.T) {
 
 		err := c.Provide(newD)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(),
-			`introduces a cycle: *dig.D -> int[group="bar"] -> string[group="foo"] -> *dig.D`)
-	})
-
-	t.Run("detectCycles invalid param", func(t *testing.T) {
-		type badParam struct{ param }
-
-		assert.Panics(t, func() {
-			detectCycles(badParam{}, nil, nil)
-		})
+		assert.Contains(t, err.Error(), "this function introduces a cycle:")
+		assert.Contains(t, err.Error(), `*dig.D provided by "go.uber.org/dig".TestProvideCycleFails`)
+		assert.Contains(t, err.Error(), `depends on int[group="bar"] provided by "go.uber.org/dig".TestProvideCycleFails`)
+		assert.Contains(t, err.Error(), `depends on string[group="foo"] provided by "go.uber.org/dig".TestProvideCycleFails`)
+		assert.Contains(t, err.Error(), `depends on *dig.D provided by "go.uber.org/dig".TestProvideCycleFails`)
 	})
 }
 

@@ -203,9 +203,9 @@ func (c *Container) provide(ctor interface{}) error {
 	for k := range keys {
 		oldProducers := c.providers[k]
 		c.providers[k] = append(oldProducers, n)
-		if err := c.isAcyclic(n.Params, k); err != nil {
+		if err := verifyAcyclic(c, n, k); err != nil {
 			c.providers[k] = oldProducers
-			return errWrapf(err, "%v (%v) introduces a cycle", ctor, ctype)
+			return err
 		}
 	}
 
@@ -322,10 +322,6 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 	return cv
 }
 
-func (c *Container) isAcyclic(p param, k key) error {
-	return detectCycles(p, c.providers, []key{k})
-}
-
 // node is a node in the dependency graph. Each node maps to a single
 // constructor provided by the user.
 //
@@ -391,58 +387,6 @@ func (n *node) Call(c *Container) error {
 
 	n.called = true
 	return nil
-}
-
-type errCycleDetected struct {
-	Path []key
-	Key  key
-}
-
-func (e errCycleDetected) Error() string {
-	items := make([]string, len(e.Path)+1)
-	for i, k := range e.Path {
-		items[i] = fmt.Sprint(k)
-	}
-	items[len(e.Path)] = fmt.Sprint(e.Key)
-	return strings.Join(items, " -> ")
-}
-
-func detectCycles(par param, graph map[key][]*node, path []key) error {
-	var err error
-	walkParam(par, paramVisitorFunc(func(param param) bool {
-		if err != nil {
-			return false
-		}
-
-		var k key
-		switch p := param.(type) {
-		case paramSingle:
-			k = key{name: p.Name, t: p.Type}
-		case paramGroupedSlice:
-			// NOTE: The key uses the element type, not the slice type.
-			k = key{group: p.Group, t: p.Type.Elem()}
-		default:
-			return true
-		}
-
-		for _, p := range path {
-			if p == k {
-				err = errCycleDetected{Path: path, Key: k}
-				return false
-			}
-		}
-
-		for _, n := range graph[k] {
-			if e := detectCycles(n.Params, graph, append(path, k)); e != nil {
-				err = e
-				return false
-			}
-		}
-
-		return true
-	}))
-
-	return err
 }
 
 // Checks if a field of an In struct is optional.
