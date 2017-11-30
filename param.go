@@ -212,30 +212,11 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 
 	nodes := c.providers[k]
 	if len(nodes) == 0 {
-		// Unlike in the fallback case below, if a user makes an error
-		// requesting an optional value, a good error message ("did you mean
-		// X?") will not be used and we'll return a zero value instead.
 		if ps.Optional {
 			return reflect.Zero(ps.Type), nil
 		}
 
-		// If the type being asked for is the pointer that is not found,
-		// check if the graph contains the value type element - perhaps the user
-		// accidentally included a splat and vice versa.
-		var typo reflect.Type
-		if ps.Type.Kind() == reflect.Ptr {
-			typo = ps.Type.Elem()
-		} else {
-			typo = reflect.PtrTo(ps.Type)
-		}
-
-		tk := key{t: typo, name: ps.Name}
-		if _, ok := c.providers[tk]; ok {
-			return _noValue, fmt.Errorf(
-				"type %v is not in the container, did you mean to use %v?", k, tk)
-		}
-
-		return _noValue, fmt.Errorf("type %v isn't in the container", k)
+		return _noValue, newErrMissingType(c, k)
 	}
 
 	for _, n := range nodes {

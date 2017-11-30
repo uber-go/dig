@@ -780,7 +780,7 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		err := c.Invoke(func(B) {})
 		require.Error(t, err, "invoking with B param should error out")
-		assert.Contains(t, err.Error(), "B isn't in the container")
+		assert.Contains(t, err.Error(), "B is not in the container")
 	})
 }
 
@@ -1584,7 +1584,7 @@ func TestInvokeFailures(t *testing.T) {
 		})
 
 		require.Error(t, err, "expected invoke error")
-		require.Contains(t, err.Error(), "dig.type2 isn't in the container")
+		require.Contains(t, err.Error(), "type *dig.type2 is not in the container, did you mean to Provide it?")
 	})
 
 	t.Run("unmet named dependency", func(t *testing.T) {
@@ -1598,7 +1598,7 @@ func TestInvokeFailures(t *testing.T) {
 			t.Fatal("function should not be called")
 		})
 		require.Error(t, err, "invoke should fail")
-		assert.Contains(t, err.Error(), `type *bytes.Buffer[name="foo"] isn't in the container`)
+		assert.Contains(t, err.Error(), `type *bytes.Buffer[name="foo"] is not in the container`)
 	})
 
 	t.Run("unmet constructor dependency", func(t *testing.T) {
@@ -1765,7 +1765,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.NoError(t, c.Invoke(func(param1) {}))
 		err := c.Invoke(func(param2) {})
 		require.Error(t, err, "provide should return error since cases don't match")
-		assert.Contains(t, err.Error(), `dig.A[name="camelcase"] isn't in the container`)
+		assert.Contains(t, err.Error(), `dig.A[name="camelcase"] is not in the container`)
 	})
 
 	t.Run("in unexported member gets an error", func(t *testing.T) {
@@ -2042,8 +2042,9 @@ func TestInvokeFailures(t *testing.T) {
 			require.FailNow(t, "must not be called")
 		})
 		require.Error(t, err, "expected failure")
-		assert.Contains(t, err.Error(), "type dig.A isn't in the container")
 		assert.Contains(t, err.Error(), `could not build value group dig.B[group="b"]`)
+		assert.Contains(t, err.Error(),
+			"type dig.A is not in the container, did you mean to Provide it")
 	})
 }
 
