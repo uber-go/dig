@@ -166,7 +166,10 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 
 	args, err := pl.BuildList(c)
 	if err != nil {
-		return errWrapf(err, "failed to get arguments for %v (type %v)", function, ftype)
+		return errArgumentsFailed{
+			Func:   digreflect.InspectFunc(function),
+			Reason: err,
+		}
 	}
 
 	returned := reflect.ValueOf(function).Call(args)
@@ -375,7 +378,7 @@ func (n *node) Call(c *Container) error {
 
 	args, err := n.Params.BuildList(c)
 	if err != nil {
-		return errWrapf(err, "couldn't get arguments for constructor %v", n.ctype)
+		return errArgumentsFailed{Func: n.Func, Reason: err}
 	}
 
 	receiver := newStagingReceiver()
