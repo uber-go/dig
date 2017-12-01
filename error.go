@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"go.uber.org/dig/internal/digreflect"
 )
@@ -164,32 +165,49 @@ func (e errParamGroupFailed) Error() string {
 type errMissingType struct {
 	Key key
 
-	// If set, we'll include a suggestion of what the user probably meant.
-	//
-	// So in addition to "cannot find X", we can tell them "did you mean *X?".
-	Typo *key
+	// If non-empty, we will include suggestions for what the user may have
+	// meant.
+	suggestions []key
 }
 
 func newErrMissingType(c *Container, k key) errMissingType {
-	// If the type being asked for is the pointer that is not found, check if
-	// the graph contains the value type element - perhaps the user
-	// accidentally included a splat and vice versa.
-	var typo reflect.Type
+	// Possible types we will look for in the container. We will always look
+	// for pointers to the requested type and some extras on a per-Kind basis.
+
+	suggestions := []reflect.Type{reflect.PtrTo(k.t)}
 	if k.t.Kind() == reflect.Ptr {
-		typo = k.t.Elem()
-	} else {
-		typo = reflect.PtrTo(k.t)
+		// The user requested a pointer but maybe we have a value.
+		suggestions = append(suggestions, k.t.Elem())
 	}
 
-	// TODO(abg): If the requested type is an interface, look for
-	// implementations of that interface.
+	if k.t.Kind() == reflect.Interface {
+		// Maybe we have an implementation of the interface.
+		for p := range c.providers {
+			if p.t.Implements(k.t) {
+				suggestions = append(suggestions, p.t)
+			}
+		}
+	} else {
+		// Maybe we have an interface that this type implements.
+		for p := range c.providers {
+			if p.t.Kind() == reflect.Interface {
+				if k.t.Implements(p.t) {
+					suggestions = append(suggestions, p.t)
+				}
+			}
+		}
+	}
+
+	// range through c.providers is non-deterministic. Let's sort the list of
+	// suggestions.
+	sort.Sort(byTypeName(suggestions))
 
 	err := errMissingType{Key: k}
-
-	typoK := k
-	typoK.t = typo
-	if len(c.providers[typoK]) > 0 {
-		err.Typo = &typoK
+	for _, t := range suggestions {
+		k.t = t
+		if len(c.providers[k]) > 0 {
+			err.suggestions = append(err.suggestions, k)
+		}
 	}
 
 	return err
@@ -199,17 +217,30 @@ func (e errMissingType) Error() string {
 	// Sample messages:
 	//
 	//   type io.Reader is not in the container, did you mean to Provide it?
+	//   type io.Reader is not in the container, did you mean to use one of *bytes.Buffer, *MyBuffer
 	//   type bytes.Buffer is not in the container, did you mean to use *bytes.Buffer?
 	//   type *foo[name="bar"] is not in the container, did you mean to use foo[name="bar"]?
 
 	b := new(bytes.Buffer)
 
 	fmt.Fprintf(b, "type %v is not in the container", e.Key)
-
-	if e.Typo != nil {
-		fmt.Fprintf(b, ", did you mean to use %v?", *e.Typo)
-	} else {
-		fmt.Fprint(b, ", did you mean to Provide it?")
+	switch len(e.suggestions) {
+	case 0:
+		b.WriteString(", did you mean to Provide it?")
+	case 1:
+		fmt.Fprintf(b, ", did you mean to use %v?", e.suggestions[0])
+	default:
+		b.WriteString(", did you mean to use one of ")
+		for i, k := range e.suggestions {
+			if i > 0 {
+				b.WriteString(", ")
+				if i == len(e.suggestions)-1 {
+					b.WriteString("or ")
+				}
+			}
+			fmt.Fprint(b, k)
+		}
+		b.WriteString("?")
 	}
 
 	return b.String()
@@ -231,10 +262,39 @@ func (e errMissingManyTypes) Error() string {
 			b.WriteString("; ")
 		}
 		fmt.Fprintf(b, "%v", err.Key)
-		if err.Typo != nil {
-			fmt.Fprintf(b, " (did you mean %v?)", *err.Typo)
+		switch len(err.suggestions) {
+		case 0:
+			// do nothing
+		case 1:
+			fmt.Fprintf(b, " (did you mean %v?)", err.suggestions[0])
+		default:
+			b.WriteString(" (did you mean ")
+			for i, k := range err.suggestions {
+				if i > 0 {
+					b.WriteString(", ")
+					if i == len(err.suggestions)-1 {
+						b.WriteString("or ")
+					}
+				}
+				fmt.Fprint(b, k)
+			}
+			b.WriteString("?)")
 		}
 	}
 
 	return b.String()
+}
+
+type byTypeName []reflect.Type
+
+func (bs byTypeName) Len() int {
+	return len(bs)
+}
+
+func (bs byTypeName) Less(i int, j int) bool {
+	return fmt.Sprint(bs[i]) < fmt.Sprint(bs[j])
+}
+
+func (bs byTypeName) Swap(i int, j int) {
+	bs[i], bs[j] = bs[j], bs[i]
 }
