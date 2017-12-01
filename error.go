@@ -121,6 +121,19 @@ func (e errArgumentsFailed) Error() string {
 	return fmt.Sprintf("could not build arguments for function %v: %v", e.Func, e.Reason)
 }
 
+// errMissingDependencies is returned when the dependencies of a function are
+// not available in the container.
+type errMissingDependencies struct {
+	Func   *digreflect.Func
+	Reason error
+}
+
+func (e errMissingDependencies) cause() error { return e.Reason }
+
+func (e errMissingDependencies) Error() string {
+	return fmt.Sprintf("missing dependencies for function %v: %v", e.Func, e.Reason)
+}
+
 // errParamSingleFailed is returned when a paramSingle could not be built.
 type errParamSingleFailed struct {
 	Key    key

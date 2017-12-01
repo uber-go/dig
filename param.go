@@ -220,16 +220,18 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 	}
 
 	for _, n := range nodes {
-		if err := shallowCheckDependencies(c, n.Params); err != nil {
-			if ps.Optional {
-				return reflect.Zero(ps.Type), nil
-			}
-			return _noValue, errWrapf(err, "missing dependencies for %v", k)
+		err := n.Call(c)
+		if err == nil {
+			continue
 		}
 
-		if err := n.Call(c); err != nil {
-			return _noValue, errParamSingleFailed{Key: k, Reason: err}
+		// If we're missing dependencies but the parameter itself is optional,
+		// we can just move on.
+		if _, ok := err.(errMissingDependencies); ok && ps.Optional {
+			return reflect.Zero(ps.Type), nil
 		}
+
+		return _noValue, errParamSingleFailed{Key: k, Reason: err}
 	}
 
 	return c.values[k], nil
