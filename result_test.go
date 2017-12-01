@@ -34,12 +34,10 @@ func TestNewResultListErrors(t *testing.T) {
 	tests := []struct {
 		desc string
 		give interface{}
-		err  string
 	}{
 		{
 			desc: "returns dig.In",
 			give: func() struct{ In } { panic("invalid") },
-			err:  "bad result 1: cannot provide parameter objects",
 		},
 		{
 			desc: "returns dig.Out+dig.In",
@@ -49,7 +47,6 @@ func TestNewResultListErrors(t *testing.T) {
 			} {
 				panic("invalid")
 			},
-			err: "bad result 1: cannot provide parameter objects",
 		},
 	}
 
@@ -57,7 +54,10 @@ func TestNewResultListErrors(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			_, err := newResultList(reflect.TypeOf(tt.give))
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.err)
+			assertErrorMatches(t, err,
+				"bad result 1:",
+				"cannot provide parameter objects:",
+				"embeds a dig.In")
 		})
 	}
 }
