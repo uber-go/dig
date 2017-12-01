@@ -165,7 +165,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	}
 
 	if err := shallowCheckDependencies(c, pl); err != nil {
-		return errWrapf(err, "missing dependencies for function %v", digreflect.InspectFunc(function))
+		return errMissingDependencies{Func: digreflect.InspectFunc(function), Reason: err}
 	}
 
 	args, err := pl.BuildList(c)
@@ -374,6 +374,10 @@ func newNode(ctor interface{}) (*node, error) {
 func (n *node) Call(c *Container) error {
 	if n.called {
 		return nil
+	}
+
+	if err := shallowCheckDependencies(c, n.Params); err != nil {
+		return errMissingDependencies{Func: n.Func, Reason: err}
 	}
 
 	args, err := n.Params.BuildList(c)

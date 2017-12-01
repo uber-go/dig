@@ -1626,8 +1626,10 @@ func TestInvokeFailures(t *testing.T) {
 			t.Fatal("function must not be called")
 		})
 		require.Error(t, err, "invoke must fail")
-		require.Contains(t, err.Error(), "missing dependencies for *dig.type3")
-		require.Contains(t, err.Error(), "*dig.type1 is not in the container")
+		assert.Contains(t, err.Error(), `could not build arguments for function "go.uber.org/dig".TestInvokeFailures`)
+		assert.Contains(t, err.Error(), "failed to build *dig.type3:")
+		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig".TestInvokeFailures`)
+		require.Contains(t, err.Error(), "type *dig.type1 is not in the container")
 		// We don't expect type2 to be mentioned in the list because it's
 		// optional
 	})
@@ -1652,9 +1654,10 @@ func TestInvokeFailures(t *testing.T) {
 		})
 
 		require.Error(t, err, "invoke must fail")
-		assert.Contains(t, err.Error(), "missing dependencies for dig.type3: "+
-			"the following types are not in the container: "+
-			"dig.type1; *dig.type2 (did you mean dig.type2?)")
+		assert.Contains(t, err.Error(), `could not build arguments for function "go.uber.org/dig".TestInvokeFailures`)
+		assert.Contains(t, err.Error(), "failed to build dig.type3:")
+		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig".TestInvokeFailures`)
+		assert.Contains(t, err.Error(), "the following types are not in the container: dig.type1; *dig.type2 (did you mean dig.type2?)")
 	})
 
 	t.Run("invalid optional tag", func(t *testing.T) {
