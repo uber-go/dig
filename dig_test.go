@@ -1960,6 +1960,76 @@ func TestInvokeFailures(t *testing.T) {
 		}
 	})
 
+	t.Run("requesting an interface when an implementation is available", func(t *testing.T) {
+		c := New()
+		require.NoError(t, c.Provide(bytes.NewReader))
+		err := c.Invoke(func(io.Reader) {
+			t.Fatalf("this function should not be called")
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "type io.Reader is not in the container, did you mean to use *bytes.Reader?")
+	})
+
+	t.Run("requesting an interface when multiple implementations are available", func(t *testing.T) {
+		c := New()
+
+		require.NoError(t, c.Provide(bytes.NewReader))
+		require.NoError(t, c.Provide(bytes.NewBufferString))
+
+		err := c.Invoke(func(io.Reader) {
+			t.Fatalf("this function should not be called")
+		})
+		require.Error(t, err)
+
+		assert.Contains(t, err.Error(), "type io.Reader is not in the container, "+
+			"did you mean to use one of *bytes.Buffer, or *bytes.Reader?")
+	})
+
+	t.Run("requesting multiple interfaces when multiple implementations are available", func(t *testing.T) {
+		c := New()
+
+		require.NoError(t, c.Provide(bytes.NewReader))
+		require.NoError(t, c.Provide(bytes.NewBufferString))
+
+		err := c.Invoke(func(io.Reader, io.Writer) {
+			t.Fatalf("this function should not be called")
+		})
+		require.Error(t, err)
+
+		assert.Contains(t, err.Error(), "the following types are not in the container: "+
+			"io.Reader (did you mean *bytes.Buffer, or *bytes.Reader?); io.Writer (did you mean *bytes.Buffer?)")
+	})
+
+	t.Run("requesting a type when an interface is available", func(t *testing.T) {
+		c := New()
+
+		require.NoError(t, c.Provide(func() io.Writer { return nil }))
+		err := c.Invoke(func(*bytes.Buffer) {
+			t.Fatalf("this function should not be called")
+		})
+
+		require.Error(t, err)
+
+		assert.Contains(t, err.Error(), "type *bytes.Buffer is not in the container, "+
+			"did you mean to use io.Writer?")
+	})
+
+	t.Run("requesting a type when multiple interfaces are available", func(t *testing.T) {
+		c := New()
+
+		require.NoError(t, c.Provide(func() io.Writer { return nil }))
+		require.NoError(t, c.Provide(func() io.Reader { return nil }))
+
+		err := c.Invoke(func(*bytes.Buffer) {
+			t.Fatalf("this function should not be called")
+		})
+
+		require.Error(t, err)
+
+		assert.Contains(t, err.Error(), "type *bytes.Buffer is not in the container, "+
+			"did you mean to use one of io.Reader, or io.Writer?")
+	})
+
 	t.Run("direct dependency error", func(t *testing.T) {
 		type A struct{}
 
