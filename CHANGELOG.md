@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.4.0 (unreleased)
+
+- No changes yet.
+
 ## v1.3.0 (2017-12-04)
 
 - Improved messages for errors thrown by Dig under a many scenarios to be more
