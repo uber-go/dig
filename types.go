@@ -54,6 +54,9 @@ type digSentinel interface {
 //               container. See Named Values for more information.
 //   optional    If set to true, indicates that the dependency is optional and
 //               the constructor gracefully handles its absence.
+//   group       Name of the Value Group from which this field will be filled.
+//               The field must be a slice type. See Value Groups in the
+//               package documentation for more information.
 type In struct{ digSentinel }
 
 // Out is an embeddable type that signals to dig that the returned
@@ -72,6 +75,9 @@ type In struct{ digSentinel }
 //   name        Specifies the name of the value. Only a field on a dig.In
 //               struct with the same 'name' annotation can receive this
 //               value. See Named Values for more information.
+//   group       Name of the Value Group to which this field's value is being
+//               sent. See Value Groups in the package documentation for more
+//               information.
 type Out struct{ digSentinel }
 
 func isError(t reflect.Type) bool {
