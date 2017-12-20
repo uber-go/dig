@@ -221,10 +221,25 @@
 // Named Values
 //
 // Some use cases call for multiple values of the same type. Dig allows adding
-// multiple values of the same type to the container with the use of
-// `name:".."` tags on fields of dig.In and dig.Out structs.
+// multiple values of the same type to the container with the use of Named
+// Values.
 //
-// A constructor that produces a dig.Out struct can tag any field with
+// Named Values can be produced by passing the dig.Name option when a
+// constructor is provided. All values produced by that constructor will have
+// the given name.
+//
+// Given the following constructors,
+//
+//   func NewReadOnlyConnection(...) (*sql.DB, error)
+//   func NewReadWriteConnection(...) (*sql.DB, error)
+//
+// You can provide *sql.DB into a Container under different names by passing
+// the dig.Name option.
+//
+//   c.Provide(NewReadOnlyConnection, dig.Name("ro"))
+//   c.Provide(NewReadWriteConnection, dig.Name("rw"))
+//
+// Alternatively, you can produce a dig.Out struct and tag its fields with
 // `name:".."` to have the corresponding value added to the graph under the
 // specified name.
 //
@@ -240,8 +255,9 @@
 //     return ConnectionResult{ReadWrite: rw, ReadOnly:  ro}, nil
 //   }
 //
-// Another constructor can consume these values by adding fields to a dig.In
-// struct with the same name AND type.
+// Regardless of how a Named Value was produced, it can be consumed by another
+// constructor by accepting a dig.In struct which has exported fields with the
+// same name AND type that you provided.
 //
 //   type GatewayParams struct {
 //     dig.In

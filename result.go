@@ -64,15 +64,22 @@ var (
 	_ result = resultGrouped{}
 )
 
+type resultOptions struct {
+	// If set, this is the name of the associated result value.
+	//
+	// For Result Objects, name:".." tags on fields override this.
+	Name string
+}
+
 // newResult builds a result from the given type.
-func newResult(t reflect.Type) (result, error) {
+func newResult(t reflect.Type, opts resultOptions) (result, error) {
 	switch {
 	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
 		return nil, fmt.Errorf("cannot provide parameter objects: %v embeds a dig.In", t)
 	case isError(t):
 		return resultError{}, nil
 	case IsOut(t):
-		return newResultObject(t)
+		return newResultObject(t, opts)
 	case embedsType(t, _outPtrType):
 		return nil, fmt.Errorf(
 			"cannot build a result object by embedding *dig.Out, embed dig.Out instead: "+
@@ -82,7 +89,7 @@ func newResult(t reflect.Type) (result, error) {
 			"cannot return a pointer to a result object, use a value instead: "+
 				"%v is a pointer to a struct that embeds dig.Out", t)
 	default:
-		return resultSingle{Type: t}, nil
+		return resultSingle{Type: t, Name: opts.Name}, nil
 	}
 }
 
@@ -165,14 +172,14 @@ type resultList struct {
 	Results []result
 }
 
-func newResultList(ctype reflect.Type) (resultList, error) {
+func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 	rl := resultList{
 		ctype:   ctype,
 		Results: make([]result, ctype.NumOut()),
 	}
 
 	for i := 0; i < ctype.NumOut(); i++ {
-		r, err := newResult(ctype.Out(i))
+		r, err := newResult(ctype.Out(i), opts)
 		if err != nil {
 			return rl, errWrapf(err, "bad result %d", i+1)
 		}
@@ -226,7 +233,7 @@ type resultObject struct {
 	Fields []resultObjectField
 }
 
-func newResultObject(t reflect.Type) (resultObject, error) {
+func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 	ro := resultObject{Type: t}
 
 	for i := 0; i < t.NumField(); i++ {
@@ -236,7 +243,7 @@ func newResultObject(t reflect.Type) (resultObject, error) {
 			continue
 		}
 
-		rof, err := newResultObjectField(i, f)
+		rof, err := newResultObjectField(i, f, opts)
 		if err != nil {
 			return ro, errWrapf(err, "bad field %q of %v", f.Name, t)
 		}
@@ -267,9 +274,9 @@ type resultObjectField struct {
 	Result result
 }
 
-// newResultObjectField(i, f) builds a resultObjectField from the field f at
-// index i.
-func newResultObjectField(idx int, f reflect.StructField) (resultObjectField, error) {
+// newResultObjectField(i, f, opts) builds a resultObjectField from the field
+// f at index i.
+func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (resultObjectField, error) {
 	rof := resultObjectField{
 		FieldName:  f.Name,
 		FieldIndex: idx,
@@ -296,16 +303,14 @@ func newResultObjectField(idx int, f reflect.StructField) (resultObjectField, er
 
 	default:
 		var err error
-		r, err = newResult(f.Type)
+		if name := f.Tag.Get(_nameTag); len(name) > 0 {
+			// can modify in-place because options are passed-by-value.
+			opts.Name = name
+		}
+		r, err = newResult(f.Type, opts)
 		if err != nil {
 			return rof, err
 		}
-	}
-
-	if rs, ok := r.(resultSingle); ok {
-		// Field tags apply only if the result is "simple"
-		rs.Name = f.Tag.Get(_nameTag)
-		r = rs
 	}
 
 	rof.Result = r
