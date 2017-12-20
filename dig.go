@@ -57,10 +57,47 @@ type optionFunc func(*Container)
 
 func (f optionFunc) applyOption(c *Container) { f(c) }
 
-// A ProvideOption modifies the default behavior of Provide. It's included for
-// future functionality; currently, there are no concrete implementations.
+type provideOptions struct {
+	Name string
+}
+
+// A ProvideOption modifies the default behavior of Provide.
 type ProvideOption interface {
-	unimplemented()
+	applyProvideOption(*provideOptions)
+}
+
+type provideOptionFunc func(*provideOptions)
+
+func (f provideOptionFunc) applyProvideOption(opts *provideOptions) { f(opts) }
+
+// Name is a ProvideOption that specifies that all values produced by a
+// constructor should have the given name. See also the package documentation
+// about Named Values.
+//
+// The name also applies to the fields of a dig.Out struct returned by the
+// constructor if those fields did not have their own name:"..." tag.
+//
+// Given,
+//
+//   type ConnectionResult struct {
+//     dig.Out
+//
+//     Conn    *sql.DB
+//     ROConn  *sql.DB `name:"ro"`
+//   }
+//
+//   func NewConnection(...) (ConnectionResult, error)
+//
+// The following will provide two connections to the container: one under the
+// name "ro" and the other under the name "rw".
+//
+//   c.Provide(NewConnection, dig.Name("rw"))
+//
+// This option has no effect on Value Groups.
+func Name(name string) ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.Name = name
+	})
 }
 
 // An InvokeOption modifies the default behavior of Invoke. It's included for
@@ -133,7 +170,13 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	if ctype.Kind() != reflect.Func {
 		return fmt.Errorf("must provide constructor function, got %v (type %v)", constructor, ctype)
 	}
-	if err := c.provide(constructor); err != nil {
+
+	var options provideOptions
+	for _, o := range opts {
+		o.applyProvideOption(&options)
+	}
+
+	if err := c.provide(constructor, options); err != nil {
 		return errProvide{
 			Func:   digreflect.InspectFunc(constructor),
 			Reason: err,
@@ -188,8 +231,8 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
-func (c *Container) provide(ctor interface{}) error {
-	n, err := newNode(ctor)
+func (c *Container) provide(ctor interface{}, opts provideOptions) error {
+	n, err := newNode(ctor, nodeOptions{ResultName: opts.Name})
 	if err != nil {
 		return err
 	}
@@ -347,7 +390,12 @@ type node struct {
 	Results resultList
 }
 
-func newNode(ctor interface{}) (*node, error) {
+type nodeOptions struct {
+	// If specified, all values produced by this node have the provided name.
+	ResultName string
+}
+
+func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 	ctype := reflect.TypeOf(ctor)
 
 	params, err := newParamList(ctype)
@@ -355,7 +403,7 @@ func newNode(ctor interface{}) (*node, error) {
 		return nil, err
 	}
 
-	results, err := newResultList(ctype)
+	results, err := newResultList(ctype, resultOptions{Name: opts.ResultName})
 	if err != nil {
 		return nil, err
 	}

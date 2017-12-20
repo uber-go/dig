@@ -455,7 +455,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
-	t.Run("named instances", func(t *testing.T) {
+	t.Run("named instances can be created with tags", func(t *testing.T) {
 		c := New()
 		type A struct{ idx int }
 
@@ -484,6 +484,32 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "invoke should succeed, pulling out two named instances")
 	})
 
+	t.Run("named instances can be created with Name option", func(t *testing.T) {
+		c := New()
+
+		type A struct{ idx int }
+
+		buildConstructor := func(idx int) func() A {
+			return func() A { return A{idx: idx} }
+		}
+
+		require.NoError(t, c.Provide(buildConstructor(1), Name("first")))
+		require.NoError(t, c.Provide(buildConstructor(2), Name("second")))
+		require.NoError(t, c.Provide(buildConstructor(3), Name("third")))
+
+		type param struct {
+			In
+
+			A1 A `name:"first"`
+			A3 A `name:"third"`
+		}
+
+		require.NoError(t, c.Invoke(func(p param) {
+			assert.Equal(t, 1, p.A1.idx)
+			assert.Equal(t, 3, p.A3.idx)
+		}), "invoke should succeed, pulling out two named instances")
+	})
+
 	t.Run("named and unnamed instances coexist", func(t *testing.T) {
 		c := New()
 		type A struct{ idx int }
@@ -502,6 +528,35 @@ func TestEndToEndSuccess(t *testing.T) {
 
 			A1 A `name:"foo"`
 			A2 A
+		}
+		require.NoError(t, c.Invoke(func(i in) {
+			assert.Equal(t, 1, i.A1.idx)
+			assert.Equal(t, 2, i.A2.idx)
+		}))
+	})
+
+	t.Run("named instances with tags and the Name option coexist", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+
+		type out struct {
+			Out
+
+			A `name:"first"`
+		}
+
+		require.NoError(t, c.Provide(func() out {
+			return out{A: A{1}}
+		}))
+		require.NoError(t, c.Provide(func() A {
+			return A{2}
+		}, Name("second")))
+
+		type in struct {
+			In
+
+			A1 A `name:"first"`
+			A2 A `name:"second"`
 		}
 		require.NoError(t, c.Invoke(func(i in) {
 			assert.Equal(t, 1, i.A1.idx)
@@ -541,6 +596,49 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
 		}), "invoke should succeed, pulling out two named instances")
+	})
+
+	t.Run("name tags on result structs recurse", func(t *testing.T) {
+		c := New()
+		type A string
+
+		type Ret1 struct {
+			Out
+
+			A1 A `name:"foo"`
+			A2 A
+		}
+
+		type Ret2 struct {
+			Out
+
+			A1   A
+			Ret1 Ret1 `name:"bar"`
+		}
+
+		require.NoError(t, c.Provide(func() Ret2 {
+			return Ret2{
+				A1: "baz", // Name("baz") on Provide()
+				Ret1: Ret1{
+					A1: "foo", // name:"foo" on Ret1.A1
+					A2: "bar", // name:"bar" on Ret2.Ret1
+				},
+			}
+		}, Name("baz")))
+
+		type param struct {
+			In
+
+			Foo A `name:"foo"`
+			Bar A `name:"bar"`
+			Baz A `name:"baz"`
+		}
+
+		require.NoError(t, c.Invoke(func(p param) {
+			assert.Equal(t, "foo", string(p.Foo))
+			assert.Equal(t, "bar", string(p.Bar))
+			assert.Equal(t, "baz", string(p.Baz))
+		}))
 	})
 
 	t.Run("named instances do not cause cycles", func(t *testing.T) {
@@ -2296,7 +2394,7 @@ func TestNodeAlreadyCalled(t *testing.T) {
 	type type1 struct{}
 	f := func() type1 { return type1{} }
 
-	n, err := newNode(f)
+	n, err := newNode(f, nodeOptions{})
 	require.NoError(t, err, "failed to build node")
 	require.False(t, n.called, "node must not have been called")
 

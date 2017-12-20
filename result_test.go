@@ -52,7 +52,7 @@ func TestNewResultListErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			_, err := newResultList(reflect.TypeOf(tt.give))
+			_, err := newResultList(reflect.TypeOf(tt.give), resultOptions{})
 			require.Error(t, err)
 			assertErrorMatches(t, err,
 				"bad result 1:",
@@ -65,7 +65,7 @@ func TestNewResultListErrors(t *testing.T) {
 func TestResultListExtractFails(t *testing.T) {
 	rl, err := newResultList(reflect.TypeOf(func() (io.Writer, error) {
 		panic("function should not be called")
-	}))
+	}), resultOptions{})
 	require.NoError(t, err)
 	assert.Panics(t, func() {
 		rl.Extract(newStagingReceiver(), reflect.ValueOf("irrelevant"))
@@ -106,11 +106,152 @@ func TestNewResultErrors(t *testing.T) {
 	for _, tt := range tests {
 		give := reflect.TypeOf(tt.give)
 		t.Run(fmt.Sprint(give), func(t *testing.T) {
-			_, err := newResult(give)
+			_, err := newResult(give, resultOptions{})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.err)
 		})
 	}
+}
+
+func TestNewResultObject(t *testing.T) {
+	typeOfReader := reflect.TypeOf((*io.Reader)(nil)).Elem()
+	typeOfWriter := reflect.TypeOf((*io.Writer)(nil)).Elem()
+
+	tests := []struct {
+		desc string
+		give interface{}
+		opts resultOptions
+
+		wantFields []resultObjectField
+	}{
+		{desc: "empty", give: struct{ Out }{}},
+		{
+			desc: "multiple values",
+			give: struct {
+				Out
+
+				Reader io.Reader
+				Writer io.Writer
+			}{},
+			wantFields: []resultObjectField{
+				{
+					FieldName:  "Reader",
+					FieldIndex: 1,
+					Result:     resultSingle{Type: typeOfReader},
+				},
+				{
+					FieldName:  "Writer",
+					FieldIndex: 2,
+					Result:     resultSingle{Type: typeOfWriter},
+				},
+			},
+		},
+		{
+			desc: "name tag",
+			give: struct {
+				Out
+
+				A io.Writer `name:"stream-a"`
+				B io.Writer `name:"stream-b" `
+			}{},
+			wantFields: []resultObjectField{
+				{
+					FieldName:  "A",
+					FieldIndex: 1,
+					Result:     resultSingle{Name: "stream-a", Type: typeOfWriter},
+				},
+				{
+					FieldName:  "B",
+					FieldIndex: 2,
+					Result:     resultSingle{Name: "stream-b", Type: typeOfWriter},
+				},
+			},
+		},
+		{
+			desc: "name option",
+			give: struct {
+				Out
+
+				Reader io.Reader
+			}{},
+			opts: resultOptions{Name: "foo"},
+			wantFields: []resultObjectField{
+				{
+					FieldName:  "Reader",
+					FieldIndex: 1,
+					Result:     resultSingle{Type: typeOfReader, Name: "foo"},
+				},
+			},
+		},
+		{
+			desc: "name option with name tag",
+			give: struct {
+				Out
+
+				A io.Writer `name:"stream-a"`
+				B io.Writer
+			}{},
+			opts: resultOptions{Name: "stream"},
+			wantFields: []resultObjectField{
+				{
+					FieldName:  "A",
+					FieldIndex: 1,
+					Result:     resultSingle{Name: "stream-a", Type: typeOfWriter},
+				},
+				{
+					FieldName:  "B",
+					FieldIndex: 2,
+					Result:     resultSingle{Name: "stream", Type: typeOfWriter},
+				},
+			},
+		},
+		{
+			desc: "group tag",
+			give: struct {
+				Out
+
+				Writer io.Writer `group:"writers"`
+			}{},
+			wantFields: []resultObjectField{
+				{
+					FieldName:  "Writer",
+					FieldIndex: 1,
+					Result:     resultGrouped{Group: "writers", Type: typeOfWriter},
+				},
+			},
+		},
+		{
+			desc: "group tag with name option",
+			give: struct {
+				Out
+
+				Reader io.Reader
+				Writer io.Writer `group:"writers"`
+			}{},
+			opts: resultOptions{Name: "foo"},
+			wantFields: []resultObjectField{
+				{
+					FieldName:  "Reader",
+					FieldIndex: 1,
+					Result:     resultSingle{Name: "foo", Type: typeOfReader},
+				},
+				{
+					FieldName:  "Writer",
+					FieldIndex: 2,
+					Result:     resultGrouped{Group: "writers", Type: typeOfWriter},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := newResultObject(reflect.TypeOf(tt.give), tt.opts)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantFields, got.Fields)
+		})
+	}
+
 }
 
 func TestNewResultObjectErrors(t *testing.T) {
@@ -169,7 +310,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			_, err := newResultObject(reflect.TypeOf(tt.give))
+			_, err := newResultObject(reflect.TypeOf(tt.give), resultOptions{})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.err)
 		})
@@ -271,7 +412,7 @@ func TestWalkResult(t *testing.T) {
 			}
 		}{})
 
-		ro, err := newResultObject(typ)
+		ro, err := newResultObject(typ, resultOptions{})
 		require.NoError(t, err)
 
 		v := fakeResultVisits{
