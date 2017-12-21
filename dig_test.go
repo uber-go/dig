@@ -1280,6 +1280,61 @@ func TestCantProvideObjects(t *testing.T) {
 	}
 }
 
+func TestProvideWithWeirdNames(t *testing.T) {
+	t.Parallel()
+
+	t.Run("name with quotes", func(t *testing.T) {
+		type type1 struct{ value int }
+
+		c := New()
+
+		require.NoError(t, c.Provide(func() *type1 {
+			return &type1{42}
+		}, Name(`foo"""bar`)))
+
+		type params struct {
+			In
+
+			T *type1 `name:"foo\"\"\"bar"`
+		}
+
+		require.NoError(t, c.Invoke(func(p params) {
+			assert.Equal(t, &type1{value: 42}, p.T)
+		}))
+	})
+
+	t.Run("name with newline", func(t *testing.T) {
+		type type1 struct{ value int }
+
+		c := New()
+
+		require.NoError(t, c.Provide(func() *type1 {
+			return &type1{42}
+		}, Name("foo\nbar")))
+
+		type params struct {
+			In
+
+			T *type1 `name:"foo\nbar"`
+		}
+
+		require.NoError(t, c.Invoke(func(p params) {
+			assert.Equal(t, &type1{value: 42}, p.T)
+		}))
+	})
+}
+
+func TestProvideInvalidName(t *testing.T) {
+	t.Parallel()
+
+	c := New()
+	err := c.Provide(func() io.Reader {
+		panic("this function must not be called")
+	}, Name("foo`bar"))
+	require.Error(t, err, "Provide must fail")
+	assert.Contains(t, err.Error(), "invalid dig.Name(\"foo`bar\"): names cannot contain backquotes")
+}
+
 func TestCantProvideUntypedNil(t *testing.T) {
 	t.Parallel()
 	c := New()
