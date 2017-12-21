@@ -61,6 +61,17 @@ type provideOptions struct {
 	Name string
 }
 
+func (o *provideOptions) Validate() error {
+	// Names must be representable inside a backquoted string. The only
+	// limitation for raw string literals as per
+	// https://golang.org/ref/spec#raw_string_lit is that they cannot contain
+	// backquotes.
+	if strings.ContainsRune(o.Name, '`') {
+		return fmt.Errorf("invalid dig.Name(%q): names cannot contain backquotes", o.Name)
+	}
+	return nil
+}
+
 // A ProvideOption modifies the default behavior of Provide.
 type ProvideOption interface {
 	applyProvideOption(*provideOptions)
@@ -174,6 +185,9 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	var options provideOptions
 	for _, o := range opts {
 		o.applyProvideOption(&options)
+	}
+	if err := options.Validate(); err != nil {
+		return err
 	}
 
 	if err := c.provide(constructor, options); err != nil {
