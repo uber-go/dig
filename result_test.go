@@ -217,7 +217,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 
 				Error error
 			}{},
-			err: `cannot return errors from dig.Out, return it from the constructor instead: field "Error" (error)`,
+			err: `bad field "Error" of struct { dig.Out; Error error }: cannot return an error here, return it from the constructor instead`,
 		},
 		{
 			desc: "nested dig.In",
