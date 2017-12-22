@@ -126,6 +126,18 @@ type Container struct {
 	rand *rand.Rand
 }
 
+// containerWriter provides write access to the Container.
+type containerWriter interface {
+	// setValue sets the value with the given name and type in the container.
+	// If a value with the same name and type already exists, it will be
+	// overwritten.
+	setValue(name string, t reflect.Type, v reflect.Value)
+
+	// submitGroupedValue submits a value to the value group with the provided
+	// name.
+	submitGroupedValue(name string, t reflect.Type, v reflect.Value)
+}
+
 // New constructs a Container.
 func New(opts ...Option) *Container {
 	c := &Container{
@@ -148,6 +160,15 @@ func setRand(r *rand.Rand) Option {
 	return optionFunc(func(c *Container) {
 		c.rand = r
 	})
+}
+
+func (c *Container) setValue(name string, t reflect.Type, v reflect.Value) {
+	c.values[key{name: name, t: t}] = v
+}
+
+func (c *Container) submitGroupedValue(name string, t reflect.Type, v reflect.Value) {
+	k := key{group: name, t: t}
+	c.groups[k] = append(c.groups[k], v)
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -440,7 +461,7 @@ func (n *node) Call(c *Container) error {
 		return errArgumentsFailed{Func: n.Func, Reason: err}
 	}
 
-	receiver := newStagingReceiver()
+	receiver := newStagingContainerWriter()
 	results := reflect.ValueOf(n.ctor).Call(args)
 	if err := n.Results.ExtractList(receiver, results); err != nil {
 		return errConstructorFailed{Func: n.Func, Reason: err}
@@ -491,36 +512,40 @@ func shallowCheckDependencies(c *Container, p param) error {
 	return nil
 }
 
-type stagingReceiver struct {
+// stagingContainerWriter is a containerWriter that records the changes that
+// would be made to a containerWriter and defers them until Commit is called.
+type stagingContainerWriter struct {
 	values map[key]reflect.Value
 	groups map[key][]reflect.Value
 }
 
-func newStagingReceiver() *stagingReceiver {
-	return &stagingReceiver{
+var _ containerWriter = (*stagingContainerWriter)(nil)
+
+func newStagingContainerWriter() *stagingContainerWriter {
+	return &stagingContainerWriter{
 		values: make(map[key]reflect.Value),
 		groups: make(map[key][]reflect.Value),
 	}
 }
 
-func (sr *stagingReceiver) SubmitValue(name string, t reflect.Type, v reflect.Value) {
+func (sr *stagingContainerWriter) setValue(name string, t reflect.Type, v reflect.Value) {
 	sr.values[key{t: t, name: name}] = v
 }
 
-func (sr *stagingReceiver) SubmitGroupValue(group string, t reflect.Type, v reflect.Value) {
+func (sr *stagingContainerWriter) submitGroupedValue(group string, t reflect.Type, v reflect.Value) {
 	k := key{t: t, group: group}
 	sr.groups[k] = append(sr.groups[k], v)
 }
 
-// Commit commits the received results to the provided container.
-//
-// If the resultReceiver failed, no changes are committed to the container.
-func (sr *stagingReceiver) Commit(c *Container) {
+// Commit commits the received results to the provided containerWriter.
+func (sr *stagingContainerWriter) Commit(cw containerWriter) {
 	for k, v := range sr.values {
-		c.values[k] = v
+		cw.setValue(k.name, k.t, v)
 	}
 
 	for k, vs := range sr.groups {
-		c.groups[k] = append(c.groups[k], vs...)
+		for _, v := range vs {
+			cw.submitGroupedValue(k.group, k.t, v)
+		}
 	}
 }
