@@ -37,19 +37,10 @@ import (
 //                 group.
 type result interface {
 	// Extracts the values for this result from the provided value and
-	// stores them into the provided resultReceiver.
+	// stores them into the provided containerWriter.
 	//
 	// This MAY panic if the result does not consume a single value.
-	Extract(resultReceiver, reflect.Value)
-}
-
-// resultReceiver receives the values or failures produced by constructors.
-type resultReceiver interface {
-	// Submits a new value to the receiver.
-	SubmitValue(name string, t reflect.Type, v reflect.Value)
-
-	// Submits a new value to a value group.
-	SubmitGroupValue(group string, t reflect.Type, v reflect.Value)
+	Extract(containerWriter, reflect.Value)
 }
 
 var (
@@ -200,17 +191,17 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 	return rl, nil
 }
 
-func (resultList) Extract(resultReceiver, reflect.Value) {
+func (resultList) Extract(containerWriter, reflect.Value) {
 	panic("It looks like you have found a bug in dig. " +
 		"Please file an issue at https://github.com/uber-go/dig/issues/ " +
 		"and provide the following message: " +
 		"resultList.Extract() must never be called")
 }
 
-func (rl resultList) ExtractList(rr resultReceiver, values []reflect.Value) error {
+func (rl resultList) ExtractList(cw containerWriter, values []reflect.Value) error {
 	for i, v := range values {
 		if resultIdx := rl.resultIndexes[i]; resultIdx >= 0 {
-			rl.Results[resultIdx].Extract(rr, v)
+			rl.Results[resultIdx].Extract(cw, v)
 			continue
 		}
 
@@ -231,8 +222,8 @@ type resultSingle struct {
 	Type reflect.Type
 }
 
-func (rs resultSingle) Extract(rr resultReceiver, v reflect.Value) {
-	rr.SubmitValue(rs.Name, rs.Type, v)
+func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
+	cw.setValue(rs.Name, rs.Type, v)
 }
 
 // resultObject is a dig.Out struct where each field is another result.
@@ -268,9 +259,9 @@ func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 	return ro, nil
 }
 
-func (ro resultObject) Extract(rr resultReceiver, v reflect.Value) {
+func (ro resultObject) Extract(cw containerWriter, v reflect.Value) {
 	for _, f := range ro.Fields {
-		f.Result.Extract(rr, v.Field(f.FieldIndex))
+		f.Result.Extract(cw, v.Field(f.FieldIndex))
 	}
 }
 
@@ -355,6 +346,6 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	return rg, nil
 }
 
-func (rt resultGrouped) Extract(rr resultReceiver, v reflect.Value) {
-	rr.SubmitGroupValue(rt.Group, rt.Type, v)
+func (rt resultGrouped) Extract(cw containerWriter, v reflect.Value) {
+	cw.submitGroupedValue(rt.Group, rt.Type, v)
 }

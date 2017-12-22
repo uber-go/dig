@@ -68,7 +68,7 @@ func TestResultListExtractFails(t *testing.T) {
 	}), resultOptions{})
 	require.NoError(t, err)
 	assert.Panics(t, func() {
-		rl.Extract(newStagingReceiver(), reflect.ValueOf("irrelevant"))
+		rl.Extract(newStagingContainerWriter(), reflect.ValueOf("irrelevant"))
 	})
 }
 
