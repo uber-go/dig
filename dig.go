@@ -442,12 +442,10 @@ func (n *node) Call(c *Container) error {
 
 	receiver := newStagingReceiver()
 	results := reflect.ValueOf(n.ctor).Call(args)
-	n.Results.ExtractList(receiver, results)
-
-	if err := receiver.Commit(c); err != nil {
+	if err := n.Results.ExtractList(receiver, results); err != nil {
 		return errConstructorFailed{Func: n.Func, Reason: err}
 	}
-
+	receiver.Commit(c)
 	n.called = true
 	return nil
 }
@@ -494,7 +492,6 @@ func shallowCheckDependencies(c *Container, p param) error {
 }
 
 type stagingReceiver struct {
-	err    error
 	values map[key]reflect.Value
 	groups map[key][]reflect.Value
 }
@@ -503,13 +500,6 @@ func newStagingReceiver() *stagingReceiver {
 	return &stagingReceiver{
 		values: make(map[key]reflect.Value),
 		groups: make(map[key][]reflect.Value),
-	}
-}
-
-func (sr *stagingReceiver) SubmitError(err error) {
-	// record failure only if we haven't already failed
-	if sr.err == nil {
-		sr.err = err
 	}
 }
 
@@ -525,11 +515,7 @@ func (sr *stagingReceiver) SubmitGroupValue(group string, t reflect.Type, v refl
 // Commit commits the received results to the provided container.
 //
 // If the resultReceiver failed, no changes are committed to the container.
-func (sr *stagingReceiver) Commit(c *Container) error {
-	if sr.err != nil {
-		return sr.err
-	}
-
+func (sr *stagingReceiver) Commit(c *Container) {
 	for k, v := range sr.values {
 		c.values[k] = v
 	}
@@ -537,6 +523,4 @@ func (sr *stagingReceiver) Commit(c *Container) error {
 	for k, vs := range sr.groups {
 		c.groups[k] = append(c.groups[k], vs...)
 	}
-
-	return nil
 }
