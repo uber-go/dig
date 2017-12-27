@@ -43,6 +43,9 @@ type result interface {
 	//
 	// This MAY panic if the result does not consume a single value.
 	Extract(containerWriter, reflect.Value)
+
+	// Enumerates the Keys produced by this result.
+	Produces() []internal.Key
 }
 
 var (
@@ -77,79 +80,7 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 			"cannot return a pointer to a result object, use a value instead: "+
 				"%v is a pointer to a struct that embeds dig.Out", t)
 	default:
-		return resultSingle{Type: t, Name: opts.Name}, nil
-	}
-}
-
-// resultVisitor visits every result in a result tree, allowing tracking state
-// at each level.
-type resultVisitor interface {
-	// Visit is called on the result being visited.
-	//
-	// If Visit returns a non-nil resultVisitor, that resultVisitor visits all
-	// the child results of this result.
-	Visit(result) resultVisitor
-
-	// AnnotateWithField is called on each field of a resultObject after
-	// visiting it but before walking its descendants.
-	//
-	// The same resultVisitor is used for all fields: the one returned upon
-	// visiting the resultObject.
-	//
-	// For each visited field, if AnnotateWithField returns a non-nil
-	// resultVisitor, it will be used to walk the result of that field.
-	AnnotateWithField(resultObjectField) resultVisitor
-
-	// AnnotateWithPosition is called with the index of each result of a
-	// resultList after vising it but before walking its descendants.
-	//
-	// The same resultVisitor is used for all results: the one returned upon
-	// visiting the resultList.
-	//
-	// For each position, if AnnotateWithPosition returns a non-nil
-	// resultVisitor, it will be used to walk the result at that index.
-	AnnotateWithPosition(idx int) resultVisitor
-}
-
-// walkResult walks the result tree for the given result with the provided
-// visitor.
-//
-// resultVisitor.Visit will be called on the provided result and if a non-nil
-// resultVisitor is received, it will be used to walk its descendants. If a
-// resultObject or resultList was visited, AnnotateWithField and
-// AnnotateWithPosition respectively will be called before visiting the
-// descendants of that resultObject/resultList.
-//
-// This is very similar to how go/ast.Walk works.
-func walkResult(r result, v resultVisitor) {
-	v = v.Visit(r)
-	if v == nil {
-		return
-	}
-
-	switch res := r.(type) {
-	case resultSingle, resultGrouped:
-		// No sub-results
-	case resultObject:
-		w := v
-		for _, f := range res.Fields {
-			if v := w.AnnotateWithField(f); v != nil {
-				walkResult(f.Result, v)
-			}
-		}
-	case resultList:
-		w := v
-		for i, r := range res.Results {
-			if v := w.AnnotateWithPosition(i); v != nil {
-				walkResult(r, v)
-			}
-		}
-	default:
-		panic(fmt.Sprintf(
-			"It looks like you have found a bug in dig. "+
-				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
-				"and provide the following message: "+
-				"received unknown result type %T", res))
+		return newResultSingle(t, opts), nil
 	}
 }
 
@@ -158,6 +89,7 @@ type resultList struct {
 	ctype reflect.Type
 
 	Results []result
+	keys    *internal.KeySet
 
 	// For each item at index i returned by the constructor, resultIndexes[i]
 	// is the index in .Results for the corresponding result object.
@@ -169,6 +101,7 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 	rl := resultList{
 		ctype:         ctype,
 		Results:       make([]result, 0, ctype.NumOut()),
+		keys:          internal.NewKeySet(),
 		resultIndexes: make([]int, ctype.NumOut()),
 	}
 
@@ -185,6 +118,13 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 			return rl, errWrapf(err, "bad result %d", i+1)
 		}
 
+		src := fmt.Sprintf("result %d", i)
+		for _, k := range r.Produces() {
+			if err := rl.keys.Provide(src, k); err != nil {
+				return rl, errWrapf(err, "cannot provide %v from %v", k, src)
+			}
+		}
+
 		rl.Results = append(rl.Results, r)
 		rl.resultIndexes[i] = resultIdx
 		resultIdx++
@@ -199,6 +139,8 @@ func (resultList) Extract(containerWriter, reflect.Value) {
 		"and provide the following message: " +
 		"resultList.Extract() must never be called")
 }
+
+func (rl resultList) Produces() []internal.Key { return rl.keys.Items() }
 
 func (rl resultList) ExtractList(cw containerWriter, values []reflect.Value) error {
 	for i, v := range values {
@@ -224,6 +166,16 @@ type resultSingle struct {
 	Type reflect.Type
 }
 
+func newResultSingle(t reflect.Type, opts resultOptions) resultSingle {
+	return resultSingle{Name: opts.Name, Type: t}
+}
+
+func (rs resultSingle) Produces() []internal.Key {
+	return []internal.Key{
+		internal.ValueKey{Name: rs.Name, Type: rs.Type},
+	}
+}
+
 func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
 	cw.setValue(internal.ValueKey{Name: rs.Name, Type: rs.Type}, v)
 }
@@ -235,10 +187,15 @@ func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
 type resultObject struct {
 	Type   reflect.Type
 	Fields []resultObjectField
+	keys   *internal.KeySet
 }
 
 func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
-	ro := resultObject{Type: t}
+	ro := resultObject{
+		Type: t,
+		keys: internal.NewKeySet(),
+	}
+
 	if len(opts.Name) > 0 {
 		return ro, fmt.Errorf(
 			"cannot specify a name for result objects: %v embeds dig.Out", t)
@@ -256,6 +213,13 @@ func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 			return ro, errWrapf(err, "bad field %q of %v", f.Name, t)
 		}
 
+		src := fmt.Sprintf("field %v", f.Name)
+		for _, k := range rof.Result.Produces() {
+			if err := ro.keys.Provide(src, k); err != nil {
+				return ro, errWrapf(err, "cannot provide %v from %v", k, src)
+			}
+		}
+
 		ro.Fields = append(ro.Fields, rof)
 	}
 	return ro, nil
@@ -266,6 +230,8 @@ func (ro resultObject) Extract(cw containerWriter, v reflect.Value) {
 		f.Result.Extract(cw, v.Field(f.FieldIndex))
 	}
 }
+
+func (ro resultObject) Produces() []internal.Key { return ro.keys.Items() }
 
 // resultObjectField is a single field inside a dig.Out struct.
 type resultObjectField struct {
@@ -350,4 +316,10 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 
 func (rt resultGrouped) Extract(cw containerWriter, v reflect.Value) {
 	cw.submitGroupedValue(internal.GroupKey{Name: rt.Group, Type: rt.Type}, v)
+}
+
+func (rt resultGrouped) Produces() []internal.Key {
+	return []internal.Key{
+		internal.GroupKey{Name: rt.Group, Type: rt.Type},
+	}
 }

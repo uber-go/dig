@@ -61,7 +61,7 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 		require.Error(t, err, "B should fail to provide")
 		assertErrorMatches(t, err,
 			`function "go.uber.org/dig".TestEndToEndSuccessWithAliases\S+ \(\S+:\d+\) cannot be provided:`,
-			`cannot provide dig.A from \[0\]:`,
+			`cannot provide dig.A:`,
 			`already provided by "go.uber.org/dig".TestEndToEndSuccessWithAliases\S+`,
 		)
 	})

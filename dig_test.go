@@ -1640,8 +1640,9 @@ func TestProvideFailures(t *testing.T) {
 		require.Error(t, err, "provide must return error")
 		assertErrorMatches(t, err,
 			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
-			`cannot provide dig.A from \[0\].A2:`,
-			`already provided by \[0\].A1`,
+			`bad result 1:`,
+			`cannot provide dig.A from field A2:`,
+			`already provided by field A1`,
 		)
 	})
 
@@ -1665,7 +1666,7 @@ func TestProvideFailures(t *testing.T) {
 		require.Error(t, err, "expected error on the second provide")
 		assertErrorMatches(t, err,
 			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
-			`cannot provide \*dig.A\[name="foo"\] from \[0\].A:`,
+			`cannot provide \*dig.A\[name="foo"\]:`,
 			`already provided by "go.uber.org/dig".TestProvideFailures\S+`,
 		)
 	})

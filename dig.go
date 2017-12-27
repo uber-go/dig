@@ -107,6 +107,7 @@ type InvokeOption interface {
 type Container struct {
 	// Mapping from value or group key to nodes that fill those keys.
 	providers map[internal.Key][]*node
+	keySet    *internal.KeySet // to find Provide conflicts
 
 	// Values that have already been generated in the container.
 	values map[internal.ValueKey]reflect.Value
@@ -175,6 +176,7 @@ type provider interface {
 func New(opts ...Option) *Container {
 	c := &Container{
 		providers: make(map[internal.Key][]*node),
+		keySet:    internal.NewKeySet(),
 		values:    make(map[internal.ValueKey]reflect.Value),
 		groups:    make(map[internal.GroupKey][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -331,17 +333,16 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		return err
 	}
 
-	keys, err := c.findAndValidateResults(n)
-	if err != nil {
-		return err
-	}
-
-	ctype := reflect.TypeOf(ctor)
+	keys := n.ResultList().Produces()
 	if len(keys) == 0 {
-		return fmt.Errorf("%v must provide at least one non-error type", ctype)
+		return fmt.Errorf("%v must provide at least one non-error type", n.Location())
 	}
 
-	for k := range keys {
+	for _, k := range keys {
+		if err := c.keySet.Provide(fmt.Sprint(n.Location()), k); err != nil {
+			return fmt.Errorf("cannot provide %v: %v", k, err)
+		}
+
 		oldProducers := c.providers[k]
 		c.providers[k] = append(oldProducers, n)
 		if err := verifyAcyclic(c, n, k); err != nil {
@@ -351,116 +352,6 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	}
 
 	return nil
-}
-
-// Builds a collection of all result types produced by this node.
-func (c *Container) findAndValidateResults(n *node) (map[internal.Key]struct{}, error) {
-	var err error
-	keyPaths := make(map[internal.Key]string)
-	walkResult(n.ResultList(), connectionVisitor{
-		c:        c,
-		n:        n,
-		err:      &err,
-		keyPaths: keyPaths,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	keys := make(map[internal.Key]struct{}, len(keyPaths))
-	for k := range keyPaths {
-		keys[k] = struct{}{}
-	}
-	return keys, nil
-}
-
-// Visits the results of a node and compiles a collection of all the keys
-// produced by that node.
-type connectionVisitor struct {
-	c *Container
-	n *node
-
-	// If this points to a non-nil value, we've already encountered an error
-	// and should stop traversing.
-	err *error
-
-	// Map of keys provided to path that provided this. The path is a string
-	// documenting which positional return value or dig.Out attribute is
-	// providing this particular key.
-	//
-	// For example, "[0].Foo" indicates that the value was provided by the Foo
-	// attribute of the dig.Out returned as the first result of the
-	// constructor.
-	keyPaths map[internal.Key]string
-
-	// We track the path to the current result here. For example, this will
-	// be, ["[1]", "Foo", "Bar"] when we're visiting Bar in,
-	//
-	//   func() (io.Writer, struct {
-	//     dig.Out
-	//
-	//     Foo struct {
-	//       dig.Out
-	//
-	//       Bar io.Reader
-	//     }
-	//   })
-	currentResultPath []string
-}
-
-func (cv connectionVisitor) AnnotateWithField(f resultObjectField) resultVisitor {
-	cv.currentResultPath = append(cv.currentResultPath, f.FieldName)
-	return cv
-}
-
-func (cv connectionVisitor) AnnotateWithPosition(i int) resultVisitor {
-	cv.currentResultPath = append(cv.currentResultPath, fmt.Sprintf("[%d]", i))
-	return cv
-}
-
-func (cv connectionVisitor) Visit(res result) resultVisitor {
-	// Already failed. Stop looking.
-	if *cv.err != nil {
-		return nil
-	}
-
-	path := strings.Join(cv.currentResultPath, ".")
-
-	switch r := res.(type) {
-	case resultSingle:
-		k := internal.ValueKey{Name: r.Name, Type: r.Type}
-
-		if conflict, ok := cv.keyPaths[k]; ok {
-			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, conflict)
-			return nil
-		}
-
-		if ps := cv.c.providers[k]; len(ps) > 0 {
-			cons := make([]string, len(ps))
-			for i, p := range ps {
-				cons[i] = fmt.Sprint(p.Location())
-			}
-
-			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, strings.Join(cons, "; "))
-			return nil
-		}
-
-		cv.keyPaths[k] = path
-
-	case resultGrouped:
-		// we don't really care about the path for this since conflicts are
-		// okay for group results. We'll track it for the sake of having a
-		// value there.
-		k := internal.GroupKey{Name: r.Group, Type: r.Type}
-		cv.keyPaths[k] = path
-	}
-
-	return cv
 }
 
 // node is a node in the dependency graph. Each node maps to a single
