@@ -52,7 +52,7 @@ func (c *Container) String() string {
 }
 
 func (n *node) String() string {
-	return fmt.Sprintf("deps: %v, ctor: %v", n.Params, n.ctype)
+	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)
 }
 
 func (k key) String() string {

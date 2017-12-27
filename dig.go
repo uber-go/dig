@@ -166,6 +166,17 @@ type containerStore interface {
 
 // provider encapsulates a user-provided constructor.
 type provider interface {
+	// Location returns where this constructor was defined.
+	Location() *digreflect.Func
+
+	// ParamList returns information about the direct dependencies of this
+	// constructor.
+	ParamList() paramList
+
+	// ResultList returns information about the values produced by this
+	// constructor.
+	ResultList() resultList
+
 	// Calls the underlying constructor, reading values from the
 	// containerStore as needed.
 	//
@@ -369,7 +380,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 	var err error
 	keyPaths := make(map[key]string)
-	walkResult(n.Results, connectionVisitor{
+	walkResult(n.ResultList(), connectionVisitor{
 		c:        c,
 		n:        n,
 		err:      &err,
@@ -453,7 +464,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		if ps := cv.c.providers[k]; len(ps) > 0 {
 			cons := make([]string, len(ps))
 			for i, p := range ps {
-				cons[i] = fmt.Sprint(p.Func)
+				cons[i] = fmt.Sprint(p.Location())
 			}
 
 			*cv.err = fmt.Errorf(
@@ -484,16 +495,18 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 type node struct {
 	ctor  interface{}
 	ctype reflect.Type
-	Func  *digreflect.Func
+
+	// Location where this function was defined.
+	location *digreflect.Func
 
 	// Whether the constructor owned by this node was already called.
 	called bool
 
 	// Type information about constructor parameters.
-	Params paramList
+	paramList paramList
 
 	// Type information about constructor results.
-	Results resultList
+	resultList resultList
 }
 
 type nodeOptions struct {
@@ -515,13 +528,17 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 	}
 
 	return &node{
-		ctor:    ctor,
-		ctype:   ctype,
-		Func:    digreflect.InspectFunc(ctor),
-		Params:  params,
-		Results: results,
+		ctor:       ctor,
+		ctype:      ctype,
+		location:   digreflect.InspectFunc(ctor),
+		paramList:  params,
+		resultList: results,
 	}, err
 }
+
+func (n *node) Location() *digreflect.Func { return n.location }
+func (n *node) ParamList() paramList       { return n.paramList }
+func (n *node) ResultList() resultList     { return n.resultList }
 
 // Call calls this node's constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
@@ -530,19 +547,19 @@ func (n *node) Call(c containerStore) error {
 		return nil
 	}
 
-	if err := shallowCheckDependencies(c, n.Params); err != nil {
-		return errMissingDependencies{Func: n.Func, Reason: err}
+	if err := shallowCheckDependencies(c, n.paramList); err != nil {
+		return errMissingDependencies{Func: n.location, Reason: err}
 	}
 
-	args, err := n.Params.BuildList(c)
+	args, err := n.paramList.BuildList(c)
 	if err != nil {
-		return errArgumentsFailed{Func: n.Func, Reason: err}
+		return errArgumentsFailed{Func: n.location, Reason: err}
 	}
 
 	receiver := newStagingContainerWriter()
 	results := reflect.ValueOf(n.ctor).Call(args)
-	if err := n.Results.ExtractList(receiver, results); err != nil {
-		return errConstructorFailed{Func: n.Func, Reason: err}
+	if err := n.resultList.ExtractList(receiver, results); err != nil {
+		return errConstructorFailed{Func: n.location, Reason: err}
 	}
 	receiver.Commit(c)
 	n.called = true

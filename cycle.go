@@ -55,9 +55,9 @@ func (e errCycleDetected) Error() string {
 	return b.String()
 }
 
-func verifyAcyclic(c *Container, n *node, k key) error {
-	err := detectCycles(n, c.providers, []cycleEntry{
-		{Key: k, Func: n.Func},
+func verifyAcyclic(c containerStore, n provider, k key) error {
+	err := detectCycles(n, c, []cycleEntry{
+		{Key: k, Func: n.Location()},
 	})
 	if err != nil {
 		err = errWrapf(err, "this function introduces a cycle")
@@ -65,26 +65,31 @@ func verifyAcyclic(c *Container, n *node, k key) error {
 	return err
 }
 
-func detectCycles(n *node, graph map[key][]*node, path []cycleEntry) error {
+func detectCycles(n provider, c containerStore, path []cycleEntry) error {
 	var err error
-	walkParam(n.Params, paramVisitorFunc(func(param param) bool {
+	walkParam(n.ParamList(), paramVisitorFunc(func(param param) bool {
 		if err != nil {
 			return false
 		}
 
-		var k key
+		var (
+			k         key
+			providers []provider
+		)
 		switch p := param.(type) {
 		case paramSingle:
 			k = key{name: p.Name, t: p.Type}
+			providers = c.getValueProviders(p.Name, p.Type)
 		case paramGroupedSlice:
 			// NOTE: The key uses the element type, not the slice type.
 			k = key{group: p.Group, t: p.Type.Elem()}
+			providers = c.getGroupProviders(p.Group, p.Type.Elem())
 		default:
 			// Recurse for non-edge params.
 			return true
 		}
 
-		entry := cycleEntry{Func: n.Func, Key: k}
+		entry := cycleEntry{Func: n.Location(), Key: k}
 
 		for _, p := range path {
 			if p.Key == k {
@@ -93,8 +98,8 @@ func detectCycles(n *node, graph map[key][]*node, path []cycleEntry) error {
 			}
 		}
 
-		for _, n := range graph[k] {
-			if e := detectCycles(n, graph, append(path, entry)); e != nil {
+		for _, n := range providers {
+			if e := detectCycles(n, c, append(path, entry)); e != nil {
 				err = e
 				return false
 			}
