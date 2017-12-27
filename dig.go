@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -126,7 +127,8 @@ type Container struct {
 	rand *rand.Rand
 }
 
-// containerWriter provides write access to the Container.
+// containerWriter provides write access to the Container's underlying data
+// store.
 type containerWriter interface {
 	// setValue sets the value with the given name and type in the container.
 	// If a value with the same name and type already exists, it will be
@@ -136,6 +138,40 @@ type containerWriter interface {
 	// submitGroupedValue submits a value to the value group with the provided
 	// name.
 	submitGroupedValue(name string, t reflect.Type, v reflect.Value)
+}
+
+// containerStore provides access to the Container's underlying data store.
+type containerStore interface {
+	containerWriter
+
+	// Returns a slice containing all known types.
+	knownTypes() []reflect.Type
+
+	// Retrieves the value with the provided name and type, if any.
+	getValue(name string, t reflect.Type) (v reflect.Value, ok bool)
+
+	// Retrieves all values for the provided group and type.
+	//
+	// The order in which the values are returned is undefined.
+	getValueGroup(name string, t reflect.Type) []reflect.Value
+
+	// Returns the providers that can produce a value with the given name and
+	// type.
+	getValueProviders(name string, t reflect.Type) []provider
+
+	// Returns the providers that can produce values for the given group and
+	// type.
+	getGroupProviders(name string, t reflect.Type) []provider
+}
+
+// provider encapsulates a user-provided constructor.
+type provider interface {
+	// Calls the underlying constructor, reading values from the
+	// containerStore as needed.
+	//
+	// The values produced by this provider should be submitted into the
+	// containerStore.
+	Call(containerStore) error
 }
 
 // New constructs a Container.
@@ -162,13 +198,55 @@ func setRand(r *rand.Rand) Option {
 	})
 }
 
+func (c *Container) knownTypes() []reflect.Type {
+	typeSet := make(map[reflect.Type]struct{}, len(c.providers))
+	for k := range c.providers {
+		typeSet[k.t] = struct{}{}
+	}
+
+	types := make([]reflect.Type, 0, len(typeSet))
+	for t := range typeSet {
+		types = append(types, t)
+	}
+	sort.Sort(byTypeName(types))
+	return types
+}
+
+func (c *Container) getValue(name string, t reflect.Type) (v reflect.Value, ok bool) {
+	v, ok = c.values[key{name: name, t: t}]
+	return
+}
+
 func (c *Container) setValue(name string, t reflect.Type, v reflect.Value) {
 	c.values[key{name: name, t: t}] = v
+}
+
+func (c *Container) getValueGroup(name string, t reflect.Type) []reflect.Value {
+	items := c.groups[key{group: name, t: t}]
+	// shuffle the list so users don't rely on the ordering of grouped values
+	return shuffledCopy(c.rand, items)
 }
 
 func (c *Container) submitGroupedValue(name string, t reflect.Type, v reflect.Value) {
 	k := key{group: name, t: t}
 	c.groups[k] = append(c.groups[k], v)
+}
+
+func (c *Container) getValueProviders(name string, t reflect.Type) []provider {
+	return c.getProviders(key{name: name, t: t})
+}
+
+func (c *Container) getGroupProviders(name string, t reflect.Type) []provider {
+	return c.getProviders(key{group: name, t: t})
+}
+
+func (c *Container) getProviders(k key) []provider {
+	nodes := c.providers[k]
+	providers := make([]provider, len(nodes))
+	for i, n := range nodes {
+		providers[i] = n
+	}
+	return providers
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -447,7 +525,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 
 // Call calls this node's constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
-func (n *node) Call(c *Container) error {
+func (n *node) Call(c containerStore) error {
 	if n.called {
 		return nil
 	}
@@ -490,7 +568,7 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 
 // Checks that all direct dependencies of the provided param are present in
 // the container. Returns an error if not.
-func shallowCheckDependencies(c *Container, p param) error {
+func shallowCheckDependencies(c containerStore, p param) error {
 	var missing errMissingManyTypes
 	walkParam(p, paramVisitorFunc(func(p param) bool {
 		ps, ok := p.(paramSingle)
@@ -498,9 +576,8 @@ func shallowCheckDependencies(c *Container, p param) error {
 			return true
 		}
 
-		k := key{name: ps.Name, t: ps.Type}
-		if ns := c.providers[k]; len(ns) == 0 && !ps.Optional {
-			missing = append(missing, newErrMissingType(c, k))
+		if ns := c.getValueProviders(ps.Name, ps.Type); len(ns) == 0 && !ps.Optional {
+			missing = append(missing, newErrMissingType(c, key{name: ps.Name, t: ps.Type}))
 		}
 
 		return true
@@ -548,4 +625,26 @@ func (sr *stagingContainerWriter) Commit(cw containerWriter) {
 			cw.submitGroupedValue(k.group, k.t, v)
 		}
 	}
+}
+
+type byTypeName []reflect.Type
+
+func (bs byTypeName) Len() int {
+	return len(bs)
+}
+
+func (bs byTypeName) Less(i int, j int) bool {
+	return fmt.Sprint(bs[i]) < fmt.Sprint(bs[j])
+}
+
+func (bs byTypeName) Swap(i int, j int) {
+	bs[i], bs[j] = bs[j], bs[i]
+}
+
+func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
+	newItems := make([]reflect.Value, len(items))
+	for i, j := range rand.Perm(len(items)) {
+		newItems[i] = items[j]
+	}
+	return newItems
 }

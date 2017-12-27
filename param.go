@@ -23,7 +23,6 @@ package dig
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"reflect"
 )
 
@@ -45,7 +44,7 @@ type param interface {
 	// Container.
 	//
 	// This MAY panic if the param does not produce a single value.
-	Build(*Container) (reflect.Value, error)
+	Build(containerStore) (reflect.Value, error)
 }
 
 var (
@@ -173,7 +172,7 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 	return pl, nil
 }
 
-func (pl paramList) Build(*Container) (reflect.Value, error) {
+func (pl paramList) Build(containerStore) (reflect.Value, error) {
 	panic("It looks like you have found a bug in dig. " +
 		"Please file an issue at https://github.com/uber-go/dig/issues/ " +
 		"and provide the following message: " +
@@ -182,7 +181,7 @@ func (pl paramList) Build(*Container) (reflect.Value, error) {
 
 // BuildList returns an ordered list of values which may be passed directly
 // to the underlying constructor.
-func (pl paramList) BuildList(c *Container) ([]reflect.Value, error) {
+func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
 	for i, p := range pl.Params {
 		var err error
@@ -204,22 +203,20 @@ type paramSingle struct {
 	Type     reflect.Type
 }
 
-func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
-	k := key{name: ps.Name, t: ps.Type}
-	if v, ok := c.values[k]; ok {
+func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
+	if v, ok := c.getValue(ps.Name, ps.Type); ok {
 		return v, nil
 	}
 
-	nodes := c.providers[k]
-	if len(nodes) == 0 {
+	providers := c.getValueProviders(ps.Name, ps.Type)
+	if len(providers) == 0 {
 		if ps.Optional {
 			return reflect.Zero(ps.Type), nil
 		}
-
-		return _noValue, newErrMissingType(c, k)
+		return _noValue, newErrMissingType(c, key{name: ps.Name, t: ps.Type})
 	}
 
-	for _, n := range nodes {
+	for _, n := range providers {
 		err := n.Call(c)
 		if err == nil {
 			continue
@@ -231,10 +228,13 @@ func (ps paramSingle) Build(c *Container) (reflect.Value, error) {
 			return reflect.Zero(ps.Type), nil
 		}
 
-		return _noValue, errParamSingleFailed{Key: k, Reason: err}
+		return _noValue, errParamSingleFailed{Key: key{t: ps.Type, name: ps.Name}, Reason: err}
 	}
 
-	return c.values[k], nil
+	// If we get here, it's impossible for the value to be absent from the
+	// container.
+	v, _ := c.getValue(ps.Name, ps.Type)
+	return v, nil
 }
 
 // paramObject is a dig.In struct where each field is another param.
@@ -268,7 +268,7 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 	return po, nil
 }
 
-func (po paramObject) Build(c *Container) (reflect.Value, error) {
+func (po paramObject) Build(c containerStore) (reflect.Value, error) {
 	dest := reflect.New(po.Type).Elem()
 	for _, f := range po.Fields {
 		v, err := f.Build(c)
@@ -339,7 +339,7 @@ func newParamObjectField(idx int, f reflect.StructField) (paramObjectField, erro
 	return pof, nil
 }
 
-func (pof paramObjectField) Build(c *Container) (reflect.Value, error) {
+func (pof paramObjectField) Build(c containerStore) (reflect.Value, error) {
 	v, err := pof.Param.Build(c)
 	if err != nil {
 		return v, err
@@ -381,31 +381,21 @@ func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
 	return pg, nil
 }
 
-func (pt paramGroupedSlice) Build(c *Container) (reflect.Value, error) {
-	k := key{group: pt.Group, t: pt.Type.Elem()}
-
-	for _, n := range c.providers[k] {
+func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
+	for _, n := range c.getGroupProviders(pt.Group, pt.Type.Elem()) {
 		if err := n.Call(c); err != nil {
-			return _noValue, errParamGroupFailed{Key: k, Reason: err}
+			return _noValue, errParamGroupFailed{
+				Key:    key{group: pt.Group, t: pt.Type.Elem()},
+				Reason: err,
+			}
 		}
 	}
 
-	items := c.groups[k]
-
-	// shuffle the list so users don't rely on the ordering of grouped values
-	items = shuffledCopy(c.rand, items)
+	items := c.getValueGroup(pt.Group, pt.Type.Elem())
 
 	result := reflect.MakeSlice(pt.Type, len(items), len(items))
 	for i, v := range items {
 		result.Index(i).Set(v)
 	}
 	return result, nil
-}
-
-func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
-	newItems := make([]reflect.Value, len(items))
-	for i, j := range rand.Perm(len(items)) {
-		newItems[i] = items[j]
-	}
-	return newItems
 }

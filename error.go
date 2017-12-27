@@ -170,7 +170,7 @@ type errMissingType struct {
 	suggestions []key
 }
 
-func newErrMissingType(c *Container, k key) errMissingType {
+func newErrMissingType(c containerStore, k key) errMissingType {
 	// Possible types we will look for in the container. We will always look
 	// for pointers to the requested type and some extras on a per-Kind basis.
 
@@ -180,19 +180,20 @@ func newErrMissingType(c *Container, k key) errMissingType {
 		suggestions = append(suggestions, k.t.Elem())
 	}
 
+	knownTypes := c.knownTypes()
 	if k.t.Kind() == reflect.Interface {
 		// Maybe we have an implementation of the interface.
-		for p := range c.providers {
-			if p.t.Implements(k.t) {
-				suggestions = append(suggestions, p.t)
+		for _, t := range knownTypes {
+			if t.Implements(k.t) {
+				suggestions = append(suggestions, t)
 			}
 		}
 	} else {
 		// Maybe we have an interface that this type implements.
-		for p := range c.providers {
-			if p.t.Kind() == reflect.Interface {
-				if k.t.Implements(p.t) {
-					suggestions = append(suggestions, p.t)
+		for _, t := range knownTypes {
+			if t.Kind() == reflect.Interface {
+				if k.t.Implements(t) {
+					suggestions = append(suggestions, t)
 				}
 			}
 		}
@@ -204,8 +205,8 @@ func newErrMissingType(c *Container, k key) errMissingType {
 
 	err := errMissingType{Key: k}
 	for _, t := range suggestions {
-		k.t = t
-		if len(c.providers[k]) > 0 {
+		if len(c.getValueProviders(k.name, t)) > 0 {
+			k.t = t
 			err.suggestions = append(err.suggestions, k)
 		}
 	}
@@ -283,18 +284,4 @@ func (e errMissingManyTypes) Error() string {
 	}
 
 	return b.String()
-}
-
-type byTypeName []reflect.Type
-
-func (bs byTypeName) Len() int {
-	return len(bs)
-}
-
-func (bs byTypeName) Less(i int, j int) bool {
-	return fmt.Sprint(bs[i]) < fmt.Sprint(bs[j])
-}
-
-func (bs byTypeName) Swap(i int, j int) {
-	bs[i], bs[j] = bs[j], bs[i]
 }
