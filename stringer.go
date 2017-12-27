@@ -55,16 +55,6 @@ func (n *node) String() string {
 	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)
 }
 
-func (k key) String() string {
-	if k.name != "" {
-		return fmt.Sprintf("%v[name=%q]", k.t, k.name)
-	}
-	if k.group != "" {
-		return fmt.Sprintf("%v[group=%q]", k.t, k.group)
-	}
-	return k.t.String()
-}
-
 func (pl paramList) String() string {
 	args := make([]string, len(pl.Params))
 	for i, p := range pl.Params {

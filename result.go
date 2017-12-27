@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+
+	"go.uber.org/dig/internal"
 )
 
 // The result interface represents a result produced by a constructor.
@@ -223,7 +225,7 @@ type resultSingle struct {
 }
 
 func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
-	cw.setValue(rs.Name, rs.Type, v)
+	cw.setValue(internal.ValueKey{Name: rs.Name, Type: rs.Type}, v)
 }
 
 // resultObject is a dig.Out struct where each field is another result.
@@ -347,5 +349,5 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 }
 
 func (rt resultGrouped) Extract(cw containerWriter, v reflect.Value) {
-	cw.submitGroupedValue(rt.Group, rt.Type, v)
+	cw.submitGroupedValue(internal.GroupKey{Name: rt.Group, Type: rt.Type}, v)
 }

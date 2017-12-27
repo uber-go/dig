@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+
+	"go.uber.org/dig/internal"
 )
 
 // The param interface represents a dependency for a constructor.
@@ -204,16 +206,17 @@ type paramSingle struct {
 }
 
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
-	if v, ok := c.getValue(ps.Name, ps.Type); ok {
+	k := internal.ValueKey{Name: ps.Name, Type: ps.Type}
+	if v, ok := c.getValue(k); ok {
 		return v, nil
 	}
 
-	providers := c.getValueProviders(ps.Name, ps.Type)
+	providers := c.getProviders(k)
 	if len(providers) == 0 {
 		if ps.Optional {
 			return reflect.Zero(ps.Type), nil
 		}
-		return _noValue, newErrMissingType(c, key{name: ps.Name, t: ps.Type})
+		return _noValue, newErrMissingType(c, k)
 	}
 
 	for _, n := range providers {
@@ -228,12 +231,12 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 			return reflect.Zero(ps.Type), nil
 		}
 
-		return _noValue, errParamSingleFailed{Key: key{t: ps.Type, name: ps.Name}, Reason: err}
+		return _noValue, errParamSingleFailed{Key: k, Reason: err}
 	}
 
 	// If we get here, it's impossible for the value to be absent from the
 	// container.
-	v, _ := c.getValue(ps.Name, ps.Type)
+	v, _ := c.getValue(k)
 	return v, nil
 }
 
@@ -382,16 +385,18 @@ func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
 }
 
 func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
-	for _, n := range c.getGroupProviders(pt.Group, pt.Type.Elem()) {
+	k := internal.GroupKey{Name: pt.Group, Type: pt.Type.Elem()}
+
+	for _, n := range c.getProviders(k) {
 		if err := n.Call(c); err != nil {
 			return _noValue, errParamGroupFailed{
-				Key:    key{group: pt.Group, t: pt.Type.Elem()},
+				Key:    k,
 				Reason: err,
 			}
 		}
 	}
 
-	items := c.getValueGroup(pt.Group, pt.Type.Elem())
+	items := c.getValueGroup(k)
 
 	result := reflect.MakeSlice(pt.Type, len(items), len(items))
 	for i, v := range items {

@@ -24,11 +24,12 @@ import (
 	"bytes"
 	"fmt"
 
+	"go.uber.org/dig/internal"
 	"go.uber.org/dig/internal/digreflect"
 )
 
 type cycleEntry struct {
-	Key  key
+	Key  internal.Key
 	Func *digreflect.Func
 }
 
@@ -55,7 +56,7 @@ func (e errCycleDetected) Error() string {
 	return b.String()
 }
 
-func verifyAcyclic(c containerStore, n provider, k key) error {
+func verifyAcyclic(c containerStore, n provider, k internal.Key) error {
 	err := detectCycles(n, c, []cycleEntry{
 		{Key: k, Func: n.Location()},
 	})
@@ -72,25 +73,19 @@ func detectCycles(n provider, c containerStore, path []cycleEntry) error {
 			return false
 		}
 
-		var (
-			k         key
-			providers []provider
-		)
+		var k internal.Key
 		switch p := param.(type) {
 		case paramSingle:
-			k = key{name: p.Name, t: p.Type}
-			providers = c.getValueProviders(p.Name, p.Type)
+			k = internal.ValueKey{Name: p.Name, Type: p.Type}
 		case paramGroupedSlice:
 			// NOTE: The key uses the element type, not the slice type.
-			k = key{group: p.Group, t: p.Type.Elem()}
-			providers = c.getGroupProviders(p.Group, p.Type.Elem())
+			k = internal.GroupKey{Name: p.Group, Type: p.Type.Elem()}
 		default:
 			// Recurse for non-edge params.
 			return true
 		}
 
 		entry := cycleEntry{Func: n.Location(), Key: k}
-
 		for _, p := range path {
 			if p.Key == k {
 				err = errCycleDetected{Path: append(path, entry)}
@@ -98,6 +93,7 @@ func detectCycles(n provider, c containerStore, path []cycleEntry) error {
 			}
 		}
 
+		providers := c.getProviders(k)
 		for _, n := range providers {
 			if e := detectCycles(n, c, append(path, entry)); e != nil {
 				err = e

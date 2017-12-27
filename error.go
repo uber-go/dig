@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"sort"
 
+	"go.uber.org/dig/internal"
 	"go.uber.org/dig/internal/digreflect"
 )
 
@@ -137,7 +138,7 @@ func (e errMissingDependencies) Error() string {
 
 // errParamSingleFailed is returned when a paramSingle could not be built.
 type errParamSingleFailed struct {
-	Key    key
+	Key    internal.ValueKey
 	Reason error
 }
 
@@ -150,7 +151,7 @@ func (e errParamSingleFailed) Error() string {
 // errParamGroupFailed is returned when a value group cannot be built because
 // any of the values in the group failed to build.
 type errParamGroupFailed struct {
-	Key    key
+	Key    internal.GroupKey
 	Reason error
 }
 
@@ -163,28 +164,37 @@ func (e errParamGroupFailed) Error() string {
 // errMissingType is returned when a single value that was expected in the
 // container was not available.
 type errMissingType struct {
-	Key key
+	Key internal.Key
 
 	// If non-empty, we will include suggestions for what the user may have
 	// meant.
-	suggestions []key
+	suggestions []internal.Key
 }
 
-func newErrMissingType(c containerStore, k key) errMissingType {
+func newErrMissingType(c containerStore, k internal.Key) errMissingType {
+	err := errMissingType{Key: k}
+	vk, ok := k.(internal.ValueKey)
+	if !ok {
+		// We can make suggestions only if we're dealing with a single value
+		// lookup.
+		return err
+	}
+
+	kt := k.GetType()
+
 	// Possible types we will look for in the container. We will always look
 	// for pointers to the requested type and some extras on a per-Kind basis.
-
-	suggestions := []reflect.Type{reflect.PtrTo(k.t)}
-	if k.t.Kind() == reflect.Ptr {
+	suggestions := []reflect.Type{reflect.PtrTo(kt)}
+	if kt.Kind() == reflect.Ptr {
 		// The user requested a pointer but maybe we have a value.
-		suggestions = append(suggestions, k.t.Elem())
+		suggestions = append(suggestions, kt.Elem())
 	}
 
 	knownTypes := c.knownTypes()
-	if k.t.Kind() == reflect.Interface {
+	if kt.Kind() == reflect.Interface {
 		// Maybe we have an implementation of the interface.
 		for _, t := range knownTypes {
-			if t.Implements(k.t) {
+			if t.Implements(kt) {
 				suggestions = append(suggestions, t)
 			}
 		}
@@ -192,7 +202,7 @@ func newErrMissingType(c containerStore, k key) errMissingType {
 		// Maybe we have an interface that this type implements.
 		for _, t := range knownTypes {
 			if t.Kind() == reflect.Interface {
-				if k.t.Implements(t) {
+				if kt.Implements(t) {
 					suggestions = append(suggestions, t)
 				}
 			}
@@ -203,11 +213,11 @@ func newErrMissingType(c containerStore, k key) errMissingType {
 	// suggestions.
 	sort.Sort(byTypeName(suggestions))
 
-	err := errMissingType{Key: k}
 	for _, t := range suggestions {
-		if len(c.getValueProviders(k.name, t)) > 0 {
-			k.t = t
-			err.suggestions = append(err.suggestions, k)
+		candidate := vk
+		candidate.Type = t
+		if len(c.getProviders(candidate)) > 0 {
+			err.suggestions = append(err.suggestions, candidate)
 		}
 	}
 

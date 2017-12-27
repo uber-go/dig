@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/dig/internal"
 	"go.uber.org/dig/internal/digreflect"
 )
 
@@ -38,15 +39,6 @@ const (
 	_nameTag     = "name"
 	_groupTag    = "group"
 )
-
-// Unique identification of an object in the graph.
-type key struct {
-	t reflect.Type
-
-	// Only one of name or group will be set.
-	name  string
-	group string
-}
 
 // Option configures a Container. It's included for future functionality;
 // currently, there are no concrete implementations.
@@ -113,15 +105,14 @@ type InvokeOption interface {
 
 // Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
-	// Mapping from key to all the nodes that can provide a value for that
-	// key.
-	providers map[key][]*node
+	// Mapping from value or group key to nodes that fill those keys.
+	providers map[internal.Key][]*node
 
 	// Values that have already been generated in the container.
-	values map[key]reflect.Value
+	values map[internal.ValueKey]reflect.Value
 
 	// Values groups that have already been generated in the container.
-	groups map[key][]reflect.Value
+	groups map[internal.GroupKey][]reflect.Value
 
 	// Source of randomness.
 	rand *rand.Rand
@@ -133,11 +124,11 @@ type containerWriter interface {
 	// setValue sets the value with the given name and type in the container.
 	// If a value with the same name and type already exists, it will be
 	// overwritten.
-	setValue(name string, t reflect.Type, v reflect.Value)
+	setValue(k internal.ValueKey, v reflect.Value)
 
 	// submitGroupedValue submits a value to the value group with the provided
 	// name.
-	submitGroupedValue(name string, t reflect.Type, v reflect.Value)
+	submitGroupedValue(k internal.GroupKey, v reflect.Value)
 }
 
 // containerStore provides access to the Container's underlying data store.
@@ -148,20 +139,15 @@ type containerStore interface {
 	knownTypes() []reflect.Type
 
 	// Retrieves the value with the provided name and type, if any.
-	getValue(name string, t reflect.Type) (v reflect.Value, ok bool)
+	getValue(internal.ValueKey) (v reflect.Value, ok bool)
 
 	// Retrieves all values for the provided group and type.
 	//
 	// The order in which the values are returned is undefined.
-	getValueGroup(name string, t reflect.Type) []reflect.Value
+	getValueGroup(internal.GroupKey) []reflect.Value
 
-	// Returns the providers that can produce a value with the given name and
-	// type.
-	getValueProviders(name string, t reflect.Type) []provider
-
-	// Returns the providers that can produce values for the given group and
-	// type.
-	getGroupProviders(name string, t reflect.Type) []provider
+	// Returns the provider for the given key, if any.
+	getProviders(internal.Key) []provider
 }
 
 // provider encapsulates a user-provided constructor.
@@ -188,9 +174,9 @@ type provider interface {
 // New constructs a Container.
 func New(opts ...Option) *Container {
 	c := &Container{
-		providers: make(map[key][]*node),
-		values:    make(map[key]reflect.Value),
-		groups:    make(map[key][]reflect.Value),
+		providers: make(map[internal.Key][]*node),
+		values:    make(map[internal.ValueKey]reflect.Value),
+		groups:    make(map[internal.GroupKey][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
@@ -212,7 +198,7 @@ func setRand(r *rand.Rand) Option {
 func (c *Container) knownTypes() []reflect.Type {
 	typeSet := make(map[reflect.Type]struct{}, len(c.providers))
 	for k := range c.providers {
-		typeSet[k.t] = struct{}{}
+		typeSet[k.GetType()] = struct{}{}
 	}
 
 	types := make([]reflect.Type, 0, len(typeSet))
@@ -223,35 +209,26 @@ func (c *Container) knownTypes() []reflect.Type {
 	return types
 }
 
-func (c *Container) getValue(name string, t reflect.Type) (v reflect.Value, ok bool) {
-	v, ok = c.values[key{name: name, t: t}]
+func (c *Container) getValue(k internal.ValueKey) (v reflect.Value, ok bool) {
+	v, ok = c.values[k]
 	return
 }
 
-func (c *Container) setValue(name string, t reflect.Type, v reflect.Value) {
-	c.values[key{name: name, t: t}] = v
+func (c *Container) setValue(k internal.ValueKey, v reflect.Value) {
+	c.values[k] = v
 }
 
-func (c *Container) getValueGroup(name string, t reflect.Type) []reflect.Value {
-	items := c.groups[key{group: name, t: t}]
+func (c *Container) getValueGroup(k internal.GroupKey) []reflect.Value {
+	items := c.groups[k]
 	// shuffle the list so users don't rely on the ordering of grouped values
 	return shuffledCopy(c.rand, items)
 }
 
-func (c *Container) submitGroupedValue(name string, t reflect.Type, v reflect.Value) {
-	k := key{group: name, t: t}
+func (c *Container) submitGroupedValue(k internal.GroupKey, v reflect.Value) {
 	c.groups[k] = append(c.groups[k], v)
 }
 
-func (c *Container) getValueProviders(name string, t reflect.Type) []provider {
-	return c.getProviders(key{name: name, t: t})
-}
-
-func (c *Container) getGroupProviders(name string, t reflect.Type) []provider {
-	return c.getProviders(key{group: name, t: t})
-}
-
-func (c *Container) getProviders(k key) []provider {
+func (c *Container) getProviders(k internal.Key) []provider {
 	nodes := c.providers[k]
 	providers := make([]provider, len(nodes))
 	for i, n := range nodes {
@@ -377,9 +354,9 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 }
 
 // Builds a collection of all result types produced by this node.
-func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
+func (c *Container) findAndValidateResults(n *node) (map[internal.Key]struct{}, error) {
 	var err error
-	keyPaths := make(map[key]string)
+	keyPaths := make(map[internal.Key]string)
 	walkResult(n.ResultList(), connectionVisitor{
 		c:        c,
 		n:        n,
@@ -391,7 +368,7 @@ func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 		return nil, err
 	}
 
-	keys := make(map[key]struct{}, len(keyPaths))
+	keys := make(map[internal.Key]struct{}, len(keyPaths))
 	for k := range keyPaths {
 		keys[k] = struct{}{}
 	}
@@ -415,7 +392,7 @@ type connectionVisitor struct {
 	// For example, "[0].Foo" indicates that the value was provided by the Foo
 	// attribute of the dig.Out returned as the first result of the
 	// constructor.
-	keyPaths map[key]string
+	keyPaths map[internal.Key]string
 
 	// We track the path to the current result here. For example, this will
 	// be, ["[1]", "Foo", "Bar"] when we're visiting Bar in,
@@ -452,7 +429,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 
 	switch r := res.(type) {
 	case resultSingle:
-		k := key{name: r.Name, t: r.Type}
+		k := internal.ValueKey{Name: r.Name, Type: r.Type}
 
 		if conflict, ok := cv.keyPaths[k]; ok {
 			*cv.err = fmt.Errorf(
@@ -479,7 +456,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		// we don't really care about the path for this since conflicts are
 		// okay for group results. We'll track it for the sake of having a
 		// value there.
-		k := key{group: r.Group, t: r.Type}
+		k := internal.GroupKey{Name: r.Group, Type: r.Type}
 		cv.keyPaths[k] = path
 	}
 
@@ -593,8 +570,9 @@ func shallowCheckDependencies(c containerStore, p param) error {
 			return true
 		}
 
-		if ns := c.getValueProviders(ps.Name, ps.Type); len(ns) == 0 && !ps.Optional {
-			missing = append(missing, newErrMissingType(c, key{name: ps.Name, t: ps.Type}))
+		k := internal.ValueKey{Name: ps.Name, Type: ps.Type}
+		if ns := c.getProviders(k); len(ns) == 0 && !ps.Optional {
+			missing = append(missing, newErrMissingType(c, k))
 		}
 
 		return true
@@ -609,37 +587,36 @@ func shallowCheckDependencies(c containerStore, p param) error {
 // stagingContainerWriter is a containerWriter that records the changes that
 // would be made to a containerWriter and defers them until Commit is called.
 type stagingContainerWriter struct {
-	values map[key]reflect.Value
-	groups map[key][]reflect.Value
+	values map[internal.ValueKey]reflect.Value
+	groups map[internal.GroupKey][]reflect.Value
 }
 
 var _ containerWriter = (*stagingContainerWriter)(nil)
 
 func newStagingContainerWriter() *stagingContainerWriter {
 	return &stagingContainerWriter{
-		values: make(map[key]reflect.Value),
-		groups: make(map[key][]reflect.Value),
+		values: make(map[internal.ValueKey]reflect.Value),
+		groups: make(map[internal.GroupKey][]reflect.Value),
 	}
 }
 
-func (sr *stagingContainerWriter) setValue(name string, t reflect.Type, v reflect.Value) {
-	sr.values[key{t: t, name: name}] = v
+func (sr *stagingContainerWriter) setValue(k internal.ValueKey, v reflect.Value) {
+	sr.values[k] = v
 }
 
-func (sr *stagingContainerWriter) submitGroupedValue(group string, t reflect.Type, v reflect.Value) {
-	k := key{t: t, group: group}
+func (sr *stagingContainerWriter) submitGroupedValue(k internal.GroupKey, v reflect.Value) {
 	sr.groups[k] = append(sr.groups[k], v)
 }
 
 // Commit commits the received results to the provided containerWriter.
 func (sr *stagingContainerWriter) Commit(cw containerWriter) {
 	for k, v := range sr.values {
-		cw.setValue(k.name, k.t, v)
+		cw.setValue(k, v)
 	}
 
 	for k, vs := range sr.groups {
 		for _, v := range vs {
-			cw.submitGroupedValue(k.group, k.t, v)
+			cw.submitGroupedValue(k, v)
 		}
 	}
 }
