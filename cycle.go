@@ -67,42 +67,21 @@ func verifyAcyclic(c containerStore, n provider, k internal.Key) error {
 }
 
 func detectCycles(n provider, c containerStore, path []cycleEntry) error {
-	var err error
-	walkParam(n.ParamList(), paramVisitorFunc(func(param param) bool {
-		if err != nil {
-			return false
-		}
-
-		var k internal.Key
-		switch p := param.(type) {
-		case paramSingle:
-			k = internal.ValueKey{Name: p.Name, Type: p.Type}
-		case paramGroupedSlice:
-			// NOTE: The key uses the element type, not the slice type.
-			k = internal.GroupKey{Name: p.Group, Type: p.Type.Elem()}
-		default:
-			// Recurse for non-edge params.
-			return true
-		}
-
+	for _, d := range n.ParamList().Consumes() {
+		k := d.Key
 		entry := cycleEntry{Func: n.Location(), Key: k}
 		for _, p := range path {
 			if p.Key == k {
-				err = errCycleDetected{Path: append(path, entry)}
-				return false
+				return errCycleDetected{Path: append(path, entry)}
 			}
 		}
 
 		providers := c.getProviders(k)
 		for _, n := range providers {
-			if e := detectCycles(n, c, append(path, entry)); e != nil {
-				err = e
-				return false
+			if err := detectCycles(n, c, append(path, entry)); err != nil {
+				return err
 			}
 		}
-
-		return true
-	}))
-
-	return err
+	}
+	return nil
 }

@@ -47,6 +47,9 @@ type param interface {
 	//
 	// This MAY panic if the param does not produce a single value.
 	Build(containerStore) (reflect.Value, error)
+
+	// Enumerates all the dependencies consumed by this param directly.
+	Consumes() []internal.Dependency
 }
 
 var (
@@ -73,66 +76,7 @@ func newParam(t reflect.Type) (param, error) {
 			"cannot depend on a pointer to a parameter object, use a value instead: "+
 				"%v is a pointer to a struct that embeds dig.In", t)
 	default:
-		return paramSingle{Type: t}, nil
-	}
-}
-
-// paramVisitor visits every param in a param tree, allowing tracking state at
-// each level.
-type paramVisitor interface {
-	// Visit is called on the param being visited.
-	//
-	// If Visit returns a non-nil paramVisitor, that paramVisitor visits all
-	// the child params of this param.
-	Visit(param) paramVisitor
-
-	// We can implement AnnotateWithField and AnnotateWithPosition like
-	// resultVisitor if we need to track that information in the future.
-}
-
-// paramVisitorFunc is a paramVisitor that visits param in a tree with the
-// return value deciding whether the descendants of this param should be
-// recursed into.
-type paramVisitorFunc func(param) (recurse bool)
-
-func (f paramVisitorFunc) Visit(p param) paramVisitor {
-	if f(p) {
-		return f
-	}
-	return nil
-}
-
-// walkParam walks the param tree for the given param with the provided
-// visitor.
-//
-// paramVisitor.Visit will be called on the provided param and if a non-nil
-// paramVisitor is received, this param's descendants will be walked with that
-// visitor.
-//
-// This is very similar to how go/ast.Walk works.
-func walkParam(p param, v paramVisitor) {
-	v = v.Visit(p)
-	if v == nil {
-		return
-	}
-
-	switch par := p.(type) {
-	case paramSingle, paramGroupedSlice:
-		// No sub-results
-	case paramObject:
-		for _, f := range par.Fields {
-			walkParam(f.Param, v)
-		}
-	case paramList:
-		for _, p := range par.Params {
-			walkParam(p, v)
-		}
-	default:
-		panic(fmt.Sprintf(
-			"It looks like you have found a bug in dig. "+
-				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
-				"and provide the following message: "+
-				"received unknown param type %T", p))
+		return newParamSingle(t), nil
 	}
 }
 
@@ -143,7 +87,8 @@ func walkParam(p param, v paramVisitor) {
 type paramList struct {
 	ctype reflect.Type // type of the constructor
 
-	Params []param
+	Params   []param
+	consumes []internal.Dependency
 }
 
 // newParamList builds a paramList from the provided constructor type.
@@ -169,6 +114,7 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 			return pl, errWrapf(err, "bad argument %d", i+1)
 		}
 		pl.Params = append(pl.Params, p)
+		pl.consumes = append(pl.consumes, p.Consumes()...)
 	}
 
 	return pl, nil
@@ -195,6 +141,8 @@ func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	return args, nil
 }
 
+func (pl paramList) Consumes() []internal.Dependency { return pl.consumes }
+
 // paramSingle is an explicitly requested type, optionally with a name.
 //
 // This object must be present in the graph as-is unless it's specified as
@@ -203,6 +151,10 @@ type paramSingle struct {
 	Name     string
 	Optional bool
 	Type     reflect.Type
+}
+
+func newParamSingle(t reflect.Type) paramSingle {
+	return paramSingle{Type: t}
 }
 
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
@@ -240,12 +192,22 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	return v, nil
 }
 
+func (ps paramSingle) Consumes() []internal.Dependency {
+	return []internal.Dependency{
+		{
+			Key:      internal.ValueKey{Name: ps.Name, Type: ps.Type},
+			Optional: ps.Optional,
+		},
+	}
+}
+
 // paramObject is a dig.In struct where each field is another param.
 //
 // This object is not expected in the graph as-is.
 type paramObject struct {
-	Type   reflect.Type
-	Fields []paramObjectField
+	Type     reflect.Type
+	Fields   []paramObjectField
+	consumes []internal.Dependency
 }
 
 // newParamObject builds an paramObject from the provided type. The type MUST
@@ -266,6 +228,7 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 		}
 
 		po.Fields = append(po.Fields, pof)
+		po.consumes = append(po.consumes, pof.Param.Consumes()...)
 	}
 
 	return po, nil
@@ -282,6 +245,8 @@ func (po paramObject) Build(c containerStore) (reflect.Value, error) {
 	}
 	return dest, nil
 }
+
+func (po paramObject) Consumes() []internal.Dependency { return po.consumes }
 
 // paramObjectField is a single field of a dig.In struct.
 type paramObjectField struct {
@@ -403,4 +368,14 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 		result.Index(i).Set(v)
 	}
 	return result, nil
+}
+
+func (pt paramGroupedSlice) Consumes() []internal.Dependency {
+	return []internal.Dependency{
+		{
+			Key: internal.GroupKey{Name: pt.Group, Type: pt.Type.Elem()},
+			// Value group dependencies are always optional.
+			Optional: true,
+		},
+	}
 }

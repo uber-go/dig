@@ -455,19 +455,12 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 // the container. Returns an error if not.
 func shallowCheckDependencies(c containerStore, p param) error {
 	var missing errMissingManyTypes
-	walkParam(p, paramVisitorFunc(func(p param) bool {
-		ps, ok := p.(paramSingle)
-		if !ok {
-			return true
-		}
-
-		k := internal.ValueKey{Name: ps.Name, Type: ps.Type}
-		if ns := c.getProviders(k); len(ns) == 0 && !ps.Optional {
+	for _, d := range p.Consumes() {
+		k := d.Key
+		if ns := c.getProviders(k); len(ns) == 0 && !d.Optional {
 			missing = append(missing, newErrMissingType(c, k))
 		}
-
-		return true
-	}))
+	}
 
 	if len(missing) > 0 {
 		return missing
