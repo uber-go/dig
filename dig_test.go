@@ -535,35 +535,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
-	t.Run("named instances with tags and the Name option coexist", func(t *testing.T) {
-		c := New()
-		type A struct{ idx int }
-
-		type out struct {
-			Out
-
-			A `name:"first"`
-		}
-
-		require.NoError(t, c.Provide(func() out {
-			return out{A: A{1}}
-		}))
-		require.NoError(t, c.Provide(func() A {
-			return A{2}
-		}, Name("second")))
-
-		type in struct {
-			In
-
-			A1 A `name:"first"`
-			A2 A `name:"second"`
-		}
-		require.NoError(t, c.Invoke(func(i in) {
-			assert.Equal(t, 1, i.A1.idx)
-			assert.Equal(t, 2, i.A2.idx)
-		}))
-	})
-
 	t.Run("named instances recurse", func(t *testing.T) {
 		c := New()
 		type A struct{ idx int }
@@ -596,49 +567,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
 		}), "invoke should succeed, pulling out two named instances")
-	})
-
-	t.Run("name tags on result structs recurse", func(t *testing.T) {
-		c := New()
-		type A string
-
-		type Ret1 struct {
-			Out
-
-			A1 A `name:"foo"`
-			A2 A
-		}
-
-		type Ret2 struct {
-			Out
-
-			A1   A
-			Ret1 Ret1 `name:"bar"`
-		}
-
-		require.NoError(t, c.Provide(func() Ret2 {
-			return Ret2{
-				A1: "baz", // Name("baz") on Provide()
-				Ret1: Ret1{
-					A1: "foo", // name:"foo" on Ret1.A1
-					A2: "bar", // name:"bar" on Ret2.Ret1
-				},
-			}
-		}, Name("baz")))
-
-		type param struct {
-			In
-
-			Foo A `name:"foo"`
-			Bar A `name:"bar"`
-			Baz A `name:"baz"`
-		}
-
-		require.NoError(t, c.Invoke(func(p param) {
-			assert.Equal(t, "foo", string(p.Foo))
-			assert.Equal(t, "bar", string(p.Bar))
-			assert.Equal(t, "baz", string(p.Baz))
-		}))
 	})
 
 	t.Run("named instances do not cause cycles", func(t *testing.T) {
@@ -1225,6 +1153,55 @@ func TestProvideConstructorErrors(t *testing.T) {
 					tt.msg)
 			})
 		}
+	})
+
+	t.Run("name option cannot be provided for result structs", func(t *testing.T) {
+		c := New()
+		type A struct{ idx int }
+
+		type out struct {
+			Out
+
+			A A
+		}
+
+		err := c.Provide(func() out {
+			panic("this function must never be called")
+		}, Name("second"))
+		require.Error(t, err)
+
+		assertErrorMatches(t, err,
+			`function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
+			`bad result 1:`,
+			"cannot specify a name for result objects: dig.out embeds dig.Out",
+		)
+	})
+
+	t.Run("name tags on result structs are not allowed", func(t *testing.T) {
+		c := New()
+
+		type Result1 struct {
+			Out
+
+			A string `name:"foo"`
+		}
+
+		type Result2 struct {
+			Out
+
+			Result1 Result1 `name:"bar"`
+		}
+
+		err := c.Provide(func() Result2 {
+			panic("this function should never be called")
+		})
+		require.Error(t, err)
+
+		assertErrorMatches(t, err,
+			`function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
+			`bad field "Result1" of dig.Result2:`,
+			"cannot specify a name for result objects: dig.Result1 embeds dig.Out",
+		)
 	})
 }
 

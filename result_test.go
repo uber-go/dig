@@ -168,44 +168,6 @@ func TestNewResultObject(t *testing.T) {
 			},
 		},
 		{
-			desc: "name option",
-			give: struct {
-				Out
-
-				Reader io.Reader
-			}{},
-			opts: resultOptions{Name: "foo"},
-			wantFields: []resultObjectField{
-				{
-					FieldName:  "Reader",
-					FieldIndex: 1,
-					Result:     resultSingle{Type: typeOfReader, Name: "foo"},
-				},
-			},
-		},
-		{
-			desc: "name option with name tag",
-			give: struct {
-				Out
-
-				A io.Writer `name:"stream-a"`
-				B io.Writer
-			}{},
-			opts: resultOptions{Name: "stream"},
-			wantFields: []resultObjectField{
-				{
-					FieldName:  "A",
-					FieldIndex: 1,
-					Result:     resultSingle{Name: "stream-a", Type: typeOfWriter},
-				},
-				{
-					FieldName:  "B",
-					FieldIndex: 2,
-					Result:     resultSingle{Name: "stream", Type: typeOfWriter},
-				},
-			},
-		},
-		{
 			desc: "group tag",
 			give: struct {
 				Out
@@ -216,28 +178,6 @@ func TestNewResultObject(t *testing.T) {
 				{
 					FieldName:  "Writer",
 					FieldIndex: 1,
-					Result:     resultGrouped{Group: "writers", Type: typeOfWriter},
-				},
-			},
-		},
-		{
-			desc: "group tag with name option",
-			give: struct {
-				Out
-
-				Reader io.Reader
-				Writer io.Writer `group:"writers"`
-			}{},
-			opts: resultOptions{Name: "foo"},
-			wantFields: []resultObjectField{
-				{
-					FieldName:  "Reader",
-					FieldIndex: 1,
-					Result:     resultSingle{Name: "foo", Type: typeOfReader},
-				},
-				{
-					FieldName:  "Writer",
-					FieldIndex: 2,
 					Result:     resultGrouped{Group: "writers", Type: typeOfWriter},
 				},
 			},
@@ -258,6 +198,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 	tests := []struct {
 		desc string
 		give interface{}
+		opts resultOptions
 		err  string
 	}{
 		{
@@ -306,11 +247,43 @@ func TestNewResultObjectErrors(t *testing.T) {
 			}{},
 			err: "value groups cannot be optional",
 		},
+		{
+			desc: "name option",
+			give: struct {
+				Out
+
+				Reader io.Reader
+			}{},
+			opts: resultOptions{Name: "foo"},
+			err:  `cannot specify a name for result objects`,
+		},
+		{
+			desc: "name option with name tag",
+			give: struct {
+				Out
+
+				A io.Writer `name:"stream-a"`
+				B io.Writer
+			}{},
+			opts: resultOptions{Name: "stream"},
+			err:  `cannot specify a name for result objects`,
+		},
+		{
+			desc: "group tag with name option",
+			give: struct {
+				Out
+
+				Reader io.Reader
+				Writer io.Writer `group:"writers"`
+			}{},
+			opts: resultOptions{Name: "foo"},
+			err:  `cannot specify a name for result objects`,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			_, err := newResultObject(reflect.TypeOf(tt.give), resultOptions{})
+			_, err := newResultObject(reflect.TypeOf(tt.give), tt.opts)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.err)
 		})

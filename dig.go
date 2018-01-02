@@ -85,26 +85,19 @@ func (f provideOptionFunc) applyProvideOption(opts *provideOptions) { f(opts) }
 // constructor should have the given name. See also the package documentation
 // about Named Values.
 //
-// The name also applies to the fields of a dig.Out struct returned by the
-// constructor if those fields did not have their own name:"..." tag.
-//
 // Given,
 //
-//   type ConnectionResult struct {
-//     dig.Out
-//
-//     Conn    *sql.DB
-//     ROConn  *sql.DB `name:"ro"`
-//   }
-//
-//   func NewConnection(...) (ConnectionResult, error)
+//   func NewReadOnlyConnection(...) (*Connection, error)
+//   func NewReadWriteConnection(...) (*Connection, error)
 //
 // The following will provide two connections to the container: one under the
 // name "ro" and the other under the name "rw".
 //
-//   c.Provide(NewConnection, dig.Name("rw"))
+//   c.Provide(NewReadOnlyConnection, dig.Name("ro"))
+//   c.Provide(NewReadWriteConnection, dig.Name("rw"))
 //
-// This option has no effect on Value Groups.
+// This option cannot be provided for constructors which produce result
+// objects.
 func Name(name string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Name = name

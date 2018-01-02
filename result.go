@@ -235,6 +235,10 @@ type resultObject struct {
 
 func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 	ro := resultObject{Type: t}
+	if len(opts.Name) > 0 {
+		return ro, fmt.Errorf(
+			"cannot specify a name for result objects: %v embeds dig.Out", t)
+	}
 
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)

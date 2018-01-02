@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   information.
 
 ### Changed
-- `name:"..."` tags on nested Result Objects are no longer ignored.
+- `name:"..."` tags on nested Result Objects will now cause errors instead of
+  being ignored.
 
 ## [1.3.0] - 2017-12-04
 ### Changed
