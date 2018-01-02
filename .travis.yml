@@ -15,5 +15,5 @@ cache:
 install:
   - make dependencies
 script:
-  - test "$LINT" -eq 1 && make lint || echo "Skipping lint"
+  - test -z "$LINT" && echo "Skipping lint" || make lint
   - make ci

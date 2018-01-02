@@ -12,7 +12,9 @@ dependencies:
 	glide --version || go get -u -f github.com/Masterminds/glide
 	glide install
 	@echo "Installing uber-license tool..."
-	update-license || go get -u -f go.uber.org/tools/update-license
+	update-license -h || go get -u -f go.uber.org/tools/update-license
+	@echo "Installing golint..."
+	golint -h || go get -u -f github.com/golang/lint/golint
 
 .PHONY: lint
 lint:
