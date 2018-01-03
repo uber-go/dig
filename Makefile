@@ -16,6 +16,10 @@ dependencies:
 	@echo "Installing golint..."
 	command -v golint >/dev/null || go get -u -f github.com/golang/lint/golint
 
+.PHONY: license
+license: dependencies
+	./check_license.sh | tee -a lint.log
+
 .PHONY: lint
 lint:
 	@rm -rf lint.log
