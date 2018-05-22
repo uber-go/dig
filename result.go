@@ -234,7 +234,10 @@ type resultSingle struct {
 }
 
 func (rs resultSingle) GraphNode() []graphNode {
-	return []graphNode{{Type: rs.Type.String()}}
+	return []graphNode{{
+		Type: rs.Type.String(),
+		name: rs.Name,
+	}}
 }
 
 func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
@@ -357,7 +360,10 @@ type resultGrouped struct {
 }
 
 func (rg resultGrouped) GraphNode() []graphNode {
-	return []graphNode{graphNode{Type: rg.Type.String()}}
+	return []graphNode{graphNode{
+		Type:  rg.Type.String(),
+		group: rg.Group,
+	}}
 }
 
 // newResultGrouped(f) builds a new resultGrouped from the provided field.

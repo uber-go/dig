@@ -2593,28 +2593,73 @@ func TestDotGraph(t *testing.T) {
 		type in struct {
 			In
 
-			D []T1 `group:"Group1"`
+			D []T1 `group:"foo"`
 		}
 
 		type out struct {
 			Out
 
-			A T1 `group:"Group1"`
-			B T1 `group:"Group1"`
-			C T1 `group:"Group1"`
+			A T1 `group:"foo"`
+			B T1 `group:"foo"`
+			C T1 `group:"foo"`
 		}
 
 		expected := []graphEdge{
-			{param: e2, result: e1},
-			{param: e2, result: e1},
-			{param: e2, result: e1},
-			{param: graphNode{Type: "[]dig.T1"}, result: e3},
+			{param: e2, result: graphNode{Type: "dig.T1", group: "foo"}},
+			{param: e2, result: graphNode{Type: "dig.T1", group: "foo"}},
+			{param: e2, result: graphNode{Type: "dig.T1", group: "foo"}},
+			{param: graphNode{Type: "[]dig.T1", group: "foo"}, result: e3},
 		}
 
 		c := New()
 
 		c.Provide(func(t2 T2) out { return out{Out{}, T1{}, T1{}, T1{}} })
 		c.Provide(func(i in) T3 { return T3{} })
+		assert.Equal(t, expected, c.dotgraph)
+	})
+
+	t.Run("named values", func(t *testing.T) {
+		type in struct {
+			In
+
+			A T1 `name:"A"`
+		}
+
+		type out struct {
+			Out
+
+			B T2 `name:"B"`
+		}
+
+		expected := []graphEdge{{
+			param:  graphNode{Type: "dig.T1", name: "A"},
+			result: graphNode{Type: "dig.T2", name: "B"},
+		}}
+
+		c := New()
+
+		c.Provide(func(i in) out { return out{B: T2{}} })
+		assert.Equal(t, expected, c.dotgraph)
+	})
+
+	t.Run("optional dependencies", func(t *testing.T) {
+		type in struct {
+			In
+
+			A T1 `name:"A" optional:"true"`
+			B T2 `name:"B"`
+			C T3 `optional:"true"`
+		}
+
+		expected := []graphEdge{
+			{param: graphNode{Type: "dig.T1", name: "A", optional: true}, result: e4},
+			{param: graphNode{Type: "dig.T2", name: "B"}, result: e4},
+			{param: graphNode{Type: "dig.T3", optional: true}, result: e4},
+		}
+
+		c := New()
+
+		c.Provide(func(i in) T4 { return T4{} })
 		assert.Equal(t, expected, c.dotgraph)
 	})
 }

@@ -113,8 +113,10 @@ type InvokeOption interface {
 
 // A graphNode represents a node in the dependency DOT graph
 type graphNode struct {
-	Type string
-	// TODO(leyao): Add Groups, Names, and Optionals
+	Type     string
+	name     string
+	optional bool
+	group    string
 }
 
 // A graphEdge represents an edge in the dependency DOT graph
@@ -399,17 +401,6 @@ func (c *Container) addToGraph(ge []graphEdge) {
 	c.dotgraph = append(c.dotgraph, ge...)
 }
 
-// toGraphEdges returns graph edges in node n
-func (n *node) toGraphEdges() []graphEdge {
-	edges := []graphEdge{}
-	for _, pnode := range n.paramList.GraphNode() {
-		for _, rnode := range n.resultList.GraphNode() {
-			edges = append(edges, graphEdge{param: pnode, result: rnode})
-		}
-	}
-	return edges
-}
-
 // Builds a collection of all result types produced by this node.
 func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 	var err error
@@ -598,6 +589,17 @@ func (n *node) Call(c containerStore) error {
 	receiver.Commit(c)
 	n.called = true
 	return nil
+}
+
+// toGraphEdges returns graph edges in node n
+func (n *node) toGraphEdges() []graphEdge {
+	edges := []graphEdge{}
+	for _, pnode := range n.paramList.GraphNode() {
+		for _, rnode := range n.resultList.GraphNode() {
+			edges = append(edges, graphEdge{param: pnode, result: rnode})
+		}
+	}
+	return edges
 }
 
 // Checks if a field of an In struct is optional.

@@ -215,7 +215,11 @@ type paramSingle struct {
 }
 
 func (ps paramSingle) GraphNode() []graphNode {
-	return []graphNode{graphNode{Type: ps.Type.String()}}
+	return []graphNode{graphNode{
+		Type:     ps.Type.String(),
+		name:     ps.Name,
+		optional: ps.Optional,
+	}}
 }
 
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
@@ -385,7 +389,10 @@ type paramGroupedSlice struct {
 }
 
 func (pgs paramGroupedSlice) GraphNode() []graphNode {
-	return []graphNode{graphNode{Type: pgs.Type.String()}}
+	return []graphNode{graphNode{
+		Type:  pgs.Type.String(),
+		group: pgs.Group,
+	}}
 }
 
 // newParamGroupedSlice builds a paramGroupedSlice from the provided type with
