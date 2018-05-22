@@ -41,6 +41,9 @@ type result interface {
 	//
 	// This MAY panic if the result does not consume a single value.
 	Extract(containerWriter, reflect.Value)
+
+	// DotNodes returns a slice of result(s) represented in dotNodes for the DOT-format graph.
+	DotNodes() []*dotNode
 }
 
 var (
@@ -163,6 +166,14 @@ type resultList struct {
 	resultIndexes []int
 }
 
+func (rl resultList) DotNodes() []*dotNode {
+	var types []*dotNode
+	for _, result := range rl.Results {
+		types = append(types, result.DotNodes()...)
+	}
+	return types
+}
+
 func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 	rl := resultList{
 		ctype:         ctype,
@@ -222,6 +233,13 @@ type resultSingle struct {
 	Type reflect.Type
 }
 
+func (rs resultSingle) DotNodes() []*dotNode {
+	return []*dotNode{{
+		Type: rs.Type.String(),
+		name: rs.Name,
+	}}
+}
+
 func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
 	cw.setValue(rs.Name, rs.Type, v)
 }
@@ -233,6 +251,14 @@ func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
 type resultObject struct {
 	Type   reflect.Type
 	Fields []resultObjectField
+}
+
+func (ro resultObject) DotNodes() []*dotNode {
+	var types []*dotNode
+	for _, field := range ro.Fields {
+		types = append(types, field.DotNodes()...)
+	}
+	return types
 }
 
 func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
@@ -278,6 +304,10 @@ type resultObjectField struct {
 
 	// Result produced by this field.
 	Result result
+}
+
+func (rof resultObjectField) DotNodes() []*dotNode {
+	return rof.Result.DotNodes()
 }
 
 // newResultObjectField(i, f, opts) builds a resultObjectField from the field
@@ -327,6 +357,13 @@ type resultGrouped struct {
 
 	// Type of value produced.
 	Type reflect.Type
+}
+
+func (rt resultGrouped) DotNodes() []*dotNode {
+	return []*dotNode{{
+		Type:  rt.Type.String(),
+		group: rt.Group,
+	}}
 }
 
 // newResultGrouped(f) builds a new resultGrouped from the provided field.

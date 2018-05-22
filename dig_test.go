@@ -2509,3 +2509,215 @@ func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {
 		require.FailNow(t, "second invoke must not call the function")
 	}), "second invoke must fail")
 }
+
+func TestDotGraph(t *testing.T) {
+	type T1 struct{}
+	type T2 struct{}
+	type T3 struct{}
+	type T4 struct{}
+
+	e1, e2, e3, e4 := &dotNode{Type: "dig.T1"}, &dotNode{Type: "dig.T2"}, &dotNode{Type: "dig.T3"}, &dotNode{Type: "dig.T4"}
+
+	t.Parallel()
+
+	t.Run("single edge", func(t *testing.T) {
+		expected := []*dotEdge{
+			{param: e1, result: e2},
+		}
+
+		c := New()
+
+		c.Provide(func(t1 T1) T2 { return T2{} })
+		assert.Equal(t, expected, c.dg.edges)
+	})
+
+	t.Run("more edges", func(t *testing.T) {
+		expected := []*dotEdge{
+			{param: e1, result: e2},
+			{param: e1, result: e3},
+			{param: e2, result: e4},
+		}
+
+		c := New()
+
+		c.Provide(func(t1 T1) T2 { return T2{} })
+		c.Provide(func(t1 T1) T3 { return T3{} })
+		c.Provide(func(t1 T2) T4 { return T4{} })
+		assert.Equal(t, expected, c.dg.edges)
+	})
+
+	t.Run("multiple params and results", func(t *testing.T) {
+		expected := []*dotEdge{
+			{param: e1, result: e3},
+			{param: e1, result: e4},
+			{param: e2, result: e3},
+			{param: e2, result: e4},
+		}
+
+		c := New()
+
+		c.Provide(func(t1 T1, t2 T2) (T3, T4) { return T3{}, T4{} })
+		assert.Equal(t, expected, c.dg.edges)
+	})
+
+	t.Run("param objects and result objects", func(t *testing.T) {
+		type in struct {
+			In
+
+			A T1
+			B T2
+		}
+
+		type out struct {
+			Out
+
+			C T3
+			D T4
+		}
+
+		expected := []*dotEdge{
+			{param: e1, result: e3},
+			{param: e1, result: e4},
+			{param: e2, result: e3},
+			{param: e2, result: e4},
+		}
+
+		c := New()
+
+		c.Provide(func(i in) out { return out{Out{}, T3{}, T4{}} })
+		assert.Equal(t, expected, c.dg.edges)
+	})
+
+	t.Run("nested param object", func(t *testing.T) {
+		type in struct {
+			In
+			A    T1
+			Nest struct {
+				In
+				B    T2
+				Nest struct {
+					In
+					C T3
+				}
+			}
+		}
+
+		expected := []*dotEdge{
+			{param: e1, result: e4},
+			{param: e2, result: e4},
+			{param: e3, result: e4},
+		}
+
+		c := New()
+
+		c.Provide(func(p in) T4 { return T4{} })
+		assert.Equal(t, expected, c.dg.edges)
+	})
+
+	t.Run("nested result object", func(t *testing.T) {
+		type nested1 struct {
+			Out
+			D T4
+		}
+
+		type nested2 struct {
+			Out
+			C    T3
+			Nest nested1
+		}
+
+		type out struct {
+			Out
+			B    T2
+			Nest nested2
+		}
+
+		expected := []*dotEdge{
+			{param: e1, result: e2},
+			{param: e1, result: e3},
+			{param: e1, result: e4},
+		}
+
+		c := New()
+
+		c.Provide(func(t1 T1) out {
+			return out{Out{}, T2{}, nested2{Out{}, T3{}, nested1{Out{}, T4{}}}}
+		})
+		assert.Equal(t, expected, c.dg.edges)
+	})
+
+	t.Run("value groups", func(t *testing.T) {
+		type in struct {
+			In
+
+			D []T1 `group:"foo"`
+		}
+
+		type out struct {
+			Out
+
+			A T1 `group:"foo"`
+			B T1 `group:"foo"`
+			C T1 `group:"foo"`
+		}
+
+		expected := []*dotEdge{
+			{param: e2, result: &dotNode{Type: "dig.T1", group: "foo"}},
+			{param: e2, result: &dotNode{Type: "dig.T1", group: "foo"}},
+			{param: e2, result: &dotNode{Type: "dig.T1", group: "foo"}},
+			{param: &dotNode{Type: "[]dig.T1", group: "foo"}, result: e3},
+		}
+
+		c := New()
+
+		c.Provide(func(t2 T2) out { return out{Out{}, T1{}, T1{}, T1{}} })
+		c.Provide(func(i in) T3 { return T3{} })
+		assert.Equal(t, expected, c.dg.edges)
+	})
+
+	t.Run("named values", func(t *testing.T) {
+		type in struct {
+			In
+
+			A T1 `name:"A"`
+		}
+
+		type out struct {
+			Out
+
+			B T2 `name:"B"`
+		}
+
+		expected := []*dotEdge{{
+			param:  &dotNode{Type: "dig.T1", name: "A"},
+			result: &dotNode{Type: "dig.T2", name: "B"},
+		}}
+
+		c := New()
+
+		c.Provide(func(i in) out { return out{B: T2{}} })
+		assert.Equal(t, expected, c.dg.edges)
+	})
+
+	t.Run("optional dependencies", func(t *testing.T) {
+		type in struct {
+			In
+
+			A T1 `name:"A" optional:"true"`
+			B T2 `name:"B"`
+			C T3 `optional:"true"`
+		}
+
+		expected := []*dotEdge{
+			{param: &dotNode{Type: "dig.T1", name: "A", optional: true}, result: e4},
+			{param: &dotNode{Type: "dig.T2", name: "B"}, result: e4},
+			{param: &dotNode{Type: "dig.T3", optional: true}, result: e4},
+		}
+
+		c := New()
+
+		c.Provide(func(i in) T4 { return T4{} })
+
+		assert.Equal(t, expected, c.dg.edges)
+	})
+}
