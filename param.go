@@ -45,6 +45,9 @@ type param interface {
 	//
 	// This MAY panic if the param does not produce a single value.
 	Build(containerStore) (reflect.Value, error)
+
+	// GraphNode returns a slice of param(s) represented in graphNodes for the dotgraph
+	GraphNode() []graphNode
 }
 
 var (
@@ -144,6 +147,14 @@ type paramList struct {
 	Params []param
 }
 
+func (pl paramList) GraphNode() []graphNode {
+	types := []graphNode{}
+	for _, param := range pl.Params {
+		types = append(types, param.GraphNode()...)
+	}
+	return types
+}
+
 // newParamList builds a paramList from the provided constructor type.
 //
 // Variadic arguments of a constructor are ignored and not included as
@@ -203,6 +214,10 @@ type paramSingle struct {
 	Type     reflect.Type
 }
 
+func (ps paramSingle) GraphNode() []graphNode {
+	return []graphNode{graphNode{Type: ps.Type.String()}}
+}
+
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	if v, ok := c.getValue(ps.Name, ps.Type); ok {
 		return v, nil
@@ -243,6 +258,14 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 type paramObject struct {
 	Type   reflect.Type
 	Fields []paramObjectField
+}
+
+func (po paramObject) GraphNode() []graphNode {
+	types := []graphNode{}
+	for _, field := range po.Fields {
+		types = append(types, field.GraphNode()...)
+	}
+	return types
 }
 
 // newParamObject builds an paramObject from the provided type. The type MUST
@@ -293,6 +316,10 @@ type paramObjectField struct {
 
 	// The dependency requested by this field.
 	Param param
+}
+
+func (pof paramObjectField) GraphNode() []graphNode {
+	return pof.Param.GraphNode()
 }
 
 func newParamObjectField(idx int, f reflect.StructField) (paramObjectField, error) {
@@ -355,6 +382,10 @@ type paramGroupedSlice struct {
 
 	// Type of the slice.
 	Type reflect.Type
+}
+
+func (pgs paramGroupedSlice) GraphNode() []graphNode {
+	return []graphNode{graphNode{Type: pgs.Type.String()}}
 }
 
 // newParamGroupedSlice builds a paramGroupedSlice from the provided type with

@@ -111,6 +111,18 @@ type InvokeOption interface {
 	unimplemented()
 }
 
+// A graphNode represents a node in the dependency DOT graph
+type graphNode struct {
+	Type string
+	// TODO(leyao): Add Groups, Names, and Optionals
+}
+
+// A graphEdge represents an edge in the dependency DOT graph
+type graphEdge struct {
+	param  graphNode
+	result graphNode
+}
+
 // Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
 	// Mapping from key to all the nodes that can provide a value for that
@@ -125,6 +137,9 @@ type Container struct {
 
 	// Source of randomness.
 	rand *rand.Rand
+
+	// Dot graph of dependencies
+	dotgraph []graphEdge
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -192,6 +207,7 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		dotgraph:  make([]graphEdge, 0),
 	}
 
 	for _, opt := range opts {
@@ -372,8 +388,26 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			return err
 		}
 	}
+	ge := n.toGraphEdges()
+	c.addToGraph(ge)
 
 	return nil
+}
+
+// addToGraph adds the provided graph edges to the dependency graph
+func (c *Container) addToGraph(ge []graphEdge) {
+	c.dotgraph = append(c.dotgraph, ge...)
+}
+
+// toGraphEdges returns graph edges in node n
+func (n *node) toGraphEdges() []graphEdge {
+	edges := []graphEdge{}
+	for _, pnode := range n.paramList.GraphNode() {
+		for _, rnode := range n.resultList.GraphNode() {
+			edges = append(edges, graphEdge{param: pnode, result: rnode})
+		}
+	}
+	return edges
 }
 
 // Builds a collection of all result types produced by this node.
