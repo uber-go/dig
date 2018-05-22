@@ -2,6 +2,8 @@
 
 A reflection based dependency injection toolkit for Go.
 
+This is a feature branch!
+
 ### Good for:
 
 * Powering an application framework, e.g. [Fx](https://github.com/uber-go/fx).
