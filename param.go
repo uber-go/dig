@@ -215,7 +215,7 @@ type paramSingle struct {
 }
 
 func (ps paramSingle) GraphNode() []graphNode {
-	return []graphNode{graphNode{
+	return []graphNode{{
 		Type:     ps.Type.String(),
 		name:     ps.Name,
 		optional: ps.Optional,
@@ -388,10 +388,10 @@ type paramGroupedSlice struct {
 	Type reflect.Type
 }
 
-func (pgs paramGroupedSlice) GraphNode() []graphNode {
-	return []graphNode{graphNode{
-		Type:  pgs.Type.String(),
-		group: pgs.Group,
+func (pt paramGroupedSlice) GraphNode() []graphNode {
+	return []graphNode{{
+		Type:  pt.Type.String(),
+		group: pt.Group,
 	}}
 }
 

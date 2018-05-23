@@ -359,10 +359,10 @@ type resultGrouped struct {
 	Type reflect.Type
 }
 
-func (rg resultGrouped) GraphNode() []graphNode {
-	return []graphNode{graphNode{
-		Type:  rg.Type.String(),
-		group: rg.Group,
+func (rt resultGrouped) GraphNode() []graphNode {
+	return []graphNode{{
+		Type:  rt.Type.String(),
+		group: rt.Group,
 	}}
 }
 
