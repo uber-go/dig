@@ -111,18 +111,23 @@ type InvokeOption interface {
 	unimplemented()
 }
 
-// A graphNode represents a node in the dependency DOT graph
-type graphNode struct {
+// A dotNode represents a node in a Container's DOT-format graph.
+type dotNode struct {
 	Type     string
 	name     string
 	optional bool
 	group    string
 }
 
-// A graphEdge represents an edge in the dependency DOT graph
-type graphEdge struct {
-	param  graphNode
-	result graphNode
+// A dotEdge represents an edge in a Container's DOT-format graph.
+type dotEdge struct {
+	param  dotNode
+	result dotNode
+}
+
+// A dotGraph represents the DOT-format graph in a Container.
+type dotGraph struct {
+	edges []dotEdge
 }
 
 // Container is a directed acyclic graph of types and their dependencies.
@@ -140,8 +145,8 @@ type Container struct {
 	// Source of randomness.
 	rand *rand.Rand
 
-	// Dot graph of dependencies
-	dotgraph []graphEdge
+	// DOT-format graph of dependencies.
+	dg *dotGraph
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -209,7 +214,7 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		dotgraph:  make([]graphEdge, 0),
+		dg:        new(dotGraph),
 	}
 
 	for _, opt := range opts {
@@ -390,15 +395,26 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			return err
 		}
 	}
-	ge := n.toGraphEdges()
-	c.addToGraph(ge)
+	c.addNode(n)
 
 	return nil
 }
 
-// addToGraph adds the provided graph edges to the dependency graph
-func (c *Container) addToGraph(ge []graphEdge) {
-	c.dotgraph = append(c.dotgraph, ge...)
+// addNode adds the dotEdges in node n into the DOT-format graph in Container c.
+func (c *Container) addNode(n *node) {
+	pnodes := n.paramList.DotNodes()
+	rnodes := n.resultList.DotNodes()
+	edges := make([]dotEdge, len(pnodes)*len(rnodes))
+	i := 0
+
+	for _, pnode := range pnodes {
+		for _, rnode := range rnodes {
+			edges[i] = dotEdge{param: pnode, result: rnode}
+			i++
+		}
+	}
+
+	c.dg.edges = append(c.dg.edges, edges...)
 }
 
 // Builds a collection of all result types produced by this node.
@@ -589,17 +605,6 @@ func (n *node) Call(c containerStore) error {
 	receiver.Commit(c)
 	n.called = true
 	return nil
-}
-
-// toGraphEdges returns graph edges in node n
-func (n *node) toGraphEdges() []graphEdge {
-	edges := []graphEdge{}
-	for _, pnode := range n.paramList.GraphNode() {
-		for _, rnode := range n.resultList.GraphNode() {
-			edges = append(edges, graphEdge{param: pnode, result: rnode})
-		}
-	}
-	return edges
 }
 
 // Checks if a field of an In struct is optional.

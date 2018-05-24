@@ -46,8 +46,8 @@ type param interface {
 	// This MAY panic if the param does not produce a single value.
 	Build(containerStore) (reflect.Value, error)
 
-	// GraphNode returns a slice of param(s) represented in graphNodes for the dotgraph
-	GraphNode() []graphNode
+	// DotNodes returns a slice of param(s) represented in dotNodes for the DOT-format graph.
+	DotNodes() []dotNode
 }
 
 var (
@@ -147,10 +147,10 @@ type paramList struct {
 	Params []param
 }
 
-func (pl paramList) GraphNode() []graphNode {
-	types := []graphNode{}
+func (pl paramList) DotNodes() []dotNode {
+	var types []dotNode
 	for _, param := range pl.Params {
-		types = append(types, param.GraphNode()...)
+		types = append(types, param.DotNodes()...)
 	}
 	return types
 }
@@ -214,8 +214,8 @@ type paramSingle struct {
 	Type     reflect.Type
 }
 
-func (ps paramSingle) GraphNode() []graphNode {
-	return []graphNode{{
+func (ps paramSingle) DotNodes() []dotNode {
+	return []dotNode{{
 		Type:     ps.Type.String(),
 		name:     ps.Name,
 		optional: ps.Optional,
@@ -264,10 +264,10 @@ type paramObject struct {
 	Fields []paramObjectField
 }
 
-func (po paramObject) GraphNode() []graphNode {
-	types := []graphNode{}
+func (po paramObject) DotNodes() []dotNode {
+	var types []dotNode
 	for _, field := range po.Fields {
-		types = append(types, field.GraphNode()...)
+		types = append(types, field.DotNodes()...)
 	}
 	return types
 }
@@ -322,8 +322,8 @@ type paramObjectField struct {
 	Param param
 }
 
-func (pof paramObjectField) GraphNode() []graphNode {
-	return pof.Param.GraphNode()
+func (pof paramObjectField) DotNodes() []dotNode {
+	return pof.Param.DotNodes()
 }
 
 func newParamObjectField(idx int, f reflect.StructField) (paramObjectField, error) {
@@ -388,8 +388,8 @@ type paramGroupedSlice struct {
 	Type reflect.Type
 }
 
-func (pt paramGroupedSlice) GraphNode() []graphNode {
-	return []graphNode{{
+func (pt paramGroupedSlice) DotNodes() []dotNode {
+	return []dotNode{{
 		Type:  pt.Type.String(),
 		group: pt.Group,
 	}}
