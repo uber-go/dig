@@ -111,6 +111,40 @@ type InvokeOption interface {
 	unimplemented()
 }
 
+// A dotNode represents a single node in a dotGraph.
+type dotNode struct {
+	Type     string
+	name     string
+	optional bool
+	group    string
+}
+
+// A dotEdge connects a dotNode parameter to a dotNode result.
+type dotEdge struct {
+	param  *dotNode
+	result *dotNode
+}
+
+// A dotGraph represents the DOT-format graph in a Container.
+type dotGraph struct {
+	edges []*dotEdge
+}
+
+// add adds the dotEdges in node n into dg.
+func (dg *dotGraph) add(n *node) {
+	pnodes := n.paramList.DotNodes()
+	rnodes := n.resultList.DotNodes()
+	edges := make([]*dotEdge, len(pnodes)*len(rnodes))
+
+	for i, pnode := range pnodes {
+		for j, rnode := range rnodes {
+			edges[i*len(rnodes)+j] = &dotEdge{param: pnode, result: rnode}
+		}
+	}
+
+	dg.edges = append(dg.edges, edges...)
+}
+
 // Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
 	// Mapping from key to all the nodes that can provide a value for that
@@ -125,6 +159,9 @@ type Container struct {
 
 	// Source of randomness.
 	rand *rand.Rand
+
+	// DOT-format graph of dependencies.
+	dg *dotGraph
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -192,6 +229,7 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		dg:        new(dotGraph),
 	}
 
 	for _, opt := range opts {
@@ -372,6 +410,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			return err
 		}
 	}
+	c.dg.add(n)
 
 	return nil
 }

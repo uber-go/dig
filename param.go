@@ -45,6 +45,9 @@ type param interface {
 	//
 	// This MAY panic if the param does not produce a single value.
 	Build(containerStore) (reflect.Value, error)
+
+	// DotNodes returns a slice of param(s) represented in dotNodes for the DOT-format graph.
+	DotNodes() []*dotNode
 }
 
 var (
@@ -144,6 +147,14 @@ type paramList struct {
 	Params []param
 }
 
+func (pl paramList) DotNodes() []*dotNode {
+	var types []*dotNode
+	for _, param := range pl.Params {
+		types = append(types, param.DotNodes()...)
+	}
+	return types
+}
+
 // newParamList builds a paramList from the provided constructor type.
 //
 // Variadic arguments of a constructor are ignored and not included as
@@ -203,6 +214,14 @@ type paramSingle struct {
 	Type     reflect.Type
 }
 
+func (ps paramSingle) DotNodes() []*dotNode {
+	return []*dotNode{{
+		Type:     ps.Type.String(),
+		name:     ps.Name,
+		optional: ps.Optional,
+	}}
+}
+
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	if v, ok := c.getValue(ps.Name, ps.Type); ok {
 		return v, nil
@@ -243,6 +262,14 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 type paramObject struct {
 	Type   reflect.Type
 	Fields []paramObjectField
+}
+
+func (po paramObject) DotNodes() []*dotNode {
+	var types []*dotNode
+	for _, field := range po.Fields {
+		types = append(types, field.DotNodes()...)
+	}
+	return types
 }
 
 // newParamObject builds an paramObject from the provided type. The type MUST
@@ -293,6 +320,10 @@ type paramObjectField struct {
 
 	// The dependency requested by this field.
 	Param param
+}
+
+func (pof paramObjectField) DotNodes() []*dotNode {
+	return pof.Param.DotNodes()
 }
 
 func newParamObjectField(idx int, f reflect.StructField) (paramObjectField, error) {
@@ -355,6 +386,13 @@ type paramGroupedSlice struct {
 
 	// Type of the slice.
 	Type reflect.Type
+}
+
+func (pt paramGroupedSlice) DotNodes() []*dotNode {
+	return []*dotNode{{
+		Type:  pt.Type.String(),
+		group: pt.Group,
+	}}
 }
 
 // newParamGroupedSlice builds a paramGroupedSlice from the provided type with
