@@ -111,7 +111,7 @@ type InvokeOption interface {
 	unimplemented()
 }
 
-// A dotNode represents a node in a Container's DOT-format graph.
+// A dotNode represents a single node in a dotGraph.
 type dotNode struct {
 	Type     string
 	name     string
@@ -119,15 +119,30 @@ type dotNode struct {
 	group    string
 }
 
-// A dotEdge represents an edge in a Container's DOT-format graph.
+// A dotEdge connects a dotNode parameter to a dotNode result.
 type dotEdge struct {
-	param  dotNode
-	result dotNode
+	param  *dotNode
+	result *dotNode
 }
 
 // A dotGraph represents the DOT-format graph in a Container.
 type dotGraph struct {
-	edges []dotEdge
+	edges []*dotEdge
+}
+
+// add adds the dotEdges in node n into dg.
+func (dg *dotGraph) add(n *node) {
+	pnodes := n.paramList.DotNodes()
+	rnodes := n.resultList.DotNodes()
+	edges := make([]*dotEdge, len(pnodes)*len(rnodes))
+
+	for i, pnode := range pnodes {
+		for j, rnode := range rnodes {
+			edges[i*len(rnodes)+j] = &dotEdge{param: pnode, result: rnode}
+		}
+	}
+
+	dg.edges = append(dg.edges, edges...)
 }
 
 // Container is a directed acyclic graph of types and their dependencies.
@@ -395,26 +410,9 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			return err
 		}
 	}
-	c.addNode(n)
+	c.dg.add(n)
 
 	return nil
-}
-
-// addNode adds the dotEdges in node n into the DOT-format graph in Container c.
-func (c *Container) addNode(n *node) {
-	pnodes := n.paramList.DotNodes()
-	rnodes := n.resultList.DotNodes()
-	edges := make([]dotEdge, len(pnodes)*len(rnodes))
-	i := 0
-
-	for _, pnode := range pnodes {
-		for _, rnode := range rnodes {
-			edges[i] = dotEdge{param: pnode, result: rnode}
-			i++
-		}
-	}
-
-	c.dg.edges = append(c.dg.edges, edges...)
 }
 
 // Builds a collection of all result types produced by this node.

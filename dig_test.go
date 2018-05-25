@@ -2459,12 +2459,12 @@ func TestDotGraph(t *testing.T) {
 	type T3 struct{}
 	type T4 struct{}
 
-	e1, e2, e3, e4 := dotNode{Type: "dig.T1"}, dotNode{Type: "dig.T2"}, dotNode{Type: "dig.T3"}, dotNode{Type: "dig.T4"}
+	e1, e2, e3, e4 := &dotNode{Type: "dig.T1"}, &dotNode{Type: "dig.T2"}, &dotNode{Type: "dig.T3"}, &dotNode{Type: "dig.T4"}
 
 	t.Parallel()
 
 	t.Run("single edge", func(t *testing.T) {
-		expected := []dotEdge{
+		expected := []*dotEdge{
 			{param: e1, result: e2},
 		}
 
@@ -2475,7 +2475,7 @@ func TestDotGraph(t *testing.T) {
 	})
 
 	t.Run("more edges", func(t *testing.T) {
-		expected := []dotEdge{
+		expected := []*dotEdge{
 			{param: e1, result: e2},
 			{param: e1, result: e3},
 			{param: e2, result: e4},
@@ -2490,7 +2490,7 @@ func TestDotGraph(t *testing.T) {
 	})
 
 	t.Run("multiple params and results", func(t *testing.T) {
-		expected := []dotEdge{
+		expected := []*dotEdge{
 			{param: e1, result: e3},
 			{param: e1, result: e4},
 			{param: e2, result: e3},
@@ -2518,7 +2518,7 @@ func TestDotGraph(t *testing.T) {
 			D T4
 		}
 
-		expected := []dotEdge{
+		expected := []*dotEdge{
 			{param: e1, result: e3},
 			{param: e1, result: e4},
 			{param: e2, result: e3},
@@ -2545,7 +2545,7 @@ func TestDotGraph(t *testing.T) {
 			}
 		}
 
-		expected := []dotEdge{
+		expected := []*dotEdge{
 			{param: e1, result: e4},
 			{param: e2, result: e4},
 			{param: e3, result: e4},
@@ -2575,7 +2575,7 @@ func TestDotGraph(t *testing.T) {
 			Nest nested2
 		}
 
-		expected := []dotEdge{
+		expected := []*dotEdge{
 			{param: e1, result: e2},
 			{param: e1, result: e3},
 			{param: e1, result: e4},
@@ -2604,11 +2604,11 @@ func TestDotGraph(t *testing.T) {
 			C T1 `group:"foo"`
 		}
 
-		expected := []dotEdge{
-			{param: e2, result: dotNode{Type: "dig.T1", group: "foo"}},
-			{param: e2, result: dotNode{Type: "dig.T1", group: "foo"}},
-			{param: e2, result: dotNode{Type: "dig.T1", group: "foo"}},
-			{param: dotNode{Type: "[]dig.T1", group: "foo"}, result: e3},
+		expected := []*dotEdge{
+			{param: e2, result: &dotNode{Type: "dig.T1", group: "foo"}},
+			{param: e2, result: &dotNode{Type: "dig.T1", group: "foo"}},
+			{param: e2, result: &dotNode{Type: "dig.T1", group: "foo"}},
+			{param: &dotNode{Type: "[]dig.T1", group: "foo"}, result: e3},
 		}
 
 		c := New()
@@ -2631,9 +2631,9 @@ func TestDotGraph(t *testing.T) {
 			B T2 `name:"B"`
 		}
 
-		expected := []dotEdge{{
-			param:  dotNode{Type: "dig.T1", name: "A"},
-			result: dotNode{Type: "dig.T2", name: "B"},
+		expected := []*dotEdge{{
+			param:  &dotNode{Type: "dig.T1", name: "A"},
+			result: &dotNode{Type: "dig.T2", name: "B"},
 		}}
 
 		c := New()
@@ -2651,15 +2651,16 @@ func TestDotGraph(t *testing.T) {
 			C T3 `optional:"true"`
 		}
 
-		expected := []dotEdge{
-			{param: dotNode{Type: "dig.T1", name: "A", optional: true}, result: e4},
-			{param: dotNode{Type: "dig.T2", name: "B"}, result: e4},
-			{param: dotNode{Type: "dig.T3", optional: true}, result: e4},
+		expected := []*dotEdge{
+			{param: &dotNode{Type: "dig.T1", name: "A", optional: true}, result: e4},
+			{param: &dotNode{Type: "dig.T2", name: "B"}, result: e4},
+			{param: &dotNode{Type: "dig.T3", optional: true}, result: e4},
 		}
 
 		c := New()
 
 		c.Provide(func(i in) T4 { return T4{} })
+
 		assert.Equal(t, expected, c.dg.edges)
 	})
 }

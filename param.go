@@ -47,7 +47,7 @@ type param interface {
 	Build(containerStore) (reflect.Value, error)
 
 	// DotNodes returns a slice of param(s) represented in dotNodes for the DOT-format graph.
-	DotNodes() []dotNode
+	DotNodes() []*dotNode
 }
 
 var (
@@ -147,8 +147,8 @@ type paramList struct {
 	Params []param
 }
 
-func (pl paramList) DotNodes() []dotNode {
-	var types []dotNode
+func (pl paramList) DotNodes() []*dotNode {
+	var types []*dotNode
 	for _, param := range pl.Params {
 		types = append(types, param.DotNodes()...)
 	}
@@ -214,8 +214,8 @@ type paramSingle struct {
 	Type     reflect.Type
 }
 
-func (ps paramSingle) DotNodes() []dotNode {
-	return []dotNode{{
+func (ps paramSingle) DotNodes() []*dotNode {
+	return []*dotNode{{
 		Type:     ps.Type.String(),
 		name:     ps.Name,
 		optional: ps.Optional,
@@ -264,8 +264,8 @@ type paramObject struct {
 	Fields []paramObjectField
 }
 
-func (po paramObject) DotNodes() []dotNode {
-	var types []dotNode
+func (po paramObject) DotNodes() []*dotNode {
+	var types []*dotNode
 	for _, field := range po.Fields {
 		types = append(types, field.DotNodes()...)
 	}
@@ -322,7 +322,7 @@ type paramObjectField struct {
 	Param param
 }
 
-func (pof paramObjectField) DotNodes() []dotNode {
+func (pof paramObjectField) DotNodes() []*dotNode {
 	return pof.Param.DotNodes()
 }
 
@@ -388,8 +388,8 @@ type paramGroupedSlice struct {
 	Type reflect.Type
 }
 
-func (pt paramGroupedSlice) DotNodes() []dotNode {
-	return []dotNode{{
+func (pt paramGroupedSlice) DotNodes() []*dotNode {
+	return []*dotNode{{
 		Type:  pt.Type.String(),
 		group: pt.Group,
 	}}
