@@ -43,8 +43,8 @@ type Graph struct {
 func (dg *Graph) Add(params []*Node, results []*Node) {
 	edges := make([]*Edge, 0, len(params)*len(results))
 
-	for i, param := range params {
-		for j, result := range results {
+	for _, param := range params {
+		for _, result := range results {
 			edges = append(edges, &Edge{Param: param, Result: result})
 		}
 	}
