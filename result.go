@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+
+	"go.uber.org/dig/internal/dot"
 )
 
 // The result interface represents a result produced by a constructor.
@@ -42,8 +44,8 @@ type result interface {
 	// This MAY panic if the result does not consume a single value.
 	Extract(containerWriter, reflect.Value)
 
-	// DotNodes returns a slice of result(s) represented in dotNodes for the DOT-format graph.
-	DotNodes() []*dotNode
+	// DotNodes returns a slice of result(s) represented in dot.Nodes for the DOT-format graph.
+	DotNodes() []*dot.Node
 }
 
 var (
@@ -166,8 +168,8 @@ type resultList struct {
 	resultIndexes []int
 }
 
-func (rl resultList) DotNodes() []*dotNode {
-	var types []*dotNode
+func (rl resultList) DotNodes() []*dot.Node {
+	var types []*dot.Node
 	for _, result := range rl.Results {
 		types = append(types, result.DotNodes()...)
 	}
@@ -233,10 +235,10 @@ type resultSingle struct {
 	Type reflect.Type
 }
 
-func (rs resultSingle) DotNodes() []*dotNode {
-	return []*dotNode{{
+func (rs resultSingle) DotNodes() []*dot.Node {
+	return []*dot.Node{{
 		Type: rs.Type.String(),
-		name: rs.Name,
+		Name: rs.Name,
 	}}
 }
 
@@ -253,8 +255,8 @@ type resultObject struct {
 	Fields []resultObjectField
 }
 
-func (ro resultObject) DotNodes() []*dotNode {
-	var types []*dotNode
+func (ro resultObject) DotNodes() []*dot.Node {
+	var types []*dot.Node
 	for _, field := range ro.Fields {
 		types = append(types, field.DotNodes()...)
 	}
@@ -306,7 +308,7 @@ type resultObjectField struct {
 	Result result
 }
 
-func (rof resultObjectField) DotNodes() []*dotNode {
+func (rof resultObjectField) DotNodes() []*dot.Node {
 	return rof.Result.DotNodes()
 }
 
@@ -359,10 +361,10 @@ type resultGrouped struct {
 	Type reflect.Type
 }
 
-func (rt resultGrouped) DotNodes() []*dotNode {
-	return []*dotNode{{
+func (rt resultGrouped) DotNodes() []*dot.Node {
+	return []*dot.Node{{
 		Type:  rt.Type.String(),
-		group: rt.Group,
+		Group: rt.Group,
 	}}
 }
 
