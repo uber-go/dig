@@ -28,6 +28,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path"
 	"reflect"
 	"testing"
 	"time"
@@ -2455,11 +2456,25 @@ func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {
 	}), "second invoke must fail")
 }
 
+func compareCtor(t *testing.T, expected *dot.Ctor, ctor *dot.Ctor) {
+	assert.Equal(t, expected.Name, ctor.Name)
+	assert.Equal(t, expected.Package, ctor.Package)
+	assert.Equal(t, path.Base(expected.File), path.Base(ctor.File))
+	assert.Equal(t, expected.Params, ctor.Params)
+	assert.Equal(t, expected.Results, ctor.Results)
+	assert.NotZero(t, ctor.Line)
+}
+
+func compareCtors(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
+	for i := range ctors {
+		compareCtor(t, expected[i], ctors[i])
+	}
+}
+
 func TestDotGraph(t *testing.T) {
 	h := new(helper)
 	pkg := "go.uber.org/dig"
-	dir, _ := os.Getwd()
-	file := dir + "/dig_test_helper.go"
+	file := "dig_test_helper.go"
 
 	e1, e2, e3, e4 := &dot.Node{Type: "dig.t1"}, &dot.Node{Type: "dig.t2"}, &dot.Node{Type: "dig.t3"}, &dot.Node{Type: "dig.t4"}
 
@@ -2467,178 +2482,153 @@ func TestDotGraph(t *testing.T) {
 
 	t.Run("constructor with one param and one result", func(t *testing.T) {
 		c := New()
-		ctor := &dot.Ctor{
+		expected := []*dot.Ctor{{
 			Name:    "helper.f1.func1",
 			Package: pkg,
 			File:    file,
-			Line:    31,
 			Params:  []*dot.Node{e1},
 			Results: []*dot.Node{e2},
-		}
+		}}
 
-		expected := []*dot.Ctor{ctor}
 		h.f1(c)
-		assert.Equal(t, expected, c.dg.Ctors)
+		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("more constructors", func(t *testing.T) {
 		c := New()
-		ctor1 := &dot.Ctor{
+		expected := []*dot.Ctor{{
 			Name:    "helper.f2.func1",
 			Package: pkg,
 			File:    file,
-			Line:    35,
 			Params:  []*dot.Node{e1},
 			Results: []*dot.Node{e2},
-		}
-		ctor2 := &dot.Ctor{
+		}, {
 			Name:    "helper.f2.func2",
 			Package: pkg,
 			File:    file,
-			Line:    36,
 			Params:  []*dot.Node{e1},
 			Results: []*dot.Node{e3},
-		}
-		ctor3 := &dot.Ctor{
+		}, {
 			Name:    "helper.f2.func3",
 			Package: pkg,
 			File:    file,
-			Line:    37,
 			Params:  []*dot.Node{e2},
 			Results: []*dot.Node{e4},
-		}
+		}}
 
-		expected := []*dot.Ctor{ctor1, ctor2, ctor3}
 		h.f2(c)
-		assert.Equal(t, expected, c.dg.Ctors)
+		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("constructor with multiple params and results", func(t *testing.T) {
 		c := New()
-		ctor := &dot.Ctor{
+		expected := []*dot.Ctor{{
 			Name:    "helper.f3.func1",
 			Package: pkg,
 			File:    file,
-			Line:    41,
 			Params:  []*dot.Node{e1, e2},
 			Results: []*dot.Node{e3, e4},
-		}
+		}}
 
-		expected := []*dot.Ctor{ctor}
 		h.f3(c)
-		assert.Equal(t, expected, c.dg.Ctors)
+		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("param objects and result objects", func(t *testing.T) {
 		c := New()
-		ctor := &dot.Ctor{
+		expected := []*dot.Ctor{{
 			Name:    "helper.f4.func1",
 			Package: pkg,
 			File:    file,
-			Line:    58,
 			Params:  []*dot.Node{e1, e2},
 			Results: []*dot.Node{e3, e4},
-		}
+		}}
 
-		expected := []*dot.Ctor{ctor}
 		h.f4(c)
-		assert.Equal(t, expected, c.dg.Ctors)
+		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("nested param object", func(t *testing.T) {
 		c := New()
-		ctor := &dot.Ctor{
+		expected := []*dot.Ctor{{
 			Name:    "helper.f5.func1",
 			Package: pkg,
 			File:    file,
-			Line:    75,
 			Params:  []*dot.Node{e1, e2, e3},
 			Results: []*dot.Node{e4},
-		}
+		}}
 
-		expected := []*dot.Ctor{ctor}
 		h.f5(c)
-		assert.Equal(t, expected, c.dg.Ctors)
+		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("nested result object", func(t *testing.T) {
 		c := New()
-		ctor := &dot.Ctor{
+		expected := []*dot.Ctor{{
 			Name:    "helper.f6.func1",
 			Package: pkg,
 			File:    file,
-			Line:    96,
 			Params:  []*dot.Node{e1},
 			Results: []*dot.Node{e2, e3, e4},
-		}
+		}}
 
-		expected := []*dot.Ctor{ctor}
 		h.f6(c)
-		assert.Equal(t, expected, c.dg.Ctors)
+		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("value groups", func(t *testing.T) {
 		c := New()
-		ctor1 := &dot.Ctor{
+		expected := []*dot.Ctor{{
 			Name:    "helper.f7.func1",
 			Package: pkg,
 			File:    file,
-			Line:    116,
 			Params:  []*dot.Node{e2},
 			Results: []*dot.Node{
 				{Type: "dig.t1", Group: "foo"},
 				{Type: "dig.t1", Group: "foo"},
 				{Type: "dig.t1", Group: "foo"},
 			},
-		}
-
-		ctor2 := &dot.Ctor{
+		}, {
 			Name:    "helper.f7.func2",
 			Package: pkg,
 			File:    file,
-			Line:    117,
 			Params:  []*dot.Node{{Type: "[]dig.t1", Group: "foo"}},
 			Results: []*dot.Node{e3},
-		}
+		}}
 
-		expected := []*dot.Ctor{ctor1, ctor2}
 		h.f7(c)
-		assert.Equal(t, expected, c.dg.Ctors)
+		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("named values", func(t *testing.T) {
 		c := New()
-		ctor := &dot.Ctor{
+		expected := []*dot.Ctor{{
 			Name:    "helper.f8.func1",
 			Package: pkg,
 			File:    file,
-			Line:    133,
 			Params:  []*dot.Node{{Type: "dig.t1", Name: "A"}},
 			Results: []*dot.Node{{Type: "dig.t2", Name: "B"}},
-		}
+		}}
 
-		expected := []*dot.Ctor{ctor}
 		h.f8(c)
-		assert.Equal(t, expected, c.dg.Ctors)
+		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("optional dependencies", func(t *testing.T) {
 		c := New()
-		ctor := &dot.Ctor{
+		expected := []*dot.Ctor{{
 			Name:    "helper.f9.func1",
 			Package: pkg,
 			File:    file,
-			Line:    145,
 			Params: []*dot.Node{
 				{Type: "dig.t1", Name: "A", Optional: true},
 				{Type: "dig.t2", Name: "B"},
 				{Type: "dig.t3", Optional: true},
 			},
 			Results: []*dot.Node{e4},
-		}
+		}}
 
-		expected := []*dot.Ctor{ctor}
 		h.f9(c)
-		assert.Equal(t, expected, c.dg.Ctors)
+		compareCtors(t, expected, c.dg.Ctors)
 	})
 }
