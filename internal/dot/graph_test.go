@@ -27,30 +27,36 @@ import (
 )
 
 func TestDotGraphAdd(t *testing.T) {
-	n1 := &Node{Type: "t1", Name: "Type 1"}
+	n1 := &Node{Type: "t1", Name: "type1"}
 	n2 := &Node{Type: "t2", Optional: true}
-	n3 := &Node{Type: "t3", Name: "Type 3", Optional: true}
-	n4 := &Node{Type: "t4", Group: "Group 4"}
-
-	t.Run("Add empty param and result list", func(t *testing.T) {
-		dg := new(Graph)
-		dg.Add(make([]*Node, 0), make([]*Node, 0))
-
-		assert.Equal(t, new(Graph), dg)
-	})
+	n3 := &Node{Type: "t3", Name: "type3", Optional: true}
+	n4 := &Node{Type: "t4", Group: "group4"}
 
 	t.Run("Add param and result list", func(t *testing.T) {
 		expected := new(Graph)
-		expected.Edges = []*Edge{
-			{Param: n1, Result: n3},
-			{Param: n1, Result: n4},
-			{Param: n2, Result: n3},
-			{Param: n2, Result: n4},
+		expected.Ctors = []*Ctor{
+			{Params: []*Node{n1, n2, n2, n2}, Results: []*Node{n3, n4}},
+		}
+		expected.Nodes = map[string]*Node{
+			"t1[name=\"type1\"]":   n1,
+			"t2":                   n2,
+			"t3[name=\"type3\"]":   n3,
+			"t4[group=\"group4\"]": n4,
 		}
 
-		dg := new(Graph)
-		dg.Add([]*Node{n1, n2}, []*Node{n3, n4})
+		dg := &Graph{Nodes: make(map[string]*Node)}
+		dg.Add(&Ctor{}, []*Node{n1, n2, n2, n2}, []*Node{n3, n4})
 
 		assert.Equal(t, expected, dg)
 	})
+}
+
+func TestNodeStr(t *testing.T) {
+	n1 := &Node{Type: "t1"}
+	n2 := &Node{Type: "t2", Name: "bar"}
+	n3 := &Node{Type: "t3", Group: "foo"}
+
+	assert.Equal(t, "t1", n1.str())
+	assert.Equal(t, "t2[name=\"bar\"]", n2.str())
+	assert.Equal(t, "t3[group=\"foo\"]", n3.str())
 }

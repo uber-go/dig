@@ -2456,213 +2456,189 @@ func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {
 }
 
 func TestDotGraph(t *testing.T) {
-	type T1 struct{}
-	type T2 struct{}
-	type T3 struct{}
-	type T4 struct{}
+	h := new(helper)
+	pkg := "go.uber.org/dig"
+	dir, _ := os.Getwd()
+	file := dir + "/dig_test_helper.go"
 
-	e1, e2, e3, e4 := &dot.Node{Type: "dig.T1"}, &dot.Node{Type: "dig.T2"}, &dot.Node{Type: "dig.T3"}, &dot.Node{Type: "dig.T4"}
+	e1, e2, e3, e4 := &dot.Node{Type: "dig.t1"}, &dot.Node{Type: "dig.t2"}, &dot.Node{Type: "dig.t3"}, &dot.Node{Type: "dig.t4"}
 
 	t.Parallel()
 
-	t.Run("single edge", func(t *testing.T) {
-		expected := []*dot.Edge{
-			{Param: e1, Result: e2},
+	t.Run("constructor with one param and one result", func(t *testing.T) {
+		c := New()
+		ctor := &dot.Ctor{
+			Name:    "helper.f1.func1",
+			Package: pkg,
+			File:    file,
+			Line:    31,
+			Params:  []*dot.Node{e1},
+			Results: []*dot.Node{e2},
 		}
 
-		c := New()
-
-		c.Provide(func(t1 T1) T2 { return T2{} })
-		assert.Equal(t, expected, c.dg.Edges)
+		expected := []*dot.Ctor{ctor}
+		h.f1(c)
+		assert.Equal(t, expected, c.dg.Ctors)
 	})
 
-	t.Run("more edges", func(t *testing.T) {
-		expected := []*dot.Edge{
-			{Param: e1, Result: e2},
-			{Param: e1, Result: e3},
-			{Param: e2, Result: e4},
+	t.Run("more constructors", func(t *testing.T) {
+		c := New()
+		ctor1 := &dot.Ctor{
+			Name:    "helper.f2.func1",
+			Package: pkg,
+			File:    file,
+			Line:    35,
+			Params:  []*dot.Node{e1},
+			Results: []*dot.Node{e2},
+		}
+		ctor2 := &dot.Ctor{
+			Name:    "helper.f2.func2",
+			Package: pkg,
+			File:    file,
+			Line:    36,
+			Params:  []*dot.Node{e1},
+			Results: []*dot.Node{e3},
+		}
+		ctor3 := &dot.Ctor{
+			Name:    "helper.f2.func3",
+			Package: pkg,
+			File:    file,
+			Line:    37,
+			Params:  []*dot.Node{e2},
+			Results: []*dot.Node{e4},
 		}
 
-		c := New()
-
-		c.Provide(func(t1 T1) T2 { return T2{} })
-		c.Provide(func(t1 T1) T3 { return T3{} })
-		c.Provide(func(t1 T2) T4 { return T4{} })
-		assert.Equal(t, expected, c.dg.Edges)
+		expected := []*dot.Ctor{ctor1, ctor2, ctor3}
+		h.f2(c)
+		assert.Equal(t, expected, c.dg.Ctors)
 	})
 
-	t.Run("multiple params and results", func(t *testing.T) {
-		expected := []*dot.Edge{
-			{Param: e1, Result: e3},
-			{Param: e1, Result: e4},
-			{Param: e2, Result: e3},
-			{Param: e2, Result: e4},
+	t.Run("constructor with multiple params and results", func(t *testing.T) {
+		c := New()
+		ctor := &dot.Ctor{
+			Name:    "helper.f3.func1",
+			Package: pkg,
+			File:    file,
+			Line:    41,
+			Params:  []*dot.Node{e1, e2},
+			Results: []*dot.Node{e3, e4},
 		}
 
-		c := New()
-
-		c.Provide(func(t1 T1, t2 T2) (T3, T4) { return T3{}, T4{} })
-		assert.Equal(t, expected, c.dg.Edges)
+		expected := []*dot.Ctor{ctor}
+		h.f3(c)
+		assert.Equal(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("param objects and result objects", func(t *testing.T) {
-		type in struct {
-			In
-
-			A T1
-			B T2
-		}
-
-		type out struct {
-			Out
-
-			C T3
-			D T4
-		}
-
-		expected := []*dot.Edge{
-			{Param: e1, Result: e3},
-			{Param: e1, Result: e4},
-			{Param: e2, Result: e3},
-			{Param: e2, Result: e4},
-		}
-
 		c := New()
+		ctor := &dot.Ctor{
+			Name:    "helper.f4.func1",
+			Package: pkg,
+			File:    file,
+			Line:    58,
+			Params:  []*dot.Node{e1, e2},
+			Results: []*dot.Node{e3, e4},
+		}
 
-		c.Provide(func(i in) out { return out{Out{}, T3{}, T4{}} })
-		assert.Equal(t, expected, c.dg.Edges)
+		expected := []*dot.Ctor{ctor}
+		h.f4(c)
+		assert.Equal(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("nested param object", func(t *testing.T) {
-		type in struct {
-			In
-			A    T1
-			Nest struct {
-				In
-				B    T2
-				Nest struct {
-					In
-					C T3
-				}
-			}
-		}
-
-		expected := []*dot.Edge{
-			{Param: e1, Result: e4},
-			{Param: e2, Result: e4},
-			{Param: e3, Result: e4},
-		}
-
 		c := New()
+		ctor := &dot.Ctor{
+			Name:    "helper.f5.func1",
+			Package: pkg,
+			File:    file,
+			Line:    75,
+			Params:  []*dot.Node{e1, e2, e3},
+			Results: []*dot.Node{e4},
+		}
 
-		c.Provide(func(p in) T4 { return T4{} })
-		assert.Equal(t, expected, c.dg.Edges)
+		expected := []*dot.Ctor{ctor}
+		h.f5(c)
+		assert.Equal(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("nested result object", func(t *testing.T) {
-		type nested1 struct {
-			Out
-			D T4
-		}
-
-		type nested2 struct {
-			Out
-			C    T3
-			Nest nested1
-		}
-
-		type out struct {
-			Out
-			B    T2
-			Nest nested2
-		}
-
-		expected := []*dot.Edge{
-			{Param: e1, Result: e2},
-			{Param: e1, Result: e3},
-			{Param: e1, Result: e4},
-		}
-
 		c := New()
+		ctor := &dot.Ctor{
+			Name:    "helper.f6.func1",
+			Package: pkg,
+			File:    file,
+			Line:    96,
+			Params:  []*dot.Node{e1},
+			Results: []*dot.Node{e2, e3, e4},
+		}
 
-		c.Provide(func(t1 T1) out {
-			return out{Out{}, T2{}, nested2{Out{}, T3{}, nested1{Out{}, T4{}}}}
-		})
-		assert.Equal(t, expected, c.dg.Edges)
+		expected := []*dot.Ctor{ctor}
+		h.f6(c)
+		assert.Equal(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("value groups", func(t *testing.T) {
-		type in struct {
-			In
-
-			D []T1 `group:"foo"`
-		}
-
-		type out struct {
-			Out
-
-			A T1 `group:"foo"`
-			B T1 `group:"foo"`
-			C T1 `group:"foo"`
-		}
-
-		expected := []*dot.Edge{
-			{Param: e2, Result: &dot.Node{Type: "dig.T1", Group: "foo"}},
-			{Param: e2, Result: &dot.Node{Type: "dig.T1", Group: "foo"}},
-			{Param: e2, Result: &dot.Node{Type: "dig.T1", Group: "foo"}},
-			{Param: &dot.Node{Type: "[]dig.T1", Group: "foo"}, Result: e3},
-		}
-
 		c := New()
+		ctor1 := &dot.Ctor{
+			Name:    "helper.f7.func1",
+			Package: pkg,
+			File:    file,
+			Line:    116,
+			Params:  []*dot.Node{e2},
+			Results: []*dot.Node{
+				{Type: "dig.t1", Group: "foo"},
+				{Type: "dig.t1", Group: "foo"},
+				{Type: "dig.t1", Group: "foo"},
+			},
+		}
 
-		c.Provide(func(t2 T2) out { return out{Out{}, T1{}, T1{}, T1{}} })
-		c.Provide(func(i in) T3 { return T3{} })
-		assert.Equal(t, expected, c.dg.Edges)
+		ctor2 := &dot.Ctor{
+			Name:    "helper.f7.func2",
+			Package: pkg,
+			File:    file,
+			Line:    117,
+			Params:  []*dot.Node{{Type: "[]dig.t1", Group: "foo"}},
+			Results: []*dot.Node{e3},
+		}
+
+		expected := []*dot.Ctor{ctor1, ctor2}
+		h.f7(c)
+		assert.Equal(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("named values", func(t *testing.T) {
-		type in struct {
-			In
-
-			A T1 `name:"A"`
-		}
-
-		type out struct {
-			Out
-
-			B T2 `name:"B"`
-		}
-
-		expected := []*dot.Edge{{
-			Param:  &dot.Node{Type: "dig.T1", Name: "A"},
-			Result: &dot.Node{Type: "dig.T2", Name: "B"},
-		}}
-
 		c := New()
+		ctor := &dot.Ctor{
+			Name:    "helper.f8.func1",
+			Package: pkg,
+			File:    file,
+			Line:    133,
+			Params:  []*dot.Node{{Type: "dig.t1", Name: "A"}},
+			Results: []*dot.Node{{Type: "dig.t2", Name: "B"}},
+		}
 
-		c.Provide(func(i in) out { return out{B: T2{}} })
-		assert.Equal(t, expected, c.dg.Edges)
+		expected := []*dot.Ctor{ctor}
+		h.f8(c)
+		assert.Equal(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("optional dependencies", func(t *testing.T) {
-		type in struct {
-			In
-
-			A T1 `name:"A" optional:"true"`
-			B T2 `name:"B"`
-			C T3 `optional:"true"`
-		}
-
-		expected := []*dot.Edge{
-			{Param: &dot.Node{Type: "dig.T1", Name: "A", Optional: true}, Result: e4},
-			{Param: &dot.Node{Type: "dig.T2", Name: "B"}, Result: e4},
-			{Param: &dot.Node{Type: "dig.T3", Optional: true}, Result: e4},
-		}
-
 		c := New()
+		ctor := &dot.Ctor{
+			Name:    "helper.f9.func1",
+			Package: pkg,
+			File:    file,
+			Line:    145,
+			Params: []*dot.Node{
+				{Type: "dig.t1", Name: "A", Optional: true},
+				{Type: "dig.t2", Name: "B"},
+				{Type: "dig.t3", Optional: true},
+			},
+			Results: []*dot.Node{e4},
+		}
 
-		c.Provide(func(i in) T4 { return T4{} })
-
-		assert.Equal(t, expected, c.dg.Edges)
+		expected := []*dot.Ctor{ctor}
+		h.f9(c)
+		assert.Equal(t, expected, c.dg.Ctors)
 	})
 }

@@ -196,7 +196,7 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		dg:        new(dot.Graph),
+		dg:        &dot.Graph{Nodes: make(map[string]*dot.Node)},
 	}
 
 	for _, opt := range opts {
@@ -377,7 +377,14 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			return err
 		}
 	}
-	c.dg.Add(n.paramList.DotNodes(), n.resultList.DotNodes())
+
+	constructor := &dot.Ctor{
+		Name:    n.location.Name,
+		Package: n.location.Package,
+		File:    n.location.File,
+		Line:    n.location.Line,
+	}
+	c.dg.Add(constructor, n.paramList.DotNodes(), n.resultList.DotNodes())
 
 	return nil
 }
