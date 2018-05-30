@@ -20,7 +20,7 @@
 
 package dot
 
-// Node represents a single node in a graph.
+// Node is a single node in a graph.
 type Node struct {
 	Type     string
 	Name     string
@@ -34,18 +34,18 @@ type Edge struct {
 	Result *Node
 }
 
-// Graph represents the DOT-format graph in a Container.
+// Graph is the DOT-format graph in a Container.
 type Graph struct {
 	Edges []*Edge
 }
 
 // Add adds the edges in node n into dg.
 func (dg *Graph) Add(params []*Node, results []*Node) {
-	edges := make([]*Edge, len(params)*len(results))
+	edges := make([]*Edge, 0, len(params)*len(results))
 
 	for i, param := range params {
 		for j, result := range results {
-			edges[i*len(results)+j] = &Edge{Param: param, Result: result}
+			edges = append(edges, &Edge{Param: param, Result: result})
 		}
 	}
 
