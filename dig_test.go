@@ -2472,114 +2472,179 @@ func compareCtors(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
 }
 
 func TestDotGraph(t *testing.T) {
-	h := new(helper)
+	type t1 struct{}
+	type t2 struct{}
+	type t3 struct{}
+	type t4 struct{}
+
 	pkg := "go.uber.org/dig"
-	file := "dig_test_helper.go"
+	file := "dig_test.go"
 
 	e1, e2, e3, e4 := &dot.Node{Type: "dig.t1"}, &dot.Node{Type: "dig.t2"}, &dot.Node{Type: "dig.t3"}, &dot.Node{Type: "dig.t4"}
 
 	t.Parallel()
 
 	t.Run("constructor with one param and one result", func(t *testing.T) {
-		c := New()
 		expected := []*dot.Ctor{{
-			Name:    "helper.f1.func1",
+			Name:    "TestDotGraph.func1.1",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{e1},
 			Results: []*dot.Node{e2},
 		}}
 
-		h.f1(c)
+		c := New()
+		c.Provide(func(A t1) t2 { return t2{} })
 		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("more constructors", func(t *testing.T) {
-		c := New()
 		expected := []*dot.Ctor{{
-			Name:    "helper.f2.func1",
+			Name:    "TestDotGraph.func2.1",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{e1},
 			Results: []*dot.Node{e2},
 		}, {
-			Name:    "helper.f2.func2",
+			Name:    "TestDotGraph.func2.2",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{e1},
 			Results: []*dot.Node{e3},
 		}, {
-			Name:    "helper.f2.func3",
+			Name:    "TestDotGraph.func2.3",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{e2},
 			Results: []*dot.Node{e4},
 		}}
 
-		h.f2(c)
+		c := New()
+		c.Provide(func(A t1) t2 { return t2{} })
+		c.Provide(func(A t1) t3 { return t3{} })
+		c.Provide(func(A t2) t4 { return t4{} })
 		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("constructor with multiple params and results", func(t *testing.T) {
-		c := New()
 		expected := []*dot.Ctor{{
-			Name:    "helper.f3.func1",
+			Name:    "TestDotGraph.func3.1",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{e1, e2},
 			Results: []*dot.Node{e3, e4},
 		}}
 
-		h.f3(c)
+		c := New()
+		c.Provide(func(A t1, B t2) (t3, t4) { return t3{}, t4{} })
 		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("param objects and result objects", func(t *testing.T) {
-		c := New()
+		type in struct {
+			In
+
+			A t1
+			B t2
+		}
+
+		type out struct {
+			Out
+
+			C t3
+			D t4
+		}
+
 		expected := []*dot.Ctor{{
-			Name:    "helper.f4.func1",
+			Name:    "TestDotGraph.func4.1",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{e1, e2},
 			Results: []*dot.Node{e3, e4},
 		}}
 
-		h.f4(c)
+		c := New()
+		c.Provide(func(i in) out { return out{Out{}, t3{}, t4{}} })
 		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("nested param object", func(t *testing.T) {
-		c := New()
+		type in struct {
+			In
+			A    t1
+			Nest struct {
+				In
+				B    t2
+				Nest struct {
+					In
+					C t3
+				}
+			}
+		}
+
 		expected := []*dot.Ctor{{
-			Name:    "helper.f5.func1",
+			Name:    "TestDotGraph.func5.1",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{e1, e2, e3},
 			Results: []*dot.Node{e4},
 		}}
 
-		h.f5(c)
+		c := New()
+		c.Provide(func(p in) t4 { return t4{} })
 		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("nested result object", func(t *testing.T) {
-		c := New()
+		type nested1 struct {
+			Out
+			D t4
+		}
+
+		type nested2 struct {
+			Out
+			C    t3
+			Nest nested1
+		}
+
+		type out struct {
+			Out
+			B    t2
+			Nest nested2
+		}
+
 		expected := []*dot.Ctor{{
-			Name:    "helper.f6.func1",
+			Name:    "TestDotGraph.func6.1",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{e1},
 			Results: []*dot.Node{e2, e3, e4},
 		}}
 
-		h.f6(c)
+		c := New()
+		c.Provide(func(A t1) out {
+			return out{Out{}, t2{}, nested2{Out{}, t3{}, nested1{Out{}, t4{}}}}
+		})
 		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("value groups", func(t *testing.T) {
-		c := New()
+		type in struct {
+			In
+
+			D []t1 `group:"foo"`
+		}
+
+		type out struct {
+			Out
+
+			A t1 `group:"foo"`
+			B t1 `group:"foo"`
+			C t1 `group:"foo"`
+		}
+
 		expected := []*dot.Ctor{{
-			Name:    "helper.f7.func1",
+			Name:    "TestDotGraph.func7.1",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{e2},
@@ -2589,35 +2654,56 @@ func TestDotGraph(t *testing.T) {
 				{Type: "dig.t1", Group: "foo"},
 			},
 		}, {
-			Name:    "helper.f7.func2",
+			Name:    "TestDotGraph.func7.2",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{{Type: "[]dig.t1", Group: "foo"}},
 			Results: []*dot.Node{e3},
 		}}
 
-		h.f7(c)
+		c := New()
+		c.Provide(func(B t2) out { return out{Out{}, t1{}, t1{}, t1{}} })
+		c.Provide(func(i in) t3 { return t3{} })
 		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("named values", func(t *testing.T) {
-		c := New()
+		type in struct {
+			In
+
+			A t1 `name:"A"`
+		}
+
+		type out struct {
+			Out
+
+			B t2 `name:"B"`
+		}
+
 		expected := []*dot.Ctor{{
-			Name:    "helper.f8.func1",
+			Name:    "TestDotGraph.func8.1",
 			Package: pkg,
 			File:    file,
 			Params:  []*dot.Node{{Type: "dig.t1", Name: "A"}},
 			Results: []*dot.Node{{Type: "dig.t2", Name: "B"}},
 		}}
 
-		h.f8(c)
+		c := New()
+		c.Provide(func(i in) out { return out{B: t2{}} })
 		compareCtors(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("optional dependencies", func(t *testing.T) {
-		c := New()
+		type in struct {
+			In
+
+			A t1 `name:"A" optional:"true"`
+			B t2 `name:"B"`
+			C t3 `optional:"true"`
+		}
+
 		expected := []*dot.Ctor{{
-			Name:    "helper.f9.func1",
+			Name:    "TestDotGraph.func9.1",
 			Package: pkg,
 			File:    file,
 			Params: []*dot.Node{
@@ -2628,7 +2714,8 @@ func TestDotGraph(t *testing.T) {
 			Results: []*dot.Node{e4},
 		}}
 
-		h.f9(c)
+		c := New()
+		c.Provide(func(i in) t4 { return t4{} })
 		compareCtors(t, expected, c.dg.Ctors)
 	})
 }
