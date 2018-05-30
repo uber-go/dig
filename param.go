@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+
+	"go.uber.org/dig/internal/dot"
 )
 
 // The param interface represents a dependency for a constructor.
@@ -46,8 +48,8 @@ type param interface {
 	// This MAY panic if the param does not produce a single value.
 	Build(containerStore) (reflect.Value, error)
 
-	// DotNodes returns a slice of param(s) represented in dotNodes for the DOT-format graph.
-	DotNodes() []*dotNode
+	// DotNodes returns a slice of param(s) represented in dot.Nodes for the DOT-format graph.
+	DotNodes() []*dot.Node
 }
 
 var (
@@ -147,8 +149,8 @@ type paramList struct {
 	Params []param
 }
 
-func (pl paramList) DotNodes() []*dotNode {
-	var types []*dotNode
+func (pl paramList) DotNodes() []*dot.Node {
+	var types []*dot.Node
 	for _, param := range pl.Params {
 		types = append(types, param.DotNodes()...)
 	}
@@ -214,11 +216,11 @@ type paramSingle struct {
 	Type     reflect.Type
 }
 
-func (ps paramSingle) DotNodes() []*dotNode {
-	return []*dotNode{{
+func (ps paramSingle) DotNodes() []*dot.Node {
+	return []*dot.Node{{
 		Type:     ps.Type.String(),
-		name:     ps.Name,
-		optional: ps.Optional,
+		Name:     ps.Name,
+		Optional: ps.Optional,
 	}}
 }
 
@@ -264,8 +266,8 @@ type paramObject struct {
 	Fields []paramObjectField
 }
 
-func (po paramObject) DotNodes() []*dotNode {
-	var types []*dotNode
+func (po paramObject) DotNodes() []*dot.Node {
+	var types []*dot.Node
 	for _, field := range po.Fields {
 		types = append(types, field.DotNodes()...)
 	}
@@ -322,7 +324,7 @@ type paramObjectField struct {
 	Param param
 }
 
-func (pof paramObjectField) DotNodes() []*dotNode {
+func (pof paramObjectField) DotNodes() []*dot.Node {
 	return pof.Param.DotNodes()
 }
 
@@ -388,10 +390,10 @@ type paramGroupedSlice struct {
 	Type reflect.Type
 }
 
-func (pt paramGroupedSlice) DotNodes() []*dotNode {
-	return []*dotNode{{
+func (pt paramGroupedSlice) DotNodes() []*dot.Node {
+	return []*dot.Node{{
 		Type:  pt.Type.String(),
-		group: pt.Group,
+		Group: pt.Group,
 	}}
 }
 
