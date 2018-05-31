@@ -20,13 +20,9 @@
 
 package dot
 
-import (
-	"fmt"
-)
-
-// Ctor encodes the edges in a graph. It includes information like the name
-// of the constructor, the package, file, and line where the constructor is provided,
-// and the params and results of the constructor.
+// Ctor encodes the edges that connects results to params in a graph. It includes information
+// like the name of the constructor, the package, file, line where the constructor is
+// provided, and the params and results of the constructor.
 type Ctor struct {
 	Name    string
 	Package string
@@ -36,10 +32,9 @@ type Ctor struct {
 	Results []*Node
 }
 
-// Graph is the DOT-format graph in a Container represented by a list of Ctor-s.
+// Graph is the DOT-format graph in a Container represented by a list of Ctors.
 type Graph struct {
 	Ctors []*Ctor
-	Nodes map[string]*Node
 }
 
 // Node is a single node in a graph.
@@ -48,36 +43,4 @@ type Node struct {
 	Name     string
 	Optional bool
 	Group    string
-}
-
-// Add updates the param and result nodes in the constructor and adds the constructor to the graph
-func (dg *Graph) Add(c *Ctor, params []*Node, results []*Node) {
-	c.Params = getNodes(dg, params)
-	c.Results = getNodes(dg, results)
-	dg.Ctors = append(dg.Ctors, c)
-}
-
-func (n *Node) str() string {
-	if n.Name != "" {
-		return fmt.Sprintf("%v[name=%q]", n.Type, n.Name)
-	} else if n.Group != "" {
-		return fmt.Sprintf("%v[group=%q]", n.Type, n.Group)
-	}
-
-	return n.Type
-}
-
-func getNodes(dg *Graph, nodes []*Node) []*Node {
-	ptrs := make([]*Node, len(nodes))
-	for i, node := range nodes {
-		k := node.str()
-
-		if n := dg.Nodes[k]; n != nil {
-			ptrs[i] = n
-		} else {
-			dg.Nodes[k] = node
-			ptrs[i] = node
-		}
-	}
-	return ptrs
 }
