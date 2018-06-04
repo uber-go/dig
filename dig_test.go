@@ -28,7 +28,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"path"
 	"reflect"
 	"testing"
 	"time"
@@ -36,6 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
 )
 
@@ -2456,18 +2456,15 @@ func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {
 	}), "second invoke must fail")
 }
 
-func compareCtor(t *testing.T, expected *dot.Ctor, ctor *dot.Ctor) {
-	assert.Equal(t, expected.Name, ctor.Name)
-	assert.Equal(t, expected.Package, ctor.Package)
-	assert.Equal(t, path.Base(expected.File), path.Base(ctor.File))
+func assertCtorEqual(t *testing.T, expected *dot.Ctor, ctor *dot.Ctor) {
 	assert.Equal(t, expected.Params, ctor.Params)
 	assert.Equal(t, expected.Results, ctor.Results)
 	assert.NotZero(t, ctor.Line)
 }
 
-func compareCtors(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
-	for i := range ctors {
-		compareCtor(t, expected[i], ctors[i])
+func assertCtorsEqual(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
+	for i, c := range ctors {
+		assertCtorEqual(t, expected[i], c)
 	}
 }
 
@@ -2477,67 +2474,55 @@ func TestDotGraph(t *testing.T) {
 	type t3 struct{}
 	type t4 struct{}
 
-	pkg := "go.uber.org/dig"
-	file := "dig_test.go"
-
-	e1, e2, e3, e4 := &dot.Node{Type: "dig.t1"}, &dot.Node{Type: "dig.t2"}, &dot.Node{Type: "dig.t3"}, &dot.Node{Type: "dig.t4"}
+	n1, n2, n3, n4 := &dot.Node{Type: "dig.t1"}, &dot.Node{Type: "dig.t2"}, &dot.Node{Type: "dig.t3"}, &dot.Node{Type: "dig.t4"}
 
 	t.Parallel()
 
 	t.Run("constructor with one param and one result", func(t *testing.T) {
-		expected := []*dot.Ctor{{
-			Name:    "TestDotGraph.func1.1",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{e1},
-			Results: []*dot.Node{e2},
-		}}
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Node{n1},
+				Results: []*dot.Node{n2},
+			},
+		}
 
 		c := New()
 		c.Provide(func(A t1) t2 { return t2{} })
-		compareCtors(t, expected, c.dg.Ctors)
+		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("more constructors", func(t *testing.T) {
-		expected := []*dot.Ctor{{
-			Name:    "TestDotGraph.func2.1",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{e1},
-			Results: []*dot.Node{e2},
-		}, {
-			Name:    "TestDotGraph.func2.2",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{e1},
-			Results: []*dot.Node{e3},
-		}, {
-			Name:    "TestDotGraph.func2.3",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{e2},
-			Results: []*dot.Node{e4},
-		}}
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Node{n1},
+				Results: []*dot.Node{n2},
+			}, {
+				Params:  []*dot.Node{n1},
+				Results: []*dot.Node{n3},
+			}, {
+				Params:  []*dot.Node{n2},
+				Results: []*dot.Node{n4},
+			},
+		}
 
 		c := New()
 		c.Provide(func(A t1) t2 { return t2{} })
 		c.Provide(func(A t1) t3 { return t3{} })
 		c.Provide(func(A t2) t4 { return t4{} })
-		compareCtors(t, expected, c.dg.Ctors)
+		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("constructor with multiple params and results", func(t *testing.T) {
-		expected := []*dot.Ctor{{
-			Name:    "TestDotGraph.func3.1",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{e1, e2},
-			Results: []*dot.Node{e3, e4},
-		}}
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Node{n1, n2},
+				Results: []*dot.Node{n3, n4},
+			},
+		}
 
 		c := New()
 		c.Provide(func(A t1, B t2) (t3, t4) { return t3{}, t4{} })
-		compareCtors(t, expected, c.dg.Ctors)
+		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("param objects and result objects", func(t *testing.T) {
@@ -2555,17 +2540,16 @@ func TestDotGraph(t *testing.T) {
 			D t4
 		}
 
-		expected := []*dot.Ctor{{
-			Name:    "TestDotGraph.func4.1",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{e1, e2},
-			Results: []*dot.Node{e3, e4},
-		}}
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Node{n1, n2},
+				Results: []*dot.Node{n3, n4},
+			},
+		}
 
 		c := New()
 		c.Provide(func(i in) out { return out{Out{}, t3{}, t4{}} })
-		compareCtors(t, expected, c.dg.Ctors)
+		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("nested param object", func(t *testing.T) {
@@ -2582,17 +2566,16 @@ func TestDotGraph(t *testing.T) {
 			}
 		}
 
-		expected := []*dot.Ctor{{
-			Name:    "TestDotGraph.func5.1",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{e1, e2, e3},
-			Results: []*dot.Node{e4},
-		}}
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Node{n1, n2, n3},
+				Results: []*dot.Node{n4},
+			},
+		}
 
 		c := New()
 		c.Provide(func(p in) t4 { return t4{} })
-		compareCtors(t, expected, c.dg.Ctors)
+		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("nested result object", func(t *testing.T) {
@@ -2613,19 +2596,18 @@ func TestDotGraph(t *testing.T) {
 			Nest nested2
 		}
 
-		expected := []*dot.Ctor{{
-			Name:    "TestDotGraph.func6.1",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{e1},
-			Results: []*dot.Node{e2, e3, e4},
-		}}
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Node{n1},
+				Results: []*dot.Node{n2, n3, n4},
+			},
+		}
 
 		c := New()
 		c.Provide(func(A t1) out {
 			return out{Out{}, t2{}, nested2{Out{}, t3{}, nested1{Out{}, t4{}}}}
 		})
-		compareCtors(t, expected, c.dg.Ctors)
+		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("value groups", func(t *testing.T) {
@@ -2643,28 +2625,24 @@ func TestDotGraph(t *testing.T) {
 			C t1 `group:"foo"`
 		}
 
-		expected := []*dot.Ctor{{
-			Name:    "TestDotGraph.func7.1",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{e2},
-			Results: []*dot.Node{
-				{Type: "dig.t1", Group: "foo"},
-				{Type: "dig.t1", Group: "foo"},
-				{Type: "dig.t1", Group: "foo"},
+		expected := []*dot.Ctor{
+			{
+				Params: []*dot.Node{n2},
+				Results: []*dot.Node{
+					{Type: "dig.t1", Group: "foo"},
+					{Type: "dig.t1", Group: "foo"},
+					{Type: "dig.t1", Group: "foo"},
+				},
+			}, {
+				Params:  []*dot.Node{{Type: "[]dig.t1", Group: "foo"}},
+				Results: []*dot.Node{n3},
 			},
-		}, {
-			Name:    "TestDotGraph.func7.2",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{{Type: "[]dig.t1", Group: "foo"}},
-			Results: []*dot.Node{e3},
-		}}
+		}
 
 		c := New()
 		c.Provide(func(B t2) out { return out{Out{}, t1{}, t1{}, t1{}} })
 		c.Provide(func(i in) t3 { return t3{} })
-		compareCtors(t, expected, c.dg.Ctors)
+		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("named values", func(t *testing.T) {
@@ -2680,17 +2658,16 @@ func TestDotGraph(t *testing.T) {
 			B t2 `name:"B"`
 		}
 
-		expected := []*dot.Ctor{{
-			Name:    "TestDotGraph.func8.1",
-			Package: pkg,
-			File:    file,
-			Params:  []*dot.Node{{Type: "dig.t1", Name: "A"}},
-			Results: []*dot.Node{{Type: "dig.t2", Name: "B"}},
-		}}
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Node{{Type: "dig.t1", Name: "A"}},
+				Results: []*dot.Node{{Type: "dig.t2", Name: "B"}},
+			},
+		}
 
 		c := New()
 		c.Provide(func(i in) out { return out{B: t2{}} })
-		compareCtors(t, expected, c.dg.Ctors)
+		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
 	t.Run("optional dependencies", func(t *testing.T) {
@@ -2702,20 +2679,42 @@ func TestDotGraph(t *testing.T) {
 			C t3 `optional:"true"`
 		}
 
-		expected := []*dot.Ctor{{
-			Name:    "TestDotGraph.func9.1",
-			Package: pkg,
-			File:    file,
-			Params: []*dot.Node{
-				{Type: "dig.t1", Name: "A", Optional: true},
-				{Type: "dig.t2", Name: "B"},
-				{Type: "dig.t3", Optional: true},
+		expected := []*dot.Ctor{
+			{
+				Params: []*dot.Node{
+					{Type: "dig.t1", Name: "A", Optional: true},
+					{Type: "dig.t2", Name: "B"},
+					{Type: "dig.t3", Optional: true},
+				},
+				Results: []*dot.Node{n4},
 			},
-			Results: []*dot.Node{e4},
-		}}
+		}
 
 		c := New()
 		c.Provide(func(i in) t4 { return t4{} })
-		compareCtors(t, expected, c.dg.Ctors)
+		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
+}
+
+func TestNewDotCtor(t *testing.T) {
+	type t1 struct{}
+	type t2 struct{}
+
+	n, err := newNode(func(A t1) t2 { return t2{} }, nodeOptions{})
+	require.NoError(t, err)
+
+	n.location = &digreflect.Func{
+		Name:    "function1",
+		Package: "pkg1",
+		File:    "file1",
+		Line:    24534,
+	}
+
+	ctor := newDotCtor(n)
+	assert.Equal(t, "function1", ctor.Name)
+	assert.Equal(t, "pkg1", ctor.Package)
+	assert.Equal(t, "file1", ctor.File)
+	assert.Equal(t, 24534, ctor.Line)
+	assert.Equal(t, []*dot.Node{{Type: "dig.t1"}}, ctor.Params)
+	assert.Equal(t, []*dot.Node{{Type: "dig.t2"}}, ctor.Results)
 }

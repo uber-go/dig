@@ -20,9 +20,7 @@
 
 package dot
 
-// Ctor encodes the edges that connects results to params in a graph. It includes information
-// like the name of the constructor, the package, file, line where the constructor is
-// provided, and the params and results of the constructor.
+// Ctor encodes a constructor provided to the container for the DOT graph.
 type Ctor struct {
 	Name    string
 	Package string
@@ -32,7 +30,7 @@ type Ctor struct {
 	Results []*Node
 }
 
-// Graph is the DOT-format graph in a Container represented by a list of Ctors.
+// Graph is the DOT-format graph in a Container.
 type Graph struct {
 	Ctors []*Ctor
 }
