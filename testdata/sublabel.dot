@@ -1,0 +1,12 @@
+digraph {
+	graph [compound=true];
+
+	subgraph cluster_0 {
+		"constructor1" [shape=plaintext];
+
+		"t1[name=foo]" [label=<t1<BR /><FONT POINT-SIZE="10">Name: foo</FONT>>];
+		"t2[group=bar]" [label=<t2<BR /><FONT POINT-SIZE="10">Group: bar</FONT>>];
+	}
+
+	"constructor1" -> "t3" [ltail=cluster_0];
+}

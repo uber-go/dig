@@ -23,11 +23,13 @@ package dig
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"go.uber.org/dig/internal/digreflect"
@@ -203,6 +205,45 @@ func New(opts ...Option) *Container {
 		opt.applyOption(c)
 	}
 	return c
+}
+
+// A VisualizeOption modifies the default behavior of Visualize. It's included for
+// future functionality; currently, there are no concrete implementations.
+type VisualizeOption interface {
+	unimplemented()
+}
+
+// Visualize parses the graph in Container c into DOT format and writes it to
+// io.Writer w. The nodes(types) are clustered by constructors. Clusters and
+// nodes are connected by directed edges in the graph to indicate dependency.
+//
+// For example, if constructor c1 has params p1 and p2, c1 -> t1 and c1 -> t2.
+//
+// Different type attributes are represented differently on the graph -
+//   The names and groups of types are indicated in sublabels.
+//   An optional dependency is indicated by dotted edges to the params.
+func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
+	tmpl := `digraph {
+	graph [compound=true];
+{{range $index, $ctor := .Ctors}}
+	subgraph cluster_{{$index}} {
+		"{{.Name}}" [shape=plaintext];
+{{range $res := .Results}}
+		"{{.String}}" [label=<{{.Type}}{{.Attributes}}>];{{end}}
+	}
+{{range $par := .Params}}
+	"{{$ctor.Name}}" -> "{{.String}}" [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];{{end}}
+{{end}}}`
+
+	t := template.New("DOT graph")
+	t, err := t.Parse(tmpl)
+	if err != nil {
+		return fmt.Errorf("error parsing DOT graph template: got %v", err)
+	}
+	if err := t.Execute(w, c.dg); err != nil {
+		return fmt.Errorf("error executing DOT graph template: got %v", err)
+	}
+	return nil
 }
 
 // Changes the source of randomness for the container.

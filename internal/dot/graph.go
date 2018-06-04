@@ -20,6 +20,8 @@
 
 package dot
 
+import "fmt"
+
 // Ctor encodes a constructor provided to the container for the DOT graph.
 type Ctor struct {
 	Name    string
@@ -41,4 +43,28 @@ type Node struct {
 	Name     string
 	Optional bool
 	Group    string
+}
+
+// String returns the string representation of a node so the different constructors can refer to
+// the same node. We omit information on the optional field since the same type can be optional to
+// one constructor and required for another.
+func (n *Node) String() string {
+	if n.Name != "" {
+		return fmt.Sprintf("%v[name=%v]", n.Type, n.Name)
+	} else if n.Group != "" {
+		return fmt.Sprintf("%v[group=%v]", n.Type, n.Group)
+	}
+
+	return n.Type
+}
+
+// Attributes composes and returns a string to style the sublabels when visualizing graph.
+func (n *Node) Attributes() string {
+	if n.Name != "" {
+		return fmt.Sprintf("<BR /><FONT POINT-SIZE=\"10\">Name: %v</FONT>", n.Name)
+	} else if n.Group != "" {
+		return fmt.Sprintf("<BR /><FONT POINT-SIZE=\"10\">Group: %v</FONT>", n.Group)
+	} else {
+		return ""
+	}
 }
