@@ -2496,10 +2496,12 @@ func TestDotGraph(t *testing.T) {
 			{
 				Params:  []*dot.Node{n1},
 				Results: []*dot.Node{n2},
-			}, {
+			},
+			{
 				Params:  []*dot.Node{n1},
 				Results: []*dot.Node{n3},
-			}, {
+			},
+			{
 				Params:  []*dot.Node{n2},
 				Results: []*dot.Node{n4},
 			},
@@ -2633,7 +2635,8 @@ func TestDotGraph(t *testing.T) {
 					{Type: "dig.t1", Group: "foo"},
 					{Type: "dig.t1", Group: "foo"},
 				},
-			}, {
+			},
+			{
 				Params:  []*dot.Node{{Type: "[]dig.t1", Group: "foo"}},
 				Results: []*dot.Node{n3},
 			},
