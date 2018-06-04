@@ -377,7 +377,8 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			return err
 		}
 	}
-	c.dg.Add(n.paramList.DotNodes(), n.resultList.DotNodes())
+
+	c.dg.Ctors = append(c.dg.Ctors, newDotCtor(n))
 
 	return nil
 }
@@ -670,4 +671,15 @@ func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
 		newItems[i] = items[j]
 	}
 	return newItems
+}
+
+func newDotCtor(n *node) *dot.Ctor {
+	return &dot.Ctor{
+		Name:    n.location.Name,
+		Package: n.location.Package,
+		File:    n.location.File,
+		Line:    n.location.Line,
+		Params:  n.paramList.DotNodes(),
+		Results: n.resultList.DotNodes(),
+	}
 }
