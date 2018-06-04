@@ -207,8 +207,8 @@ func New(opts ...Option) *Container {
 	return c
 }
 
-// A VisualizeOption modifies the default behavior of Visualize. It's included for
-// future functionality; currently, there are no concrete implementations.
+// A VisualizeOption modifies the default behavior of Visualize. It's included
+// for future functionality; currently, there are no concrete implementations.
 type VisualizeOption interface {
 	unimplemented()
 }

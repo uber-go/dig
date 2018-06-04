@@ -45,9 +45,10 @@ type Node struct {
 	Group    string
 }
 
-// String returns the string representation of a node so the different constructors can refer to
-// the same node. We omit information on the optional field since the same type can be optional to
-// one constructor and required for another.
+// String returns the string representation of a node so the different
+// constructors can refer to the same node. We omit information on the optional
+// field since the same type can be optional to one constructor and required
+// for another.
 func (n *Node) String() string {
 	if n.Name != "" {
 		return fmt.Sprintf("%v[name=%v]", n.Type, n.Name)
@@ -58,7 +59,8 @@ func (n *Node) String() string {
 	return n.Type
 }
 
-// Attributes composes and returns a string to style the sublabels when visualizing graph.
+// Attributes composes and returns a string to style the sublabels when
+// visualizing graph.
 func (n *Node) Attributes() string {
 	if n.Name != "" {
 		return fmt.Sprintf("<BR /><FONT POINT-SIZE=\"10\">Name: %v</FONT>", n.Name)
