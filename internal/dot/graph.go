@@ -20,34 +20,25 @@
 
 package dot
 
+// Ctor encodes a constructor provided to the container for the DOT graph.
+type Ctor struct {
+	Name    string
+	Package string
+	File    string
+	Line    int
+	Params  []*Node
+	Results []*Node
+}
+
+// Graph is the DOT-format graph in a Container.
+type Graph struct {
+	Ctors []*Ctor
+}
+
 // Node is a single node in a graph.
 type Node struct {
 	Type     string
 	Name     string
 	Optional bool
 	Group    string
-}
-
-// Edge connects a node parameter to a node result.
-type Edge struct {
-	Param  *Node
-	Result *Node
-}
-
-// Graph is the DOT-format graph in a Container.
-type Graph struct {
-	Edges []*Edge
-}
-
-// Add adds the edges in node n into dg.
-func (dg *Graph) Add(params []*Node, results []*Node) {
-	edges := make([]*Edge, 0, len(params)*len(results))
-
-	for _, param := range params {
-		for _, result := range results {
-			edges = append(edges, &Edge{Param: param, Result: result})
-		}
-	}
-
-	dg.Edges = append(dg.Edges, edges...)
 }
