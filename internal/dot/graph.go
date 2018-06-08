@@ -62,11 +62,12 @@ func (n *Node) String() string {
 // Attributes composes and returns a string to style the sublabels when
 // visualizing graph.
 func (n *Node) Attributes() string {
-	if n.Name != "" {
-		return fmt.Sprintf("<BR /><FONT POINT-SIZE=\"10\">Name: %v</FONT>", n.Name)
-	} else if n.Group != "" {
-		return fmt.Sprintf("<BR /><FONT POINT-SIZE=\"10\">Group: %v</FONT>", n.Group)
-	} else {
+	switch {
+	case n.Name != "":
+		return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Name: %v</FONT>`, n.Name)
+	case n.Group != "":
+		return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Group: %v</FONT>`, n.Group)
+	default:
 		return ""
 	}
 }

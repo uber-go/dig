@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"flag"
 	"io/ioutil"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,18 +34,18 @@ import (
 var generate = flag.Bool("generate", false, "generates output to testdata/ if set")
 
 func VerifyVisualization(t *testing.T, testname string, c *Container) {
-	flag.Parse()
-
 	var b bytes.Buffer
 	require.NoError(t, Visualize(c, &b))
 
+	dotFile := filepath.Join("testdata", testname+".dot")
+
 	if *generate {
-		err := ioutil.WriteFile("testdata/"+testname+".dot", b.Bytes(), 0644)
+		err := ioutil.WriteFile(dotFile, b.Bytes(), 0644)
 		require.NoError(t, err)
 		return
 	}
 
-	wantBytes, err := ioutil.ReadFile("testdata/" + testname + ".dot")
+	wantBytes, err := ioutil.ReadFile(dotFile)
 	require.NoError(t, err)
 
 	got := b.String()
