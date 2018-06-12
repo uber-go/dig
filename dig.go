@@ -23,11 +23,13 @@ package dig
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"go.uber.org/dig/internal/digreflect"
@@ -203,6 +205,36 @@ func New(opts ...Option) *Container {
 		opt.applyOption(c)
 	}
 	return c
+}
+
+// A VisualizeOption modifies the default behavior of Visualize. It's included
+// for future functionality; currently, there are no concrete implementations.
+type VisualizeOption interface {
+	unimplemented()
+}
+
+var _graphTmpl = template.Must(template.New("DotGraph").Parse(`digraph {
+	graph [compound=true];
+	{{range $index, $ctor := .Ctors}}
+		subgraph cluster_{{$index}} {
+			{{printf "%q" .Name}} [shape=plaintext];
+			{{range $res := .Results}}
+				{{printf "%q" .String}} [label=<{{.Type}}{{.Attributes}}>];
+			{{end}}
+		}
+		{{range $par := .Params}}
+			{{printf "%q" $ctor.Name}} -> {{printf "%q" .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
+		{{end}}
+	{{end}}
+}`))
+
+// Visualize parses the graph in Container c into DOT format and writes it to
+// io.Writer w.
+func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
+	if err := _graphTmpl.Execute(w, c.dg); err != nil {
+		return fmt.Errorf("error executing template: %v", err)
+	}
+	return nil
 }
 
 // Changes the source of randomness for the container.
