@@ -45,18 +45,17 @@ type Node struct {
 	Group    string
 }
 
-// String returns the string representation of a node so the different
-// constructors can refer to the same node. We omit information on the optional
-// field since the same type can be optional to one constructor and required
-// for another.
+// String implements fmt.Stringer for Node. We omit the optional field since a
+// type can be optional to one constructor and required for another.
 func (n *Node) String() string {
-	if n.Name != "" {
+	switch {
+	case n.Name != "":
 		return fmt.Sprintf("%v[name=%v]", n.Type, n.Name)
-	} else if n.Group != "" {
+	case n.Group != "":
 		return fmt.Sprintf("%v[group=%v]", n.Type, n.Group)
+	default:
+		return n.Type
 	}
-
-	return n.Type
 }
 
 // Attributes composes and returns a string to style the sublabels when

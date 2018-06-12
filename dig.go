@@ -213,10 +213,7 @@ type VisualizeOption interface {
 	unimplemented()
 }
 
-// Visualize parses the graph in Container c into DOT format and writes it to
-// io.Writer w.
-func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
-	graphTmpl := template.Must(template.New("DotGraph").Parse(`digraph {
+var _graphTmpl = template.Must(template.New("DotGraph").Parse(`digraph {
 	graph [compound=true];
 	{{range $index, $ctor := .Ctors}}
 		subgraph cluster_{{$index}} {
@@ -231,7 +228,10 @@ func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
 	{{end}}
 }`))
 
-	if err := graphTmpl.Execute(w, c.dg); err != nil {
+// Visualize parses the graph in Container c into DOT format and writes it to
+// io.Writer w.
+func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
+	if err := _graphTmpl.Execute(w, c.dg); err != nil {
 		return fmt.Errorf("error executing template: %v", err)
 	}
 	return nil

@@ -2474,7 +2474,10 @@ func TestDotGraph(t *testing.T) {
 	type t3 struct{}
 	type t4 struct{}
 
-	n1, n2, n3, n4 := &dot.Node{Type: "dig.t1"}, &dot.Node{Type: "dig.t2"}, &dot.Node{Type: "dig.t3"}, &dot.Node{Type: "dig.t4"}
+	n1 := &dot.Node{Type: "t1"}
+	n2 := &dot.Node{Type: "t2"}
+	n3 := &dot.Node{Type: "t3"}
+	n4 := &dot.Node{Type: "t4"}
 
 	t.Parallel()
 
@@ -2723,7 +2726,10 @@ func TestNewDotCtor(t *testing.T) {
 }
 
 func TestVisualize(t *testing.T) {
-	n1, n2, n3, n4 := &dot.Node{Type: "t1"}, &dot.Node{Type: "t2"}, &dot.Node{Type: "t3"}, &dot.Node{Type: "t4"}
+	n1 := &dot.Node{Type: "t1"}
+	n2 := &dot.Node{Type: "t2"}
+	n3 := &dot.Node{Type: "t3"}
+	n4 := &dot.Node{Type: "t4"}
 
 	t.Parallel()
 
