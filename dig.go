@@ -198,7 +198,7 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		dg:        new(dot.Graph),
+		dg:        dot.NewGraph(),
 	}
 
 	for _, opt := range opts {
@@ -222,7 +222,7 @@ func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
 		subgraph cluster_{{$index}} {
 			{{printf "%q" .Name}} [shape=plaintext];
 			{{range $res := .Results}}
-				{{printf "%q" .String}} [label=<{{.Type}}{{.Attributes}}>];
+				{{printf "%q" .String}} [label=<{{.Type.String}}{{.Attributes}}>];
 			{{end}}
 		}
 		{{range $par := .Params}}
@@ -382,6 +382,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -410,7 +411,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		}
 	}
 
-	c.dg.Ctors = append(c.dg.Ctors, newDotCtor(n))
+	c.dg.AddDotCtor(newDotCtor(n))
 
 	return nil
 }

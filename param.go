@@ -218,7 +218,7 @@ type paramSingle struct {
 
 func (ps paramSingle) DotNodes() []*dot.Node {
 	return []*dot.Node{{
-		Type:     ps.Type.String(),
+		Type:     ps.Type,
 		Name:     ps.Name,
 		Optional: ps.Optional,
 	}}
@@ -392,7 +392,7 @@ type paramGroupedSlice struct {
 
 func (pt paramGroupedSlice) DotNodes() []*dot.Node {
 	return []*dot.Node{{
-		Type:  pt.Type.String(),
+		Type:  pt.Type.Elem(),
 		Group: pt.Group,
 	}}
 }
