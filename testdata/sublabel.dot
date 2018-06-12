@@ -4,13 +4,13 @@ digraph {
 		subgraph cluster_0 {
 			"constructor1" [shape=plaintext];
 			
-				"t1[name=foo]" [label=<t1<BR /><FONT POINT-SIZE="10">Name: foo</FONT>>];
+				"int[name=foo]" [label=<int<BR /><FONT POINT-SIZE="10">Name: foo</FONT>>];
 			
-				"t2[group=bar]" [label=<t2<BR /><FONT POINT-SIZE="10">Group: bar</FONT>>];
+				"string[group=bar]0" [label=<string<BR /><FONT POINT-SIZE="10">Group: bar</FONT>>];
 			
 		}
 		
-			"constructor1" -> "t3" [ltail=cluster_0];
+			"constructor1" -> "bool" [ltail=cluster_0];
 		
 	
 }

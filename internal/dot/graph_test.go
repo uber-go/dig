@@ -21,25 +21,35 @@
 package dot
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNodeString(t *testing.T) {
-	n1 := &Node{Type: "t1"}
-	n2 := &Node{Type: "t2", Name: "bar"}
-	n3 := &Node{Type: "t3", Group: "foo"}
+func TestNewGraph(t *testing.T) {
+	dg := NewGraph()
 
-	assert.Equal(t, "t1", n1.String())
-	assert.Equal(t, "t2[name=bar]", n2.String())
-	assert.Equal(t, "t3[group=foo]", n3.String())
+	assert.Equal(t, "*dot.Graph", reflect.TypeOf(dg).String())
+	assert.Equal(t, make(map[key][]*Ctor), dg.ctorMap)
+	assert.Equal(t, make(map[key][]*Node), dg.nodes)
+	assert.Equal(t, make(map[key][]*Ctor), dg.subscribers)
+}
+
+func TestNodeString(t *testing.T) {
+	n1 := &Node{Type: reflect.TypeOf("123")}
+	n2 := &Node{Type: reflect.TypeOf(123), Name: "bar"}
+	n3 := &Node{Type: reflect.TypeOf(123.0), Group: "foo"}
+
+	assert.Equal(t, "string", n1.String())
+	assert.Equal(t, "int[name=bar]", n2.String())
+	assert.Equal(t, "float64[group=foo]0", n3.String())
 }
 
 func TestAttributes(t *testing.T) {
-	n1 := &Node{Type: "t1"}
-	n2 := &Node{Type: "t2", Name: "bar"}
-	n3 := &Node{Type: "t3", Group: "foo"}
+	n1 := &Node{Type: reflect.TypeOf(123)}
+	n2 := &Node{Type: reflect.TypeOf(123), Name: "bar"}
+	n3 := &Node{Type: reflect.TypeOf(123), Group: "foo", GroupIndex: 2}
 
 	assert.Equal(t, "", n1.Attributes())
 	assert.Equal(t, `<BR /><FONT POINT-SIZE="10">Name: bar</FONT>`, n2.Attributes())

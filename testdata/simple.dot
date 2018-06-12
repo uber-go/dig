@@ -4,21 +4,21 @@ digraph {
 		subgraph cluster_0 {
 			"constructor1" [shape=plaintext];
 			
-				"t3" [label=<t3>];
+				"bool" [label=<bool>];
 			
 		}
 		
-			"constructor1" -> "t1" [ltail=cluster_0];
+			"constructor1" -> "int" [ltail=cluster_0];
 		
 	
 		subgraph cluster_1 {
 			"constructor2" [shape=plaintext];
 			
-				"t4" [label=<t4>];
+				"float64" [label=<float64>];
 			
 		}
 		
-			"constructor2" -> "t2" [ltail=cluster_1];
+			"constructor2" -> "string" [ltail=cluster_1];
 		
 	
 }

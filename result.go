@@ -237,7 +237,7 @@ type resultSingle struct {
 
 func (rs resultSingle) DotNodes() []*dot.Node {
 	return []*dot.Node{{
-		Type: rs.Type.String(),
+		Type: rs.Type,
 		Name: rs.Name,
 	}}
 }
@@ -363,7 +363,7 @@ type resultGrouped struct {
 
 func (rt resultGrouped) DotNodes() []*dot.Node {
 	return []*dot.Node{{
-		Type:  rt.Type.String(),
+		Type:  rt.Type,
 		Group: rt.Group,
 	}}
 }

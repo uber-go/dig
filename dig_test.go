@@ -2474,7 +2474,15 @@ func TestDotGraph(t *testing.T) {
 	type t3 struct{}
 	type t4 struct{}
 
-	n1, n2, n3, n4 := &dot.Node{Type: "dig.t1"}, &dot.Node{Type: "dig.t2"}, &dot.Node{Type: "dig.t3"}, &dot.Node{Type: "dig.t4"}
+	type1 := reflect.TypeOf(t1{})
+	type2 := reflect.TypeOf(t2{})
+	type3 := reflect.TypeOf(t3{})
+	type4 := reflect.TypeOf(t4{})
+
+	n1 := &dot.Node{Type: type1}
+	n2 := &dot.Node{Type: type2}
+	n3 := &dot.Node{Type: type3}
+	n4 := &dot.Node{Type: type4}
 
 	t.Parallel()
 
@@ -2627,17 +2635,17 @@ func TestDotGraph(t *testing.T) {
 			C t1 `group:"foo"`
 		}
 
+		p1 := &dot.Node{Type: type1, Group: "foo", GroupIndex: 0}
+		p2 := &dot.Node{Type: type1, Group: "foo", GroupIndex: 1}
+		p3 := &dot.Node{Type: type1, Group: "foo", GroupIndex: 2}
+
 		expected := []*dot.Ctor{
 			{
-				Params: []*dot.Node{n2},
-				Results: []*dot.Node{
-					{Type: "dig.t1", Group: "foo"},
-					{Type: "dig.t1", Group: "foo"},
-					{Type: "dig.t1", Group: "foo"},
-				},
+				Params:  []*dot.Node{n2},
+				Results: []*dot.Node{p1, p2, p3},
 			},
 			{
-				Params:  []*dot.Node{{Type: "[]dig.t1", Group: "foo"}},
+				Params:  []*dot.Node{p1, p2, p3},
 				Results: []*dot.Node{n3},
 			},
 		}
@@ -2663,8 +2671,8 @@ func TestDotGraph(t *testing.T) {
 
 		expected := []*dot.Ctor{
 			{
-				Params:  []*dot.Node{{Type: "dig.t1", Name: "A"}},
-				Results: []*dot.Node{{Type: "dig.t2", Name: "B"}},
+				Params:  []*dot.Node{{Type: type1, Name: "A"}},
+				Results: []*dot.Node{{Type: type2, Name: "B"}},
 			},
 		}
 
@@ -2685,9 +2693,9 @@ func TestDotGraph(t *testing.T) {
 		expected := []*dot.Ctor{
 			{
 				Params: []*dot.Node{
-					{Type: "dig.t1", Name: "A", Optional: true},
-					{Type: "dig.t2", Name: "B"},
-					{Type: "dig.t3", Optional: true},
+					{Type: type1, Name: "A", Optional: true},
+					{Type: type2, Name: "B"},
+					{Type: type3, Optional: true},
 				},
 				Results: []*dot.Node{n4},
 			},
@@ -2702,6 +2710,8 @@ func TestDotGraph(t *testing.T) {
 func TestNewDotCtor(t *testing.T) {
 	type t1 struct{}
 	type t2 struct{}
+
+	type1, type2 := reflect.TypeOf(t1{}), reflect.TypeOf(t2{})
 
 	n, err := newNode(func(A t1) t2 { return t2{} }, nodeOptions{})
 	require.NoError(t, err)
@@ -2718,12 +2728,20 @@ func TestNewDotCtor(t *testing.T) {
 	assert.Equal(t, "pkg1", ctor.Package)
 	assert.Equal(t, "file1", ctor.File)
 	assert.Equal(t, 24534, ctor.Line)
-	assert.Equal(t, []*dot.Node{{Type: "dig.t1"}}, ctor.Params)
-	assert.Equal(t, []*dot.Node{{Type: "dig.t2"}}, ctor.Results)
+	assert.Equal(t, []*dot.Node{{Type: type1}}, ctor.Params)
+	assert.Equal(t, []*dot.Node{{Type: type2}}, ctor.Results)
 }
 
 func TestVisualize(t *testing.T) {
-	n1, n2, n3, n4 := &dot.Node{Type: "t1"}, &dot.Node{Type: "t2"}, &dot.Node{Type: "t3"}, &dot.Node{Type: "t4"}
+	type1 := reflect.TypeOf(72)
+	type2 := reflect.TypeOf("72")
+	type3 := reflect.TypeOf(true)
+	type4 := reflect.TypeOf(72.0)
+
+	n1 := &dot.Node{Type: type1}
+	n2 := &dot.Node{Type: type2}
+	n3 := &dot.Node{Type: type3}
+	n4 := &dot.Node{Type: type4}
 
 	t.Parallel()
 
@@ -2753,8 +2771,8 @@ func TestVisualize(t *testing.T) {
 			Name:   "constructor1",
 			Params: []*dot.Node{n3},
 			Results: []*dot.Node{
-				{Type: "t1", Name: "foo"},
-				{Type: "t2", Group: "bar"},
+				{Type: type1, Name: "foo"},
+				{Type: type2, Group: "bar"},
 			},
 		}}
 
@@ -2766,8 +2784,8 @@ func TestVisualize(t *testing.T) {
 		c.dg.Ctors = []*dot.Ctor{{
 			Name: "constructor1",
 			Params: []*dot.Node{
-				{Type: "t1", Name: "foo", Optional: true},
-				{Type: "t2", Optional: true},
+				{Type: type1, Name: "foo", Optional: true},
+				{Type: type2, Optional: true},
 			},
 			Results: []*dot.Node{n3},
 		}}
