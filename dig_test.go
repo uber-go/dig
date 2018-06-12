@@ -2531,7 +2531,10 @@ func TestDotGraph(t *testing.T) {
 	type t3 struct{}
 	type t4 struct{}
 
-	n1, n2, n3, n4 := &dot.Node{Type: "dig.t1"}, &dot.Node{Type: "dig.t2"}, &dot.Node{Type: "dig.t3"}, &dot.Node{Type: "dig.t4"}
+	n1 := &dot.Node{Type: "dig.t1"}
+	n2 := &dot.Node{Type: "dig.t2"}
+	n3 := &dot.Node{Type: "dig.t3"}
+	n4 := &dot.Node{Type: "dig.t4"}
 
 	t.Parallel()
 
@@ -2777,4 +2780,61 @@ func TestNewDotCtor(t *testing.T) {
 	assert.Equal(t, 24534, ctor.Line)
 	assert.Equal(t, []*dot.Node{{Type: "dig.t1"}}, ctor.Params)
 	assert.Equal(t, []*dot.Node{{Type: "dig.t2"}}, ctor.Results)
+}
+
+func TestVisualize(t *testing.T) {
+	n1 := &dot.Node{Type: "t1"}
+	n2 := &dot.Node{Type: "t2"}
+	n3 := &dot.Node{Type: "t3"}
+	n4 := &dot.Node{Type: "t4"}
+
+	t.Parallel()
+
+	t.Run("empty graph in container", func(t *testing.T) {
+		c := New()
+		VerifyVisualization(t, "empty", c)
+	})
+
+	t.Run("simple graph", func(t *testing.T) {
+		c := New()
+		c.dg.Ctors = []*dot.Ctor{{
+			Name:    "constructor1",
+			Params:  []*dot.Node{n1},
+			Results: []*dot.Node{n3},
+		}, {
+			Name:    "constructor2",
+			Params:  []*dot.Node{n2},
+			Results: []*dot.Node{n4},
+		}}
+
+		VerifyVisualization(t, "simple", c)
+	})
+
+	t.Run("named and grouped types", func(t *testing.T) {
+		c := New()
+		c.dg.Ctors = []*dot.Ctor{{
+			Name:   "constructor1",
+			Params: []*dot.Node{n3},
+			Results: []*dot.Node{
+				{Type: "t1", Name: "foo"},
+				{Type: "t2", Group: "bar"},
+			},
+		}}
+
+		VerifyVisualization(t, "sublabel", c)
+	})
+
+	t.Run("optional params", func(t *testing.T) {
+		c := New()
+		c.dg.Ctors = []*dot.Ctor{{
+			Name: "constructor1",
+			Params: []*dot.Node{
+				{Type: "t1", Name: "foo", Optional: true},
+				{Type: "t2", Optional: true},
+			},
+			Results: []*dot.Node{n3},
+		}}
+
+		VerifyVisualization(t, "optional", c)
+	})
 }

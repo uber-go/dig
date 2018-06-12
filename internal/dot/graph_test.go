@@ -20,53 +20,28 @@
 
 package dot
 
-import "fmt"
+import (
+	"testing"
 
-// Ctor encodes a constructor provided to the container for the DOT graph.
-type Ctor struct {
-	Name    string
-	Package string
-	File    string
-	Line    int
-	Params  []*Node
-	Results []*Node
+	"github.com/stretchr/testify/assert"
+)
+
+func TestNodeString(t *testing.T) {
+	n1 := &Node{Type: "t1"}
+	n2 := &Node{Type: "t2", Name: "bar"}
+	n3 := &Node{Type: "t3", Group: "foo"}
+
+	assert.Equal(t, "t1", n1.String())
+	assert.Equal(t, "t2[name=bar]", n2.String())
+	assert.Equal(t, "t3[group=foo]", n3.String())
 }
 
-// Graph is the DOT-format graph in a Container.
-type Graph struct {
-	Ctors []*Ctor
-}
+func TestAttributes(t *testing.T) {
+	n1 := &Node{Type: "t1"}
+	n2 := &Node{Type: "t2", Name: "bar"}
+	n3 := &Node{Type: "t3", Group: "foo"}
 
-// Node is a single node in a graph.
-type Node struct {
-	Type     string
-	Name     string
-	Optional bool
-	Group    string
-}
-
-// String implements fmt.Stringer for Node. We omit the optional field since a
-// type can be optional to one constructor and required for another.
-func (n *Node) String() string {
-	switch {
-	case n.Name != "":
-		return fmt.Sprintf("%v[name=%v]", n.Type, n.Name)
-	case n.Group != "":
-		return fmt.Sprintf("%v[group=%v]", n.Type, n.Group)
-	default:
-		return n.Type
-	}
-}
-
-// Attributes composes and returns a string to style the sublabels when
-// visualizing graph.
-func (n *Node) Attributes() string {
-	switch {
-	case n.Name != "":
-		return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Name: %v</FONT>`, n.Name)
-	case n.Group != "":
-		return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Group: %v</FONT>`, n.Group)
-	default:
-		return ""
-	}
+	assert.Equal(t, "", n1.Attributes())
+	assert.Equal(t, `<BR /><FONT POINT-SIZE="10">Name: bar</FONT>`, n2.Attributes())
+	assert.Equal(t, `<BR /><FONT POINT-SIZE="10">Group: foo</FONT>`, n3.Attributes())
 }
