@@ -2,23 +2,21 @@ digraph {
 	graph [compound=true];
 	
 		subgraph cluster_0 {
-			"constructor1" [shape=plaintext];
-			
-				"t3" [label=<t3>];
+			"TestVisualize.func2.1" [shape=plaintext];
+			"dig.t1" [label=<dig.t1>];
+			"dig.t2" [label=<dig.t2>];
 			
 		}
 		
-			"constructor1" -> "t1" [ltail=cluster_0];
 		
-	
 		subgraph cluster_1 {
-			"constructor2" [shape=plaintext];
-			
-				"t4" [label=<t4>];
+			"TestVisualize.func2.2" [shape=plaintext];
+			"dig.t3" [label=<dig.t3>];
+			"dig.t4" [label=<dig.t4>];
 			
 		}
+		"TestVisualize.func2.2" -> "dig.t1" [ltail=cluster_1];
+		"TestVisualize.func2.2" -> "dig.t2" [ltail=cluster_1];
 		
-			"constructor2" -> "t2" [ltail=cluster_1];
 		
-	
 }

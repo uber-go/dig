@@ -44,8 +44,8 @@ type result interface {
 	// This MAY panic if the result does not consume a single value.
 	Extract(containerWriter, reflect.Value)
 
-	// DotNodes returns a slice of result(s) represented in dot.Nodes for the DOT-format graph.
-	DotNodes() []*dot.Node
+	// DotNodes returns a slice of dot.Result(s).
+	DotNodes() []*dot.Result
 }
 
 var (
@@ -168,8 +168,8 @@ type resultList struct {
 	resultIndexes []int
 }
 
-func (rl resultList) DotNodes() []*dot.Node {
-	var types []*dot.Node
+func (rl resultList) DotNodes() []*dot.Result {
+	var types []*dot.Result
 	for _, result := range rl.Results {
 		types = append(types, result.DotNodes()...)
 	}
@@ -235,11 +235,15 @@ type resultSingle struct {
 	Type reflect.Type
 }
 
-func (rs resultSingle) DotNodes() []*dot.Node {
-	return []*dot.Node{{
-		Type: rs.Type.String(),
-		Name: rs.Name,
-	}}
+func (rs resultSingle) DotNodes() []*dot.Result {
+	return []*dot.Result{
+		{
+			Node: &dot.Node{
+				Type: rs.Type,
+				Name: rs.Name,
+			},
+		},
+	}
 }
 
 func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
@@ -255,8 +259,8 @@ type resultObject struct {
 	Fields []resultObjectField
 }
 
-func (ro resultObject) DotNodes() []*dot.Node {
-	var types []*dot.Node
+func (ro resultObject) DotNodes() []*dot.Result {
+	var types []*dot.Result
 	for _, field := range ro.Fields {
 		types = append(types, field.DotNodes()...)
 	}
@@ -308,7 +312,7 @@ type resultObjectField struct {
 	Result result
 }
 
-func (rof resultObjectField) DotNodes() []*dot.Node {
+func (rof resultObjectField) DotNodes() []*dot.Result {
 	return rof.Result.DotNodes()
 }
 
@@ -361,11 +365,15 @@ type resultGrouped struct {
 	Type reflect.Type
 }
 
-func (rt resultGrouped) DotNodes() []*dot.Node {
-	return []*dot.Node{{
-		Type:  rt.Type.String(),
-		Group: rt.Group,
-	}}
+func (rt resultGrouped) DotNodes() []*dot.Result {
+	return []*dot.Result{
+		{
+			Node: &dot.Node{
+				Type:  rt.Type,
+				Group: rt.Group,
+			},
+		},
+	}
 }
 
 // newResultGrouped(f) builds a new resultGrouped from the provided field.

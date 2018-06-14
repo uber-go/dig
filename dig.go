@@ -198,7 +198,7 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		dg:        new(dot.Graph),
+		dg:        dot.NewGraph(),
 	}
 
 	for _, opt := range opts {
@@ -215,16 +215,25 @@ type VisualizeOption interface {
 
 var _graphTmpl = template.Must(template.New("DotGraph").Parse(`digraph {
 	graph [compound=true];
+	{{range $g := .Groups}}
+		{{- printf "%q" .String}} [shape=diamond label=<{{.Type}}{{.Attributes}}>];
+		{{range .Results}}
+			{{- printf "%q" $g.String}} -> {{printf "%q" .String}};
+		{{end}}
+	{{end -}}
 	{{range $index, $ctor := .Ctors}}
 		subgraph cluster_{{$index}} {
 			{{printf "%q" .Name}} [shape=plaintext];
-			{{range $res := .Results}}
-				{{printf "%q" .String}} [label=<{{.Type}}{{.Attributes}}>];
+			{{range .Results}}
+				{{- printf "%q" .String}} [label=<{{.Type}}{{.Attributes}}>];
 			{{end}}
 		}
-		{{range $par := .Params}}
-			{{printf "%q" $ctor.Name}} -> {{printf "%q" .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
+		{{range .Params}}
+			{{- printf "%q" $ctor.Name}} -> {{printf "%q" .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
 		{{end}}
+		{{range .GroupParam}}
+			{{- printf "%q" $ctor.Name}} -> {{printf "%q" .String}} [ltail=cluster_{{$index}}];
+		{{end -}}
 	{{end}}
 }`))
 
@@ -410,7 +419,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		}
 	}
 
-	c.dg.Ctors = append(c.dg.Ctors, newDotCtor(n))
+	c.dg.AddCtor(newDotCtor(n), n.paramList.DotNodes(), n.resultList.DotNodes())
 
 	return nil
 }
@@ -711,7 +720,5 @@ func newDotCtor(n *node) *dot.Ctor {
 		Package: n.location.Package,
 		File:    n.location.File,
 		Line:    n.location.Line,
-		Params:  n.paramList.DotNodes(),
-		Results: n.resultList.DotNodes(),
 	}
 }
