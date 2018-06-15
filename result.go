@@ -44,8 +44,8 @@ type result interface {
 	// This MAY panic if the result does not consume a single value.
 	Extract(containerWriter, reflect.Value)
 
-	// DotNodes returns a slice of dot.Result(s).
-	DotNodes() []*dot.Result
+	// DotResult returns a slice of dot.Result(s).
+	DotResult() []*dot.Result
 }
 
 var (
@@ -168,10 +168,10 @@ type resultList struct {
 	resultIndexes []int
 }
 
-func (rl resultList) DotNodes() []*dot.Result {
+func (rl resultList) DotResult() []*dot.Result {
 	var types []*dot.Result
 	for _, result := range rl.Results {
-		types = append(types, result.DotNodes()...)
+		types = append(types, result.DotResult()...)
 	}
 	return types
 }
@@ -235,7 +235,7 @@ type resultSingle struct {
 	Type reflect.Type
 }
 
-func (rs resultSingle) DotNodes() []*dot.Result {
+func (rs resultSingle) DotResult() []*dot.Result {
 	return []*dot.Result{
 		{
 			Node: &dot.Node{
@@ -259,10 +259,10 @@ type resultObject struct {
 	Fields []resultObjectField
 }
 
-func (ro resultObject) DotNodes() []*dot.Result {
+func (ro resultObject) DotResult() []*dot.Result {
 	var types []*dot.Result
 	for _, field := range ro.Fields {
-		types = append(types, field.DotNodes()...)
+		types = append(types, field.DotResult()...)
 	}
 	return types
 }
@@ -312,8 +312,8 @@ type resultObjectField struct {
 	Result result
 }
 
-func (rof resultObjectField) DotNodes() []*dot.Result {
-	return rof.Result.DotNodes()
+func (rof resultObjectField) DotResult() []*dot.Result {
+	return rof.Result.DotResult()
 }
 
 // newResultObjectField(i, f, opts) builds a resultObjectField from the field
@@ -365,7 +365,7 @@ type resultGrouped struct {
 	Type reflect.Type
 }
 
-func (rt resultGrouped) DotNodes() []*dot.Result {
+func (rt resultGrouped) DotResult() []*dot.Result {
 	return []*dot.Result{
 		{
 			Node: &dot.Node{

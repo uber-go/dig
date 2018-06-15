@@ -213,29 +213,37 @@ type VisualizeOption interface {
 	unimplemented()
 }
 
-var _graphTmpl = template.Must(template.New("DotGraph").Parse(`digraph {
+var funcMap = template.FuncMap{
+	"quote": quote,
+}
+
+var _graphTmpl = template.Must(template.New("DotGraph").Funcs(funcMap).Parse(`digraph {
 	graph [compound=true];
 	{{range $g := .Groups}}
-		{{- printf "%q" .String}} [shape=diamond label=<{{.Type}}{{.Attributes}}>];
+		{{- quote .String}} [shape=diamond label=<{{.Type}}{{.Attributes}}>];
 		{{range .Results}}
-			{{- printf "%q" $g.String}} -> {{printf "%q" .String}};
+			{{- quote $g.String}} -> {{quote .String}};
 		{{end}}
 	{{end -}}
 	{{range $index, $ctor := .Ctors}}
 		subgraph cluster_{{$index}} {
-			{{printf "%q" .Name}} [shape=plaintext];
+			{{quote .Name}} [shape=plaintext];
 			{{range .Results}}
-				{{- printf "%q" .String}} [label=<{{.Type}}{{.Attributes}}>];
+				{{- quote .String}} [label=<{{.Type}}{{.Attributes}}>];
 			{{end}}
 		}
 		{{range .Params}}
-			{{- printf "%q" $ctor.Name}} -> {{printf "%q" .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
+			{{- quote $ctor.Name}} -> {{quote .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
 		{{end}}
-		{{range .GroupParam}}
-			{{- printf "%q" $ctor.Name}} -> {{printf "%q" .String}} [ltail=cluster_{{$index}}];
+		{{range .GroupParams}}
+			{{- quote $ctor.Name}} -> {{quote .String}} [ltail=cluster_{{$index}}];
 		{{end -}}
 	{{end}}
 }`))
+
+func quote(s string) string {
+	return strconv.Quote(s)
+}
 
 // Visualize parses the graph in Container c into DOT format and writes it to
 // io.Writer w.
@@ -419,7 +427,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		}
 	}
 
-	c.dg.AddCtor(newDotCtor(n), n.paramList.DotNodes(), n.resultList.DotNodes())
+	c.dg.AddCtor(newDotCtor(n), n.paramList.DotParam(), n.resultList.DotResult())
 
 	return nil
 }

@@ -2677,7 +2677,7 @@ func TestDotGraph(t *testing.T) {
 				Results: []*dot.Result{res1},
 			},
 			{
-				GroupParam: []*dot.Group{
+				GroupParams: []*dot.Group{
 					{
 						Type:    type1,
 						Group:   "foo",

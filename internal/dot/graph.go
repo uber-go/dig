@@ -27,13 +27,13 @@ import (
 
 // Ctor encodes a constructor provided to the container for the DOT graph.
 type Ctor struct {
-	Name       string
-	Package    string
-	File       string
-	Line       int
-	Params     []*Param
-	GroupParam []*Group
-	Results    []*Result
+	Name        string
+	Package     string
+	File        string
+	Line        int
+	Params      []*Param
+	GroupParams []*Group
+	Results     []*Result
 }
 
 // Param is a parameter node in the graph.
@@ -45,11 +45,17 @@ type Param struct {
 // Result is a result node in the graph.
 type Result struct {
 	*Node
+
+	// GroupIndex is added to differenciate grouped values from one another.
+	// Since grouped values have the same type and group, their Node / string
+	// representations are the same so we need indices to uniquely identify
+	// the values.
 	GroupIndex int
 }
 
 // Group is a group node in the graph.
 type Group struct {
+	// Type is the type of values in the group.
 	Type    reflect.Type
 	Group   string
 	Results []*Result
@@ -58,7 +64,7 @@ type Group struct {
 // Graph is the DOT-format graph in a Container.
 type Graph struct {
 	Ctors  []*Ctor
-	Groups map[key]*Group
+	Groups map[groupKey]*Group
 }
 
 // Node is a single node in a graph and is embedded into Params and Results.
@@ -68,70 +74,81 @@ type Node struct {
 	Group string
 }
 
-type key struct {
-	t reflect.Type
-	g string
+type groupKey struct {
+	t     reflect.Type
+	group string
 }
 
 // NewGraph creates an empty graph.
 func NewGraph() *Graph {
 	return &Graph{
-		Groups: make(map[key]*Group),
+		Groups: make(map[groupKey]*Group),
 	}
 }
 
-// NewGroup creates a new group with information in the key.
-func NewGroup(k key) *Group {
+// NewGroup creates a new group with information in the groupKey.
+func NewGroup(k groupKey) *Group {
 	return &Group{
 		Type:  k.t,
-		Group: k.g,
+		Group: k.group,
 	}
 }
 
 // AddCtor adds the constructor with paramList and resultList into the graph.
 func (dg *Graph) AddCtor(c *Ctor, paramList []*Param, resultList []*Result) {
-	var params []*Param
-	var groupParam []*Group
+	var (
+		params      []*Param
+		groupParams []*Group
+	)
 
 	// Loop through the paramList to separate them into regular params and
 	// grouped params. For grouped params, we use getGroup to find the actual
 	// group.
 	for _, param := range paramList {
-		if param.Group != "" {
-			k := key{t: param.Type.Elem(), g: param.Group}
-			group := dg.getGroup(k)
-			groupParam = append(groupParam, group)
-		} else {
+		if param.Group == "" {
+			// Not a value group.
 			params = append(params, param)
+			continue
 		}
+
+		k := groupKey{t: param.Type.Elem(), group: param.Group}
+		group := dg.getGroup(k)
+		groupParams = append(groupParams, group)
 	}
 
 	for _, result := range resultList {
 		// If the result is a grouped value, we want to update its GroupIndex
 		// and add it to the Group.
 		if result.Group != "" {
-			k := key{t: result.Type, g: result.Group}
-			group := dg.getGroup(k)
-
-			result.GroupIndex = len(group.Results)
-			group.Results = append(group.Results, result)
+			dg.addToGroup(result)
 		}
 	}
 
 	c.Params = params
-	c.GroupParam = groupParam
+	c.GroupParams = groupParams
 	c.Results = resultList
 
 	dg.Ctors = append(dg.Ctors, c)
 }
 
-// getGroup finds the group by key from the graph. If it is not available, a
-// new group is created and returned.
-func (dg *Graph) getGroup(k key) *Group {
-	if _, ok := dg.Groups[k]; !ok {
-		dg.Groups[k] = NewGroup(k)
+// getGroup finds the group by groupKey from the graph. If it is not available,
+// a new group is created and returned.
+func (dg *Graph) getGroup(k groupKey) *Group {
+	g, ok := dg.Groups[k]
+	if !ok {
+		g = NewGroup(k)
+		dg.Groups[k] = g
 	}
-	return dg.Groups[k]
+	return g
+}
+
+// addToGroup adds a newly provided grouped result to the appropriate group.
+func (dg *Graph) addToGroup(r *Result) {
+	k := groupKey{t: r.Type, group: r.Group}
+	group := dg.getGroup(k)
+
+	r.GroupIndex = len(group.Results)
+	group.Results = append(group.Results, r)
 }
 
 // String implements fmt.Stringer for Param.

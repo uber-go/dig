@@ -48,8 +48,8 @@ type param interface {
 	// This MAY panic if the param does not produce a single value.
 	Build(containerStore) (reflect.Value, error)
 
-	// DotNodes returns a slice of dot.Param(s).
-	DotNodes() []*dot.Param
+	// DotParam returns a slice of dot.Param(s).
+	DotParam() []*dot.Param
 }
 
 var (
@@ -149,10 +149,10 @@ type paramList struct {
 	Params []param
 }
 
-func (pl paramList) DotNodes() []*dot.Param {
+func (pl paramList) DotParam() []*dot.Param {
 	var types []*dot.Param
 	for _, param := range pl.Params {
-		types = append(types, param.DotNodes()...)
+		types = append(types, param.DotParam()...)
 	}
 	return types
 }
@@ -216,7 +216,7 @@ type paramSingle struct {
 	Type     reflect.Type
 }
 
-func (ps paramSingle) DotNodes() []*dot.Param {
+func (ps paramSingle) DotParam() []*dot.Param {
 	return []*dot.Param{
 		{
 			Node: &dot.Node{
@@ -270,10 +270,10 @@ type paramObject struct {
 	Fields []paramObjectField
 }
 
-func (po paramObject) DotNodes() []*dot.Param {
+func (po paramObject) DotParam() []*dot.Param {
 	var types []*dot.Param
 	for _, field := range po.Fields {
-		types = append(types, field.DotNodes()...)
+		types = append(types, field.DotParam()...)
 	}
 	return types
 }
@@ -328,8 +328,8 @@ type paramObjectField struct {
 	Param param
 }
 
-func (pof paramObjectField) DotNodes() []*dot.Param {
-	return pof.Param.DotNodes()
+func (pof paramObjectField) DotParam() []*dot.Param {
+	return pof.Param.DotParam()
 }
 
 func newParamObjectField(idx int, f reflect.StructField) (paramObjectField, error) {
@@ -394,7 +394,7 @@ type paramGroupedSlice struct {
 	Type reflect.Type
 }
 
-func (pt paramGroupedSlice) DotNodes() []*dot.Param {
+func (pt paramGroupedSlice) DotParam() []*dot.Param {
 	return []*dot.Param{
 		{
 			Node: &dot.Node{
