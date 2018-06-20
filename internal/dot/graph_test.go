@@ -45,7 +45,7 @@ func TestNewGroup(t *testing.T) {
 	group := NewGroup(k)
 
 	assert.Equal(t, type1, group.Type)
-	assert.Equal(t, "group1", group.Group)
+	assert.Equal(t, "group1", group.Name)
 	assert.Equal(t, "*dot.Group", reflect.TypeOf(group).String())
 }
 
@@ -87,8 +87,8 @@ func TestAddCtor(t *testing.T) {
 			group: "foo",
 		}
 		expectedGroup := &Group{
-			Type:  type3.Elem(),
-			Group: "foo",
+			Type: type3.Elem(),
+			Name: "foo",
 		}
 
 		assert.Equal(t, map[groupKey]*Group{}, dg.Groups)
@@ -111,12 +111,12 @@ func TestAddCtor(t *testing.T) {
 		k := groupKey{t: type3, group: "foo"}
 		group0 := &Group{
 			Type:    type3,
-			Group:   "foo",
+			Name:    "foo",
 			Results: []*Result{res0},
 		}
 		group1 := &Group{
 			Type:    type3,
-			Group:   "foo",
+			Name:    "foo",
 			Results: []*Result{res0, res1},
 		}
 
@@ -174,7 +174,7 @@ func TestStringerAndAttribute(t *testing.T) {
 	r2 := &Result{Node: n2}
 	r3 := &Result{Node: n3, GroupIndex: 5}
 
-	g1 := &Group{Type: reflect.TypeOf(t1{}), Group: "group1"}
+	g1 := &Group{Type: reflect.TypeOf(t1{}), Name: "group1"}
 
 	t.Parallel()
 

@@ -213,11 +213,12 @@ type VisualizeOption interface {
 	unimplemented()
 }
 
-var funcMap = template.FuncMap{
-	"quote": quote,
-}
-
-var _graphTmpl = template.Must(template.New("DotGraph").Funcs(funcMap).Parse(`digraph {
+var _graphTmpl = template.Must(
+	template.New("DotGraph").
+		Funcs(template.FuncMap{
+			"quote": strconv.Quote,
+		}).
+		Parse(`digraph {
 	graph [compound=true];
 	{{range $g := .Groups}}
 		{{- quote .String}} [shape=diamond label=<{{.Type}}{{.Attributes}}>];
@@ -240,10 +241,6 @@ var _graphTmpl = template.Must(template.New("DotGraph").Funcs(funcMap).Parse(`di
 		{{end -}}
 	{{end}}
 }`))
-
-func quote(s string) string {
-	return strconv.Quote(s)
-}
 
 // Visualize parses the graph in Container c into DOT format and writes it to
 // io.Writer w.

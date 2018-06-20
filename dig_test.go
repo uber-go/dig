@@ -2468,29 +2468,28 @@ func assertCtorsEqual(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
 	}
 }
 
-func testParam(t reflect.Type, n string, g string, o bool) *dot.Param {
-	return &dot.Param{
-		Node: &dot.Node{
-			Type:  t,
-			Name:  n,
-			Group: g,
-		},
-		Optional: o,
-	}
-}
-
-func testResult(t reflect.Type, n string, g string, gi int) *dot.Result {
-	return &dot.Result{
-		Node: &dot.Node{
-			Type:  t,
-			Name:  n,
-			Group: g,
-		},
-		GroupIndex: gi,
-	}
-}
-
 func TestDotGraph(t *testing.T) {
+	tparam := func(t reflect.Type, n string, g string, o bool) *dot.Param {
+		return &dot.Param{
+			Node: &dot.Node{
+				Type:  t,
+				Name:  n,
+				Group: g,
+			},
+			Optional: o,
+		}
+	}
+
+	tresult := func(t reflect.Type, n string, g string, gi int) *dot.Result {
+		return &dot.Result{
+			Node: &dot.Node{
+				Type:  t,
+				Name:  n,
+				Group: g,
+			},
+			GroupIndex: gi,
+		}
+	}
 	type t1 struct{}
 	type t2 struct{}
 	type t3 struct{}
@@ -2501,15 +2500,15 @@ func TestDotGraph(t *testing.T) {
 	type3 := reflect.TypeOf(t3{})
 	type4 := reflect.TypeOf(t4{})
 
-	p1 := testParam(type1, "", "", false)
-	p2 := testParam(type2, "", "", false)
-	p3 := testParam(type3, "", "", false)
-	p4 := testParam(type4, "", "", false)
+	p1 := tparam(type1, "", "", false)
+	p2 := tparam(type2, "", "", false)
+	p3 := tparam(type3, "", "", false)
+	p4 := tparam(type4, "", "", false)
 
-	r1 := testResult(type1, "", "", 0)
-	r2 := testResult(type2, "", "", 0)
-	r3 := testResult(type3, "", "", 0)
-	r4 := testResult(type4, "", "", 0)
+	r1 := tresult(type1, "", "", 0)
+	r2 := tresult(type2, "", "", 0)
+	r3 := tresult(type3, "", "", 0)
+	r4 := tresult(type4, "", "", 0)
 
 	t.Parallel()
 
@@ -2664,8 +2663,8 @@ func TestDotGraph(t *testing.T) {
 			A t1 `group:"foo"`
 		}
 
-		res0 := testResult(type1, "", "foo", 0)
-		res1 := testResult(type1, "", "foo", 1)
+		res0 := tresult(type1, "", "foo", 0)
+		res1 := tresult(type1, "", "foo", 1)
 
 		expected := []*dot.Ctor{
 			{
@@ -2680,7 +2679,7 @@ func TestDotGraph(t *testing.T) {
 				GroupParams: []*dot.Group{
 					{
 						Type:    type1,
-						Group:   "foo",
+						Name:    "foo",
 						Results: []*dot.Result{res0, res1},
 					},
 				},
@@ -2711,10 +2710,10 @@ func TestDotGraph(t *testing.T) {
 		expected := []*dot.Ctor{
 			{
 				Params: []*dot.Param{
-					testParam(type1, "A", "", false),
+					tparam(type1, "A", "", false),
 				},
 				Results: []*dot.Result{
-					testResult(type2, "B", "", 0),
+					tresult(type2, "B", "", 0),
 				},
 			},
 		}
@@ -2733,9 +2732,9 @@ func TestDotGraph(t *testing.T) {
 			C t3 `optional:"true"`
 		}
 
-		par1 := testParam(type1, "A", "", true)
-		par2 := testParam(type2, "B", "", false)
-		par3 := testParam(type3, "", "", true)
+		par1 := tparam(type1, "A", "", true)
+		par2 := tparam(type2, "B", "", false)
+		par3 := tparam(type3, "", "", true)
 
 		expected := []*dot.Ctor{
 			{

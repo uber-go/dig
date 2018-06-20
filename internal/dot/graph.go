@@ -39,6 +39,7 @@ type Ctor struct {
 // Param is a parameter node in the graph.
 type Param struct {
 	*Node
+
 	Optional bool
 }
 
@@ -46,7 +47,7 @@ type Param struct {
 type Result struct {
 	*Node
 
-	// GroupIndex is added to differenciate grouped values from one another.
+	// GroupIndex is added to differentiate grouped values from one another.
 	// Since grouped values have the same type and group, their Node / string
 	// representations are the same so we need indices to uniquely identify
 	// the values.
@@ -57,7 +58,7 @@ type Result struct {
 type Group struct {
 	// Type is the type of values in the group.
 	Type    reflect.Type
-	Group   string
+	Name    string
 	Results []*Result
 }
 
@@ -89,8 +90,8 @@ func NewGraph() *Graph {
 // NewGroup creates a new group with information in the groupKey.
 func NewGroup(k groupKey) *Group {
 	return &Group{
-		Type:  k.t,
-		Group: k.group,
+		Type: k.t,
+		Name: k.group,
 	}
 }
 
@@ -173,7 +174,7 @@ func (r *Result) String() string {
 
 // String implements fmt.Stringer for Group.
 func (g *Group) String() string {
-	return fmt.Sprintf("[type=%v group=%v]", g.Type.String(), g.Group)
+	return fmt.Sprintf("[type=%v group=%v]", g.Type.String(), g.Name)
 }
 
 // Attributes composes and returns a string to style the Param's sublabel.
@@ -198,5 +199,5 @@ func (r *Result) Attributes() string {
 
 // Attributes composes and returns a string to style the Group's sublabel.
 func (g *Group) Attributes() string {
-	return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Group: %v</FONT>`, g.Group)
+	return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Group: %v</FONT>`, g.Name)
 }
