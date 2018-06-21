@@ -2469,23 +2469,54 @@ func assertCtorsEqual(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
 }
 
 func TestDotGraph(t *testing.T) {
+	tparam := func(t reflect.Type, n string, g string, o bool) *dot.Param {
+		return &dot.Param{
+			Node: &dot.Node{
+				Type:  t,
+				Name:  n,
+				Group: g,
+			},
+			Optional: o,
+		}
+	}
+
+	tresult := func(t reflect.Type, n string, g string, gi int) *dot.Result {
+		return &dot.Result{
+			Node: &dot.Node{
+				Type:  t,
+				Name:  n,
+				Group: g,
+			},
+			GroupIndex: gi,
+		}
+	}
 	type t1 struct{}
 	type t2 struct{}
 	type t3 struct{}
 	type t4 struct{}
 
-	n1 := &dot.Node{Type: "dig.t1"}
-	n2 := &dot.Node{Type: "dig.t2"}
-	n3 := &dot.Node{Type: "dig.t3"}
-	n4 := &dot.Node{Type: "dig.t4"}
+	type1 := reflect.TypeOf(t1{})
+	type2 := reflect.TypeOf(t2{})
+	type3 := reflect.TypeOf(t3{})
+	type4 := reflect.TypeOf(t4{})
+
+	p1 := tparam(type1, "", "", false)
+	p2 := tparam(type2, "", "", false)
+	p3 := tparam(type3, "", "", false)
+	p4 := tparam(type4, "", "", false)
+
+	r1 := tresult(type1, "", "", 0)
+	r2 := tresult(type2, "", "", 0)
+	r3 := tresult(type3, "", "", 0)
+	r4 := tresult(type4, "", "", 0)
 
 	t.Parallel()
 
 	t.Run("constructor with one param and one result", func(t *testing.T) {
 		expected := []*dot.Ctor{
 			{
-				Params:  []*dot.Node{n1},
-				Results: []*dot.Node{n2},
+				Params:  []*dot.Param{p1},
+				Results: []*dot.Result{r2},
 			},
 		}
 
@@ -2497,16 +2528,16 @@ func TestDotGraph(t *testing.T) {
 	t.Run("more constructors", func(t *testing.T) {
 		expected := []*dot.Ctor{
 			{
-				Params:  []*dot.Node{n1},
-				Results: []*dot.Node{n2},
+				Params:  []*dot.Param{p1},
+				Results: []*dot.Result{r2},
 			},
 			{
-				Params:  []*dot.Node{n1},
-				Results: []*dot.Node{n3},
+				Params:  []*dot.Param{p1},
+				Results: []*dot.Result{r3},
 			},
 			{
-				Params:  []*dot.Node{n2},
-				Results: []*dot.Node{n4},
+				Params:  []*dot.Param{p2},
+				Results: []*dot.Result{r4},
 			},
 		}
 
@@ -2520,13 +2551,13 @@ func TestDotGraph(t *testing.T) {
 	t.Run("constructor with multiple params and results", func(t *testing.T) {
 		expected := []*dot.Ctor{
 			{
-				Params:  []*dot.Node{n1, n2},
-				Results: []*dot.Node{n3, n4},
+				Params:  []*dot.Param{p3, p4},
+				Results: []*dot.Result{r1, r2},
 			},
 		}
 
 		c := New()
-		c.Provide(func(A t1, B t2) (t3, t4) { return t3{}, t4{} })
+		c.Provide(func(A t3, B t4) (t1, t2) { return t1{}, t2{} })
 		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
@@ -2547,13 +2578,13 @@ func TestDotGraph(t *testing.T) {
 
 		expected := []*dot.Ctor{
 			{
-				Params:  []*dot.Node{n1, n2},
-				Results: []*dot.Node{n3, n4},
+				Params:  []*dot.Param{p1, p2},
+				Results: []*dot.Result{r3, r4},
 			},
 		}
 
 		c := New()
-		c.Provide(func(i in) out { return out{Out{}, t3{}, t4{}} })
+		c.Provide(func(i in) out { return out{} })
 		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
@@ -2573,8 +2604,8 @@ func TestDotGraph(t *testing.T) {
 
 		expected := []*dot.Ctor{
 			{
-				Params:  []*dot.Node{n1, n2, n3},
-				Results: []*dot.Node{n4},
+				Params:  []*dot.Param{p1, p2, p3},
+				Results: []*dot.Result{r4},
 			},
 		}
 
@@ -2603,15 +2634,13 @@ func TestDotGraph(t *testing.T) {
 
 		expected := []*dot.Ctor{
 			{
-				Params:  []*dot.Node{n1},
-				Results: []*dot.Node{n2, n3, n4},
+				Params:  []*dot.Param{p1},
+				Results: []*dot.Result{r2, r3, r4},
 			},
 		}
 
 		c := New()
-		c.Provide(func(A t1) out {
-			return out{Out{}, t2{}, nested2{Out{}, t3{}, nested1{Out{}, t4{}}}}
-		})
+		c.Provide(func(A t1) out { return out{} })
 		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
 
@@ -2622,31 +2651,45 @@ func TestDotGraph(t *testing.T) {
 			D []t1 `group:"foo"`
 		}
 
-		type out struct {
+		type out1 struct {
 			Out
 
 			A t1 `group:"foo"`
-			B t1 `group:"foo"`
-			C t1 `group:"foo"`
 		}
+
+		type out2 struct {
+			Out
+
+			A t1 `group:"foo"`
+		}
+
+		res0 := tresult(type1, "", "foo", 0)
+		res1 := tresult(type1, "", "foo", 1)
 
 		expected := []*dot.Ctor{
 			{
-				Params: []*dot.Node{n2},
-				Results: []*dot.Node{
-					{Type: "dig.t1", Group: "foo"},
-					{Type: "dig.t1", Group: "foo"},
-					{Type: "dig.t1", Group: "foo"},
-				},
+				Params:  []*dot.Param{p2},
+				Results: []*dot.Result{res0},
 			},
 			{
-				Params:  []*dot.Node{{Type: "[]dig.t1", Group: "foo"}},
-				Results: []*dot.Node{n3},
+				Params:  []*dot.Param{p4},
+				Results: []*dot.Result{res1},
+			},
+			{
+				GroupParams: []*dot.Group{
+					{
+						Type:    type1,
+						Name:    "foo",
+						Results: []*dot.Result{res0, res1},
+					},
+				},
+				Results: []*dot.Result{r3},
 			},
 		}
 
 		c := New()
-		c.Provide(func(B t2) out { return out{Out{}, t1{}, t1{}, t1{}} })
+		c.Provide(func(B t2) out1 { return out1{} })
+		c.Provide(func(B t4) out2 { return out2{} })
 		c.Provide(func(i in) t3 { return t3{} })
 		assertCtorsEqual(t, expected, c.dg.Ctors)
 	})
@@ -2666,8 +2709,12 @@ func TestDotGraph(t *testing.T) {
 
 		expected := []*dot.Ctor{
 			{
-				Params:  []*dot.Node{{Type: "dig.t1", Name: "A"}},
-				Results: []*dot.Node{{Type: "dig.t2", Name: "B"}},
+				Params: []*dot.Param{
+					tparam(type1, "A", "", false),
+				},
+				Results: []*dot.Result{
+					tresult(type2, "B", "", 0),
+				},
 			},
 		}
 
@@ -2685,14 +2732,14 @@ func TestDotGraph(t *testing.T) {
 			C t3 `optional:"true"`
 		}
 
+		par1 := tparam(type1, "A", "", true)
+		par2 := tparam(type2, "B", "", false)
+		par3 := tparam(type3, "", "", true)
+
 		expected := []*dot.Ctor{
 			{
-				Params: []*dot.Node{
-					{Type: "dig.t1", Name: "A", Optional: true},
-					{Type: "dig.t2", Name: "B"},
-					{Type: "dig.t3", Optional: true},
-				},
-				Results: []*dot.Node{n4},
+				Params:  []*dot.Param{par1, par2, par3},
+				Results: []*dot.Result{r4},
 			},
 		}
 
@@ -2705,7 +2752,6 @@ func TestDotGraph(t *testing.T) {
 func TestNewDotCtor(t *testing.T) {
 	type t1 struct{}
 	type t2 struct{}
-
 	n, err := newNode(func(A t1) t2 { return t2{} }, nodeOptions{})
 	require.NoError(t, err)
 
@@ -2721,15 +2767,13 @@ func TestNewDotCtor(t *testing.T) {
 	assert.Equal(t, "pkg1", ctor.Package)
 	assert.Equal(t, "file1", ctor.File)
 	assert.Equal(t, 24534, ctor.Line)
-	assert.Equal(t, []*dot.Node{{Type: "dig.t1"}}, ctor.Params)
-	assert.Equal(t, []*dot.Node{{Type: "dig.t2"}}, ctor.Results)
 }
 
 func TestVisualize(t *testing.T) {
-	n1 := &dot.Node{Type: "t1"}
-	n2 := &dot.Node{Type: "t2"}
-	n3 := &dot.Node{Type: "t3"}
-	n4 := &dot.Node{Type: "t4"}
+	type t1 struct{}
+	type t2 struct{}
+	type t3 struct{}
+	type t4 struct{}
 
 	t.Parallel()
 
@@ -2740,44 +2784,76 @@ func TestVisualize(t *testing.T) {
 
 	t.Run("simple graph", func(t *testing.T) {
 		c := New()
-		c.dg.Ctors = []*dot.Ctor{{
-			Name:    "constructor1",
-			Params:  []*dot.Node{n1},
-			Results: []*dot.Node{n3},
-		}, {
-			Name:    "constructor2",
-			Params:  []*dot.Node{n2},
-			Results: []*dot.Node{n4},
-		}}
 
+		c.Provide(func() (t1, t2) { return t1{}, t2{} })
+		c.Provide(func(A t1, B t2) (t3, t4) { return t3{}, t4{} })
 		VerifyVisualization(t, "simple", c)
 	})
 
-	t.Run("named and grouped types", func(t *testing.T) {
+	t.Run("named types", func(t *testing.T) {
 		c := New()
-		c.dg.Ctors = []*dot.Ctor{{
-			Name:   "constructor1",
-			Params: []*dot.Node{n3},
-			Results: []*dot.Node{
-				{Type: "t1", Name: "foo"},
-				{Type: "t2", Group: "bar"},
-			},
-		}}
 
-		VerifyVisualization(t, "sublabel", c)
+		type in struct {
+			In
+
+			A t3 `name:"foo"`
+		}
+		type out1 struct {
+			Out
+
+			A t1 `name:"bar"`
+			B t2 `name:"baz"`
+		}
+		type out2 struct {
+			Out
+
+			A t3 `name:"foo"`
+		}
+
+		c.Provide(func(in) out1 { return out1{} })
+		c.Provide(func() out2 { return out2{} })
+		VerifyVisualization(t, "named", c)
 	})
 
 	t.Run("optional params", func(t *testing.T) {
 		c := New()
-		c.dg.Ctors = []*dot.Ctor{{
-			Name: "constructor1",
-			Params: []*dot.Node{
-				{Type: "t1", Name: "foo", Optional: true},
-				{Type: "t2", Optional: true},
-			},
-			Results: []*dot.Node{n3},
-		}}
 
+		type in struct {
+			In
+
+			A t1 `optional:"true"`
+		}
+
+		c.Provide(func() t1 { return t1{} })
+		c.Provide(func(in) t2 { return t2{} })
 		VerifyVisualization(t, "optional", c)
+	})
+
+	t.Run("grouped types", func(t *testing.T) {
+		c := New()
+
+		type in struct {
+			In
+
+			A []t3 `group:"foo"`
+		}
+
+		type out1 struct {
+			Out
+
+			A t3 `group:"foo"`
+		}
+
+		type out2 struct {
+			Out
+
+			A t3 `group:"foo"`
+		}
+
+		c.Provide(func() out1 { return out1{} })
+		c.Provide(func() out2 { return out2{} })
+		c.Provide(func(in) t2 { return t2{} })
+
+		VerifyVisualization(t, "grouped", c)
 	})
 }

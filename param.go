@@ -48,8 +48,8 @@ type param interface {
 	// This MAY panic if the param does not produce a single value.
 	Build(containerStore) (reflect.Value, error)
 
-	// DotNodes returns a slice of param(s) represented in dot.Nodes for the DOT-format graph.
-	DotNodes() []*dot.Node
+	// DotParam returns a slice of dot.Param(s).
+	DotParam() []*dot.Param
 }
 
 var (
@@ -149,10 +149,10 @@ type paramList struct {
 	Params []param
 }
 
-func (pl paramList) DotNodes() []*dot.Node {
-	var types []*dot.Node
+func (pl paramList) DotParam() []*dot.Param {
+	var types []*dot.Param
 	for _, param := range pl.Params {
-		types = append(types, param.DotNodes()...)
+		types = append(types, param.DotParam()...)
 	}
 	return types
 }
@@ -216,12 +216,16 @@ type paramSingle struct {
 	Type     reflect.Type
 }
 
-func (ps paramSingle) DotNodes() []*dot.Node {
-	return []*dot.Node{{
-		Type:     ps.Type.String(),
-		Name:     ps.Name,
-		Optional: ps.Optional,
-	}}
+func (ps paramSingle) DotParam() []*dot.Param {
+	return []*dot.Param{
+		{
+			Node: &dot.Node{
+				Type: ps.Type,
+				Name: ps.Name,
+			},
+			Optional: ps.Optional,
+		},
+	}
 }
 
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
@@ -266,10 +270,10 @@ type paramObject struct {
 	Fields []paramObjectField
 }
 
-func (po paramObject) DotNodes() []*dot.Node {
-	var types []*dot.Node
+func (po paramObject) DotParam() []*dot.Param {
+	var types []*dot.Param
 	for _, field := range po.Fields {
-		types = append(types, field.DotNodes()...)
+		types = append(types, field.DotParam()...)
 	}
 	return types
 }
@@ -324,8 +328,8 @@ type paramObjectField struct {
 	Param param
 }
 
-func (pof paramObjectField) DotNodes() []*dot.Node {
-	return pof.Param.DotNodes()
+func (pof paramObjectField) DotParam() []*dot.Param {
+	return pof.Param.DotParam()
 }
 
 func newParamObjectField(idx int, f reflect.StructField) (paramObjectField, error) {
@@ -390,11 +394,15 @@ type paramGroupedSlice struct {
 	Type reflect.Type
 }
 
-func (pt paramGroupedSlice) DotNodes() []*dot.Node {
-	return []*dot.Node{{
-		Type:  pt.Type.String(),
-		Group: pt.Group,
-	}}
+func (pt paramGroupedSlice) DotParam() []*dot.Param {
+	return []*dot.Param{
+		{
+			Node: &dot.Node{
+				Type:  pt.Type,
+				Group: pt.Group,
+			},
+		},
+	}
 }
 
 // newParamGroupedSlice builds a paramGroupedSlice from the provided type with
