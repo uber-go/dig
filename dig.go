@@ -169,7 +169,12 @@ type containerStore interface {
 	// type.
 	getGroupProviders(name string, t reflect.Type) []provider
 
+	// Adds the nodes to the list of failed nodes of the graph in the container
+	// and marks the corresponding constructor as failed.
 	failNodes(params []*dot.Param, id uintptr)
+
+	// Adds the grouped nodes to the list of failed nodes of the graph in the
+	// container and mark the constructor and group as failed.
 	failGroupNodes(params []*dot.Param, id uintptr)
 }
 
@@ -587,7 +592,8 @@ type node struct {
 	// Location where this function was defined.
 	location *digreflect.Func
 
-	// id is a unique identifier of node.
+	// id is the address of memory location for the constructor. It is used to
+	// identify the constructor so a node maps to exactly one constructor.
 	id uintptr
 
 	// Whether the constructor owned by this node was already called.

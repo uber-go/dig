@@ -68,10 +68,13 @@ type Result struct {
 // Group is a group node in the graph.
 type Group struct {
 	// Type is the type of values in the group.
-	Type      reflect.Type
-	Name      string
-	Results   []*Result
-	State     State
+	Type    reflect.Type
+	Name    string
+	Results []*Result
+	State   State
+
+	// ResultMap maps constructor ID to the grouped result it produces so we
+	// can get the result that failed given constructor ID.
 	ResultMap map[uintptr]*Result
 }
 
@@ -80,8 +83,15 @@ type Graph struct {
 	Ctors   []*Ctor
 	ctorMap map[uintptr]*Ctor
 	Groups  map[groupKey]*Group
-	Pof     []*Result
-	Failed  []*Result
+
+	// Pof is a list of the point of failures. They are the root causes of
+	// failed invokes and can be either missing types (not provided) or error
+	// types (error providing).
+	Pof []*Result
+
+	// Failed is the list of nodes that failed to build due to missing/failed
+	// dependencies.
+	Failed []*Result
 }
 
 // Node is a single node in a graph and is embedded into Params and Results.
@@ -243,7 +253,7 @@ func (g *Group) String() string {
 	return fmt.Sprintf("[type=%v group=%v]", g.Type.String(), g.Name)
 }
 
-// Attributes composes and returns a string to style the Result's sublabel.
+// Attributes composes and returns a string of the Result node's attributes.
 func (r *Result) Attributes() string {
 	switch {
 	case r.Name != "":
@@ -255,7 +265,7 @@ func (r *Result) Attributes() string {
 	}
 }
 
-// Attributes composes and returns a string to style the Group's sublabel.
+// Attributes composes and returns a string of the Group node's attributes.
 func (g *Group) Attributes() string {
 	attr := fmt.Sprintf(`shape=diamond label=<%v<BR /><FONT POINT-SIZE="10">Group: %v</FONT>>`, g.Type, g.Name)
 	switch g.State {
