@@ -2763,6 +2763,7 @@ func TestNewDotCtor(t *testing.T) {
 	}
 
 	ctor := newDotCtor(n)
+	assert.Equal(t, n.id, ctor.ID)
 	assert.Equal(t, "function1", ctor.Name)
 	assert.Equal(t, "pkg1", ctor.Package)
 	assert.Equal(t, "file1", ctor.File)

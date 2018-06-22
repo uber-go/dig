@@ -168,6 +168,9 @@ type containerStore interface {
 	// Returns the providers that can produce values for the given group and
 	// type.
 	getGroupProviders(name string, t reflect.Type) []provider
+
+	failNodes(params []*dot.Param, id uintptr)
+	failGroupNodes(params []*dot.Param, id uintptr)
 }
 
 // provider encapsulates a user-provided constructor.
@@ -189,6 +192,8 @@ type provider interface {
 	// The values produced by this provider should be submitted into the
 	// containerStore.
 	Call(containerStore) error
+
+	ID() uintptr
 }
 
 // New constructs a Container.
@@ -221,7 +226,7 @@ var _graphTmpl = template.Must(
 		Parse(`digraph {
 	graph [compound=true];
 	{{range $g := .Groups}}
-		{{- quote .String}} [shape=diamond label=<{{.Type}}{{.Attributes}}>];
+		{{- quote .String}} [{{.Attributes}}];
 		{{range .Results}}
 			{{- quote $g.String}} -> {{quote .String}};
 		{{end}}
@@ -229,8 +234,10 @@ var _graphTmpl = template.Must(
 	{{range $index, $ctor := .Ctors}}
 		subgraph cluster_{{$index}} {
 			{{quote .Name}} [shape=plaintext];
+			{{- if eq .State 1}}color=red;{{end}}
+			{{- if eq .State 2}}color=orange;{{end}}
 			{{range .Results}}
-				{{- quote .String}} [label=<{{.Type}}{{.Attributes}}>];
+				{{- quote .String}} [{{.Attributes}}];
 			{{end}}
 		}
 		{{range .Params}}
@@ -239,6 +246,12 @@ var _graphTmpl = template.Must(
 		{{range .GroupParams}}
 			{{- quote $ctor.Name}} -> {{quote .String}} [ltail=cluster_{{$index}}];
 		{{end -}}
+	{{end}}
+	{{range .Failed}}
+		{{- quote .String}} [color=orange];
+	{{end -}}
+	{{range .Pof}}
+		{{- quote .String}} [color=red];
 	{{end}}
 }`))
 
@@ -309,6 +322,28 @@ func (c *Container) getProviders(k key) []provider {
 		providers[i] = n
 	}
 	return providers
+}
+
+func (c *Container) failNodes(params []*dot.Param, id uintptr) {
+	failed := make([]*dot.Result, len(params))
+
+	for i, p := range params {
+		failed[i] = &dot.Result{Node: p.Node}
+	}
+	c.dg.FailNodes(failed, id)
+}
+
+func (c *Container) failGroupNodes(params []*dot.Param, id uintptr) {
+	// Taking first element since there will only be one group node that fails.
+	p := params[0]
+
+	failed := &dot.Result{
+		Node: &dot.Node{
+			Group: p.Group,
+			Type:  p.Type.Elem(),
+		},
+	}
+	c.dg.FailGroupNode(failed, id)
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -552,6 +587,9 @@ type node struct {
 	// Location where this function was defined.
 	location *digreflect.Func
 
+	// id is a unique identifier of node.
+	id uintptr
+
 	// Whether the constructor owned by this node was already called.
 	called bool
 
@@ -569,6 +607,7 @@ type nodeOptions struct {
 
 func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 	ctype := reflect.TypeOf(ctor)
+	cptr := reflect.ValueOf(ctor).Pointer()
 
 	params, err := newParamList(ctype)
 	if err != nil {
@@ -584,6 +623,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 		ctor:       ctor,
 		ctype:      ctype,
 		location:   digreflect.InspectFunc(ctor),
+		id:         cptr,
 		paramList:  params,
 		resultList: results,
 	}, err
@@ -592,6 +632,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 func (n *node) Location() *digreflect.Func { return n.location }
 func (n *node) ParamList() paramList       { return n.paramList }
 func (n *node) ResultList() resultList     { return n.resultList }
+func (n *node) ID() uintptr                { return n.id }
 
 // Call calls this node's constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
@@ -640,6 +681,7 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 // the container. Returns an error if not.
 func shallowCheckDependencies(c containerStore, p param) error {
 	var missing errMissingManyTypes
+	var missingNodes []*dot.Param
 	walkParam(p, paramVisitorFunc(func(p param) bool {
 		ps, ok := p.(paramSingle)
 		if !ok {
@@ -648,12 +690,14 @@ func shallowCheckDependencies(c containerStore, p param) error {
 
 		if ns := c.getValueProviders(ps.Name, ps.Type); len(ns) == 0 && !ps.Optional {
 			missing = append(missing, newErrMissingType(c, key{name: ps.Name, t: ps.Type}))
+			missingNodes = append(missingNodes, ps.DotParam()...)
 		}
 
 		return true
 	}))
 
 	if len(missing) > 0 {
+		c.failNodes(missingNodes, 0)
 		return missing
 	}
 	return nil
@@ -721,6 +765,7 @@ func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
 
 func newDotCtor(n *node) *dot.Ctor {
 	return &dot.Ctor{
+		ID:      n.id,
 		Name:    n.location.Name,
 		Package: n.location.Package,
 		File:    n.location.File,
