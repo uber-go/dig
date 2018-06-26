@@ -1,0 +1,19 @@
+digraph {
+	graph [compound=true];
+	
+		subgraph cluster_0 {
+			"TestVisualize.func7.1" [shape=plaintext];color=orange;
+			"dig.t4" [label=<dig.t4>];
+			
+		}
+		"TestVisualize.func7.1" -> "dig.t1" [ltail=cluster_0];
+		"TestVisualize.func7.1" -> "dig.t2" [ltail=cluster_0];
+		"TestVisualize.func7.1" -> "dig.t3" [ltail=cluster_0];
+		
+		
+	"dig.t4" [color=orange];
+	"dig.t1" [color=red];
+	"dig.t2" [color=red];
+	"dig.t3" [color=red];
+	
+}

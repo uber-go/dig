@@ -169,17 +169,22 @@ type containerStore interface {
 	// type.
 	getGroupProviders(name string, t reflect.Type) []provider
 
+	// Finds and adds the node to the list of failed nodes of the graph in the
+	// container and mark the corresponding constructor and group as failed.
+	failGroupNodes(name string, t reflect.Type, id dot.CtorID)
+
 	// Adds the nodes to the list of failed nodes of the graph in the container
 	// and marks the corresponding constructor as failed.
-	failNodes(params []*dot.Param, id uintptr)
+	failNodes(params []*dot.Param, id dot.CtorID)
 
-	// Adds the grouped nodes to the list of failed nodes of the graph in the
-	// container and mark the constructor and group as failed.
-	failGroupNodes(params []*dot.Param, id uintptr)
+	missingNodes(params []*dot.Param)
 }
 
 // provider encapsulates a user-provided constructor.
 type provider interface {
+	// ID is a unique numerical identifier for this provider.
+	ID() dot.CtorID
+
 	// Location returns where this constructor was defined.
 	Location() *digreflect.Func
 
@@ -197,8 +202,6 @@ type provider interface {
 	// The values produced by this provider should be submitted into the
 	// containerStore.
 	Call(containerStore) error
-
-	ID() uintptr
 }
 
 // New constructs a Container.
@@ -239,8 +242,7 @@ var _graphTmpl = template.Must(
 	{{range $index, $ctor := .Ctors}}
 		subgraph cluster_{{$index}} {
 			{{quote .Name}} [shape=plaintext];
-			{{- if eq .State 1}}color=red;{{end}}
-			{{- if eq .State 2}}color=orange;{{end}}
+			{{- with .State}}color={{.Color}};{{end}}
 			{{range .Results}}
 				{{- quote .String}} [{{.Attributes}}];
 			{{end}}
@@ -255,7 +257,7 @@ var _graphTmpl = template.Must(
 	{{range .Failed}}
 		{{- quote .String}} [color=orange];
 	{{end -}}
-	{{range .Pof}}
+	{{range .RootCauses}}
 		{{- quote .String}} [color=red];
 	{{end}}
 }`))
@@ -329,7 +331,16 @@ func (c *Container) getProviders(k key) []provider {
 	return providers
 }
 
-func (c *Container) failNodes(params []*dot.Param, id uintptr) {
+func (c *Container) missingNodes(params []*dot.Param) {
+	missing := make([]*dot.Result, len(params))
+
+	for i, p := range params {
+		missing[i] = &dot.Result{Node: p.Node}
+	}
+	c.dg.MissingNodes(missing)
+}
+
+func (c *Container) failNodes(params []*dot.Param, id dot.CtorID) {
 	failed := make([]*dot.Result, len(params))
 
 	for i, p := range params {
@@ -338,17 +349,8 @@ func (c *Container) failNodes(params []*dot.Param, id uintptr) {
 	c.dg.FailNodes(failed, id)
 }
 
-func (c *Container) failGroupNodes(params []*dot.Param, id uintptr) {
-	// Taking first element since there will only be one group node that fails.
-	p := params[0]
-
-	failed := &dot.Result{
-		Node: &dot.Node{
-			Group: p.Group,
-			Type:  p.Type.Elem(),
-		},
-	}
-	c.dg.FailGroupNode(failed, id)
+func (c *Container) failGroupNodes(name string, t reflect.Type, id dot.CtorID) {
+	c.dg.FailGroupNodes(name, t, id)
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -594,7 +596,7 @@ type node struct {
 
 	// id is the address of memory location for the constructor. It is used to
 	// identify the constructor so a node maps to exactly one constructor.
-	id uintptr
+	id dot.CtorID
 
 	// Whether the constructor owned by this node was already called.
 	called bool
@@ -629,7 +631,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 		ctor:       ctor,
 		ctype:      ctype,
 		location:   digreflect.InspectFunc(ctor),
-		id:         cptr,
+		id:         dot.CtorID(cptr),
 		paramList:  params,
 		resultList: results,
 	}, err
@@ -638,7 +640,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 func (n *node) Location() *digreflect.Func { return n.location }
 func (n *node) ParamList() paramList       { return n.paramList }
 func (n *node) ResultList() resultList     { return n.resultList }
-func (n *node) ID() uintptr                { return n.id }
+func (n *node) ID() dot.CtorID             { return n.id }
 
 // Call calls this node's constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
@@ -703,7 +705,7 @@ func shallowCheckDependencies(c containerStore, p param) error {
 	}))
 
 	if len(missing) > 0 {
-		c.failNodes(missingNodes, 0)
+		c.missingNodes(missingNodes)
 		return missing
 	}
 	return nil
