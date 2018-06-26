@@ -254,10 +254,10 @@ var _graphTmpl = template.Must(
 			{{- quote $ctor.Name}} -> {{quote .String}} [ltail=cluster_{{$index}}];
 		{{end -}}
 	{{end}}
-	{{range .Failed}}
+	{{range .Failed.TransitiveFailures}}
 		{{- quote .String}} [color=orange];
 	{{end -}}
-	{{range .RootCauses}}
+	{{range .Failed.RootCauses}}
 		{{- quote .String}} [color=red];
 	{{end}}
 }`))

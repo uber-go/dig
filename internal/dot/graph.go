@@ -50,6 +50,13 @@ type Ctor struct {
 	State       FailureState
 }
 
+// Node is a single node in a graph and is embedded into Params and Results.
+type Node struct {
+	Type  reflect.Type
+	Name  string
+	Group string
+}
+
 // Param is a parameter node in the graph.
 type Param struct {
 	*Node
@@ -81,23 +88,22 @@ type Group struct {
 type Graph struct {
 	Ctors   []*Ctor
 	ctorMap map[CtorID]*Ctor
-	Groups  map[groupKey]*Group
 
-	// RootCauses is a list of the point of failures. They are the root causes of
-	// failed invokes and can be either missing types (not provided) or error
-	// types (error providing).
-	RootCauses []*Result
+	Groups   []*Group
+	groupMap map[groupKey]*Group
 
-	// Failed is the list of nodes that failed to build due to missing/failed
-	// dependencies.
-	Failed []*Result
+	Failed *failedNodes
 }
 
-// Node is a single node in a graph and is embedded into Params and Results.
-type Node struct {
-	Type  reflect.Type
-	Name  string
-	Group string
+type failedNodes struct {
+	// RootCauses is a list of the point of failures. They are the root causes
+	// of failed invokes and can be either missing types (not provided) or
+	// error types (error providing).
+	RootCauses []*Result
+
+	// TransitiveFailures is the list of nodes that failed to build due to
+	// missing/failed dependencies.
+	TransitiveFailures []*Result
 }
 
 type groupKey struct {
@@ -108,8 +114,9 @@ type groupKey struct {
 // NewGraph creates an empty graph.
 func NewGraph() *Graph {
 	return &Graph{
-		ctorMap: make(map[CtorID]*Ctor),
-		Groups:  make(map[groupKey]*Group),
+		ctorMap:  make(map[CtorID]*Ctor),
+		groupMap: make(map[groupKey]*Group),
+		Failed:   &failedNodes{},
 	}
 }
 
@@ -161,15 +168,15 @@ func (dg *Graph) AddCtor(c *Ctor, paramList []*Param, resultList []*Result) {
 
 func (dg *Graph) failNode(r *Result, pof bool) {
 	if pof {
-		dg.RootCauses = append(dg.RootCauses, r)
+		dg.addRootCause(r)
 	} else {
-		dg.Failed = append(dg.Failed, r)
+		dg.addTransitiveFailure(r)
 	}
 }
 
 // MissingNodes adds missing nodes to the list of failed Results in the graph.
 func (dg *Graph) MissingNodes(results []*Result) {
-	pof := len(dg.RootCauses) == 0
+	pof := len(dg.Failed.RootCauses) == 0
 
 	for _, r := range results {
 		dg.failNode(r, pof)
@@ -179,7 +186,7 @@ func (dg *Graph) MissingNodes(results []*Result) {
 // FailNodes adds results to the list of failed Results in the graph, and
 // updates the state of the constructor with the given id accordingly.
 func (dg *Graph) FailNodes(results []*Result, id CtorID) {
-	pof := len(dg.RootCauses) == 0
+	pof := len(dg.Failed.RootCauses) == 0
 
 	for _, r := range results {
 		dg.failNode(r, pof)
@@ -198,7 +205,7 @@ func (dg *Graph) FailNodes(results []*Result, id CtorID) {
 // Results in the graph, and updates the state of the group and constructor
 // with the given id accordingly.
 func (dg *Graph) FailGroupNodes(name string, t reflect.Type, id CtorID) {
-	pof := len(dg.RootCauses) == 0
+	pof := len(dg.Failed.RootCauses) == 0
 
 	k := groupKey{t: t, group: name}
 	group := dg.getGroup(k)
@@ -223,10 +230,11 @@ func (dg *Graph) FailGroupNodes(name string, t reflect.Type, id CtorID) {
 // getGroup finds the group by groupKey from the graph. If it is not available,
 // a new group is created and returned.
 func (dg *Graph) getGroup(k groupKey) *Group {
-	g, ok := dg.Groups[k]
+	g, ok := dg.groupMap[k]
 	if !ok {
 		g = NewGroup(k)
-		dg.Groups[k] = g
+		dg.groupMap[k] = g
+		dg.Groups = append(dg.Groups, g)
 	}
 	return g
 }
@@ -296,4 +304,12 @@ func (s FailureState) Color() string {
 	default:
 		return "black"
 	}
+}
+
+func (dg *Graph) addRootCause(r *Result) {
+	dg.Failed.RootCauses = append(dg.Failed.RootCauses, r)
+}
+
+func (dg *Graph) addTransitiveFailure(r *Result) {
+	dg.Failed.TransitiveFailures = append(dg.Failed.TransitiveFailures, r)
 }

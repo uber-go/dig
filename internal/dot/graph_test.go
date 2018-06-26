@@ -34,8 +34,9 @@ type t3 struct{}
 func TestNewGraph(t *testing.T) {
 	g := NewGraph()
 
-	assert.Equal(t, make(map[groupKey]*Group), g.Groups)
+	assert.Equal(t, make(map[groupKey]*Group), g.groupMap)
 	assert.Equal(t, make(map[CtorID]*Ctor), g.ctorMap)
+	assert.Equal(t, &failedNodes{}, g.Failed)
 	assert.Equal(t, "*dot.Graph", reflect.TypeOf(g).String())
 }
 
@@ -90,12 +91,12 @@ func TestAddCtor(t *testing.T) {
 		}
 		expectedGroup := NewGroup(k)
 
-		assert.Equal(t, map[groupKey]*Group{}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{}, dg.groupMap)
 		dg.AddCtor(c, params, []*Result{})
 
 		assert.Equal(t, 0, len(c.Params))
 		assert.Equal(t, []*Group{expectedGroup}, c.GroupParams)
-		assert.Equal(t, map[groupKey]*Group{k: expectedGroup}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{k: expectedGroup}, dg.groupMap)
 	})
 
 	t.Run("grouped results", func(t *testing.T) {
@@ -119,15 +120,15 @@ func TestAddCtor(t *testing.T) {
 			Results: []*Result{res0, res1},
 		}
 
-		assert.Equal(t, map[groupKey]*Group{}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{}, dg.groupMap)
 
 		dg.AddCtor(c0, []*Param{}, []*Result{res0})
 		assert.Equal(t, []*Result{res0}, c0.Results)
-		assert.Equal(t, map[groupKey]*Group{k: group0}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{k: group0}, dg.groupMap)
 
 		dg.AddCtor(c1, []*Param{}, []*Result{res1})
 		assert.Equal(t, []*Result{res1}, c1.Results)
-		assert.Equal(t, map[groupKey]*Group{k: group1}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{k: group1}, dg.groupMap)
 
 		assert.Equal(t, []*Ctor{c0, c1}, dg.Ctors)
 	})
@@ -153,12 +154,12 @@ func TestFailNodes(t *testing.T) {
 		dg := NewGraph()
 
 		dg.MissingNodes([]*Result{r1, r2})
-		assert.Equal(t, []*Result{r1, r2}, dg.RootCauses)
-		assert.Equal(t, 0, len(dg.Failed))
+		assert.Equal(t, []*Result{r1, r2}, dg.Failed.RootCauses)
+		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
 
 		dg.MissingNodes([]*Result{r3, r4})
-		assert.Equal(t, []*Result{r1, r2}, dg.RootCauses)
-		assert.Equal(t, []*Result{r3, r4}, dg.Failed)
+		assert.Equal(t, []*Result{r1, r2}, dg.Failed.RootCauses)
+		assert.Equal(t, []*Result{r3, r4}, dg.Failed.TransitiveFailures)
 	})
 
 	t.Run("fail nodes", func(t *testing.T) {
@@ -170,13 +171,13 @@ func TestFailNodes(t *testing.T) {
 		dg.AddCtor(c1, []*Param{}, []*Result{r2})
 
 		dg.FailNodes([]*Result{r1}, 123)
-		assert.Equal(t, []*Result{r1}, dg.RootCauses)
-		assert.Equal(t, 0, len(dg.Failed))
+		assert.Equal(t, []*Result{r1}, dg.Failed.RootCauses)
+		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
 		assert.Equal(t, rootCause, c0.State)
 
 		dg.FailNodes([]*Result{r2}, 456)
-		assert.Equal(t, []*Result{r1}, dg.RootCauses)
-		assert.Equal(t, []*Result{r2}, dg.Failed)
+		assert.Equal(t, []*Result{r1}, dg.Failed.RootCauses)
+		assert.Equal(t, []*Result{r2}, dg.Failed.TransitiveFailures)
 		assert.Equal(t, failed, c1.State)
 	})
 
@@ -191,16 +192,16 @@ func TestFailNodes(t *testing.T) {
 		dg.AddCtor(c1, []*Param{}, []*Result{r4})
 
 		dg.FailGroupNodes("foo", type1, 123)
-		assert.Equal(t, []*Result{r3}, dg.RootCauses)
-		assert.Equal(t, 0, len(dg.Failed))
+		assert.Equal(t, []*Result{r3}, dg.Failed.RootCauses)
+		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
 		assert.Equal(t, rootCause, c0.State)
-		assert.Equal(t, rootCause, dg.Groups[k0].State)
+		assert.Equal(t, rootCause, dg.groupMap[k0].State)
 
 		dg.FailGroupNodes("bar", type2, 456)
-		assert.Equal(t, []*Result{r3}, dg.RootCauses)
-		assert.Equal(t, []*Result{r4}, dg.Failed)
+		assert.Equal(t, []*Result{r3}, dg.Failed.RootCauses)
+		assert.Equal(t, []*Result{r4}, dg.Failed.TransitiveFailures)
 		assert.Equal(t, failed, c1.State)
-		assert.Equal(t, failed, dg.Groups[k1].State)
+		assert.Equal(t, failed, dg.groupMap[k1].State)
 	})
 }
 
@@ -220,8 +221,8 @@ func TestGetGroup(t *testing.T) {
 	group2 := NewGroup(k2)
 	group2.Results = append(group2.Results, r1)
 
-	g.Groups[k1] = group1
-	g.Groups[k2] = group2
+	g.groupMap[k1] = group1
+	g.groupMap[k2] = group2
 
 	assert.Equal(t, group1, g.getGroup(k1))
 	assert.Equal(t, group2, g.getGroup(k2))

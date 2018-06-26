@@ -2959,11 +2959,11 @@ func TestFailNodes(t *testing.T) {
 		c := New()
 
 		c.missingNodes([]*dot.Param{p1, p2})
-		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.RootCauses)
+		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
 
 		c.missingNodes([]*dot.Param{p3, p4})
-		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.RootCauses)
-		assert.Equal(t, []*dot.Result{r3, r4}, c.dg.Failed)
+		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
+		assert.Equal(t, []*dot.Result{r3, r4}, c.dg.Failed.TransitiveFailures)
 	})
 
 	t.Run("fail nodes", func(t *testing.T) {
@@ -2975,12 +2975,12 @@ func TestFailNodes(t *testing.T) {
 		c.dg.AddCtor(ctor2, []*dot.Param{}, []*dot.Result{})
 
 		c.failNodes([]*dot.Param{p1, p2}, 1234)
-		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.RootCauses)
+		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
 		assert.Equal(t, "red", ctor1.State.Color())
 
 		c.failNodes([]*dot.Param{p3, p4}, 5678)
-		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.RootCauses)
-		assert.Equal(t, []*dot.Result{r3, r4}, c.dg.Failed)
+		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
+		assert.Equal(t, []*dot.Result{r3, r4}, c.dg.Failed.TransitiveFailures)
 		assert.Equal(t, "orange", ctor2.State.Color())
 	})
 
@@ -2996,12 +2996,12 @@ func TestFailNodes(t *testing.T) {
 		c.dg.AddCtor(ctor2, []*dot.Param{}, []*dot.Result{groupResult2})
 
 		c.failGroupNodes("foo", type1, 5678)
-		assert.Equal(t, []*dot.Result{groupResult2}, c.dg.RootCauses)
+		assert.Equal(t, []*dot.Result{groupResult2}, c.dg.Failed.RootCauses)
 		assert.Equal(t, "red", ctor2.State.Color())
 
 		c.failGroupNodes("foo", type1, 1234)
-		assert.Equal(t, []*dot.Result{groupResult2}, c.dg.RootCauses)
-		assert.Equal(t, []*dot.Result{groupResult1}, c.dg.Failed)
+		assert.Equal(t, []*dot.Result{groupResult2}, c.dg.Failed.RootCauses)
+		assert.Equal(t, []*dot.Result{groupResult1}, c.dg.Failed.TransitiveFailures)
 		assert.Equal(t, "orange", ctor1.State.Color())
 	})
 }
