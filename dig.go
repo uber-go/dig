@@ -120,6 +120,9 @@ type Container struct {
 	// key.
 	providers map[key][]*node
 
+	// All nodes in the container.
+	nodes []*node
+
 	// Values that have already been generated in the container.
 	values map[key]reflect.Value
 
@@ -128,9 +131,6 @@ type Container struct {
 
 	// Source of randomness.
 	rand *rand.Rand
-
-	// DOT-format graph of dependencies.
-	dg *dot.Graph
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -169,14 +169,7 @@ type containerStore interface {
 	// type.
 	getGroupProviders(name string, t reflect.Type) []provider
 
-	// Marks the given value group as failed because of the given constructor.
-	failGroupNodes(name string, t reflect.Type, id dot.CtorID)
-
-	// Marks the given parameters as failed because of the given constructor.
-	failNodes(params []*dot.Param, id dot.CtorID)
-
-	// Marks the given parameters as missing.
-	addMissingNodes(params []*dot.Param)
+	createGraph() *dot.Graph
 }
 
 // provider encapsulates a user-provided constructor.
@@ -210,7 +203,6 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		dg:        dot.NewGraph(),
 	}
 
 	for _, opt := range opts {
@@ -264,10 +256,51 @@ var _graphTmpl = template.Must(
 // Visualize parses the graph in Container c into DOT format and writes it to
 // io.Writer w.
 func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
-	if err := _graphTmpl.Execute(w, c.dg); err != nil {
-		return fmt.Errorf("error executing template: %v", err)
+	return _graphTmpl.Execute(w, c.createGraph())
+}
+
+// VisualizeError parses the container and errors included in err into a DOT
+// format graph and writes it to io.Writer w.
+func VisualizeError(err error, w io.Writer, opts ...VisualizeOption) error {
+	ep, ok := err.(errEntryPoint)
+	if !ok {
+		return fmt.Errorf("no graph included in error: %v", err)
 	}
-	return nil
+
+	var errors []errVisualizer
+	// Unwrapping the error until we reach the root cause.
+	for {
+		if ev, ok := err.(errVisualizer); ok {
+			errors = append(errors, ev)
+		}
+		e, ok := err.(causer)
+		if !ok {
+			break
+		}
+		err = e.cause()
+	}
+
+	if len(errors) == 0 {
+		return fmt.Errorf("cannot visualize error: %v", err)
+	}
+
+	dg := ep.container().createGraph()
+	// Iterating in reverse since the root cause is the last element in errors.
+	for i := len(errors) - 1; i >= 0; i-- {
+		errors[i].updateGraph(dg)
+	}
+
+	return _graphTmpl.Execute(w, dg)
+}
+
+func (c *Container) createGraph() *dot.Graph {
+	dg := dot.NewGraph()
+
+	for _, n := range c.nodes {
+		dg.AddCtor(newDotCtor(n), n.paramList.DotParam(), n.resultList.DotResult())
+	}
+
+	return dg
 }
 
 // Changes the source of randomness for the container.
@@ -328,28 +361,6 @@ func (c *Container) getProviders(k key) []provider {
 		providers[i] = n
 	}
 	return providers
-}
-
-func (c *Container) addMissingNodes(params []*dot.Param) {
-	missing := make([]*dot.Result, len(params))
-
-	for i, p := range params {
-		missing[i] = &dot.Result{Node: p.Node}
-	}
-	c.dg.AddMissingNodes(missing)
-}
-
-func (c *Container) failNodes(params []*dot.Param, id dot.CtorID) {
-	failed := make([]*dot.Result, len(params))
-
-	for i, p := range params {
-		failed[i] = &dot.Result{Node: p.Node}
-	}
-	c.dg.FailNodes(failed, id)
-}
-
-func (c *Container) failGroupNodes(name string, t reflect.Type, id dot.CtorID) {
-	c.dg.FailGroupNodes(name, t, id)
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -417,14 +428,19 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	}
 
 	if err := shallowCheckDependencies(c, pl); err != nil {
-		return errMissingDependencies{Func: digreflect.InspectFunc(function), Reason: err}
+		return errMissingDependencies{
+			Container: c,
+			Func:      digreflect.InspectFunc(function),
+			Reason:    err,
+		}
 	}
 
 	args, err := pl.BuildList(c)
 	if err != nil {
 		return errArgumentsFailed{
-			Func:   digreflect.InspectFunc(function),
-			Reason: err,
+			Container: c,
+			Func:      digreflect.InspectFunc(function),
+			Reason:    err,
 		}
 	}
 
@@ -465,7 +481,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		}
 	}
 
-	c.dg.AddCtor(newDotCtor(n), n.paramList.DotParam(), n.resultList.DotResult())
+	c.nodes = append(c.nodes, n)
 
 	return nil
 }
@@ -649,12 +665,18 @@ func (n *node) Call(c containerStore) error {
 	}
 
 	if err := shallowCheckDependencies(c, n.paramList); err != nil {
-		return errMissingDependencies{Func: n.location, Reason: err}
+		return errMissingDependencies{
+			Func:   n.location,
+			Reason: err,
+		}
 	}
 
 	args, err := n.paramList.BuildList(c)
 	if err != nil {
-		return errArgumentsFailed{Func: n.location, Reason: err}
+		return errArgumentsFailed{
+			Func:   n.location,
+			Reason: err,
+		}
 	}
 
 	receiver := newStagingContainerWriter()
@@ -704,7 +726,6 @@ func shallowCheckDependencies(c containerStore, p param) error {
 	}))
 
 	if len(missing) > 0 {
-		c.addMissingNodes(addMissingNodes)
 		return missing
 	}
 	return nil

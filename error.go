@@ -27,6 +27,7 @@ import (
 	"sort"
 
 	"go.uber.org/dig/internal/digreflect"
+	"go.uber.org/dig/internal/dot"
 )
 
 // Errors which know their underlying cause should implement this interface to
@@ -112,11 +113,14 @@ func (e errConstructorFailed) Error() string {
 // errArgumentsFailed is returned when a function could not be run because one
 // of its dependencies failed to build for any reason.
 type errArgumentsFailed struct {
-	Func   *digreflect.Func
-	Reason error
+	Container *Container
+	Func      *digreflect.Func
+	Reason    error
 }
 
 func (e errArgumentsFailed) cause() error { return e.Reason }
+
+func (e errArgumentsFailed) container() *Container { return e.Container }
 
 func (e errArgumentsFailed) Error() string {
 	return fmt.Sprintf("could not build arguments for function %v: %v", e.Func, e.Reason)
@@ -125,11 +129,14 @@ func (e errArgumentsFailed) Error() string {
 // errMissingDependencies is returned when the dependencies of a function are
 // not available in the container.
 type errMissingDependencies struct {
-	Func   *digreflect.Func
-	Reason error
+	Container *Container
+	Func      *digreflect.Func
+	Reason    error
 }
 
 func (e errMissingDependencies) cause() error { return e.Reason }
+
+func (e errMissingDependencies) container() *Container { return e.Container }
 
 func (e errMissingDependencies) Error() string {
 	return fmt.Sprintf("missing dependencies for function %v: %v", e.Func, e.Reason)
@@ -139,6 +146,7 @@ func (e errMissingDependencies) Error() string {
 type errParamSingleFailed struct {
 	Key    key
 	Reason error
+	CtorID dot.CtorID
 }
 
 func (e errParamSingleFailed) cause() error { return e.Reason }
@@ -147,17 +155,33 @@ func (e errParamSingleFailed) Error() string {
 	return fmt.Sprintf("failed to build %v: %v", e.Key, e.Reason)
 }
 
+func (e errParamSingleFailed) updateGraph(g *dot.Graph) {
+	failed := &dot.Result{
+		Node: &dot.Node{
+			Name:  e.Key.name,
+			Group: e.Key.group,
+			Type:  e.Key.t,
+		},
+	}
+	g.FailNodes([]*dot.Result{failed}, e.CtorID)
+}
+
 // errParamGroupFailed is returned when a value group cannot be built because
 // any of the values in the group failed to build.
 type errParamGroupFailed struct {
 	Key    key
 	Reason error
+	CtorID dot.CtorID
 }
 
 func (e errParamGroupFailed) cause() error { return e.Reason }
 
 func (e errParamGroupFailed) Error() string {
 	return fmt.Sprintf("could not build value group %v: %v", e.Key, e.Reason)
+}
+
+func (e errParamGroupFailed) updateGraph(g *dot.Graph) {
+	g.FailGroupNodes(e.Key.group, e.Key.t, e.CtorID)
 }
 
 // errMissingType is returned when a single value that was expected in the
@@ -284,4 +308,27 @@ func (e errMissingManyTypes) Error() string {
 	}
 
 	return b.String()
+}
+
+func (e errMissingManyTypes) updateGraph(g *dot.Graph) {
+	missing := make([]*dot.Result, len(e))
+
+	for i, err := range e {
+		missing[i] = &dot.Result{
+			Node: &dot.Node{
+				Name:  err.Key.name,
+				Group: err.Key.group,
+				Type:  err.Key.t,
+			},
+		}
+	}
+	g.MissingNodes(missing)
+}
+
+type errVisualizer interface {
+	updateGraph(*dot.Graph)
+}
+
+type errEntryPoint interface {
+	container() *Container
 }
