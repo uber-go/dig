@@ -153,11 +153,11 @@ func TestFailNodes(t *testing.T) {
 	t.Run("missing nodes", func(t *testing.T) {
 		dg := NewGraph()
 
-		dg.MissingNodes([]*Result{r1, r2})
+		dg.AddMissingNodes([]*Result{r1, r2})
 		assert.Equal(t, []*Result{r1, r2}, dg.Failed.RootCauses)
 		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
 
-		dg.MissingNodes([]*Result{r3, r4})
+		dg.AddMissingNodes([]*Result{r3, r4})
 		assert.Equal(t, []*Result{r1, r2}, dg.Failed.RootCauses)
 		assert.Equal(t, []*Result{r3, r4}, dg.Failed.TransitiveFailures)
 	})

@@ -170,14 +170,14 @@ type containerStore interface {
 	getGroupProviders(name string, t reflect.Type) []provider
 
 	// Finds and adds the node to the list of failed nodes of the graph in the
-	// container and mark the corresponding constructor and group as failed.
+	// container and marks the corresponding constructor and group as failed.
 	failGroupNodes(name string, t reflect.Type, id dot.CtorID)
 
 	// Adds the nodes to the list of failed nodes of the graph in the container
 	// and marks the corresponding constructor as failed.
 	failNodes(params []*dot.Param, id dot.CtorID)
 
-	missingNodes(params []*dot.Param)
+	addMissingNodes(params []*dot.Param)
 }
 
 // provider encapsulates a user-provided constructor.
@@ -331,13 +331,13 @@ func (c *Container) getProviders(k key) []provider {
 	return providers
 }
 
-func (c *Container) missingNodes(params []*dot.Param) {
+func (c *Container) addMissingNodes(params []*dot.Param) {
 	missing := make([]*dot.Result, len(params))
 
 	for i, p := range params {
 		missing[i] = &dot.Result{Node: p.Node}
 	}
-	c.dg.MissingNodes(missing)
+	c.dg.AddMissingNodes(missing)
 }
 
 func (c *Container) failNodes(params []*dot.Param, id dot.CtorID) {
@@ -594,8 +594,7 @@ type node struct {
 	// Location where this function was defined.
 	location *digreflect.Func
 
-	// id is the address of memory location for the constructor. It is used to
-	// identify the constructor so a node maps to exactly one constructor.
+	// id uniquely identifies the constructor that produces a node.
 	id dot.CtorID
 
 	// Whether the constructor owned by this node was already called.
@@ -689,7 +688,7 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 // the container. Returns an error if not.
 func shallowCheckDependencies(c containerStore, p param) error {
 	var missing errMissingManyTypes
-	var missingNodes []*dot.Param
+	var addMissingNodes []*dot.Param
 	walkParam(p, paramVisitorFunc(func(p param) bool {
 		ps, ok := p.(paramSingle)
 		if !ok {
@@ -698,14 +697,14 @@ func shallowCheckDependencies(c containerStore, p param) error {
 
 		if ns := c.getValueProviders(ps.Name, ps.Type); len(ns) == 0 && !ps.Optional {
 			missing = append(missing, newErrMissingType(c, key{name: ps.Name, t: ps.Type}))
-			missingNodes = append(missingNodes, ps.DotParam()...)
+			addMissingNodes = append(addMissingNodes, ps.DotParam()...)
 		}
 
 		return true
 	}))
 
 	if len(missing) > 0 {
-		c.missingNodes(missingNodes)
+		c.addMissingNodes(addMissingNodes)
 		return missing
 	}
 	return nil

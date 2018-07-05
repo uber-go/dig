@@ -174,8 +174,8 @@ func (dg *Graph) failNode(r *Result, pof bool) {
 	}
 }
 
-// MissingNodes adds missing nodes to the list of failed Results in the graph.
-func (dg *Graph) MissingNodes(results []*Result) {
+// AddMissingNodes adds missing nodes to the list of failed Results in the graph.
+func (dg *Graph) AddMissingNodes(results []*Result) {
 	pof := len(dg.Failed.RootCauses) == 0
 
 	for _, r := range results {

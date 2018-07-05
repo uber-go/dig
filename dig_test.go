@@ -2958,10 +2958,10 @@ func TestFailNodes(t *testing.T) {
 	t.Run("missing nodes", func(t *testing.T) {
 		c := New()
 
-		c.missingNodes([]*dot.Param{p1, p2})
+		c.addMissingNodes([]*dot.Param{p1, p2})
 		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
 
-		c.missingNodes([]*dot.Param{p3, p4})
+		c.addMissingNodes([]*dot.Param{p3, p4})
 		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
 		assert.Equal(t, []*dot.Result{r3, r4}, c.dg.Failed.TransitiveFailures)
 	})

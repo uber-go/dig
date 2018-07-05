@@ -238,7 +238,7 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 		if ps.Optional {
 			return reflect.Zero(ps.Type), nil
 		}
-		c.missingNodes(ps.DotParam())
+		c.addMissingNodes(ps.DotParam())
 		return _noValue, newErrMissingType(c, key{name: ps.Name, t: ps.Type})
 	}
 
