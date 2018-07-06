@@ -34,7 +34,9 @@ type t3 struct{}
 func TestNewGraph(t *testing.T) {
 	g := NewGraph()
 
-	assert.Equal(t, make(map[groupKey]*Group), g.Groups)
+	assert.Equal(t, make(map[groupKey]*Group), g.groupMap)
+	assert.Equal(t, make(map[CtorID]*Ctor), g.ctorMap)
+	assert.Equal(t, &FailedNodes{}, g.Failed)
 	assert.Equal(t, "*dot.Graph", reflect.TypeOf(g).String())
 }
 
@@ -67,7 +69,7 @@ func TestAddCtor(t *testing.T) {
 
 	t.Run("ungrouped params and results", func(t *testing.T) {
 		dg := NewGraph()
-		c := &Ctor{}
+		c := &Ctor{ID: 123}
 		params := []*Param{p1, p2}
 		results := []*Result{r1, r2}
 
@@ -75,34 +77,32 @@ func TestAddCtor(t *testing.T) {
 
 		assert.Equal(t, []*Param{p1, p2}, c.Params)
 		assert.Equal(t, []*Result{r1, r2}, c.Results)
+		assert.Equal(t, map[CtorID]*Ctor{123: c}, dg.ctorMap)
 	})
 
 	t.Run("grouped params", func(t *testing.T) {
 		dg := NewGraph()
-		c := &Ctor{}
+		c := &Ctor{ID: 1234}
 		params := []*Param{p3}
 
 		k := groupKey{
 			t:     type3.Elem(),
 			group: "foo",
 		}
-		expectedGroup := &Group{
-			Type: type3.Elem(),
-			Name: "foo",
-		}
+		expectedGroup := NewGroup(k)
 
-		assert.Equal(t, map[groupKey]*Group{}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{}, dg.groupMap)
 		dg.AddCtor(c, params, []*Result{})
 
 		assert.Equal(t, 0, len(c.Params))
 		assert.Equal(t, []*Group{expectedGroup}, c.GroupParams)
-		assert.Equal(t, map[groupKey]*Group{k: expectedGroup}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{k: expectedGroup}, dg.groupMap)
 	})
 
 	t.Run("grouped results", func(t *testing.T) {
 		dg := NewGraph()
-		c0 := &Ctor{}
-		c1 := &Ctor{}
+		c0 := &Ctor{ID: 1234}
+		c1 := &Ctor{ID: 5678}
 		node0 := &Node{Type: type3, Group: "foo"}
 		node1 := &Node{Type: type3, Group: "foo"}
 		res0 := &Result{Node: node0, GroupIndex: 0}
@@ -120,17 +120,88 @@ func TestAddCtor(t *testing.T) {
 			Results: []*Result{res0, res1},
 		}
 
-		assert.Equal(t, map[groupKey]*Group{}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{}, dg.groupMap)
 
 		dg.AddCtor(c0, []*Param{}, []*Result{res0})
 		assert.Equal(t, []*Result{res0}, c0.Results)
-		assert.Equal(t, map[groupKey]*Group{k: group0}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{k: group0}, dg.groupMap)
 
 		dg.AddCtor(c1, []*Param{}, []*Result{res1})
 		assert.Equal(t, []*Result{res1}, c1.Results)
-		assert.Equal(t, map[groupKey]*Group{k: group1}, dg.Groups)
+		assert.Equal(t, map[groupKey]*Group{k: group1}, dg.groupMap)
 
 		assert.Equal(t, []*Ctor{c0, c1}, dg.Ctors)
+	})
+}
+
+func TestFailNodes(t *testing.T) {
+	type1 := reflect.TypeOf(t1{})
+	type2 := reflect.TypeOf(t2{})
+
+	n1 := &Node{Type: type1}
+	n2 := &Node{Type: type2}
+	n3 := &Node{Type: type1, Group: "foo"}
+	n4 := &Node{Type: type2, Group: "bar"}
+
+	r1 := &Result{Node: n1}
+	r2 := &Result{Node: n2}
+	r3 := &Result{Node: n3}
+	r4 := &Result{Node: n4}
+
+	t.Parallel()
+
+	t.Run("missing nodes", func(t *testing.T) {
+		dg := NewGraph()
+
+		dg.AddMissingNodes([]*Result{r1, r2})
+		assert.Equal(t, []*Result{r1, r2}, dg.Failed.RootCauses)
+		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
+
+		dg.AddMissingNodes([]*Result{r3, r4})
+		assert.Equal(t, []*Result{r1, r2}, dg.Failed.RootCauses)
+		assert.Equal(t, []*Result{r3, r4}, dg.Failed.TransitiveFailures)
+	})
+
+	t.Run("fail nodes", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+
+		dg.AddCtor(c0, []*Param{}, []*Result{r1})
+		dg.AddCtor(c1, []*Param{}, []*Result{r2})
+
+		dg.FailNodes([]*Result{r1}, 123)
+		assert.Equal(t, []*Result{r1}, dg.Failed.RootCauses)
+		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
+		assert.Equal(t, rootCause, c0.ErrorType)
+
+		dg.FailNodes([]*Result{r2}, 456)
+		assert.Equal(t, []*Result{r1}, dg.Failed.RootCauses)
+		assert.Equal(t, []*Result{r2}, dg.Failed.TransitiveFailures)
+		assert.Equal(t, transitiveFailure, c1.ErrorType)
+	})
+
+	t.Run("fail group nodes", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+		k0 := groupKey{t: type1, group: "foo"}
+		k1 := groupKey{t: type2, group: "bar"}
+
+		dg.AddCtor(c0, []*Param{}, []*Result{r3})
+		dg.AddCtor(c1, []*Param{}, []*Result{r4})
+
+		dg.FailGroupNodes("foo", type1, 123)
+		assert.Equal(t, []*Result{r3}, dg.Failed.RootCauses)
+		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
+		assert.Equal(t, rootCause, c0.ErrorType)
+		assert.Equal(t, rootCause, dg.groupMap[k0].ErrorType)
+
+		dg.FailGroupNodes("bar", type2, 456)
+		assert.Equal(t, []*Result{r3}, dg.Failed.RootCauses)
+		assert.Equal(t, []*Result{r4}, dg.Failed.TransitiveFailures)
+		assert.Equal(t, transitiveFailure, c1.ErrorType)
+		assert.Equal(t, transitiveFailure, dg.groupMap[k1].ErrorType)
 	})
 }
 
@@ -150,8 +221,8 @@ func TestGetGroup(t *testing.T) {
 	group2 := NewGroup(k2)
 	group2.Results = append(group2.Results, r1)
 
-	g.Groups[k1] = group1
-	g.Groups[k2] = group2
+	g.groupMap[k1] = group1
+	g.groupMap[k2] = group2
 
 	assert.Equal(t, group1, g.getGroup(k1))
 	assert.Equal(t, group2, g.getGroup(k2))
@@ -175,6 +246,8 @@ func TestStringerAndAttribute(t *testing.T) {
 	r3 := &Result{Node: n3, GroupIndex: 5}
 
 	g1 := &Group{Type: reflect.TypeOf(t1{}), Name: "group1"}
+	g2 := &Group{Type: reflect.TypeOf(t2{}), Name: "group2", ErrorType: rootCause}
+	g3 := &Group{Type: reflect.TypeOf(t3{}), Name: "group3", ErrorType: transitiveFailure}
 
 	t.Parallel()
 
@@ -193,18 +266,21 @@ func TestStringerAndAttribute(t *testing.T) {
 		assert.Equal(t, "[type=dot.t1 group=group1]", g1.String())
 	})
 
-	t.Run("param attributes", func(t *testing.T) {
-		assert.Equal(t, "", p1.Attributes())
-		assert.Equal(t, `<BR /><FONT POINT-SIZE="10">Name: bar</FONT>`, p2.Attributes())
-	})
-
 	t.Run("result attributes", func(t *testing.T) {
-		assert.Equal(t, "", r1.Attributes())
-		assert.Equal(t, `<BR /><FONT POINT-SIZE="10">Name: bar</FONT>`, r2.Attributes())
-		assert.Equal(t, `<BR /><FONT POINT-SIZE="10">Group: foo</FONT>`, r3.Attributes())
+		assert.Equal(t, `label=<dot.t1>`, r1.Attributes())
+		assert.Equal(t, `label=<dot.t2<BR /><FONT POINT-SIZE="10">Name: bar</FONT>>`, r2.Attributes())
+		assert.Equal(t, `label=<dot.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>`, r3.Attributes())
 	})
 
 	t.Run("group attributes", func(t *testing.T) {
-		assert.Equal(t, `<BR /><FONT POINT-SIZE="10">Group: group1</FONT>`, g1.Attributes())
+		assert.Equal(t, `shape=diamond label=<dot.t1<BR /><FONT POINT-SIZE="10">Group: group1</FONT>>`, g1.Attributes())
+		assert.Equal(t, `shape=diamond label=<dot.t2<BR /><FONT POINT-SIZE="10">Group: group2</FONT>> color=red`, g2.Attributes())
+		assert.Equal(t, `shape=diamond label=<dot.t3<BR /><FONT POINT-SIZE="10">Group: group3</FONT>> color=orange`, g3.Attributes())
 	})
+}
+
+func TestColor(t *testing.T) {
+	assert.Equal(t, "black", noError.Color())
+	assert.Equal(t, "red", rootCause.Color())
+	assert.Equal(t, "orange", transitiveFailure.Color())
 }

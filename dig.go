@@ -168,10 +168,22 @@ type containerStore interface {
 	// Returns the providers that can produce values for the given group and
 	// type.
 	getGroupProviders(name string, t reflect.Type) []provider
+
+	// Marks the given value group as failed because of the given constructor.
+	failGroupNodes(name string, t reflect.Type, id dot.CtorID)
+
+	// Marks the given parameters as failed because of the given constructor.
+	failNodes(params []*dot.Param, id dot.CtorID)
+
+	// Marks the given parameters as missing.
+	addMissingNodes(params []*dot.Param)
 }
 
 // provider encapsulates a user-provided constructor.
 type provider interface {
+	// ID is a unique numerical identifier for this provider.
+	ID() dot.CtorID
+
 	// Location returns where this constructor was defined.
 	Location() *digreflect.Func
 
@@ -221,24 +233,31 @@ var _graphTmpl = template.Must(
 		Parse(`digraph {
 	graph [compound=true];
 	{{range $g := .Groups}}
-		{{- quote .String}} [shape=diamond label=<{{.Type}}{{.Attributes}}>];
+		{{- quote .String}} [{{.Attributes}}];
 		{{range .Results}}
 			{{- quote $g.String}} -> {{quote .String}};
 		{{end}}
 	{{end -}}
 	{{range $index, $ctor := .Ctors}}
 		subgraph cluster_{{$index}} {
-			{{quote .Name}} [shape=plaintext];
+			constructor_{{$index}} [shape=plaintext label={{quote .Name}}];
+			{{- with .ErrorType}}color={{.Color}};{{end}}
 			{{range .Results}}
-				{{- quote .String}} [label=<{{.Type}}{{.Attributes}}>];
+				{{- quote .String}} [{{.Attributes}}];
 			{{end}}
 		}
 		{{range .Params}}
-			{{- quote $ctor.Name}} -> {{quote .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
+			constructor_{{$index}} -> {{quote .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
 		{{end}}
 		{{range .GroupParams}}
-			{{- quote $ctor.Name}} -> {{quote .String}} [ltail=cluster_{{$index}}];
+			constructor_{{$index}} -> {{quote .String}} [ltail=cluster_{{$index}}];
 		{{end -}}
+	{{end}}
+	{{range .Failed.TransitiveFailures}}
+		{{- quote .String}} [color=orange];
+	{{end -}}
+	{{range .Failed.RootCauses}}
+		{{- quote .String}} [color=red];
 	{{end}}
 }`))
 
@@ -309,6 +328,28 @@ func (c *Container) getProviders(k key) []provider {
 		providers[i] = n
 	}
 	return providers
+}
+
+func (c *Container) addMissingNodes(params []*dot.Param) {
+	missing := make([]*dot.Result, len(params))
+
+	for i, p := range params {
+		missing[i] = &dot.Result{Node: p.Node}
+	}
+	c.dg.AddMissingNodes(missing)
+}
+
+func (c *Container) failNodes(params []*dot.Param, id dot.CtorID) {
+	failed := make([]*dot.Result, len(params))
+
+	for i, p := range params {
+		failed[i] = &dot.Result{Node: p.Node}
+	}
+	c.dg.FailNodes(failed, id)
+}
+
+func (c *Container) failGroupNodes(name string, t reflect.Type, id dot.CtorID) {
+	c.dg.FailGroupNodes(name, t, id)
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -552,6 +593,9 @@ type node struct {
 	// Location where this function was defined.
 	location *digreflect.Func
 
+	// id uniquely identifies the constructor that produces a node.
+	id dot.CtorID
+
 	// Whether the constructor owned by this node was already called.
 	called bool
 
@@ -568,7 +612,9 @@ type nodeOptions struct {
 }
 
 func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
-	ctype := reflect.TypeOf(ctor)
+	cval := reflect.ValueOf(ctor)
+	ctype := cval.Type()
+	cptr := cval.Pointer()
 
 	params, err := newParamList(ctype)
 	if err != nil {
@@ -584,6 +630,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 		ctor:       ctor,
 		ctype:      ctype,
 		location:   digreflect.InspectFunc(ctor),
+		id:         dot.CtorID(cptr),
 		paramList:  params,
 		resultList: results,
 	}, err
@@ -592,6 +639,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 func (n *node) Location() *digreflect.Func { return n.location }
 func (n *node) ParamList() paramList       { return n.paramList }
 func (n *node) ResultList() resultList     { return n.resultList }
+func (n *node) ID() dot.CtorID             { return n.id }
 
 // Call calls this node's constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
@@ -640,6 +688,7 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 // the container. Returns an error if not.
 func shallowCheckDependencies(c containerStore, p param) error {
 	var missing errMissingManyTypes
+	var addMissingNodes []*dot.Param
 	walkParam(p, paramVisitorFunc(func(p param) bool {
 		ps, ok := p.(paramSingle)
 		if !ok {
@@ -648,12 +697,14 @@ func shallowCheckDependencies(c containerStore, p param) error {
 
 		if ns := c.getValueProviders(ps.Name, ps.Type); len(ns) == 0 && !ps.Optional {
 			missing = append(missing, newErrMissingType(c, key{name: ps.Name, t: ps.Type}))
+			addMissingNodes = append(addMissingNodes, ps.DotParam()...)
 		}
 
 		return true
 	}))
 
 	if len(missing) > 0 {
+		c.addMissingNodes(addMissingNodes)
 		return missing
 	}
 	return nil
@@ -721,6 +772,7 @@ func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
 
 func newDotCtor(n *node) *dot.Ctor {
 	return &dot.Ctor{
+		ID:      n.id,
 		Name:    n.location.Name,
 		Package: n.location.Package,
 		File:    n.location.File,
