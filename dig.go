@@ -241,17 +241,17 @@ var _graphTmpl = template.Must(
 	{{end -}}
 	{{range $index, $ctor := .Ctors}}
 		subgraph cluster_{{$index}} {
-			{{quote .Name}} [shape=plaintext];
+			constructor_{{$index}} [shape=plaintext label={{quote .Name}}];
 			{{- with .State}}color={{.Color}};{{end}}
 			{{range .Results}}
 				{{- quote .String}} [{{.Attributes}}];
 			{{end}}
 		}
 		{{range .Params}}
-			{{- quote $ctor.Name}} -> {{quote .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
+			constructor_{{$index}} -> {{quote .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
 		{{end}}
 		{{range .GroupParams}}
-			{{- quote $ctor.Name}} -> {{quote .String}} [ltail=cluster_{{$index}}];
+			constructor_{{$index}} -> {{quote .String}} [ltail=cluster_{{$index}}];
 		{{end -}}
 	{{end}}
 	{{range .Failed.TransitiveFailures}}
