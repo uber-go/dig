@@ -2592,12 +2592,15 @@ func TestDotGraph(t *testing.T) {
 	t.Run("nested param object", func(t *testing.T) {
 		type in struct {
 			In
+
 			A    t1
 			Nest struct {
 				In
+
 				B    t2
 				Nest struct {
 					In
+
 					C t3
 				}
 			}
@@ -2618,17 +2621,20 @@ func TestDotGraph(t *testing.T) {
 	t.Run("nested result object", func(t *testing.T) {
 		type nested1 struct {
 			Out
+
 			D t4
 		}
 
 		type nested2 struct {
 			Out
+
 			C    t3
 			Nest nested1
 		}
 
 		type out struct {
 			Out
+
 			B    t2
 			Nest nested2
 		}
@@ -2860,41 +2866,46 @@ func TestVisualize(t *testing.T) {
 		VerifyVisualization(t, "grouped", c)
 	})
 
-	t.Run("error types", func(t *testing.T) {
+	t.Run("constructor fails with an error", func(t *testing.T) {
 		c := New()
-
-		type in struct {
-			In
-			C []t1 `group:"g1"`
-		}
-
-		type out struct {
-			Out
-			B t3 `name:"n3"`
-			C t2 `group:"g2"`
-		}
 
 		type in1 struct {
 			In
+
+			C []t1 `group:"g1"`
+		}
+
+		type in2 struct {
+			In
+
 			A []t2 `group:"g2"`
 			B t3   `name:"n3"`
 		}
 
 		type out1 struct {
 			Out
-			D t2 `group:"g2"`
+
+			B t3 `name:"n3"`
+			C t2 `group:"g2"`
 		}
 
 		type out2 struct {
 			Out
+
+			D t2 `group:"g2"`
+		}
+
+		type out3 struct {
+			Out
+
 			A t1 `group:"g1"`
 			B t2 `group:"g2"`
 		}
 
-		c.Provide(func(in) out { return out{} })
-		c.Provide(func(in1) t4 { return t4{} })
-		c.Provide(func() out1 { return out1{} })
-		c.Provide(func() (out2, error) { return out2{}, fmt.Errorf("great sadness") })
+		c.Provide(func(in1) out1 { return out1{} })
+		c.Provide(func(in2) t4 { return t4{} })
+		c.Provide(func() out2 { return out2{} })
+		c.Provide(func() (out3, error) { return out3{}, fmt.Errorf("great sadness") })
 		c.Invoke(func(t4 t4) { return })
 
 		VerifyVisualization(t, "error", c)
@@ -2976,12 +2987,12 @@ func TestFailNodes(t *testing.T) {
 
 		c.failNodes([]*dot.Param{p1, p2}, 1234)
 		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
-		assert.Equal(t, "red", ctor1.State.Color())
+		assert.Equal(t, "red", ctor1.ErrorType.Color())
 
 		c.failNodes([]*dot.Param{p3, p4}, 5678)
 		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
 		assert.Equal(t, []*dot.Result{r3, r4}, c.dg.Failed.TransitiveFailures)
-		assert.Equal(t, "orange", ctor2.State.Color())
+		assert.Equal(t, "orange", ctor2.ErrorType.Color())
 	})
 
 	t.Run("fail group node", func(t *testing.T) {
@@ -2997,11 +3008,11 @@ func TestFailNodes(t *testing.T) {
 
 		c.failGroupNodes("foo", type1, 5678)
 		assert.Equal(t, []*dot.Result{groupResult2}, c.dg.Failed.RootCauses)
-		assert.Equal(t, "red", ctor2.State.Color())
+		assert.Equal(t, "red", ctor2.ErrorType.Color())
 
 		c.failGroupNodes("foo", type1, 1234)
 		assert.Equal(t, []*dot.Result{groupResult2}, c.dg.Failed.RootCauses)
 		assert.Equal(t, []*dot.Result{groupResult1}, c.dg.Failed.TransitiveFailures)
-		assert.Equal(t, "orange", ctor1.State.Color())
+		assert.Equal(t, "orange", ctor1.ErrorType.Color())
 	})
 }

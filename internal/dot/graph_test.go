@@ -36,7 +36,7 @@ func TestNewGraph(t *testing.T) {
 
 	assert.Equal(t, make(map[groupKey]*Group), g.groupMap)
 	assert.Equal(t, make(map[CtorID]*Ctor), g.ctorMap)
-	assert.Equal(t, &failedNodes{}, g.Failed)
+	assert.Equal(t, &FailedNodes{}, g.Failed)
 	assert.Equal(t, "*dot.Graph", reflect.TypeOf(g).String())
 }
 
@@ -173,12 +173,12 @@ func TestFailNodes(t *testing.T) {
 		dg.FailNodes([]*Result{r1}, 123)
 		assert.Equal(t, []*Result{r1}, dg.Failed.RootCauses)
 		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
-		assert.Equal(t, rootCause, c0.State)
+		assert.Equal(t, rootCause, c0.ErrorType)
 
 		dg.FailNodes([]*Result{r2}, 456)
 		assert.Equal(t, []*Result{r1}, dg.Failed.RootCauses)
 		assert.Equal(t, []*Result{r2}, dg.Failed.TransitiveFailures)
-		assert.Equal(t, failed, c1.State)
+		assert.Equal(t, transitiveFailure, c1.ErrorType)
 	})
 
 	t.Run("fail group nodes", func(t *testing.T) {
@@ -194,14 +194,14 @@ func TestFailNodes(t *testing.T) {
 		dg.FailGroupNodes("foo", type1, 123)
 		assert.Equal(t, []*Result{r3}, dg.Failed.RootCauses)
 		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
-		assert.Equal(t, rootCause, c0.State)
-		assert.Equal(t, rootCause, dg.groupMap[k0].State)
+		assert.Equal(t, rootCause, c0.ErrorType)
+		assert.Equal(t, rootCause, dg.groupMap[k0].ErrorType)
 
 		dg.FailGroupNodes("bar", type2, 456)
 		assert.Equal(t, []*Result{r3}, dg.Failed.RootCauses)
 		assert.Equal(t, []*Result{r4}, dg.Failed.TransitiveFailures)
-		assert.Equal(t, failed, c1.State)
-		assert.Equal(t, failed, dg.groupMap[k1].State)
+		assert.Equal(t, transitiveFailure, c1.ErrorType)
+		assert.Equal(t, transitiveFailure, dg.groupMap[k1].ErrorType)
 	})
 }
 
@@ -246,8 +246,8 @@ func TestStringerAndAttribute(t *testing.T) {
 	r3 := &Result{Node: n3, GroupIndex: 5}
 
 	g1 := &Group{Type: reflect.TypeOf(t1{}), Name: "group1"}
-	g2 := &Group{Type: reflect.TypeOf(t2{}), Name: "group2", State: rootCause}
-	g3 := &Group{Type: reflect.TypeOf(t3{}), Name: "group3", State: failed}
+	g2 := &Group{Type: reflect.TypeOf(t2{}), Name: "group2", ErrorType: rootCause}
+	g3 := &Group{Type: reflect.TypeOf(t3{}), Name: "group3", ErrorType: transitiveFailure}
 
 	t.Parallel()
 
@@ -280,7 +280,7 @@ func TestStringerAndAttribute(t *testing.T) {
 }
 
 func TestColor(t *testing.T) {
-	assert.Equal(t, "black", success.Color())
+	assert.Equal(t, "black", noError.Color())
 	assert.Equal(t, "red", rootCause.Color())
-	assert.Equal(t, "orange", failed.Color())
+	assert.Equal(t, "orange", transitiveFailure.Color())
 }

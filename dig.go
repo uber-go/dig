@@ -169,14 +169,13 @@ type containerStore interface {
 	// type.
 	getGroupProviders(name string, t reflect.Type) []provider
 
-	// Finds and adds the node to the list of failed nodes of the graph in the
-	// container and marks the corresponding constructor and group as failed.
+	// Marks the given value group as failed because of the given constructor.
 	failGroupNodes(name string, t reflect.Type, id dot.CtorID)
 
-	// Adds the nodes to the list of failed nodes of the graph in the container
-	// and marks the corresponding constructor as failed.
+	// Marks the given parameters as failed because of the given constructor.
 	failNodes(params []*dot.Param, id dot.CtorID)
 
+	// Marks the given parameters as missing.
 	addMissingNodes(params []*dot.Param)
 }
 
@@ -242,7 +241,7 @@ var _graphTmpl = template.Must(
 	{{range $index, $ctor := .Ctors}}
 		subgraph cluster_{{$index}} {
 			constructor_{{$index}} [shape=plaintext label={{quote .Name}}];
-			{{- with .State}}color={{.Color}};{{end}}
+			{{- with .ErrorType}}color={{.Color}};{{end}}
 			{{range .Results}}
 				{{- quote .String}} [{{.Attributes}}];
 			{{end}}
@@ -613,8 +612,9 @@ type nodeOptions struct {
 }
 
 func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
-	ctype := reflect.TypeOf(ctor)
-	cptr := reflect.ValueOf(ctor).Pointer()
+	cval := reflect.ValueOf(ctor)
+	ctype := cval.Type()
+	cptr := cval.Pointer()
 
 	params, err := newParamList(ctype)
 	if err != nil {
