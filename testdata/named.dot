@@ -2,19 +2,21 @@ digraph {
 	graph [compound=true];
 	
 		subgraph cluster_0 {
-			"TestVisualize.func3.1" [shape=plaintext];
+			constructor_0 [shape=plaintext label="TestVisualize.func3.1"];
 			"dig.t1[name=bar]" [label=<dig.t1<BR /><FONT POINT-SIZE="10">Name: bar</FONT>>];
 			"dig.t2[name=baz]" [label=<dig.t2<BR /><FONT POINT-SIZE="10">Name: baz</FONT>>];
 			
 		}
-		"TestVisualize.func3.1" -> "dig.t3[name=foo]" [ltail=cluster_0];
+		
+			constructor_0 -> "dig.t3[name=foo]" [ltail=cluster_0];
 		
 		
 		subgraph cluster_1 {
-			"TestVisualize.func3.2" [shape=plaintext];
+			constructor_1 [shape=plaintext label="TestVisualize.func3.2"];
 			"dig.t3[name=foo]" [label=<dig.t3<BR /><FONT POINT-SIZE="10">Name: foo</FONT>>];
 			
 		}
 		
 		
+	
 }

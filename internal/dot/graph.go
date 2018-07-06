@@ -25,15 +25,36 @@ import (
 	"reflect"
 )
 
+// ErrorType of a constructor or group is updated when they fail to build.
+type ErrorType int
+
+const (
+	noError ErrorType = iota
+	rootCause
+	transitiveFailure
+)
+
+// CtorID is a unique numeric identifier for constructors.
+type CtorID uintptr
+
 // Ctor encodes a constructor provided to the container for the DOT graph.
 type Ctor struct {
 	Name        string
 	Package     string
 	File        string
 	Line        int
+	ID          CtorID
 	Params      []*Param
 	GroupParams []*Group
 	Results     []*Result
+	ErrorType   ErrorType
+}
+
+// Node is a single node in a graph and is embedded into Params and Results.
+type Node struct {
+	Type  reflect.Type
+	Name  string
+	Group string
 }
 
 // Param is a parameter node in the graph.
@@ -57,22 +78,33 @@ type Result struct {
 // Group is a group node in the graph.
 type Group struct {
 	// Type is the type of values in the group.
-	Type    reflect.Type
-	Name    string
-	Results []*Result
+	Type      reflect.Type
+	Name      string
+	Results   []*Result
+	ErrorType ErrorType
 }
 
 // Graph is the DOT-format graph in a Container.
 type Graph struct {
-	Ctors  []*Ctor
-	Groups map[groupKey]*Group
+	Ctors   []*Ctor
+	ctorMap map[CtorID]*Ctor
+
+	Groups   []*Group
+	groupMap map[groupKey]*Group
+
+	Failed *FailedNodes
 }
 
-// Node is a single node in a graph and is embedded into Params and Results.
-type Node struct {
-	Type  reflect.Type
-	Name  string
-	Group string
+// FailedNodes is the nodes that failed in the graph.
+type FailedNodes struct {
+	// RootCauses is a list of the point of failures. They are the root causes
+	// of failed invokes and can be either missing types (not provided) or
+	// error types (error providing).
+	RootCauses []*Result
+
+	// TransitiveFailures is the list of nodes that failed to build due to
+	// missing/failed dependencies.
+	TransitiveFailures []*Result
 }
 
 type groupKey struct {
@@ -83,7 +115,9 @@ type groupKey struct {
 // NewGraph creates an empty graph.
 func NewGraph() *Graph {
 	return &Graph{
-		Groups: make(map[groupKey]*Group),
+		ctorMap:  make(map[CtorID]*Ctor),
+		groupMap: make(map[groupKey]*Group),
+		Failed:   &FailedNodes{},
 	}
 }
 
@@ -121,7 +155,7 @@ func (dg *Graph) AddCtor(c *Ctor, paramList []*Param, resultList []*Result) {
 		// If the result is a grouped value, we want to update its GroupIndex
 		// and add it to the Group.
 		if result.Group != "" {
-			dg.addToGroup(result)
+			dg.addToGroup(result, c.ID)
 		}
 	}
 
@@ -130,21 +164,87 @@ func (dg *Graph) AddCtor(c *Ctor, paramList []*Param, resultList []*Result) {
 	c.Results = resultList
 
 	dg.Ctors = append(dg.Ctors, c)
+	dg.ctorMap[c.ID] = c
+}
+
+func (dg *Graph) failNode(r *Result, isRootCause bool) {
+	if isRootCause {
+		dg.addRootCause(r)
+	} else {
+		dg.addTransitiveFailure(r)
+	}
+}
+
+// AddMissingNodes adds missing nodes to the list of failed Results in the graph.
+func (dg *Graph) AddMissingNodes(results []*Result) {
+	// The failure(s) are root causes if there are no other failures.
+	isRootCause := len(dg.Failed.RootCauses) == 0
+
+	for _, r := range results {
+		dg.failNode(r, isRootCause)
+	}
+}
+
+// FailNodes adds results to the list of failed Results in the graph, and
+// updates the state of the constructor with the given id accordingly.
+func (dg *Graph) FailNodes(results []*Result, id CtorID) {
+	// This failure is the root cause if there are no other failures.
+	isRootCause := len(dg.Failed.RootCauses) == 0
+
+	for _, r := range results {
+		dg.failNode(r, isRootCause)
+	}
+
+	if c, ok := dg.ctorMap[id]; ok {
+		if isRootCause {
+			c.ErrorType = rootCause
+		} else {
+			c.ErrorType = transitiveFailure
+		}
+	}
+}
+
+// FailGroupNodes finds and adds the failed grouped nodes to the list of failed
+// Results in the graph, and updates the state of the group and constructor
+// with the given id accordingly.
+func (dg *Graph) FailGroupNodes(name string, t reflect.Type, id CtorID) {
+	// This failure is the root cause if there are no other failures.
+	isRootCause := len(dg.Failed.RootCauses) == 0
+
+	k := groupKey{t: t, group: name}
+	group := dg.getGroup(k)
+
+	for _, r := range dg.ctorMap[id].Results {
+		if r.Type == t && r.Group == name {
+			dg.failNode(r, isRootCause)
+		}
+	}
+
+	if c, ok := dg.ctorMap[id]; ok {
+		if isRootCause {
+			group.ErrorType = rootCause
+			c.ErrorType = rootCause
+		} else {
+			group.ErrorType = transitiveFailure
+			c.ErrorType = transitiveFailure
+		}
+	}
 }
 
 // getGroup finds the group by groupKey from the graph. If it is not available,
 // a new group is created and returned.
 func (dg *Graph) getGroup(k groupKey) *Group {
-	g, ok := dg.Groups[k]
+	g, ok := dg.groupMap[k]
 	if !ok {
 		g = NewGroup(k)
-		dg.Groups[k] = g
+		dg.groupMap[k] = g
+		dg.Groups = append(dg.Groups, g)
 	}
 	return g
 }
 
 // addToGroup adds a newly provided grouped result to the appropriate group.
-func (dg *Graph) addToGroup(r *Result) {
+func (dg *Graph) addToGroup(r *Result, id CtorID) {
 	k := groupKey{t: r.Type, group: r.Group}
 	group := dg.getGroup(k)
 
@@ -177,27 +277,43 @@ func (g *Group) String() string {
 	return fmt.Sprintf("[type=%v group=%v]", g.Type.String(), g.Name)
 }
 
-// Attributes composes and returns a string to style the Param's sublabel.
-func (p *Param) Attributes() string {
-	if p.Name != "" {
-		return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Name: %v</FONT>`, p.Name)
-	}
-	return ""
-}
-
-// Attributes composes and returns a string to style the Result's sublabel.
+// Attributes composes and returns a string of the Result node's attributes.
 func (r *Result) Attributes() string {
 	switch {
 	case r.Name != "":
-		return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Name: %v</FONT>`, r.Name)
+		return fmt.Sprintf(`label=<%v<BR /><FONT POINT-SIZE="10">Name: %v</FONT>>`, r.Type, r.Name)
 	case r.Group != "":
-		return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Group: %v</FONT>`, r.Group)
+		return fmt.Sprintf(`label=<%v<BR /><FONT POINT-SIZE="10">Group: %v</FONT>>`, r.Type, r.Group)
 	default:
-		return ""
+		return fmt.Sprintf(`label=<%v>`, r.Type)
 	}
 }
 
-// Attributes composes and returns a string to style the Group's sublabel.
+// Attributes composes and returns a string of the Group node's attributes.
 func (g *Group) Attributes() string {
-	return fmt.Sprintf(`<BR /><FONT POINT-SIZE="10">Group: %v</FONT>`, g.Name)
+	attr := fmt.Sprintf(`shape=diamond label=<%v<BR /><FONT POINT-SIZE="10">Group: %v</FONT>>`, g.Type, g.Name)
+	if g.ErrorType != noError {
+		attr += " color=" + g.ErrorType.Color()
+	}
+	return attr
+}
+
+// Color returns the color representation of each ErrorType.
+func (s ErrorType) Color() string {
+	switch s {
+	case rootCause:
+		return "red"
+	case transitiveFailure:
+		return "orange"
+	default:
+		return "black"
+	}
+}
+
+func (dg *Graph) addRootCause(r *Result) {
+	dg.Failed.RootCauses = append(dg.Failed.RootCauses, r)
+}
+
+func (dg *Graph) addTransitiveFailure(r *Result) {
+	dg.Failed.TransitiveFailures = append(dg.Failed.TransitiveFailures, r)
 }

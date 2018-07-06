@@ -238,6 +238,7 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 		if ps.Optional {
 			return reflect.Zero(ps.Type), nil
 		}
+		c.addMissingNodes(ps.DotParam())
 		return _noValue, newErrMissingType(c, key{name: ps.Name, t: ps.Type})
 	}
 
@@ -253,6 +254,7 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 			return reflect.Zero(ps.Type), nil
 		}
 
+		c.failNodes(ps.DotParam(), n.ID())
 		return _noValue, errParamSingleFailed{Key: key{t: ps.Type, name: ps.Name}, Reason: err}
 	}
 
@@ -432,6 +434,7 @@ func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
 func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 	for _, n := range c.getGroupProviders(pt.Group, pt.Type.Elem()) {
 		if err := n.Call(c); err != nil {
+			c.failGroupNodes(pt.Group, pt.Type.Elem(), n.ID())
 			return _noValue, errParamGroupFailed{
 				Key:    key{group: pt.Group, t: pt.Type.Elem()},
 				Reason: err,
