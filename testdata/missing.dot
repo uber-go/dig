@@ -1,0 +1,22 @@
+digraph {
+	graph [compound=true];
+	
+		subgraph cluster_0 {
+			constructor_0 [shape=plaintext label="TestVisualize.func7.1"];color=orange;
+			"dig.t4" [label=<dig.t4>];
+			
+		}
+		
+			constructor_0 -> "dig.t1" [ltail=cluster_0];
+		
+			constructor_0 -> "dig.t2" [ltail=cluster_0];
+		
+			constructor_0 -> "dig.t3" [ltail=cluster_0];
+		
+		
+	"dig.t4" [color=orange];
+	"dig.t1" [color=red];
+	"dig.t2" [color=red];
+	"dig.t3" [color=red];
+	
+}
