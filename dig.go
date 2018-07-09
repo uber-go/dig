@@ -211,10 +211,51 @@ func New(opts ...Option) *Container {
 	return c
 }
 
-// A VisualizeOption modifies the default behavior of Visualize. It's included
-// for future functionality; currently, there are no concrete implementations.
+// A VisualizeOption modifies the default behavior of Visualize.
 type VisualizeOption interface {
-	unimplemented()
+	applyVisualizeOption(*visualizeOptions)
+}
+
+type visualizeOptions struct {
+	GraphErr error
+}
+
+type visualizeOptionFunc func(*visualizeOptions)
+
+func (f visualizeOptionFunc) applyVisualizeOption(opts *visualizeOptions) { f(opts) }
+
+// GraphErr is a VisualizeOption that specifies the error updates to the graph
+// that should be made before visualizing it.
+func GraphErr(err error) VisualizeOption {
+	return visualizeOptionFunc(func(opts *visualizeOptions) {
+		opts.GraphErr = err
+	})
+}
+
+func updateGraph(dg *dot.Graph, err error) error {
+	var errors []errVisualizer
+	// Unwrapping the error until we reach the root cause.
+	for {
+		if ev, ok := err.(errVisualizer); ok {
+			errors = append(errors, ev)
+		}
+		e, ok := err.(causer)
+		if !ok {
+			break
+		}
+		err = e.cause()
+	}
+
+	if len(errors) == 0 {
+		return fmt.Errorf("cannot visualize error: %v", err)
+	}
+
+	// Iterating in reverse since the root cause is the last element in errors.
+	for i := len(errors) - 1; i >= 0; i-- {
+		errors[i].updateGraph(dg)
+	}
+
+	return nil
 }
 
 var _graphTmpl = template.Must(
@@ -256,38 +297,17 @@ var _graphTmpl = template.Must(
 // Visualize parses the graph in Container c into DOT format and writes it to
 // io.Writer w.
 func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
-	return _graphTmpl.Execute(w, c.createGraph())
-}
+	dg := c.createGraph()
 
-// VisualizeError parses the container and errors included in err into a DOT
-// format graph and writes it to io.Writer w.
-func VisualizeError(err error, w io.Writer, opts ...VisualizeOption) error {
-	ep, ok := err.(errEntryPoint)
-	if !ok {
-		return fmt.Errorf("no graph included in error: %v", err)
+	var options visualizeOptions
+	for _, o := range opts {
+		o.applyVisualizeOption(&options)
 	}
 
-	var errors []errVisualizer
-	// Unwrapping the error until we reach the root cause.
-	for {
-		if ev, ok := err.(errVisualizer); ok {
-			errors = append(errors, ev)
+	if options.GraphErr != nil {
+		if err := updateGraph(dg, options.GraphErr); err != nil {
+			return err
 		}
-		e, ok := err.(causer)
-		if !ok {
-			break
-		}
-		err = e.cause()
-	}
-
-	if len(errors) == 0 {
-		return fmt.Errorf("cannot visualize error: %v", err)
-	}
-
-	dg := ep.container().createGraph()
-	// Iterating in reverse since the root cause is the last element in errors.
-	for i := len(errors) - 1; i >= 0; i-- {
-		errors[i].updateGraph(dg)
 	}
 
 	return _graphTmpl.Execute(w, dg)
@@ -429,18 +449,16 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 
 	if err := shallowCheckDependencies(c, pl); err != nil {
 		return errMissingDependencies{
-			Container: c,
-			Func:      digreflect.InspectFunc(function),
-			Reason:    err,
+			Func:   digreflect.InspectFunc(function),
+			Reason: err,
 		}
 	}
 
 	args, err := pl.BuildList(c)
 	if err != nil {
 		return errArgumentsFailed{
-			Container: c,
-			Func:      digreflect.InspectFunc(function),
-			Reason:    err,
+			Func:   digreflect.InspectFunc(function),
+			Reason: err,
 		}
 	}
 

@@ -2926,7 +2926,7 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func() (out3, error) { return out3{}, fmt.Errorf("great sadness") })
 		err := c.Invoke(func(t4 t4) { return })
 
-		VerifyVisualizationError(t, "error", err)
+		VerifyVisualization(t, "error", c, GraphErr(err))
 	})
 
 	t.Run("missing types", func(t *testing.T) {
@@ -2935,19 +2935,13 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(A t1, B t2, C t3) t4 { return t4{} })
 		err := c.Invoke(func(t4 t4) { return })
 
-		VerifyVisualizationError(t, "missing", err)
+		VerifyVisualization(t, "missing", c, GraphErr(err))
 	})
 
 	t.Run("missing dependency", func(t *testing.T) {
 		c := New()
 		err := c.Invoke(func(t1 t1) { return })
 
-		VerifyVisualizationError(t, "missingDep", err)
-	})
-
-	t.Run("no graph", func(t *testing.T) {
-		var b bytes.Buffer
-		assertErrorMatches(t, VisualizeError(fmt.Errorf("great sadness"), &b),
-			"no graph included in error: great sadness")
+		VerifyVisualization(t, "missingDep", c, GraphErr(err))
 	})
 }
