@@ -171,7 +171,6 @@ func TestFailNodes(t *testing.T) {
 		dg.AddCtor(c1, []*Param{}, []*Result{r2})
 
 		dg.FailNodes([]*Result{r1}, 123)
-
 		assert.Equal(t, []*Result{r1}, dg.Failed.RootCauses)
 		assert.Equal(t, 0, len(dg.Failed.TransitiveFailures))
 		assert.Equal(t, rootCause, c0.ErrorType)

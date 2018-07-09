@@ -2895,6 +2895,7 @@ func TestVisualize(t *testing.T) {
 
 		type in2 struct {
 			In
+
 			A []t2 `group:"g2"`
 			B t3   `name:"n3"`
 		}
