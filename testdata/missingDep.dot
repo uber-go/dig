@@ -1,0 +1,6 @@
+digraph {
+	graph [compound=true];
+	
+	"dig.t1" [color=red];
+	
+}

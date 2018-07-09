@@ -2570,7 +2570,7 @@ func TestDotGraph(t *testing.T) {
 
 	t.Parallel()
 
-	t.Run("constructor with one param and one result", func(t *testing.T) {
+	t.Run("create graph with one constructor", func(t *testing.T) {
 		expected := []*dot.Ctor{
 			{
 				Params:  []*dot.Param{p1},
@@ -2580,10 +2580,12 @@ func TestDotGraph(t *testing.T) {
 
 		c := New()
 		c.Provide(func(A t1) t2 { return t2{} })
-		assertCtorsEqual(t, expected, c.dg.Ctors)
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
-	t.Run("more constructors", func(t *testing.T) {
+	t.Run("create graph with multple constructors", func(t *testing.T) {
 		expected := []*dot.Ctor{
 			{
 				Params:  []*dot.Param{p1},
@@ -2603,7 +2605,9 @@ func TestDotGraph(t *testing.T) {
 		c.Provide(func(A t1) t2 { return t2{} })
 		c.Provide(func(A t1) t3 { return t3{} })
 		c.Provide(func(A t2) t4 { return t4{} })
-		assertCtorsEqual(t, expected, c.dg.Ctors)
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("constructor with multiple params and results", func(t *testing.T) {
@@ -2616,7 +2620,9 @@ func TestDotGraph(t *testing.T) {
 
 		c := New()
 		c.Provide(func(A t3, B t4) (t1, t2) { return t1{}, t2{} })
-		assertCtorsEqual(t, expected, c.dg.Ctors)
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("param objects and result objects", func(t *testing.T) {
@@ -2643,7 +2649,9 @@ func TestDotGraph(t *testing.T) {
 
 		c := New()
 		c.Provide(func(i in) out { return out{} })
-		assertCtorsEqual(t, expected, c.dg.Ctors)
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("nested param object", func(t *testing.T) {
@@ -2672,7 +2680,9 @@ func TestDotGraph(t *testing.T) {
 
 		c := New()
 		c.Provide(func(p in) t4 { return t4{} })
-		assertCtorsEqual(t, expected, c.dg.Ctors)
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("nested result object", func(t *testing.T) {
@@ -2705,7 +2715,9 @@ func TestDotGraph(t *testing.T) {
 
 		c := New()
 		c.Provide(func(A t1) out { return out{} })
-		assertCtorsEqual(t, expected, c.dg.Ctors)
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("value groups", func(t *testing.T) {
@@ -2755,7 +2767,9 @@ func TestDotGraph(t *testing.T) {
 		c.Provide(func(B t2) out1 { return out1{} })
 		c.Provide(func(B t4) out2 { return out2{} })
 		c.Provide(func(i in) t3 { return t3{} })
-		assertCtorsEqual(t, expected, c.dg.Ctors)
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("named values", func(t *testing.T) {
@@ -2784,7 +2798,9 @@ func TestDotGraph(t *testing.T) {
 
 		c := New()
 		c.Provide(func(i in) out { return out{B: t2{}} })
-		assertCtorsEqual(t, expected, c.dg.Ctors)
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("optional dependencies", func(t *testing.T) {
@@ -2809,7 +2825,9 @@ func TestDotGraph(t *testing.T) {
 
 		c := New()
 		c.Provide(func(i in) t4 { return t4{} })
-		assertCtorsEqual(t, expected, c.dg.Ctors)
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 }
 
@@ -2963,113 +2981,30 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(in2) t4 { return t4{} })
 		c.Provide(func() out2 { return out2{} })
 		c.Provide(func() (out3, error) { return out3{}, fmt.Errorf("great sadness") })
-		c.Invoke(func(t4 t4) { return })
+		err := c.Invoke(func(t4 t4) { return })
 
-		VerifyVisualization(t, "error", c)
+		VerifyVisualizationError(t, "error", err)
 	})
 
 	t.Run("missing types", func(t *testing.T) {
 		c := New()
 
 		c.Provide(func(A t1, B t2, C t3) t4 { return t4{} })
-		c.Invoke(func(t4 t4) { return })
+		err := c.Invoke(func(t4 t4) { return })
 
-		VerifyVisualization(t, "missing", c)
-	})
-}
-
-func TestFailNodes(t *testing.T) {
-	tparam := func(t reflect.Type, n string, g string, o bool) *dot.Param {
-		return &dot.Param{
-			Node: &dot.Node{
-				Type:  t,
-				Name:  n,
-				Group: g,
-			},
-			Optional: o,
-		}
-	}
-
-	tresult := func(t reflect.Type, n string, g string, gi int) *dot.Result {
-		return &dot.Result{
-			Node: &dot.Node{
-				Type:  t,
-				Name:  n,
-				Group: g,
-			},
-			GroupIndex: gi,
-		}
-	}
-
-	type t1 struct{}
-	type t2 struct{}
-	type t3 struct{}
-	type t4 struct{}
-
-	type1 := reflect.TypeOf(t1{})
-	type2 := reflect.TypeOf(t2{})
-	type3 := reflect.TypeOf(t3{})
-	type4 := reflect.TypeOf(t4{})
-
-	p1 := tparam(type1, "", "", false)
-	p2 := tparam(type2, "", "", false)
-	p3 := tparam(type3, "", "", false)
-	p4 := tparam(type4, "", "", false)
-
-	r1 := tresult(type1, "", "", 0)
-	r2 := tresult(type2, "", "", 0)
-	r3 := tresult(type3, "", "", 0)
-	r4 := tresult(type4, "", "", 0)
-
-	t.Parallel()
-
-	t.Run("missing nodes", func(t *testing.T) {
-		c := New()
-
-		c.addMissingNodes([]*dot.Param{p1, p2})
-		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
-
-		c.addMissingNodes([]*dot.Param{p3, p4})
-		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
-		assert.Equal(t, []*dot.Result{r3, r4}, c.dg.Failed.TransitiveFailures)
+		VerifyVisualizationError(t, "missing", err)
 	})
 
-	t.Run("fail nodes", func(t *testing.T) {
+	t.Run("missing dependency", func(t *testing.T) {
 		c := New()
-		ctor1 := &dot.Ctor{ID: 1234}
-		ctor2 := &dot.Ctor{ID: 5678}
+		err := c.Invoke(func(t1 t1) { return })
 
-		c.dg.AddCtor(ctor1, []*dot.Param{}, []*dot.Result{})
-		c.dg.AddCtor(ctor2, []*dot.Param{}, []*dot.Result{})
-
-		c.failNodes([]*dot.Param{p1, p2}, 1234)
-		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
-		assert.Equal(t, "red", ctor1.ErrorType.Color())
-
-		c.failNodes([]*dot.Param{p3, p4}, 5678)
-		assert.Equal(t, []*dot.Result{r1, r2}, c.dg.Failed.RootCauses)
-		assert.Equal(t, []*dot.Result{r3, r4}, c.dg.Failed.TransitiveFailures)
-		assert.Equal(t, "orange", ctor2.ErrorType.Color())
+		VerifyVisualizationError(t, "missingDep", err)
 	})
 
-	t.Run("fail group node", func(t *testing.T) {
-		c := New()
-		ctor1 := &dot.Ctor{ID: 1234}
-		ctor2 := &dot.Ctor{ID: 5678}
-
-		groupResult1 := tresult(type1, "", "foo", 0)
-		groupResult2 := tresult(type1, "", "foo", 1)
-
-		c.dg.AddCtor(ctor1, []*dot.Param{}, []*dot.Result{groupResult1})
-		c.dg.AddCtor(ctor2, []*dot.Param{}, []*dot.Result{groupResult2})
-
-		c.failGroupNodes("foo", type1, 5678)
-		assert.Equal(t, []*dot.Result{groupResult2}, c.dg.Failed.RootCauses)
-		assert.Equal(t, "red", ctor2.ErrorType.Color())
-
-		c.failGroupNodes("foo", type1, 1234)
-		assert.Equal(t, []*dot.Result{groupResult2}, c.dg.Failed.RootCauses)
-		assert.Equal(t, []*dot.Result{groupResult1}, c.dg.Failed.TransitiveFailures)
-		assert.Equal(t, "orange", ctor1.ErrorType.Color())
+	t.Run("no graph", func(t *testing.T) {
+		var b bytes.Buffer
+		assertErrorMatches(t, VisualizeError(fmt.Errorf("great sadness"), &b),
+			"no graph included in error: great sadness")
 	})
 }

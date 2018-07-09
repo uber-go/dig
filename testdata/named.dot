@@ -3,6 +3,7 @@ digraph {
 	
 		subgraph cluster_0 {
 			constructor_0 [shape=plaintext label="TestVisualize.func3.1"];
+			
 			"dig.t1[name=bar]" [label=<dig.t1<BR /><FONT POINT-SIZE="10">Name: bar</FONT>>];
 			"dig.t2[name=baz]" [label=<dig.t2<BR /><FONT POINT-SIZE="10">Name: baz</FONT>>];
 			
@@ -13,6 +14,7 @@ digraph {
 		
 		subgraph cluster_1 {
 			constructor_1 [shape=plaintext label="TestVisualize.func3.2"];
+			
 			"dig.t3[name=foo]" [label=<dig.t3<BR /><FONT POINT-SIZE="10">Name: foo</FONT>>];
 			
 		}

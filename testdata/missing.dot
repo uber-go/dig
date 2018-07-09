@@ -2,7 +2,8 @@ digraph {
 	graph [compound=true];
 	
 		subgraph cluster_0 {
-			constructor_0 [shape=plaintext label="TestVisualize.func7.1"];color=orange;
+			constructor_0 [shape=plaintext label="TestVisualize.func7.1"];
+			color=orange;
 			"dig.t4" [label=<dig.t4>];
 			
 		}
