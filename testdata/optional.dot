@@ -3,6 +3,7 @@ digraph {
 	
 		subgraph cluster_0 {
 			constructor_0 [shape=plaintext label="TestVisualize.func4.1"];
+			
 			"dig.t1" [label=<dig.t1>];
 			
 		}
@@ -10,6 +11,7 @@ digraph {
 		
 		subgraph cluster_1 {
 			constructor_1 [shape=plaintext label="TestVisualize.func4.2"];
+			
 			"dig.t2" [label=<dig.t2>];
 			
 		}
