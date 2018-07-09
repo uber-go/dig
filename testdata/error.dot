@@ -1,9 +1,9 @@
 digraph {
 	graph [compound=true];
-	"[type=dig.t1 group=g1]" [shape=diamond label=<dig.t1<BR /><FONT POINT-SIZE="10">Group: g1</FONT>>];
+	"[type=dig.t1 group=g1]" [shape=diamond label=<dig.t1<BR /><FONT POINT-SIZE="10">Group: g1</FONT>> color=red];
 		"[type=dig.t1 group=g1]" -> "dig.t1[group=g1]0";
 		
-	"[type=dig.t2 group=g2]" [shape=diamond label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>>];
+	"[type=dig.t2 group=g2]" [shape=diamond label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>> color=orange];
 		"[type=dig.t2 group=g2]" -> "dig.t2[group=g2]0";
 		"[type=dig.t2 group=g2]" -> "dig.t2[group=g2]1";
 		"[type=dig.t2 group=g2]" -> "dig.t2[group=g2]2";
@@ -11,6 +11,7 @@ digraph {
 	
 		subgraph cluster_0 {
 			constructor_0 [shape=plaintext label="TestVisualize.func6.1"];
+			color=orange;
 			"dig.t3[name=n3]" [label=<dig.t3<BR /><FONT POINT-SIZE="10">Name: n3</FONT>>];
 			"dig.t2[group=g2]0" [label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>>];
 			
@@ -21,6 +22,7 @@ digraph {
 		
 		subgraph cluster_1 {
 			constructor_1 [shape=plaintext label="TestVisualize.func6.2"];
+			
 			"dig.t4" [label=<dig.t4>];
 			
 		}
@@ -32,6 +34,7 @@ digraph {
 		
 		subgraph cluster_2 {
 			constructor_2 [shape=plaintext label="TestVisualize.func6.3"];
+			
 			"dig.t2[group=g2]1" [label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>>];
 			
 		}
@@ -39,11 +42,15 @@ digraph {
 		
 		subgraph cluster_3 {
 			constructor_3 [shape=plaintext label="TestVisualize.func6.4"];
+			color=red;
 			"dig.t1[group=g1]0" [label=<dig.t1<BR /><FONT POINT-SIZE="10">Group: g1</FONT>>];
 			"dig.t2[group=g2]2" [label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>>];
 			
 		}
 		
 		
+	"dig.t2[group=g2]0" [color=orange];
+	"dig.t4" [color=orange];
+	"dig.t1[group=g1]0" [color=red];
 	
 }

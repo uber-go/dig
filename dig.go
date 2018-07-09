@@ -233,7 +233,7 @@ var _graphTmpl = template.Must(
 	{{range $index, $ctor := .Ctors}}
 		subgraph cluster_{{$index}} {
 			constructor_{{$index}} [shape=plaintext label={{quote .Name}}];
-			{{- with .ErrorType}}color={{.Color}};{{end}}
+			{{with .ErrorType}}color={{.Color}};{{end}}
 			{{range .Results}}
 				{{- quote .String}} [{{.Attributes}}];
 			{{end}}

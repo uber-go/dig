@@ -322,7 +322,7 @@ func (e errMissingManyTypes) updateGraph(g *dot.Graph) {
 			},
 		}
 	}
-	g.MissingNodes(missing)
+	g.AddMissingNodes(missing)
 }
 
 type errVisualizer interface {

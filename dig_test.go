@@ -2923,7 +2923,7 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(in2) t4 { return t4{} })
 		c.Provide(func() out2 { return out2{} })
 		c.Provide(func() (out3, error) { return out3{}, fmt.Errorf("great sadness") })
-		c.Invoke(func(t4 t4) { return })
+		err := c.Invoke(func(t4 t4) { return })
 
 		VerifyVisualizationError(t, "error", err)
 	})
