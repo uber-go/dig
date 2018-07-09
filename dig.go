@@ -217,18 +217,18 @@ type VisualizeOption interface {
 }
 
 type visualizeOptions struct {
-	GraphErr error
+	VisualizeError error
 }
 
 type visualizeOptionFunc func(*visualizeOptions)
 
 func (f visualizeOptionFunc) applyVisualizeOption(opts *visualizeOptions) { f(opts) }
 
-// GraphErr is a VisualizeOption that specifies the error updates to the graph
+// VisualizeError is a VisualizeOption that specifies the error updates to the graph
 // that should be made before visualizing it.
-func GraphErr(err error) VisualizeOption {
+func VisualizeError(err error) VisualizeOption {
 	return visualizeOptionFunc(func(opts *visualizeOptions) {
-		opts.GraphErr = err
+		opts.VisualizeError = err
 	})
 }
 
@@ -304,8 +304,8 @@ func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
 		o.applyVisualizeOption(&options)
 	}
 
-	if options.GraphErr != nil {
-		if err := updateGraph(dg, options.GraphErr); err != nil {
+	if options.VisualizeError != nil {
+		if err := updateGraph(dg, options.VisualizeError); err != nil {
 			return err
 		}
 	}

@@ -2926,7 +2926,7 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func() (out3, error) { return out3{}, fmt.Errorf("great sadness") })
 		err := c.Invoke(func(t4 t4) { return })
 
-		VerifyVisualization(t, "error", c, GraphErr(err))
+		VerifyVisualization(t, "error", c, VisualizeError(err))
 	})
 
 	t.Run("missing types", func(t *testing.T) {
@@ -2935,13 +2935,13 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(A t1, B t2, C t3) t4 { return t4{} })
 		err := c.Invoke(func(t4 t4) { return })
 
-		VerifyVisualization(t, "missing", c, GraphErr(err))
+		VerifyVisualization(t, "missing", c, VisualizeError(err))
 	})
 
 	t.Run("missing dependency", func(t *testing.T) {
 		c := New()
 		err := c.Invoke(func(t1 t1) { return })
 
-		VerifyVisualization(t, "missingDep", c, GraphErr(err))
+		VerifyVisualization(t, "missingDep", c, VisualizeError(err))
 	})
 }
