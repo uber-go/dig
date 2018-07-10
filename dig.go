@@ -224,8 +224,15 @@ type visualizeOptionFunc func(*visualizeOptions)
 
 func (f visualizeOptionFunc) applyVisualizeOption(opts *visualizeOptions) { f(opts) }
 
-// VisualizeError is a VisualizeOption that specifies the error updates to the graph
-// that should be made before visualizing it.
+// VisualizeError includes a visualization of the given error in the output of
+// Visualize if an error was returned by Invoke or Provide.
+//
+//   if err := c.Provide(...); err != nil {
+//     dig.Visualize(c, w, dig.VisualizeError(err))
+//   }
+//
+// This option has no effect if the error was nil or if it didn't contain any
+// information to visualize.
 func VisualizeError(err error) VisualizeOption {
 	return visualizeOptionFunc(func(opts *visualizeOptions) {
 		opts.VisualizeError = err
@@ -234,7 +241,7 @@ func VisualizeError(err error) VisualizeOption {
 
 func updateGraph(dg *dot.Graph, err error) error {
 	var errors []errVisualizer
-	// Unwrapping the error until we reach the root cause.
+	// Unwrap error to find the root cause.
 	for {
 		if ev, ok := err.(errVisualizer); ok {
 			errors = append(errors, ev)
@@ -247,10 +254,10 @@ func updateGraph(dg *dot.Graph, err error) error {
 	}
 
 	if len(errors) == 0 {
-		return fmt.Errorf("cannot visualize error: %v", err)
+		return nil
 	}
 
-	// Iterating in reverse since the root cause is the last element in errors.
+	// We iterate in reverse because the last element is the root cause.
 	for i := len(errors) - 1; i >= 0; i-- {
 		errors[i].updateGraph(dg)
 	}
