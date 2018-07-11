@@ -113,14 +113,11 @@ func (e errConstructorFailed) Error() string {
 // errArgumentsFailed is returned when a function could not be run because one
 // of its dependencies failed to build for any reason.
 type errArgumentsFailed struct {
-	Container *Container
-	Func      *digreflect.Func
-	Reason    error
+	Func   *digreflect.Func
+	Reason error
 }
 
 func (e errArgumentsFailed) cause() error { return e.Reason }
-
-func (e errArgumentsFailed) container() *Container { return e.Container }
 
 func (e errArgumentsFailed) Error() string {
 	return fmt.Sprintf("could not build arguments for function %v: %v", e.Func, e.Reason)
@@ -129,14 +126,11 @@ func (e errArgumentsFailed) Error() string {
 // errMissingDependencies is returned when the dependencies of a function are
 // not available in the container.
 type errMissingDependencies struct {
-	Container *Container
-	Func      *digreflect.Func
-	Reason    error
+	Func   *digreflect.Func
+	Reason error
 }
 
 func (e errMissingDependencies) cause() error { return e.Reason }
-
-func (e errMissingDependencies) container() *Container { return e.Container }
 
 func (e errMissingDependencies) Error() string {
 	return fmt.Sprintf("missing dependencies for function %v: %v", e.Func, e.Reason)
@@ -327,8 +321,4 @@ func (e errMissingManyTypes) updateGraph(g *dot.Graph) {
 
 type errVisualizer interface {
 	updateGraph(*dot.Graph)
-}
-
-type errEntryPoint interface {
-	container() *Container
 }
