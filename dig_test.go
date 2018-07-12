@@ -2945,3 +2945,17 @@ func TestVisualize(t *testing.T) {
 		VerifyVisualization(t, "missingDep", c, VisualizeError(err))
 	})
 }
+
+type VisualizableErr struct{}
+
+func (err VisualizableErr) updateGraph(dg *dot.Graph) {}
+func (err VisualizableErr) Error() string             { return "great sadness" }
+
+func TestCanVisualizeError(t *testing.T) {
+	unvisualizableErr := fmt.Errorf("great sadness")
+	visualizableErr := VisualizableErr{}
+
+	assert.Error(t, visualizableErr)
+	assert.True(t, CanVisualizeError(visualizableErr))
+	assert.False(t, CanVisualizeError(unvisualizableErr))
+}
