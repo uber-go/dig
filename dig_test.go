@@ -2951,11 +2951,22 @@ type VisualizableErr struct{}
 func (err VisualizableErr) updateGraph(dg *dot.Graph) {}
 func (err VisualizableErr) Error() string             { return "great sadness" }
 
+type NestedErr struct {
+	err error
+}
+
+func (err NestedErr) Error() string { return "oh no" }
+func (err NestedErr) cause() error  { return err.err }
+
 func TestCanVisualizeError(t *testing.T) {
 	unvisualizableErr := fmt.Errorf("great sadness")
+	nestedUnvisualizableErr := NestedErr{err: unvisualizableErr}
 	visualizableErr := VisualizableErr{}
+	nestedVisualizableErr := NestedErr{err: visualizableErr}
 
 	assert.Error(t, visualizableErr)
-	assert.True(t, CanVisualizeError(visualizableErr))
 	assert.False(t, CanVisualizeError(unvisualizableErr))
+	assert.False(t, CanVisualizeError(nestedUnvisualizableErr))
+	assert.True(t, CanVisualizeError(visualizableErr))
+	assert.True(t, CanVisualizeError(nestedVisualizableErr))
 }

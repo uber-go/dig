@@ -323,8 +323,18 @@ func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
 
 // CanVisualizeError returns true if the error is an errVisualizer.
 func CanVisualizeError(err error) bool {
-	_, ok := err.(errVisualizer)
-	return ok
+	for {
+		if _, ok := err.(errVisualizer); ok {
+			return true
+		}
+		e, ok := err.(causer)
+		if !ok {
+			break
+		}
+		err = e.cause()
+	}
+
+	return false
 }
 
 func (c *Container) createGraph() *dot.Graph {
