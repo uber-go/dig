@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Added
+- Added `Visualize` function to parse the graph in a container into DOT format
+  to allow visualization of errors types dependency relationship of types in
+  container.
+- Added `CanVisualizeError` function to determine if an error can be visualized
+  in the graph.
 - Added `Name` option for `Provide` to add named values to the container
   without rewriting constructors. See package documentation for more
   information.
