@@ -634,6 +634,37 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
+	t.Run("optional and named ordering doesn't matter", func(t *testing.T) {
+		type param1 struct {
+			In
+
+			Foo struct{} `name:"foo" optional:"true"`
+		}
+
+		type param2 struct {
+			In
+
+			Foo struct{} `optional:"true" name:"foo"`
+		}
+
+		c := New()
+
+		called1 := false
+		require.NoError(t, c.Invoke(func(p param1) {
+			called1 = true
+			assert.Equal(t, struct{}{}, p.Foo)
+		}))
+
+		called2 := false
+		require.NoError(t, c.Invoke(func(p param2) {
+			called2 = true
+			assert.Equal(t, struct{}{}, p.Foo)
+		}))
+
+		assert.True(t, called1)
+		assert.True(t, called2)
+	})
+
 	t.Run("dynamically generated dig.In", func(t *testing.T) {
 		// This test verifies that a dig.In generated using reflect.StructOf
 		// works with our dig.In detection logic.
