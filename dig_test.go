@@ -2945,3 +2945,50 @@ func TestVisualize(t *testing.T) {
 		VerifyVisualization(t, "missingDep", c, VisualizeError(err))
 	})
 }
+
+type visualizableErr struct{}
+
+func (err visualizableErr) Error() string             { return "great sadness" }
+func (err visualizableErr) updateGraph(dg *dot.Graph) {}
+
+type nestedErr struct {
+	err error
+}
+
+func (err nestedErr) Error() string { return "oh no" }
+func (err nestedErr) cause() error  { return err.err }
+
+func TestCanVisualizeError(t *testing.T) {
+	tests := []struct {
+		desc         string
+		err          error
+		canVisualize bool
+	}{
+		{
+			desc:         "unvisualizable error",
+			err:          fmt.Errorf("great sadness"),
+			canVisualize: false,
+		},
+		{
+			desc:         "nested unvisualizable error",
+			err:          nestedErr{err: fmt.Errorf("great sadness")},
+			canVisualize: false,
+		},
+		{
+			desc:         "visualizable error",
+			err:          visualizableErr{},
+			canVisualize: true,
+		},
+		{
+			desc:         "nested visualizable error",
+			err:          nestedErr{err: visualizableErr{}},
+			canVisualize: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			assert.Equal(t, tt.canVisualize, CanVisualizeError(tt.err))
+		})
+	}
+}

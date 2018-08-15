@@ -253,6 +253,7 @@ func updateGraph(dg *dot.Graph, err error) error {
 		err = e.cause()
 	}
 
+	// If there are no errVisualizers included, we do not modify the graph.
 	if len(errors) == 0 {
 		return nil
 	}
@@ -318,6 +319,22 @@ func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
 	}
 
 	return _graphTmpl.Execute(w, dg)
+}
+
+// CanVisualizeError returns true if the error is an errVisualizer.
+func CanVisualizeError(err error) bool {
+	for {
+		if _, ok := err.(errVisualizer); ok {
+			return true
+		}
+		e, ok := err.(causer)
+		if !ok {
+			break
+		}
+		err = e.cause()
+	}
+
+	return false
 }
 
 func (c *Container) createGraph() *dot.Graph {
