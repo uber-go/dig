@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+- No changes yet.
+
 ## [1.4.0] - 2018-08-16
 ### Added
 - Added `Visualize` function to visualize the state of the container in the
@@ -120,6 +123,7 @@ First release candidate.
 
 Initial release.
 
+[Unreleased]: https://github.com/uber-go/dig/compare/v1.4.0...HEAD
 [1.4.0]: https://github.com/uber-go/dig/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/uber-go/dig/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/uber-go/dig/compare/v1.1.0...v1.2.0
