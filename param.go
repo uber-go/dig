@@ -98,9 +98,35 @@ type paramVisitor interface {
 // recursed into.
 type paramVisitorFunc func(param) (recurse bool)
 
-func (f paramVisitorFunc) Visit(p param) paramVisitor {
-	if f(p) {
-		return f
+type ParamVisitOnce struct {
+	f       paramVisitorFunc
+	visited map[string]bool
+}
+
+// NewParamVisitOnce constructs a paramVisitor avoiding redundant visits.
+func NewParamVisitOnce(visited map[string]bool, f paramVisitorFunc) paramVisitor {
+	return ParamVisitOnce{
+		f:       f,
+		visited: visited,
+	}
+}
+
+// Visit operates pv.f on param if:
+//		- param is not an edge node (i.e. param is a paramList), OR
+//		- param is an edge node that has not yet been visited
+func (pv ParamVisitOnce) Visit(p param) paramVisitor {
+	switch p.(type) {
+	case paramSingle, paramGroupedSlice:
+		if pv.visited[p.String()] {
+			return pv
+		}
+		defer func() {
+			pv.visited[p.String()] = true
+		}()
+	}
+
+	if pv.f(p) {
+		return pv
 	}
 	return nil
 }
@@ -113,10 +139,12 @@ func (f paramVisitorFunc) Visit(p param) paramVisitor {
 // visitor.
 //
 // This is very similar to how go/ast.Walk works.
-func walkParam(p param, v paramVisitor) {
+//
+// paramVisitor can end the walk early by returning nil.
+func walkParam(p param, v paramVisitor) (cont bool) {
 	v = v.Visit(p)
 	if v == nil {
-		return
+		return false
 	}
 
 	switch par := p.(type) {
@@ -124,11 +152,15 @@ func walkParam(p param, v paramVisitor) {
 		// No sub-results
 	case paramObject:
 		for _, f := range par.Fields {
-			walkParam(f.Param, v)
+			if !walkParam(f.Param, v) {
+				return false
+			}
 		}
 	case paramList:
 		for _, p := range par.Params {
-			walkParam(p, v)
+			if !walkParam(p, v) {
+				return false
+			}
 		}
 	default:
 		panic(fmt.Sprintf(
@@ -137,6 +169,8 @@ func walkParam(p param, v paramVisitor) {
 				"and provide the following message: "+
 				"received unknown param type %T", p))
 	}
+
+	return true
 }
 
 // paramList holds all arguments of the constructor as params.

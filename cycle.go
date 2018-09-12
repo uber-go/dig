@@ -56,18 +56,19 @@ func (e errCycleDetected) Error() string {
 }
 
 func verifyAcyclic(c containerStore, n provider, k key) error {
+	visited := make(map[string]bool)
 	err := detectCycles(n, c, []cycleEntry{
 		{Key: k, Func: n.Location()},
-	})
+	}, visited)
 	if err != nil {
 		err = errWrapf(err, "this function introduces a cycle")
 	}
 	return err
 }
 
-func detectCycles(n provider, c containerStore, path []cycleEntry) error {
+func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[string]bool) error {
 	var err error
-	walkParam(n.ParamList(), paramVisitorFunc(func(param param) bool {
+	walkParam(n.ParamList(), NewParamVisitOnce(visited, func(param param) bool {
 		if err != nil {
 			return false
 		}
@@ -91,15 +92,16 @@ func detectCycles(n provider, c containerStore, path []cycleEntry) error {
 
 		entry := cycleEntry{Func: n.Location(), Key: k}
 
-		for _, p := range path {
-			if p.Key == k {
-				err = errCycleDetected{Path: append(path, entry)}
-				return false
-			}
+		// The first element of path is the new addition to the graph, therefore
+		// it must be in any cycle that exists, assuming verifyAcyclic has been
+		// run for every previous Provide.
+		if path[0].Key == k {
+			err = errCycleDetected{Path: append(path, entry)}
+			return false
 		}
 
 		for _, n := range providers {
-			if e := detectCycles(n, c, append(path, entry)); e != nil {
+			if e := detectCycles(n, c, append(path, entry), visited); e != nil {
 				err = e
 				return false
 			}

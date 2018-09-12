@@ -163,3 +163,23 @@ func TestParamGroupSliceErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestParamVisitorCountAccumulates(t *testing.T) {
+	visitorCounts := make(map[string]bool)
+
+	params := []paramSingle{
+		{Name: "param 1"},
+		{Name: "param 2"},
+		{Name: "param 2"},
+		{Name: "param 2"},
+		{Name: "param 2"},
+	}
+
+	visitor := NewParamVisitOnce(visitorCounts, func(param) bool { return true })
+	for _, p := range params {
+		visitor.Visit(p)
+	}
+
+	assert.True(t, visitorCounts[params[0].String()])
+	assert.True(t, visitorCounts[params[1].String()])
+}
