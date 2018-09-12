@@ -56,18 +56,19 @@ func (e errCycleDetected) Error() string {
 }
 
 func verifyAcyclic(c containerStore, n provider, k key) error {
+	visitorCounts := make(map[string]int)
 	err := detectCycles(n, c, []cycleEntry{
 		{Key: k, Func: n.Location()},
-	})
+	}, visitorCounts)
 	if err != nil {
 		err = errWrapf(err, "this function introduces a cycle")
 	}
 	return err
 }
 
-func detectCycles(n provider, c containerStore, path []cycleEntry) error {
+func detectCycles(n provider, c containerStore, path []cycleEntry, visitorCounts map[string]int) error {
 	var err error
-	walkParam(n.ParamList(), paramVisitorFunc(func(param param) bool {
+	walkParam(n.ParamList(), NewParamVisitorAtMostTwice(visitorCounts, func(param param) bool {
 		if err != nil {
 			return false
 		}
@@ -99,7 +100,7 @@ func detectCycles(n provider, c containerStore, path []cycleEntry) error {
 		}
 
 		for _, n := range providers {
-			if e := detectCycles(n, c, append(path, entry)); e != nil {
+			if e := detectCycles(n, c, append(path, entry), visitorCounts); e != nil {
 				err = e
 				return false
 			}

@@ -163,3 +163,27 @@ func TestParamGroupSliceErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestParamVisitorCountAccumulates(t *testing.T) {
+	visitorCounts := make(map[string]int)
+
+	params := []paramSingle{
+		{Name: "param 1"},
+		{Name: "param 2"},
+		{Name: "param 2"},
+		{Name: "param 2"},
+		{Name: "param 2"},
+	}
+
+	visitor := NewParamVisitorAtMostTwice(visitorCounts, func(param) bool { return true })
+	for _, p := range params {
+		visitor.Visit(p)
+	}
+
+	assert.Equal(t, visitorCounts[params[0].String()], 1)
+	assert.Equal(t, visitorCounts[params[2].String()], 2)
+
+	// By confirming "param 2" count is only 2 we have implicitly confirmed
+	// visitor.f was only called twice on "param 2", i.e. redundant recursions
+	// were avoided.
+}

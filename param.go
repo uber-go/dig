@@ -98,9 +98,32 @@ type paramVisitor interface {
 // recursed into.
 type paramVisitorFunc func(param) (recurse bool)
 
-func (f paramVisitorFunc) Visit(p param) paramVisitor {
-	if f(p) {
-		return f
+type paramVisitorAtMostTwice struct {
+	f       paramVisitorFunc
+	visited map[string]int
+}
+
+// NewParamVisitorAtMostTwice constructs a paramVisitor with statekeeping to avoid
+// redundant recursions.
+func NewParamVisitorAtMostTwice(visitorCounts map[string]int, f paramVisitorFunc) paramVisitor {
+	return paramVisitorAtMostTwice{
+		f:       f,
+		visited: visitorCounts,
+	}
+}
+
+// Visit operates pv.f on params while accumulating a count of operations run.
+// Because pv.f is doing cycle detection (on a list of entries not in scope here)
+// it must be allowed to operate twice on the same parameter during a recurse.
+// There is no usecase presently requiring no executions of pv.f on params beyond
+// two, so return early to avoid unnecessary work.
+func (pv paramVisitorAtMostTwice) Visit(p param) paramVisitor {
+	if pv.visited[p.String()] > 1 {
+		return pv
+	}
+	if pv.f(p) {
+		pv.visited[p.String()] = pv.visited[p.String()] + 1
+		return pv
 	}
 	return nil
 }
