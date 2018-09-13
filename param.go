@@ -98,14 +98,15 @@ type paramVisitor interface {
 // recursed into.
 type paramVisitorFunc func(param) (recurse bool)
 
-type ParamVisitOnce struct {
+// paramVisitOnce encapsulates a paramVisitorFun and a map to track visited nodes.
+type paramVisitOnce struct {
 	f       paramVisitorFunc
 	visited map[string]bool
 }
 
 // NewParamVisitOnce constructs a paramVisitor avoiding redundant visits.
-func NewParamVisitOnce(visited map[string]bool, f paramVisitorFunc) paramVisitor {
-	return ParamVisitOnce{
+func newParamVisitOnce(visited map[string]bool, f paramVisitorFunc) paramVisitor {
+	return paramVisitOnce{
 		f:       f,
 		visited: visited,
 	}
@@ -114,7 +115,7 @@ func NewParamVisitOnce(visited map[string]bool, f paramVisitorFunc) paramVisitor
 // Visit operates pv.f on param if:
 //		- param is not an edge node (i.e. param is a paramList), OR
 //		- param is an edge node that has not yet been visited
-func (pv ParamVisitOnce) Visit(p param) paramVisitor {
+func (pv paramVisitOnce) Visit(p param) paramVisitor {
 	switch p.(type) {
 	case paramSingle, paramGroupedSlice:
 		if pv.visited[p.String()] {

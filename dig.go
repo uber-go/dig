@@ -753,7 +753,7 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 func shallowCheckDependencies(c containerStore, p param) error {
 	var missing errMissingManyTypes
 	var addMissingNodes []*dot.Param
-	walkParam(p, NewParamVisitOnce(make(map[string]bool), func(p param) bool {
+	walkParam(p, newParamVisitOnce(make(map[string]bool), func(p param) bool {
 		ps, ok := p.(paramSingle)
 		if !ok {
 			return true

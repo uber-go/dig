@@ -68,7 +68,7 @@ func verifyAcyclic(c containerStore, n provider, k key) error {
 
 func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[string]bool) error {
 	var err error
-	walkParam(n.ParamList(), NewParamVisitOnce(visited, func(param param) bool {
+	walkParam(n.ParamList(), newParamVisitOnce(visited, func(param param) bool {
 		if err != nil {
 			return false
 		}
