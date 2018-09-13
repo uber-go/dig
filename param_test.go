@@ -164,7 +164,7 @@ func TestParamGroupSliceErrors(t *testing.T) {
 	}
 }
 
-func TestParamVisitorCountAccumulates(t *testing.T) {
+func TestParamVisitorOnce(t *testing.T) {
 	visited := make(map[string]bool)
 
 	params := []paramSingle{
@@ -175,7 +175,14 @@ func TestParamVisitorCountAccumulates(t *testing.T) {
 		{Name: "param 2"},
 	}
 
-	visitor := newParamVisitOnce(visited, func(param) bool { return true })
+	var callCount int
+	visitor := newParamVisitOnce(visited, func(param) bool {
+		if callCount >= 2 {
+			t.Error("expected to be called no more than twice as there are two unique params")
+		}
+		callCount++
+		return true
+	})
 	for _, p := range params {
 		visitor.Visit(p)
 	}
