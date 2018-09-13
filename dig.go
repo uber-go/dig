@@ -135,8 +135,8 @@ type Container struct {
 	// Ensure verified acyclic before Invoke
 	verifiedAcyclic bool
 
-	// Disable acyclic check on provide
-	skipAcyclicVerification bool
+	// Defer acyclic check on provide until Invoke
+	deferAcyclicVerification bool
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -217,17 +217,17 @@ func New(opts ...Option) *Container {
 	return c
 }
 
-// SkipAcyclicVerification is an Option to override the default behavior
+// DeferAcyclicVerification is an Option to override the default behavior
 // of container.Provide, disabling the validation the dependency graph remains
 // acyclic for each new provider.
 //
 // Applications adding providers to a container in a tight loop may experience
 // performance improvements by initializing the container with this option.
 //
-// NOTE: The container will verify the graph on first `Invoke`.
-func SkipAcyclicVerification() Option {
+// The container will instead verify the graph on first `Invoke`.
+func DeferAcyclicVerification() Option {
 	return optionFunc(func(c *Container) {
-		c.skipAcyclicVerification = true
+		c.deferAcyclicVerification = true
 	})
 }
 
@@ -567,7 +567,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 
 	for k := range keys {
 		c.verifiedAcyclic = false
-		if c.skipAcyclicVerification {
+		if c.deferAcyclicVerification {
 			c.providers[k] = append(c.providers[k], n)
 			continue
 		}

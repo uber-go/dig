@@ -1599,7 +1599,7 @@ func TestProvideCycleFails(t *testing.T) {
 		)
 	})
 
-	t.Run("SkipAcyclicVerification bypasses cycle check, VerifyAcyclic catches cycle", func(t *testing.T) {
+	t.Run("DeferAcyclicVerification bypasses cycle check, VerifyAcyclic catches cycle", func(t *testing.T) {
 		// A <- B <- C
 		// |         ^
 		// |_________|
@@ -1610,7 +1610,7 @@ func TestProvideCycleFails(t *testing.T) {
 		newB := func(*A) *B { return &B{} }
 		newC := func(*B) *C { return &C{} }
 
-		c := New(SkipAcyclicVerification())
+		c := New(DeferAcyclicVerification())
 		assert.NoError(t, c.Provide(newA))
 		assert.NoError(t, c.Provide(newB))
 		assert.NoError(t, c.Provide(newC))
