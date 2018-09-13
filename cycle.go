@@ -55,6 +55,8 @@ func (e errCycleDetected) Error() string {
 	return b.String()
 }
 
+// IsCycleDetected returns a boolean as to whether the provided error indicates
+// a cycle was detected in the container graph.
 func IsCycleDetected(err error) bool {
 	_, ok := err.(errCycleDetected)
 	return ok
