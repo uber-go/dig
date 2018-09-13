@@ -55,6 +55,11 @@ func (e errCycleDetected) Error() string {
 	return b.String()
 }
 
+func IsCycleDetected(err error) bool {
+	_, ok := err.(errCycleDetected)
+	return ok
+}
+
 func verifyAcyclic(c containerStore, n provider, k key) error {
 	err := detectCycles(n, c, []cycleEntry{
 		{Key: k, Func: n.Location()},

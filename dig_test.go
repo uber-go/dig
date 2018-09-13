@@ -1610,12 +1610,12 @@ func TestProvideCycleFails(t *testing.T) {
 		newB := func(*A) *B { return &B{} }
 		newC := func(*B) *C { return &C{} }
 
-		c := New()
+		c := New(SkipAcyclicVerification())
 		assert.NoError(t, c.Provide(newA))
 		assert.NoError(t, c.Provide(newB))
-		assert.NoError(t, c.Provide(newC, SkipAcyclicVerification()))
+		assert.NoError(t, c.Provide(newC))
 
-		err := c.VerifyAcyclic()
+		err := c.Invoke(func(*A) {})
 		require.Error(t, err, "expected error when introducing cycle")
 		assertErrorMatches(t, err,
 			`this function introduces a cycle:`,

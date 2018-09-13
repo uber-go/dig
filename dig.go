@@ -62,8 +62,7 @@ type optionFunc func(*Container)
 func (f optionFunc) applyOption(c *Container) { f(c) }
 
 type provideOptions struct {
-	Name                    string
-	SkipAcyclicVerification bool
+	Name string
 }
 
 func (o *provideOptions) Validate() error {
@@ -109,22 +108,6 @@ func Name(name string) ProvideOption {
 	})
 }
 
-// SkipAcyclicVerification is a ProvideOption to override the default behavior
-// of container.Provide to ensure the dependency graph remains acyclic for each
-// new provider.
-//
-// Applications adding providers to a container in a tight loop may experience
-// performance improvements by using this option.
-//
-// NOTE: A dig container has undefined behavior if the dependency graph is not
-// acyclic. It is highly recommended to call container.VerifyAcyclic before
-// container.Invoke to ensure the dependency graph is valid.
-func SkipAcyclicVerification() ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.SkipAcyclicVerification = true
-	})
-}
-
 // An InvokeOption modifies the default behavior of Invoke. It's included for
 // future functionality; currently, there are no concrete implementations.
 type InvokeOption interface {
@@ -148,6 +131,12 @@ type Container struct {
 
 	// Source of randomness.
 	rand *rand.Rand
+
+	// Ensure verified acyclic before Invoke
+	verifiedAcyclic bool
+
+	// Disable acyclic check on provide
+	skipAcyclicVerification bool
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -226,6 +215,20 @@ func New(opts ...Option) *Container {
 		opt.applyOption(c)
 	}
 	return c
+}
+
+// SkipAcyclicVerification is an Option to override the default behavior
+// of container.Provide, disabling the validation the dependency graph remains
+// acyclic for each new provider.
+//
+// Applications adding providers to a container in a tight loop may experience
+// performance improvements by initializing the container with this option.
+//
+// NOTE: The container will verify the graph on first `Invoke`.
+func SkipAcyclicVerification() Option {
+	return optionFunc(func(c *Container) {
+		c.skipAcyclicVerification = true
+	})
 }
 
 // A VisualizeOption modifies the default behavior of Visualize.
@@ -495,6 +498,12 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		}
 	}
 
+	if !c.verifiedAcyclic {
+		if err := c.verifyAcyclic(); err != nil {
+			return err
+		}
+	}
+
 	args, err := pl.BuildList(c)
 	if err != nil {
 		return errArgumentsFailed{
@@ -515,12 +524,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
-// VerifyAcyclic ensures the dependency graph of the container is acyclical.
-//
-// When using the SkipAcyclicVerification option on container.Provide it is
-// HIGHLY recommended container.VerifyAcyclic is called to validate container
-// state before the graph is used for container.Invoke.
-func (c *Container) VerifyAcyclic() error {
+func (c *Container) verifyAcyclic() error {
 	// invert the c.providers map to satisfy verifyAcyclic's arguments
 	nodesToKeys := make(map[dot.CtorID][]key)
 	for k, ns := range c.providers {
@@ -540,6 +544,8 @@ func (c *Container) VerifyAcyclic() error {
 			}
 		}
 	}
+
+	c.verifiedAcyclic = true
 	return nil
 }
 
@@ -560,7 +566,8 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	}
 
 	for k := range keys {
-		if opts.SkipAcyclicVerification {
+		c.verifiedAcyclic = false
+		if c.skipAcyclicVerification {
 			c.providers[k] = append(c.providers[k], n)
 			continue
 		}
@@ -570,6 +577,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			c.providers[k] = oldProviders
 			return err
 		}
+		c.verifiedAcyclic = true
 	}
 
 	c.nodes = append(c.nodes, n)
