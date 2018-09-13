@@ -62,7 +62,8 @@ type optionFunc func(*Container)
 func (f optionFunc) applyOption(c *Container) { f(c) }
 
 type provideOptions struct {
-	Name string
+	Name                    string
+	SkipAcyclicVerification bool
 }
 
 func (o *provideOptions) Validate() error {
@@ -105,6 +106,22 @@ func (f provideOptionFunc) applyProvideOption(opts *provideOptions) { f(opts) }
 func Name(name string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Name = name
+	})
+}
+
+// SkipAcyclicVerification is a ProvideOption to override the default behavior
+// of container.Provide to ensure the dependency graph remains acyclic for each
+// new provider.
+//
+// Applications adding providers to a container in a tight loop may experience
+// performance improvements by using this option.
+//
+// NOTE: A dig container has undefined behavior if the dependency graph is not
+// acyclic. It is highly recommended to call container.VerifyAcyclic before
+// container.Invoke to ensure the dependency graph is valid.
+func SkipAcyclicVerification() ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.SkipAcyclicVerification = true
 	})
 }
 
@@ -498,6 +515,34 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
+// VerifyAcyclic ensures the dependency graph of the container is acyclical.
+//
+// When using the SkipAcyclicVerification option on container.Provide it is
+// HIGHLY recommended container.VerifyAcyclic is called to validate container
+// state before the graph is used for container.Invoke.
+func (c *Container) VerifyAcyclic() error {
+	// invert the c.providers map to satisfy verifyAcyclic's arguments
+	nodesToKeys := make(map[dot.CtorID][]key)
+	for k, ns := range c.providers {
+		for _, n := range ns {
+			nid := n.ID()
+			if _, exists := nodesToKeys[nid]; !exists {
+				nodesToKeys[nid] = make([]key, 0)
+			}
+			nodesToKeys[nid] = append(nodesToKeys[nid], k)
+		}
+	}
+
+	for _, n := range c.nodes {
+		for _, k := range nodesToKeys[n.ID()] {
+			if err := verifyAcyclic(c, n, k); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	n, err := newNode(ctor, nodeOptions{ResultName: opts.Name})
 	if err != nil {
@@ -515,10 +560,14 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	}
 
 	for k := range keys {
-		oldProducers := c.providers[k]
-		c.providers[k] = append(oldProducers, n)
+		if opts.SkipAcyclicVerification {
+			c.providers[k] = append(c.providers[k], n)
+			continue
+		}
+		oldProviders := c.providers[k]
+		c.providers[k] = append(oldProviders, n)
 		if err := verifyAcyclic(c, n, k); err != nil {
-			c.providers[k] = oldProducers
+			c.providers[k] = oldProviders
 			return err
 		}
 	}

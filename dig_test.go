@@ -1598,6 +1598,29 @@ func TestProvideCycleFails(t *testing.T) {
 			`depends on \*dig.D provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
+
+	t.Run("SkipAcyclicVerification bypasses cycle check, VerifyAcyclic catches cycle", func(t *testing.T) {
+		// A <- B <- C
+		// |         ^
+		// |_________|
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		newA := func(*C) *A { return &A{} }
+		newB := func(*A) *B { return &B{} }
+		newC := func(*B) *C { return &C{} }
+
+		c := New()
+		assert.NoError(t, c.Provide(newA))
+		assert.NoError(t, c.Provide(newB))
+		assert.NoError(t, c.Provide(newC, SkipAcyclicVerification()))
+
+		err := c.VerifyAcyclic()
+		require.Error(t, err, "expected error when introducing cycle")
+		assertErrorMatches(t, err,
+			`this function introduces a cycle:`,
+		)
+	})
 }
 
 func TestIncompleteGraphIsOkay(t *testing.T) {
