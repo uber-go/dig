@@ -3053,116 +3053,103 @@ func TestCanVisualizeError(t *testing.T) {
 func BenchmarkProvideCycleDetection(b *testing.B) {
 	// func TestBenchmarkProvideCycleDetection(b *testing.T) {
 	type A struct{}
+
 	type B struct{}
 	type C struct{}
 	type D struct{}
+
 	type E struct{}
 	type F struct{}
 	type G struct{}
+
 	type H struct{}
 	type I struct{}
 	type J struct{}
+
 	type K struct{}
 	type L struct{}
 	type M struct{}
+
 	type N struct{}
 	type O struct{}
 	type P struct{}
+
 	type Q struct{}
 	type R struct{}
 	type S struct{}
+
 	type T struct{}
 	type U struct{}
 	type V struct{}
+
 	type W struct{}
 	type X struct{}
 	type Y struct{}
-	type Z struct{}
-	type ZZ struct{}
-	type ZZZ struct{}
-	type ZZZZ struct{}
-	type ZZZZZ struct{}
-	type ZZZZZZ struct{}
-	type ZZZZZZZ struct{}
-	type ZZZZZZZZ struct{}
-	type ZZZZZZZZZ struct{}
-	type ZZZZZZZZZZ struct{}
 
-	newA := func(*B, *C, *D, *E, *F, *G, *H, *I, *J, *K, *L, *M, *N, *O, *P, *Q, *R, *S, *T, *U, *V, *W, *X) *A {
-		return &A{}
-	}
-	newB := func(*Y) *B { return &B{} }
-	newC := func(*Y) *C { return &C{} }
-	newD := func(*Y) *D { return &D{} }
-	newE := func(*Y) *E { return &E{} }
-	newF := func(*Y) *F { return &F{} }
-	newG := func(*Y) *G { return &G{} }
-	newH := func(*Y) *H { return &H{} }
-	newI := func(*Y) *I { return &I{} }
-	newJ := func(*Y) *J { return &J{} }
-	newK := func(*Y) *K { return &K{} }
-	newL := func(*Y) *L { return &L{} }
-	newM := func(*Y) *M { return &M{} }
-	newN := func(*Y) *N { return &N{} }
-	newO := func(*Y) *O { return &O{} }
-	newP := func(*Y) *P { return &P{} }
-	newQ := func(*Y) *Q { return &Q{} }
-	newR := func(*Y) *R { return &R{} }
-	newS := func(*Y) *S { return &S{} }
-	newT := func(*Y) *T { return &T{} }
-	newU := func(*Y) *U { return &U{} }
-	newV := func(*Y) *V { return &V{} }
-	newW := func(*Y) *W { return &W{} }
-	newX := func(*Y) *X { return &X{} }
+	type Z struct{}
+
+	newA := func(*B, *C, *D) *A { return &A{} }
+
+	newB := func(*E, *F, *G) *B { return &B{} }
+	newC := func(*E, *F, *G) *C { return &C{} }
+	newD := func(*E, *F, *G) *D { return &D{} }
+
+	newE := func(*H, *I, *J) *E { return &E{} }
+	newF := func(*H, *I, *J) *F { return &F{} }
+	newG := func(*H, *I, *J) *G { return &G{} }
+
+	newH := func(*K, *L, *M) *H { return &H{} }
+	newI := func(*K, *L, *M) *I { return &I{} }
+	newJ := func(*K, *L, *M) *J { return &J{} }
+
+	newK := func(*N, *O, *P) *K { return &K{} }
+	newL := func(*N, *O, *P) *L { return &L{} }
+	newM := func(*N, *O, *P) *M { return &M{} }
+
+	newN := func(*Q, *R, *S) *N { return &N{} }
+	newO := func(*Q, *R, *S) *O { return &O{} }
+	newP := func(*Q, *R, *S) *P { return &P{} }
+
+	newQ := func(*T, *U, *V) *Q { return &Q{} }
+	newR := func(*T, *U, *V) *R { return &R{} }
+	newS := func(*T, *U, *V) *S { return &S{} }
+
+	newT := func(*W, *X, *Y) *T { return &T{} }
+	newU := func(*W, *X, *Y) *U { return &U{} }
+	newV := func(*W, *X, *Y) *V { return &V{} }
+
+	newW := func(*Z) *W { return &W{} }
+	newX := func(*Z) *X { return &X{} }
 	newY := func(*Z) *Y { return &Y{} }
-	newZ := func(*ZZ) *Z { return &Z{} }
-	newZZ := func(*ZZZ) *ZZ { return &ZZ{} }
-	newZZZ := func(*ZZZZ) *ZZZ { return &ZZZ{} }
-	newZZZZ := func(*ZZZZZ) *ZZZZ { return &ZZZZ{} }
-	newZZZZZ := func(*ZZZZZZ) *ZZZZZ { return &ZZZZZ{} }
-	newZZZZZZ := func(*ZZZZZZZ) *ZZZZZZ { return &ZZZZZZ{} }
-	newZZZZZZZ := func(*ZZZZZZZZ) *ZZZZZZZ { return &ZZZZZZZ{} }
-	newZZZZZZZZ := func(*ZZZZZZZZZ) *ZZZZZZZZ { return &ZZZZZZZZ{} }
-	newZZZZZZZZZ := func(*ZZZZZZZZZZ) *ZZZZZZZZZ { return &ZZZZZZZZZ{} }
-	newZZZZZZZZZZ := func() *ZZZZZZZZZZ { return &ZZZZZZZZZZ{} }
+	newZ := func() *Z { return &Z{} }
 
 	for n := 0; n < b.N; n++ {
 		c := New()
-		c.Provide(newB)
-		c.Provide(newC)
-		c.Provide(newD)
-		c.Provide(newE)
-		c.Provide(newF)
-		c.Provide(newG)
-		c.Provide(newH)
-		c.Provide(newI)
-		c.Provide(newJ)
-		c.Provide(newK)
-		c.Provide(newL)
-		c.Provide(newM)
-		c.Provide(newN)
-		c.Provide(newO)
-		c.Provide(newP)
-		c.Provide(newQ)
-		c.Provide(newR)
-		c.Provide(newS)
-		c.Provide(newT)
-		c.Provide(newU)
-		c.Provide(newV)
-		c.Provide(newW)
-		c.Provide(newX)
-		c.Provide(newY)
 		c.Provide(newZ)
-		c.Provide(newZZ)
-		c.Provide(newZZZ)
-		c.Provide(newZZZZ)
-		c.Provide(newZZZZZ)
-		c.Provide(newZZZZZZ)
-		c.Provide(newZZZZZZZ)
-		c.Provide(newZZZZZZZZ)
-		c.Provide(newZZZZZZZZZ)
-		c.Provide(newZZZZZZZZZZ)
-
+		c.Provide(newY)
+		c.Provide(newX)
+		c.Provide(newW)
+		c.Provide(newV)
+		c.Provide(newU)
+		c.Provide(newT)
+		c.Provide(newS)
+		c.Provide(newR)
+		c.Provide(newQ)
+		c.Provide(newP)
+		c.Provide(newO)
+		c.Provide(newN)
+		c.Provide(newM)
+		c.Provide(newL)
+		c.Provide(newK)
+		c.Provide(newJ)
+		c.Provide(newI)
+		c.Provide(newH)
+		c.Provide(newG)
+		c.Provide(newF)
+		c.Provide(newE)
+		c.Provide(newD)
+		c.Provide(newC)
+		c.Provide(newB)
 		c.Provide(newA)
 	}
 }
