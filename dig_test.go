@@ -1620,6 +1620,15 @@ func TestProvideCycleFails(t *testing.T) {
 		assertErrorMatches(t, err,
 			`this function introduces a cycle:`,
 		)
+		assertErrorMatches(t, err,
+			`depends on \*dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+		)
+		assertErrorMatches(t, err,
+			`depends on \*dig.A provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+		)
+		assertErrorMatches(t, err,
+			`depends on \*dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+		)
 	})
 }
 
