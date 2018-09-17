@@ -3049,3 +3049,107 @@ func TestCanVisualizeError(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkProvideCycleDetection(b *testing.B) {
+	// func TestBenchmarkProvideCycleDetection(b *testing.T) {
+	type A struct{}
+
+	type B struct{}
+	type C struct{}
+	type D struct{}
+
+	type E struct{}
+	type F struct{}
+	type G struct{}
+
+	type H struct{}
+	type I struct{}
+	type J struct{}
+
+	type K struct{}
+	type L struct{}
+	type M struct{}
+
+	type N struct{}
+	type O struct{}
+	type P struct{}
+
+	type Q struct{}
+	type R struct{}
+	type S struct{}
+
+	type T struct{}
+	type U struct{}
+	type V struct{}
+
+	type W struct{}
+	type X struct{}
+	type Y struct{}
+
+	type Z struct{}
+
+	newA := func(*B, *C, *D) *A { return &A{} }
+
+	newB := func(*E, *F, *G) *B { return &B{} }
+	newC := func(*E, *F, *G) *C { return &C{} }
+	newD := func(*E, *F, *G) *D { return &D{} }
+
+	newE := func(*H, *I, *J) *E { return &E{} }
+	newF := func(*H, *I, *J) *F { return &F{} }
+	newG := func(*H, *I, *J) *G { return &G{} }
+
+	newH := func(*K, *L, *M) *H { return &H{} }
+	newI := func(*K, *L, *M) *I { return &I{} }
+	newJ := func(*K, *L, *M) *J { return &J{} }
+
+	newK := func(*N, *O, *P) *K { return &K{} }
+	newL := func(*N, *O, *P) *L { return &L{} }
+	newM := func(*N, *O, *P) *M { return &M{} }
+
+	newN := func(*Q, *R, *S) *N { return &N{} }
+	newO := func(*Q, *R, *S) *O { return &O{} }
+	newP := func(*Q, *R, *S) *P { return &P{} }
+
+	newQ := func(*T, *U, *V) *Q { return &Q{} }
+	newR := func(*T, *U, *V) *R { return &R{} }
+	newS := func(*T, *U, *V) *S { return &S{} }
+
+	newT := func(*W, *X, *Y) *T { return &T{} }
+	newU := func(*W, *X, *Y) *U { return &U{} }
+	newV := func(*W, *X, *Y) *V { return &V{} }
+
+	newW := func(*Z) *W { return &W{} }
+	newX := func(*Z) *X { return &X{} }
+	newY := func(*Z) *Y { return &Y{} }
+	newZ := func() *Z { return &Z{} }
+
+	for n := 0; n < b.N; n++ {
+		c := New()
+		c.Provide(newZ)
+		c.Provide(newY)
+		c.Provide(newX)
+		c.Provide(newW)
+		c.Provide(newV)
+		c.Provide(newU)
+		c.Provide(newT)
+		c.Provide(newS)
+		c.Provide(newR)
+		c.Provide(newQ)
+		c.Provide(newP)
+		c.Provide(newO)
+		c.Provide(newN)
+		c.Provide(newM)
+		c.Provide(newL)
+		c.Provide(newK)
+		c.Provide(newJ)
+		c.Provide(newI)
+		c.Provide(newH)
+		c.Provide(newG)
+		c.Provide(newF)
+		c.Provide(newE)
+		c.Provide(newD)
+		c.Provide(newC)
+		c.Provide(newB)
+		c.Provide(newA)
+	}
+}
