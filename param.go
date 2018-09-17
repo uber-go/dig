@@ -98,14 +98,14 @@ type paramVisitor interface {
 // recursed into.
 type paramVisitorFunc func(param) (recurse bool)
 
-// paramVisitOnce encapsulates a paramVisitorFun and a map to track visited nodes.
+// paramVisitOnce encapsulates a paramVisitorFunc and a map to track visited nodes.
 type paramVisitOnce struct {
 	f       paramVisitorFunc
-	visited map[string]bool
+	visited map[string]struct{}
 }
 
 // NewParamVisitOnce constructs a paramVisitor avoiding redundant visits.
-func newParamVisitOnce(visited map[string]bool, f paramVisitorFunc) paramVisitor {
+func newParamVisitOnce(visited map[string]struct{}, f paramVisitorFunc) paramVisitor {
 	return paramVisitOnce{
 		f:       f,
 		visited: visited,
@@ -118,11 +118,11 @@ func newParamVisitOnce(visited map[string]bool, f paramVisitorFunc) paramVisitor
 func (pv paramVisitOnce) Visit(p param) paramVisitor {
 	switch p.(type) {
 	case paramSingle, paramGroupedSlice:
-		if pv.visited[p.String()] {
+		if _, ok := pv.visited[p.String()]; ok {
 			return pv
 		}
 		defer func() {
-			pv.visited[p.String()] = true
+			pv.visited[p.String()] = struct{}{}
 		}()
 	}
 

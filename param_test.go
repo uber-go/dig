@@ -165,7 +165,7 @@ func TestParamGroupSliceErrors(t *testing.T) {
 }
 
 func TestParamVisitorOnce(t *testing.T) {
-	visited := make(map[string]bool)
+	visited := make(map[string]struct{})
 
 	params := []paramSingle{
 		{Name: "param 1"},
@@ -187,6 +187,10 @@ func TestParamVisitorOnce(t *testing.T) {
 		visitor.Visit(p)
 	}
 
-	assert.True(t, visited[params[0].String()])
-	assert.True(t, visited[params[1].String()])
+	if _, ok := visited[params[0].String()]; !assert.True(t, ok) {
+		return
+	}
+	if _, ok := visited[params[1].String()]; !assert.True(t, ok) {
+		return
+	}
 }

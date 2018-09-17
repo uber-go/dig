@@ -56,7 +56,7 @@ func (e errCycleDetected) Error() string {
 }
 
 func verifyAcyclic(c containerStore, n provider, k key) error {
-	visited := make(map[string]bool)
+	visited := make(map[string]struct{})
 	err := detectCycles(n, c, []cycleEntry{
 		{Key: k, Func: n.Location()},
 	}, visited)
@@ -66,7 +66,7 @@ func verifyAcyclic(c containerStore, n provider, k key) error {
 	return err
 }
 
-func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[string]bool) error {
+func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[string]struct{}) error {
 	var err error
 	walkParam(n.ParamList(), newParamVisitOnce(visited, func(param param) bool {
 		if err != nil {
