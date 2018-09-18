@@ -52,16 +52,21 @@ type param interface {
 	DotParam() []*dot.Param
 }
 
+var (
+	_ param = paramSingle{}
+	_ param = paramObject{}
+	_ param = paramList{}
+	_ param = paramGroupedSlice{}
+)
+
 // The keyer interface represents an entity that can uniquely identify itself.
 type keyer interface {
 	Key() key
 }
 
 var (
-	_ param = paramSingle{}
-	_ param = paramObject{}
-	_ param = paramList{}
-	_ param = paramGroupedSlice{}
+	_ keyer = paramSingle{}
+	_ keyer = paramGroupedSlice{}
 )
 
 // newParam builds a param from the given type. If the provided type is a
