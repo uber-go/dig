@@ -113,12 +113,10 @@ func (f paramVisitorFunc) Visit(p param) paramVisitor {
 // visitor.
 //
 // This is very similar to how go/ast.Walk works.
-//
-// paramVisitor can end the walk early by returning nil.
-func walkParam(p param, v paramVisitor) (cont bool) {
+func walkParam(p param, v paramVisitor) {
 	v = v.Visit(p)
 	if v == nil {
-		return false
+		return
 	}
 
 	switch par := p.(type) {
@@ -126,15 +124,11 @@ func walkParam(p param, v paramVisitor) (cont bool) {
 		// No sub-results
 	case paramObject:
 		for _, f := range par.Fields {
-			if !walkParam(f.Param, v) {
-				return false
-			}
+			walkParam(f.Param, v)
 		}
 	case paramList:
 		for _, p := range par.Params {
-			if !walkParam(p, v) {
-				return false
-			}
+			walkParam(p, v)
 		}
 	default:
 		panic(fmt.Sprintf(
@@ -143,8 +137,6 @@ func walkParam(p param, v paramVisitor) (cont bool) {
 				"and provide the following message: "+
 				"received unknown param type %T", p))
 	}
-
-	return true
 }
 
 // paramList holds all arguments of the constructor as params.
