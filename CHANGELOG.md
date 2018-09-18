@@ -5,7 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- No changes yet.
+### Changed
+- Improved cycle-detection performance by 50x in certain degenerative cases.
 
 ## [1.4.0] - 2018-08-16
 ### Added
