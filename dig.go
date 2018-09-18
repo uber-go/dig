@@ -132,10 +132,10 @@ type Container struct {
 	// Source of randomness.
 	rand *rand.Rand
 
-	// Ensure verified acyclic before Invoke
-	verifiedAcyclic bool
+	// Ensure verified acyclic before Invoke.
+	isVerifiedAcyclic bool
 
-	// Defer acyclic check on provide until Invoke
+	// Defer acyclic check on provide until Invoke.
 	deferAcyclicVerification bool
 }
 
@@ -498,7 +498,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		}
 	}
 
-	if !c.verifiedAcyclic {
+	if !c.isVerifiedAcyclic {
 		if err := c.verifyAcyclic(); err != nil {
 			return err
 		}
@@ -525,27 +525,14 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 }
 
 func (c *Container) verifyAcyclic() error {
-	// invert the c.providers map to satisfy verifyAcyclic's arguments
-	nodesToKeys := make(map[dot.CtorID][]key)
-	for k, ns := range c.providers {
-		for _, n := range ns {
-			nid := n.ID()
-			if _, exists := nodesToKeys[nid]; !exists {
-				nodesToKeys[nid] = make([]key, 0)
-			}
-			nodesToKeys[nid] = append(nodesToKeys[nid], k)
-		}
-	}
-
+	visited := make(map[key]struct{})
 	for _, n := range c.nodes {
-		for _, k := range nodesToKeys[n.ID()] {
-			if err := verifyAcyclic(c, n, k); err != nil {
-				return err
-			}
+		if err := detectCycles(n, c, nil /* path */, visited); err != nil {
+			return errWrapf(err, "this function introduces a cycle")
 		}
 	}
 
-	c.verifiedAcyclic = true
+	c.isVerifiedAcyclic = true
 	return nil
 }
 
@@ -566,7 +553,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	}
 
 	for k := range keys {
-		c.verifiedAcyclic = false
+		c.isVerifiedAcyclic = false
 		if c.deferAcyclicVerification {
 			c.providers[k] = append(c.providers[k], n)
 			continue
@@ -577,7 +564,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			c.providers[k] = oldProviders
 			return err
 		}
-		c.verifiedAcyclic = true
+		c.isVerifiedAcyclic = true
 	}
 
 	c.nodes = append(c.nodes, n)

@@ -107,16 +107,26 @@ func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[k
 
 		entry := cycleEntry{Func: n.Location(), Key: k}
 
-		// The first element of path is the new addition to the graph, therefore
-		// it must be in any cycle that exists, assuming verifyAcyclic has been
-		// run for every previous Provide.
-		// Note that path is guaranteed to have at least one element from verifyAcyclic.
-		if path[0].Key == k {
-			err = errCycleDetected{Path: append(path, entry)}
-			return false
+		if len(path) > 0 {
+			// Only mark a key as visited if path exists, i.e. this is not the
+			// first iteration through the c.verifyAcyclic() check, or the early
+			// exit from checking visited will short circuit the cycle check below.
+			visited[k] = struct{}{}
+
+			// If it exists, the first element of path is the new addition to the
+			// graph, therefore it must be in any cycle that exists, assuming
+			// verifyAcyclic has been run for every previous Provide.
+			//
+			// Alternatively, if deferAcyclicVerification was set and detectCycles
+			// is only being invoked before the first Invoke, each node in the
+			// graph will be tested as the first element of the path, so any
+			// cycle that exists is guaranteed to be identified by the following.
+			if path[0].Key == k {
+				err = errCycleDetected{Path: append(path, entry)}
+				return false
+			}
 		}
 
-		visited[k] = struct{}{}
 		for _, n := range providers {
 			if e := detectCycles(n, c, append(path, entry), visited); e != nil {
 				err = e

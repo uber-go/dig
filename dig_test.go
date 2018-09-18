@@ -1600,20 +1600,23 @@ func TestProvideCycleFails(t *testing.T) {
 	})
 
 	t.Run("DeferAcyclicVerification bypasses cycle check, VerifyAcyclic catches cycle", func(t *testing.T) {
-		// A <- B <- C
+		// A <- B <- C <- D
 		// |         ^
 		// |_________|
 		type A struct{}
 		type B struct{}
 		type C struct{}
+		type D struct{}
 		newA := func(*C) *A { return &A{} }
 		newB := func(*A) *B { return &B{} }
 		newC := func(*B) *C { return &C{} }
+		newD := func(*C) *D { return &D{} }
 
 		c := New(DeferAcyclicVerification())
 		assert.NoError(t, c.Provide(newA))
 		assert.NoError(t, c.Provide(newB))
 		assert.NoError(t, c.Provide(newC))
+		assert.NoError(t, c.Provide(newD))
 
 		err := c.Invoke(func(*A) {})
 		require.Error(t, err, "expected error when introducing cycle")
