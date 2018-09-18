@@ -218,13 +218,12 @@ func New(opts ...Option) *Container {
 }
 
 // DeferAcyclicVerification is an Option to override the default behavior
-// of container.Provide, disabling the validation the dependency graph remains
-// acyclic for each new provider.
+// of container.Provide, deferring the dependency graph validation to no longer
+// run after each call to container.Provide. The container will instead verify
+// the graph on first `Invoke`.
 //
 // Applications adding providers to a container in a tight loop may experience
 // performance improvements by initializing the container with this option.
-//
-// The container will instead verify the graph on first `Invoke`.
 func DeferAcyclicVerification() Option {
 	return optionFunc(func(c *Container) {
 		c.deferAcyclicVerification = true
