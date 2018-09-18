@@ -56,21 +56,31 @@ func (e errCycleDetected) Error() string {
 }
 
 func verifyAcyclic(c containerStore, n provider, k key) error {
-	visitor := newParamVisitOnce()
+	visited := make(map[key]struct{})
 	err := detectCycles(n, c, []cycleEntry{
 		{Key: k, Func: n.Location()},
-	}, visitor)
+	}, visited)
 	if err != nil {
 		err = errWrapf(err, "this function introduces a cycle")
 	}
 	return err
 }
 
-func detectCycles(n provider, c containerStore, path []cycleEntry, visitor paramVisitorSetter) error {
+func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[key]struct{}) error {
 	var err error
-	walkParam(n.ParamList(), visitor.With(func(param param) bool {
+	walkParam(n.ParamList(), paramVisitorFunc(func(param param) bool {
 		if err != nil {
 			return false
+		}
+
+		// Don't check for cycles if we've already verified that this param
+		// doesn't introduce cycles.
+		if pk, ok := param.(keyer); ok {
+			k := pk.Key()
+			if _, ok := visited[k]; ok {
+				return false
+			}
+			visited[k] = struct{}{}
 		}
 
 		var (
@@ -102,7 +112,7 @@ func detectCycles(n provider, c containerStore, path []cycleEntry, visitor param
 		}
 
 		for _, n := range providers {
-			if e := detectCycles(n, c, append(path, entry), visitor); e != nil {
+			if e := detectCycles(n, c, append(path, entry), visited); e != nil {
 				err = e
 				return false
 			}

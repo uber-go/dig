@@ -163,25 +163,3 @@ func TestParamGroupSliceErrors(t *testing.T) {
 		})
 	}
 }
-
-func TestParamVisitorOnce(t *testing.T) {
-	params := []paramSingle{
-		{Name: "param 1"},
-		{Name: "param 2"},
-		{Name: "param 2"},
-		{Name: "param 2"},
-		{Name: "param 2"},
-	}
-
-	var callCount int
-	visitor := newParamVisitOnce().With(func(param) bool {
-		if callCount >= 2 {
-			t.Error("expected to be called no more than twice as there are two unique params")
-		}
-		callCount++
-		return true
-	})
-	for _, p := range params {
-		visitor.Visit(p)
-	}
-}

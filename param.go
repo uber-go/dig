@@ -115,50 +115,6 @@ func (f paramVisitorFunc) Visit(p param) paramVisitor {
 	return nil
 }
 
-type paramVisitorSetter interface {
-	With(paramVisitorFunc) paramVisitor
-}
-
-// paramVisitOnce encapsulates a paramVisitorFunc and a map to track visited nodes.
-type paramVisitOnce struct {
-	f       paramVisitorFunc
-	visited map[key]struct{}
-}
-
-// NewParamVisitOnce constructs a paramVisitor avoiding redundant visits.
-func newParamVisitOnce() paramVisitorSetter {
-	return paramVisitOnce{
-		visited: make(map[key]struct{}),
-	}
-}
-
-func (pv paramVisitOnce) With(f paramVisitorFunc) paramVisitor {
-	return paramVisitOnce{
-		f:       f,
-		visited: pv.visited,
-	}
-}
-
-// Visit operates pv.f on param if:
-//		- param is not an edge node (i.e. param is a paramList), OR
-//		- param is an edge node that has not yet been visited
-func (pv paramVisitOnce) Visit(p param) paramVisitor {
-	if pTyped, ok := p.(keyer); ok && pv.checkAndSetVisited(pTyped.Key()) {
-		return pv
-	}
-
-	if pv.f(p) {
-		return pv
-	}
-	return nil
-}
-
-func (pv paramVisitOnce) checkAndSetVisited(k key) bool {
-	_, ok := pv.visited[k]
-	pv.visited[k] = struct{}{}
-	return ok
-}
-
 // walkParam walks the param tree for the given param with the provided
 // visitor.
 //
