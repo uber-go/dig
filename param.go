@@ -59,16 +59,6 @@ var (
 	_ param = paramGroupedSlice{}
 )
 
-// The keyer interface represents an entity that can uniquely identify itself.
-type keyer interface {
-	Key() key
-}
-
-var (
-	_ keyer = paramSingle{}
-	_ keyer = paramGroupedSlice{}
-)
-
 // newParam builds a param from the given type. If the provided type is a
 // dig.In struct, an paramObject will be returned.
 func newParam(t reflect.Type) (param, error) {
@@ -284,10 +274,6 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	return v, nil
 }
 
-func (ps paramSingle) Key() key {
-	return key{name: ps.Name, t: ps.Type}
-}
-
 // paramObject is a dig.In struct where each field is another param.
 //
 // This object is not expected in the graph as-is.
@@ -473,8 +459,4 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 		result.Index(i).Set(v)
 	}
 	return result, nil
-}
-
-func (pt paramGroupedSlice) Key() key {
-	return key{group: pt.Group, t: pt.Type.Elem()}
 }

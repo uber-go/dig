@@ -73,16 +73,6 @@ func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[k
 			return false
 		}
 
-		// Don't check for cycles if we've already verified that this param
-		// doesn't introduce cycles.
-		if pk, ok := param.(keyer); ok {
-			k := pk.Key()
-			if _, ok := visited[k]; ok {
-				return false
-			}
-			visited[k] = struct{}{}
-		}
-
 		var (
 			k         key
 			providers []provider
@@ -90,10 +80,18 @@ func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[k
 		switch p := param.(type) {
 		case paramSingle:
 			k = key{name: p.Name, t: p.Type}
+			if _, ok := visited[k]; ok {
+				// We've already checked the dependencies for this type.
+				return false
+			}
 			providers = c.getValueProviders(p.Name, p.Type)
 		case paramGroupedSlice:
 			// NOTE: The key uses the element type, not the slice type.
 			k = key{group: p.Group, t: p.Type.Elem()}
+			if _, ok := visited[k]; ok {
+				// We've already checked the dependencies for this type.
+				return false
+			}
 			providers = c.getGroupProviders(p.Group, p.Type.Elem())
 		default:
 			// Recurse for non-edge params.
@@ -111,6 +109,7 @@ func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[k
 			return false
 		}
 
+		visited[k] = struct{}{}
 		for _, n := range providers {
 			if e := detectCycles(n, c, append(path, entry), visited); e != nil {
 				err = e
