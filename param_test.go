@@ -163,3 +163,45 @@ func TestParamGroupSliceErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestParamVisitorChecksEverything(t *testing.T) {
+	type params struct {
+		In
+
+		ReaderAt io.ReaderAt
+	}
+
+	typeOfReader := reflect.TypeOf((*io.Reader)(nil)).Elem()
+	typeOfWriter := reflect.TypeOf((*io.Writer)(nil)).Elem()
+
+	pl, err := newParamList(reflect.TypeOf(func(io.Reader, params, io.Writer) {
+		t.Fatalf("this function should not be called")
+	}))
+	require.NoError(t, err)
+
+	idx := 0
+	walkParam(pl, paramVisitorFunc(func(p param) bool {
+		defer func() { idx++ }()
+		switch idx {
+		case 0:
+			_, ok := p.(paramList)
+			assert.True(t, ok, "expected paramList, got %T", p)
+		case 1:
+			ps, ok := p.(paramSingle)
+			assert.True(t, ok, "expected paramSingle, got %T", p)
+			assert.Equal(t, typeOfReader, ps.Type, "first parameter didn't match")
+		case 2:
+			_, ok := p.(paramObject)
+			assert.True(t, ok, "expected paramObject, got %T", p)
+			return false // don't recurse
+		case 3:
+			ps, ok := p.(paramSingle)
+			assert.True(t, ok, "expected paramSingle, got %T", p)
+			assert.Equal(t, typeOfWriter, ps.Type, "third parameter didn't match")
+		default:
+			t.Errorf("unexpected call to visitor with %v", p)
+		}
+		return true
+	}))
+	assert.Equal(t, 4, idx, "visitor wasn't called four times")
+}

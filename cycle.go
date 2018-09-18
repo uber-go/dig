@@ -56,16 +56,17 @@ func (e errCycleDetected) Error() string {
 }
 
 func verifyAcyclic(c containerStore, n provider, k key) error {
+	visited := make(map[key]struct{})
 	err := detectCycles(n, c, []cycleEntry{
 		{Key: k, Func: n.Location()},
-	})
+	}, visited)
 	if err != nil {
 		err = errWrapf(err, "this function introduces a cycle")
 	}
 	return err
 }
 
-func detectCycles(n provider, c containerStore, path []cycleEntry) error {
+func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[key]struct{}) error {
 	var err error
 	walkParam(n.ParamList(), paramVisitorFunc(func(param param) bool {
 		if err != nil {
@@ -79,10 +80,18 @@ func detectCycles(n provider, c containerStore, path []cycleEntry) error {
 		switch p := param.(type) {
 		case paramSingle:
 			k = key{name: p.Name, t: p.Type}
+			if _, ok := visited[k]; ok {
+				// We've already checked the dependencies for this type.
+				return false
+			}
 			providers = c.getValueProviders(p.Name, p.Type)
 		case paramGroupedSlice:
 			// NOTE: The key uses the element type, not the slice type.
 			k = key{group: p.Group, t: p.Type.Elem()}
+			if _, ok := visited[k]; ok {
+				// We've already checked the dependencies for this type.
+				return false
+			}
 			providers = c.getGroupProviders(p.Group, p.Type.Elem())
 		default:
 			// Recurse for non-edge params.
@@ -91,15 +100,18 @@ func detectCycles(n provider, c containerStore, path []cycleEntry) error {
 
 		entry := cycleEntry{Func: n.Location(), Key: k}
 
-		for _, p := range path {
-			if p.Key == k {
-				err = errCycleDetected{Path: append(path, entry)}
-				return false
-			}
+		// The first element of path is the new addition to the graph, therefore
+		// it must be in any cycle that exists, assuming verifyAcyclic has been
+		// run for every previous Provide.
+		// Note that path is guaranteed to have at least one element from verifyAcyclic.
+		if path[0].Key == k {
+			err = errCycleDetected{Path: append(path, entry)}
+			return false
 		}
 
+		visited[k] = struct{}{}
 		for _, n := range providers {
-			if e := detectCycles(n, c, append(path, entry)); e != nil {
+			if e := detectCycles(n, c, append(path, entry), visited); e != nil {
 				err = e
 				return false
 			}
