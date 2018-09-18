@@ -52,6 +52,11 @@ type param interface {
 	DotParam() []*dot.Param
 }
 
+// The keyer interface represents an entity that can uniquely identify itself.
+type keyer interface {
+	Key() key
+}
+
 var (
 	_ param = paramSingle{}
 	_ param = paramObject{}
@@ -98,17 +103,34 @@ type paramVisitor interface {
 // recursed into.
 type paramVisitorFunc func(param) (recurse bool)
 
+func (f paramVisitorFunc) Visit(p param) paramVisitor {
+	if f(p) {
+		return f
+	}
+	return nil
+}
+
+type paramVisitorSetter interface {
+	With(paramVisitorFunc) paramVisitor
+}
+
 // paramVisitOnce encapsulates a paramVisitorFunc and a map to track visited nodes.
 type paramVisitOnce struct {
 	f       paramVisitorFunc
-	visited map[string]struct{}
+	visited map[key]struct{}
 }
 
 // NewParamVisitOnce constructs a paramVisitor avoiding redundant visits.
-func newParamVisitOnce(visited map[string]struct{}, f paramVisitorFunc) paramVisitor {
+func newParamVisitOnce() paramVisitorSetter {
+	return paramVisitOnce{
+		visited: make(map[key]struct{}),
+	}
+}
+
+func (pv paramVisitOnce) With(f paramVisitorFunc) paramVisitor {
 	return paramVisitOnce{
 		f:       f,
-		visited: visited,
+		visited: pv.visited,
 	}
 }
 
@@ -116,20 +138,20 @@ func newParamVisitOnce(visited map[string]struct{}, f paramVisitorFunc) paramVis
 //		- param is not an edge node (i.e. param is a paramList), OR
 //		- param is an edge node that has not yet been visited
 func (pv paramVisitOnce) Visit(p param) paramVisitor {
-	switch p.(type) {
-	case paramSingle, paramGroupedSlice:
-		if _, ok := pv.visited[p.String()]; ok {
-			return pv
-		}
-		defer func() {
-			pv.visited[p.String()] = struct{}{}
-		}()
+	if pTyped, ok := p.(keyer); ok && pv.checkAndSetVisited(pTyped.Key()) {
+		return pv
 	}
 
 	if pv.f(p) {
 		return pv
 	}
 	return nil
+}
+
+func (pv paramVisitOnce) checkAndSetVisited(k key) bool {
+	_, ok := pv.visited[k]
+	pv.visited[k] = struct{}{}
+	return ok
 }
 
 // walkParam walks the param tree for the given param with the provided
@@ -299,6 +321,10 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	// container.
 	v, _ := c.getValue(ps.Name, ps.Type)
 	return v, nil
+}
+
+func (ps paramSingle) Key() key {
+	return key{name: ps.Name, t: ps.Type}
 }
 
 // paramObject is a dig.In struct where each field is another param.
@@ -486,4 +512,8 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 		result.Index(i).Set(v)
 	}
 	return result, nil
+}
+
+func (pt paramGroupedSlice) Key() key {
+	return key{group: pt.Group, t: pt.Type.Elem()}
 }
