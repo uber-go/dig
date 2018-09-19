@@ -131,6 +131,12 @@ type Container struct {
 
 	// Source of randomness.
 	rand *rand.Rand
+
+	// Flag indicating whether the graph has been checked for cycles.
+	isVerifiedAcyclic bool
+
+	// Defer acyclic check on provide until Invoke.
+	deferAcyclicVerification bool
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -209,6 +215,19 @@ func New(opts ...Option) *Container {
 		opt.applyOption(c)
 	}
 	return c
+}
+
+// DeferAcyclicVerification is an Option to override the default behavior
+// of container.Provide, deferring the dependency graph validation to no longer
+// run after each call to container.Provide. The container will instead verify
+// the graph on first `Invoke`.
+//
+// Applications adding providers to a container in a tight loop may experience
+// performance improvements by initializing the container with this option.
+func DeferAcyclicVerification() Option {
+	return optionFunc(func(c *Container) {
+		c.deferAcyclicVerification = true
+	})
 }
 
 // A VisualizeOption modifies the default behavior of Visualize.
@@ -478,6 +497,12 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		}
 	}
 
+	if !c.isVerifiedAcyclic {
+		if err := c.verifyAcyclic(); err != nil {
+			return err
+		}
+	}
+
 	args, err := pl.BuildList(c)
 	if err != nil {
 		return errArgumentsFailed{
@@ -498,6 +523,18 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
+func (c *Container) verifyAcyclic() error {
+	visited := make(map[key]struct{})
+	for _, n := range c.nodes {
+		if err := detectCycles(n, c, nil /* path */, visited); err != nil {
+			return errWrapf(err, "cycle detected in dependency graph")
+		}
+	}
+
+	c.isVerifiedAcyclic = true
+	return nil
+}
+
 func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	n, err := newNode(ctor, nodeOptions{ResultName: opts.Name})
 	if err != nil {
@@ -515,12 +552,18 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	}
 
 	for k := range keys {
-		oldProducers := c.providers[k]
-		c.providers[k] = append(oldProducers, n)
+		c.isVerifiedAcyclic = false
+		oldProviders := c.providers[k]
+		c.providers[k] = append(c.providers[k], n)
+
+		if c.deferAcyclicVerification {
+			continue
+		}
 		if err := verifyAcyclic(c, n, k); err != nil {
-			c.providers[k] = oldProducers
+			c.providers[k] = oldProviders
 			return err
 		}
+		c.isVerifiedAcyclic = true
 	}
 
 	c.nodes = append(c.nodes, n)

@@ -1475,6 +1475,7 @@ func TestProvideCycleFails(t *testing.T) {
 		assert.NoError(t, c.Provide(newB))
 		err := c.Provide(newC)
 		require.Error(t, err, "expected error when introducing cycle")
+		require.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
 			`function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
 			`this function introduces a cycle:`,
@@ -1520,6 +1521,7 @@ func TestProvideCycleFails(t *testing.T) {
 
 		err := c.Provide(newC)
 		require.Error(t, err, "expected error when introducing cycle")
+		require.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
 			`function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
 			`this function introduces a cycle:`,
@@ -1589,6 +1591,7 @@ func TestProvideCycleFails(t *testing.T) {
 
 		err := c.Provide(newD)
 		require.Error(t, err)
+		require.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
 			`function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
 			`this function introduces a cycle:`,
@@ -1596,6 +1599,42 @@ func TestProvideCycleFails(t *testing.T) {
 			`depends on int\[group="bar"\] provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 			`depends on string\[group="foo"\] provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 			`depends on \*dig.D provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+		)
+	})
+
+	t.Run("DeferAcyclicVerification bypasses cycle check, VerifyAcyclic catches cycle", func(t *testing.T) {
+		// A <- B <- C <- D
+		// |         ^
+		// |_________|
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		type D struct{}
+		newA := func(*C) *A { return &A{} }
+		newB := func(*A) *B { return &B{} }
+		newC := func(*B) *C { return &C{} }
+		newD := func(*C) *D { return &D{} }
+
+		c := New(DeferAcyclicVerification())
+		assert.NoError(t, c.Provide(newA))
+		assert.NoError(t, c.Provide(newB))
+		assert.NoError(t, c.Provide(newC))
+		assert.NoError(t, c.Provide(newD))
+
+		err := c.Invoke(func(*A) {})
+		require.Error(t, err, "expected error when introducing cycle")
+		assert.True(t, IsCycleDetected(err))
+		assertErrorMatches(t, err,
+			`cycle detected in dependency graph:`,
+		)
+		assertErrorMatches(t, err,
+			`depends on \*dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+		)
+		assertErrorMatches(t, err,
+			`depends on \*dig.A provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+		)
+		assertErrorMatches(t, err,
+			`depends on \*dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 }
