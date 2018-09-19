@@ -1626,14 +1626,9 @@ func TestProvideCycleFails(t *testing.T) {
 		assert.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
 			`cycle detected in dependency graph:`,
-		)
-		assertErrorMatches(t, err,
+			`\*dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 			`depends on \*dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-		)
-		assertErrorMatches(t, err,
 			`depends on \*dig.A provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-		)
-		assertErrorMatches(t, err,
 			`depends on \*dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
