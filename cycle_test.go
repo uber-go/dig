@@ -30,4 +30,5 @@ import (
 func TestIsCycleDetected(t *testing.T) {
 	assert.False(t, IsCycleDetected(errors.New("new error")))
 	assert.True(t, IsCycleDetected(errCycleDetected{}))
+	assert.True(t, IsCycleDetected(errWrapf(errCycleDetected{}, "this function introduces a cycle")))
 }

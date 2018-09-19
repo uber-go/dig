@@ -132,7 +132,7 @@ type Container struct {
 	// Source of randomness.
 	rand *rand.Rand
 
-	// Ensure verified acyclic before Invoke.
+	// Flag indicating whether the graph has been checked for cycles.
 	isVerifiedAcyclic bool
 
 	// Defer acyclic check on provide until Invoke.
@@ -527,7 +527,7 @@ func (c *Container) verifyAcyclic() error {
 	visited := make(map[key]struct{})
 	for _, n := range c.nodes {
 		if err := detectCycles(n, c, nil /* path */, visited); err != nil {
-			return errWrapf(err, "this function introduces a cycle")
+			return errWrapf(err, "cycle detected in dependency graph")
 		}
 	}
 
@@ -553,12 +553,12 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 
 	for k := range keys {
 		c.isVerifiedAcyclic = false
+		oldProviders := c.providers[k]
+		c.providers[k] = append(c.providers[k], n)
+
 		if c.deferAcyclicVerification {
-			c.providers[k] = append(c.providers[k], n)
 			continue
 		}
-		oldProviders := c.providers[k]
-		c.providers[k] = append(oldProviders, n)
 		if err := verifyAcyclic(c, n, k); err != nil {
 			c.providers[k] = oldProviders
 			return err
