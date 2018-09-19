@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Changed
 - Improved cycle-detection performance by 50x in certain degenerative cases.
+- Added a `DeferAcyclicVerification` container option that defers graph cycle detection until the next Invoke.
 
 ## [1.4.0] - 2018-08-16
 ### Added
