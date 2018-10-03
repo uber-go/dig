@@ -104,3 +104,7 @@ func (pt paramGroupedSlice) String() string {
 	// io.Reader[group="foo"] refers to a group of io.Readers called 'foo'
 	return fmt.Sprintf("%v[group=%q]", pt.Type.Elem(), pt.Group)
 }
+
+func (pp paramProvided) String() string {
+	return fmt.Sprintf("%v[%v]", pp.Type, pp.Param)
+}

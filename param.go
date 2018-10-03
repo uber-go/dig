@@ -53,6 +53,7 @@ type param interface {
 }
 
 var (
+	_ param = paramProvided{}
 	_ param = paramSingle{}
 	_ param = paramObject{}
 	_ param = paramList{}
@@ -120,7 +121,7 @@ func walkParam(p param, v paramVisitor) {
 	}
 
 	switch par := p.(type) {
-	case paramSingle, paramGroupedSlice:
+	case paramSingle, paramGroupedSlice, paramProvided:
 		// No sub-results
 	case paramObject:
 		for _, f := range par.Fields {
@@ -161,7 +162,7 @@ func (pl paramList) DotParam() []*dot.Param {
 //
 // Variadic arguments of a constructor are ignored and not included as
 // dependencies.
-func newParamList(ctype reflect.Type) (paramList, error) {
+func newParamList(ctype reflect.Type, providedParams ...interface{}) (paramList, error) {
 	numArgs := ctype.NumIn()
 	if ctype.IsVariadic() {
 		// NOTE: If the function is variadic, we skip the last argument
@@ -175,11 +176,17 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 	}
 
 	for i := 0; i < numArgs; i++ {
-		p, err := newParam(ctype.In(i))
-		if err != nil {
-			return pl, errWrapf(err, "bad argument %d", i+1)
+		if i < len(providedParams) {
+			pl.Params = append(pl.Params, paramProvided{Param: providedParams[i]})
+
+		} else {
+			p, err := newParam(ctype.In(i))
+			if err != nil {
+				return pl, errWrapf(err, "bad argument %d", i+1)
+			}
+
+			pl.Params = append(pl.Params, p)
 		}
-		pl.Params = append(pl.Params, p)
 	}
 
 	return pl, nil
@@ -203,6 +210,7 @@ func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 			return nil, err
 		}
 	}
+
 	return args, nil
 }
 
@@ -452,3 +460,28 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 	}
 	return result, nil
 }
+
+// paramProvided is an passed in param.
+type paramProvided struct {
+	Name     string
+	Optional bool
+	Type     reflect.Type
+	Param interface{}
+}
+
+func (pp paramProvided) DotParam() []*dot.Param {
+	return []*dot.Param{
+		{
+			Node: &dot.Node{
+				Type: pp.Type,
+				Name: pp.Name,
+			},
+			Optional: pp.Optional,
+		},
+	}
+}
+
+func (pp paramProvided) Build(c containerStore) (reflect.Value, error) {
+	return reflect.ValueOf(pp.Param), nil
+}
+
