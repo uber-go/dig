@@ -282,6 +282,9 @@ func updateGraph(dg *dot.Graph, err error) error {
 		errors[i].updateGraph(dg)
 	}
 
+	// Remove non-error entries from the graph for readability.
+	dg.PruneSuccess()
+
 	return nil
 }
 

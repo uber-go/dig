@@ -3018,6 +3018,31 @@ func TestVisualize(t *testing.T) {
 		err := c.Invoke(func(t4 t4) { return })
 
 		VerifyVisualization(t, "error", c, VisualizeError(err))
+
+		t.Run("non-failing graph nodes are pruned", func(t *testing.T) {
+
+			t.Run("prune non-failing constructor result", func(t *testing.T) {
+				c := New()
+				c.Provide(func(in1) out1 { return out1{} })
+				c.Provide(func(in2) t4 { return t4{} })
+				c.Provide(func() (out2, error) { return out2{}, fmt.Errorf("great sadness") })
+				c.Provide(func() out3 { return out3{} })
+				err := c.Invoke(func(t4 t4) { return })
+
+				VerifyVisualization(t, "prune_constructor_result", c, VisualizeError(err))
+			})
+
+			t.Run("if only the root node fails all node except for the root should be pruned", func(t *testing.T) {
+				c := New()
+				c.Provide(func(in1) out1 { return out1{} })
+				c.Provide(func(in2) (t4, error) { return t4{}, fmt.Errorf("great sadness") })
+				c.Provide(func() out2 { return out2{} })
+				c.Provide(func() out3 { return out3{} })
+				err := c.Invoke(func(t4 t4) { return })
+
+				VerifyVisualization(t, "prune_non_root_nodes", c, VisualizeError(err))
+			})
+		})
 	})
 
 	t.Run("missing types", func(t *testing.T) {

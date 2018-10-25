@@ -31,19 +31,10 @@ type t1 struct{}
 type t2 struct{}
 type t3 struct{}
 
-func TestNewGraph(t *testing.T) {
-	g := NewGraph()
-
-	assert.Equal(t, make(map[groupKey]*Group), g.groupMap)
-	assert.Equal(t, make(map[CtorID]*Ctor), g.ctorMap)
-	assert.Equal(t, &FailedNodes{}, g.Failed)
-	assert.Equal(t, "*dot.Graph", reflect.TypeOf(g).String())
-}
-
 func TestNewGroup(t *testing.T) {
 	type1 := reflect.TypeOf(t1{})
 
-	k := groupKey{t: type1, group: "group1"}
+	k := nodeKey{t: type1, group: "group1"}
 	group := NewGroup(k)
 
 	assert.Equal(t, type1, group.Type)
@@ -85,18 +76,18 @@ func TestAddCtor(t *testing.T) {
 		c := &Ctor{ID: 1234}
 		params := []*Param{p3}
 
-		k := groupKey{
+		k := nodeKey{
 			t:     type3.Elem(),
 			group: "foo",
 		}
 		expectedGroup := NewGroup(k)
 
-		assert.Equal(t, map[groupKey]*Group{}, dg.groupMap)
+		assert.Equal(t, map[nodeKey]*Group{}, dg.groupMap)
 		dg.AddCtor(c, params, []*Result{})
 
 		assert.Equal(t, 0, len(c.Params))
 		assert.Equal(t, []*Group{expectedGroup}, c.GroupParams)
-		assert.Equal(t, map[groupKey]*Group{k: expectedGroup}, dg.groupMap)
+		assert.Equal(t, map[nodeKey]*Group{k: expectedGroup}, dg.groupMap)
 	})
 
 	t.Run("grouped results", func(t *testing.T) {
@@ -108,7 +99,7 @@ func TestAddCtor(t *testing.T) {
 		res0 := &Result{Node: node0, GroupIndex: 0}
 		res1 := &Result{Node: node1, GroupIndex: 1}
 
-		k := groupKey{t: type3, group: "foo"}
+		k := nodeKey{t: type3, group: "foo"}
 		group0 := &Group{
 			Type:    type3,
 			Name:    "foo",
@@ -120,23 +111,23 @@ func TestAddCtor(t *testing.T) {
 			Results: []*Result{res0, res1},
 		}
 
-		assert.Equal(t, map[groupKey]*Group{}, dg.groupMap)
+		assert.Equal(t, map[nodeKey]*Group{}, dg.groupMap)
 
 		dg.AddCtor(c0, []*Param{}, []*Result{res0})
 		assert.Equal(t, []*Result{res0}, c0.Results)
-		assert.Equal(t, map[groupKey]*Group{k: group0}, dg.groupMap)
+		assert.Equal(t, map[nodeKey]*Group{k: group0}, dg.groupMap)
 
 		dg.AddCtor(c1, []*Param{}, []*Result{res1})
 		assert.Equal(t, []*Result{res1}, c1.Results)
-		assert.Equal(t, map[groupKey]*Group{k: group1}, dg.groupMap)
+		assert.Equal(t, map[nodeKey]*Group{k: group1}, dg.groupMap)
 
 		assert.Equal(t, []*Ctor{c0, c1}, dg.Ctors)
 	})
 }
 
 func TestFailNodes(t *testing.T) {
-	type1 := reflect.TypeOf(t1{})
-	type2 := reflect.TypeOf(t2{})
+	type1 := reflect.TypeOf(&t1{})
+	type2 := reflect.TypeOf(&t2{})
 
 	n1 := &Node{Type: type1}
 	n2 := &Node{Type: type2}
@@ -185,8 +176,8 @@ func TestFailNodes(t *testing.T) {
 		dg := NewGraph()
 		c0 := &Ctor{ID: 123}
 		c1 := &Ctor{ID: 456}
-		k0 := groupKey{t: type1, group: "foo"}
-		k1 := groupKey{t: type2, group: "bar"}
+		k0 := nodeKey{t: type1, group: "foo"}
+		k1 := nodeKey{t: type2, group: "bar"}
 
 		dg.AddCtor(c0, []*Param{}, []*Result{r3})
 		dg.AddCtor(c1, []*Param{}, []*Result{r4})
@@ -205,6 +196,184 @@ func TestFailNodes(t *testing.T) {
 	})
 }
 
+func TestPruneSuccess(t *testing.T) {
+	type1 := reflect.TypeOf(&t1{})
+	type2 := reflect.TypeOf(&t2{})
+	type3 := reflect.TypeOf([]t3{})
+
+	n1 := &Node{Type: type1}
+	n2 := &Node{Type: type2}
+	n3 := &Node{Type: type1, Group: "foo"}
+	n4 := &Node{Type: type2, Group: "bar"}
+
+	p1 := &Param{Node: n1}
+	p2 := &Param{Node: n2}
+	p3 := &Param{Node: n3}
+	p4 := &Param{Node: n4}
+
+	r1 := &Result{Node: n1}
+	r2 := &Result{Node: n2}
+	r3 := &Result{Node: n3}
+	r4 := &Result{Node: n4}
+
+	t.Parallel()
+
+	t.Run("all graph entries without failing results should be removed", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 1234}
+		c1 := &Ctor{ID: 5678}
+		node0 := &Node{Type: type3, Group: "foo"}
+		node1 := &Node{Type: type3, Group: "foo"}
+		res0 := &Result{Node: node0, GroupIndex: 0}
+		res1 := &Result{Node: node1, GroupIndex: 1}
+
+		dg.AddCtor(c0, []*Param{}, []*Result{res0})
+		dg.AddCtor(c1, []*Param{}, []*Result{res1})
+
+		dg.PruneSuccess()
+
+		assert.Len(t, dg.Ctors, 0)
+		assert.Len(t, dg.Groups, 0)
+	})
+
+	t.Run("no constructors should be removed because they all have failing results", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+
+		dg.AddCtor(c0, []*Param{}, []*Result{r1})
+		dg.AddCtor(c1, []*Param{}, []*Result{r2})
+
+		dg.FailNodes([]*Result{r1}, c0.ID)
+		dg.FailNodes([]*Result{r2}, c1.ID)
+		dg.PruneSuccess()
+
+		assert.Len(t, dg.Ctors, 2)
+		assert.Len(t, dg.ctorMap, 2)
+	})
+
+	t.Run("remove constructor without failing results", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+
+		dg.AddCtor(c0, []*Param{}, []*Result{r1})
+		dg.AddCtor(c1, []*Param{}, []*Result{r2})
+
+		dg.FailNodes([]*Result{r2}, c1.ID)
+		dg.PruneSuccess()
+
+		assert.Len(t, dg.Ctors, 1)
+	})
+
+	t.Run("no graph entries should be removed if they all contain failing result groups", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+
+		dg.AddCtor(c0, []*Param{}, []*Result{r3})
+		dg.AddCtor(c1, []*Param{}, []*Result{r4})
+
+		dg.FailGroupNodes("foo", type1, c0.ID)
+		dg.FailGroupNodes("bar", type2, c1.ID)
+		dg.PruneSuccess()
+
+		assert.Len(t, dg.Ctors, 2)
+		assert.Len(t, dg.Groups, 2)
+	})
+
+	t.Run("only graph entries without failing result groups should be removed", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+
+		dg.AddCtor(c0, []*Param{}, []*Result{r3})
+		dg.AddCtor(c1, []*Param{}, []*Result{r4})
+
+		dg.FailGroupNodes("foo", type1, c0.ID)
+		dg.PruneSuccess()
+
+		assert.Len(t, dg.Ctors, 1)
+		assert.Len(t, dg.Groups, 1)
+	})
+
+	t.Run("pruned controller results should be pruned from consuming controllers", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+
+		dg.AddCtor(c0, []*Param{p1, p2}, []*Result{r1})
+		dg.AddCtor(c1, []*Param{}, []*Result{r2})
+		assert.Len(t, c0.Params, 2)
+
+		// r1 is failed to ensure that c1 is not removed.
+		dg.FailNodes([]*Result{r1}, c0.ID)
+		dg.PruneSuccess()
+
+		assert.Len(t, c0.Params, 1)
+	})
+
+	t.Run("params from controllers that are not pruned should not be removed", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+
+		dg.AddCtor(c0, []*Param{p2}, []*Result{r1})
+		dg.AddCtor(c1, []*Param{}, []*Result{r2})
+		assert.Len(t, c0.Params, 1)
+
+		dg.FailNodes([]*Result{r2}, c1.ID)
+		dg.PruneSuccess()
+
+		assert.Len(t, c0.Params, 1)
+	})
+
+	t.Run("pruned controller grouped results should be pruned from the consuming controllers and the group", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+
+		dg.AddCtor(c0, []*Param{p4}, []*Result{r3})
+		dg.AddCtor(c1, []*Param{}, []*Result{r4})
+
+		assert.Equal(t, len(c0.GroupParams), 1)
+
+		group, ok := dg.groupMap[nodeKey{t: type2, group: "bar"}]
+		assert.True(t, ok)
+
+		assert.Equal(t, len(group.Results), 1)
+
+		// r3 is failed to ensure that c0 is not removed.
+		dg.FailNodes([]*Result{r3}, c0.ID)
+		dg.PruneSuccess()
+
+		assert.Len(t, c0.GroupParams, 0)
+		assert.Len(t, group.Results, 0)
+	})
+
+	t.Run("grouped params from controllers that are not pruned should not be removed from the consuming controller nor the group", func(t *testing.T) {
+		dg := NewGraph()
+		c0 := &Ctor{ID: 123}
+		c1 := &Ctor{ID: 456}
+
+		dg.AddCtor(c0, []*Param{p4, p3}, []*Result{r3})
+		dg.AddCtor(c1, []*Param{}, []*Result{r4})
+
+		assert.Len(t, c0.GroupParams, 2)
+
+		group, ok := dg.groupMap[nodeKey{t: type2, group: "bar"}]
+		assert.True(t, ok)
+
+		assert.Len(t, group.Results, 1)
+
+		dg.FailNodes([]*Result{r4}, c1.ID)
+		dg.PruneSuccess()
+
+		assert.Len(t, c0.GroupParams, 2)
+		assert.Len(t, group.Results, 1)
+	})
+}
+
 func TestGetGroup(t *testing.T) {
 	type1 := reflect.TypeOf(t1{})
 	type2 := reflect.TypeOf(t2{})
@@ -212,9 +381,9 @@ func TestGetGroup(t *testing.T) {
 
 	r1 := &Result{Node: &Node{Type: type1}}
 
-	k1 := groupKey{t: type1, group: "group1"}
-	k2 := groupKey{t: type2, group: "group1"}
-	k3 := groupKey{t: type3, group: "group1"}
+	k1 := nodeKey{t: type1, group: "group1"}
+	k2 := nodeKey{t: type2, group: "group1"}
+	k3 := nodeKey{t: type3, group: "group1"}
 
 	g := NewGraph()
 	group1 := NewGroup(k1)
