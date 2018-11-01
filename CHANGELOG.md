@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - No changes yet.
 
+## [1.5.1] - 2018-11-01
+### Fixed
+- Fixed a test that was causing Dig to be unusable with Go Modules.
+
 ## [1.5.0] - 2018-09-19
 ### Added
 - Added a `DeferAcyclicVerification` container option that defers graph cycle
