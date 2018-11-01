@@ -108,10 +108,10 @@ func TestInspectFunc(t *testing.T) {
 		},
 		{
 			desc:           "vendored dependency",
-			give:           myrepository.VendoredDependencyFunction(),
-			wantName:       "Panic",
-			wantPackage:    "mydependency",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/tests/myrepository.git/vendor/mydependency/panic.go",
+			give:           assert.Contains,
+			wantName:       "Contains",
+			wantPackage:    "github.com/stretchr/testify/assert",
+			wantFileSuffix: "go.uber.org/dig/vendor/github.com/stretchr/testify/assert/assertions.go",
 		},
 	}
 
