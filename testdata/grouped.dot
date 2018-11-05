@@ -1,4 +1,5 @@
 digraph {
+	rankdir=LR;
 	graph [compound=true];
 	"[type=dig.t3 group=foo]" [shape=diamond label=<dig.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>];
 		"[type=dig.t3 group=foo]" -> "dig.t3[group=foo]0";
