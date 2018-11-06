@@ -1,11 +1,11 @@
 digraph {
+	rankdir=LR;
 	graph [compound=true];
 	"[type=dig.t1 group=g1]" [shape=diamond label=<dig.t1<BR /><FONT POINT-SIZE="10">Group: g1</FONT>> color=red];
 		"[type=dig.t1 group=g1]" -> "dig.t1[group=g1]0";
 		
 	"[type=dig.t2 group=g2]" [shape=diamond label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>> color=orange];
 		"[type=dig.t2 group=g2]" -> "dig.t2[group=g2]0";
-		"[type=dig.t2 group=g2]" -> "dig.t2[group=g2]1";
 		"[type=dig.t2 group=g2]" -> "dig.t2[group=g2]2";
 		
 	
@@ -33,15 +33,7 @@ digraph {
 			constructor_1 -> "[type=dig.t2 group=g2]" [ltail=cluster_1];
 		
 		subgraph cluster_2 {
-			constructor_2 [shape=plaintext label="TestVisualize.func6.3"];
-			
-			"dig.t2[group=g2]1" [label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>>];
-			
-		}
-		
-		
-		subgraph cluster_3 {
-			constructor_3 [shape=plaintext label="TestVisualize.func6.4"];
+			constructor_2 [shape=plaintext label="TestVisualize.func6.4"];
 			color=red;
 			"dig.t1[group=g1]0" [label=<dig.t1<BR /><FONT POINT-SIZE="10">Group: g1</FONT>>];
 			"dig.t2[group=g2]2" [label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>>];

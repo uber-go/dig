@@ -282,6 +282,9 @@ func updateGraph(dg *dot.Graph, err error) error {
 		errors[i].updateGraph(dg)
 	}
 
+	// Remove non-error entries from the graph for readability.
+	dg.PruneSuccess()
+
 	return nil
 }
 
@@ -291,6 +294,7 @@ var _graphTmpl = template.Must(
 			"quote": strconv.Quote,
 		}).
 		Parse(`digraph {
+	rankdir=LR;
 	graph [compound=true];
 	{{range $g := .Groups}}
 		{{- quote .String}} [{{.Attributes}}];
