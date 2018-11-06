@@ -294,7 +294,7 @@ var _graphTmpl = template.Must(
 			"quote": strconv.Quote,
 		}).
 		Parse(`digraph {
-	rankdir=LR;
+	rankdir=RL;
 	graph [compound=true];
 	{{range $g := .Groups}}
 		{{- quote .String}} [{{.Attributes}}];

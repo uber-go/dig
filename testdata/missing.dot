@@ -1,5 +1,5 @@
 digraph {
-	rankdir=LR;
+	rankdir=RL;
 	graph [compound=true];
 	
 		subgraph cluster_0 {
