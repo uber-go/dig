@@ -1,5 +1,5 @@
 digraph {
-	rankdir=LR;
+	rankdir=RL;
 	graph [compound=true];
 	"[type=dig.t1 group=g1]" [shape=diamond label=<dig.t1<BR /><FONT POINT-SIZE="10">Group: g1</FONT>> color=red];
 		"[type=dig.t1 group=g1]" -> "dig.t1[group=g1]0";
