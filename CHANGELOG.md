@@ -5,9 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
 - When an error graph is visualized, the graph is pruned so that the graph only
   contains failure nodes.
-- The graph has been changed to be oriented from right to left.
+- Container visualization is now oriented from right to left.
 
 ## [1.5.1] - 2018-11-01
 ### Fixed
