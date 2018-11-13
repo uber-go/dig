@@ -62,7 +62,8 @@ type optionFunc func(*Container)
 func (f optionFunc) applyOption(c *Container) { f(c) }
 
 type provideOptions struct {
-	Name string
+	Name  string
+	Group string
 }
 
 func (o *provideOptions) Validate() error {
@@ -105,6 +106,17 @@ func (f provideOptionFunc) applyProvideOption(opts *provideOptions) { f(opts) }
 func Name(name string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Name = name
+	})
+}
+
+// Group is a ProvideOption that specifies that all values produced by a
+// constructor should be members of the same group. Since all members of a
+// group must be of same type, this option cannot be provided for constructors
+// that return different types. See also the package documentation about
+// Value Groups.
+func Group(group string) ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.Group = group
 	})
 }
 
