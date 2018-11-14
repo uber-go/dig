@@ -187,7 +187,10 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 	}
 
 	isGroup := len(opts.Group) > 0
-	groupType := ctype.Out(0)
+	var groupType reflect.Type
+	if ctype.NumOut() > 0 {
+		groupType = ctype.Out(0)
+	}
 
 	resultIdx := 0
 	for i := 0; i < ctype.NumOut(); i++ {
