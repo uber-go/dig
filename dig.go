@@ -118,7 +118,7 @@ func Name(name string) ProvideOption {
 }
 
 // Group is a ProvideOption that specifies that all values produced by a
-// constructor should be members of the same group. See also the package
+// constructor should be added to the specified group. See also the package
 // documentation about Value Groups.
 //
 // This option cannot be provided for constructors which produce result
