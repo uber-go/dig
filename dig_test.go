@@ -1433,7 +1433,7 @@ func TestProvideGroupAndName(t *testing.T) {
 		panic("this function must not be called")
 	}, Group("foo"), Name("bar"))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot use named values with value groups: " +
+	assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
 		"name:\"bar\" provided with group:\"foo\"")
 }
 

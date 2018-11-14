@@ -59,7 +59,7 @@ type resultOptions struct {
 	// If set, this is the name of the associated result value.
 	//
 	// For Result Objects, name:".." tags on fields override this.
-	Name string
+	Name  string
 	Group string
 }
 

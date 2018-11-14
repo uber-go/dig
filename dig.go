@@ -564,7 +564,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	n, err := newNode(
 		ctor,
 		nodeOptions{
-			ResultName: opts.Name,
+			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
 		},
 	)
@@ -741,7 +741,7 @@ type node struct {
 type nodeOptions struct {
 	// If specified, all values produced by this node have the provided name
 	// or belong to the specified value group
-	ResultName string
+	ResultName  string
 	ResultGroup string
 }
 
@@ -758,7 +758,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 	results, err := newResultList(
 		ctype,
 		resultOptions{
-			Name: opts.ResultName,
+			Name:  opts.ResultName,
 			Group: opts.ResultGroup,
 		},
 	)
