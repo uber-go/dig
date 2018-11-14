@@ -186,27 +186,12 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 		resultIndexes: make([]int, ctype.NumOut()),
 	}
 
-	isGroup := len(opts.Group) > 0
-	var groupType reflect.Type
-	if ctype.NumOut() > 0 {
-		groupType = ctype.Out(0)
-	}
-
 	resultIdx := 0
 	for i := 0; i < ctype.NumOut(); i++ {
 		t := ctype.Out(i)
 		if isError(t) {
 			rl.resultIndexes[i] = -1
 			continue
-		}
-
-		if isGroup && t != groupType {
-			return rl, fmt.Errorf(
-				"cannot use the group provide option with constructors that return " +
-					"multiple types: a constructor is trying to return type %v and type %v",
-					t,
-					groupType,
-			)
 		}
 
 		r, err := newResult(t, opts)

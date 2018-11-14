@@ -943,18 +943,6 @@ func TestGroups(t *testing.T) {
 		}), "invoke failed")
 	})
 
-	t.Run("group options only allow constructors that return values of the same type", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		provide := func(i int) {
-			require.Error(t, c.Provide(func() (int, string) {
-				return i, "uh-oh"
-			}, Group("val")), "This Provide should fail")
-		}
-
-		provide(1)
-	})
-
 	t.Run("group options may not be provided for result structs", func(t *testing.T) {
 		c := New(setRand(rand.New(rand.NewSource(0))))
 
