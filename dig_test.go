@@ -943,6 +943,32 @@ func TestGroups(t *testing.T) {
 		}), "invoke failed")
 	})
 
+	t.Run("different types may be grouped", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		provide := func(i int, s string) {
+			require.NoError(t, c.Provide(func() (int, string) {
+				return i, s
+			}, Group("val")), "failed to provide ")
+		}
+
+		provide(1, "a")
+		provide(2, "b")
+		provide(3, "c")
+
+		type in struct {
+			In
+
+			Ivalues []int    `group:"val"`
+			Svalues []string `group:"val"`
+		}
+
+		require.NoError(t, c.Invoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Ivalues)
+			assert.Equal(t, []string{"a", "c", "b"}, i.Svalues)
+		}), "invoke failed")
+	})
+
 	t.Run("group options may not be provided for result structs", func(t *testing.T) {
 		c := New(setRand(rand.New(rand.NewSource(0))))
 
@@ -952,13 +978,11 @@ func TestGroups(t *testing.T) {
 			Value int `group:"val"`
 		}
 
-		provide := func(i int) {
-			require.Error(t, c.Provide(func() out {
-				return out{Value: i}
+		func(i int) {
+			require.Error(t, c.Provide(func() {
+				t.Fatal("This should not be called")
 			}, Group("val")), "This Provide should fail")
-		}
-
-		provide(1)
+		}(1)
 	})
 
 	t.Run("constructor is called at most once", func(t *testing.T) {
