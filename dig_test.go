@@ -919,6 +919,72 @@ func TestGroups(t *testing.T) {
 		}), "invoke failed")
 	})
 
+	t.Run("groups are provided via option", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		provide := func(i int) {
+			require.NoError(t, c.Provide(func() int {
+				return i
+			}, Group("val")), "failed to provide ")
+		}
+
+		provide(1)
+		provide(2)
+		provide(3)
+
+		type in struct {
+			In
+
+			Values []int `group:"val"`
+		}
+
+		require.NoError(t, c.Invoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Values)
+		}), "invoke failed")
+	})
+
+	t.Run("different types may be grouped", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		provide := func(i int, s string) {
+			require.NoError(t, c.Provide(func() (int, string) {
+				return i, s
+			}, Group("val")), "failed to provide ")
+		}
+
+		provide(1, "a")
+		provide(2, "b")
+		provide(3, "c")
+
+		type in struct {
+			In
+
+			Ivalues []int    `group:"val"`
+			Svalues []string `group:"val"`
+		}
+
+		require.NoError(t, c.Invoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Ivalues)
+			assert.Equal(t, []string{"a", "c", "b"}, i.Svalues)
+		}), "invoke failed")
+	})
+
+	t.Run("group options may not be provided for result structs", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			Out
+
+			Value int `group:"val"`
+		}
+
+		func(i int) {
+			require.Error(t, c.Provide(func() {
+				t.Fatal("This should not be called")
+			}, Group("val")), "This Provide should fail")
+		}(1)
+	})
+
 	t.Run("constructor is called at most once", func(t *testing.T) {
 		c := New(setRand(rand.New(rand.NewSource(0))))
 
@@ -1370,6 +1436,29 @@ func TestProvideInvalidName(t *testing.T) {
 	}, Name("foo`bar"))
 	require.Error(t, err, "Provide must fail")
 	assert.Contains(t, err.Error(), "invalid dig.Name(\"foo`bar\"): names cannot contain backquotes")
+}
+
+func TestProvideInvalidGroup(t *testing.T) {
+	t.Parallel()
+
+	c := New()
+	err := c.Provide(func() io.Reader {
+		panic("this function must not be called")
+	}, Group("foo`bar"))
+	require.Error(t, err, "Provide must fail")
+	assert.Contains(t, err.Error(), "invalid dig.Group(\"foo`bar\"): group names cannot contain backquotes")
+}
+
+func TestProvideGroupAndName(t *testing.T) {
+	t.Parallel()
+
+	c := New()
+	err := c.Provide(func() io.Reader {
+		panic("this function must not be called")
+	}, Group("foo"), Name("bar"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
+		"name:\"bar\" provided with group:\"foo\"")
 }
 
 func TestCantProvideUntypedNil(t *testing.T) {

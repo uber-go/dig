@@ -62,16 +62,25 @@ type optionFunc func(*Container)
 func (f optionFunc) applyOption(c *Container) { f(c) }
 
 type provideOptions struct {
-	Name string
+	Name  string
+	Group string
 }
 
 func (o *provideOptions) Validate() error {
+	if len(o.Group) > 0 && len(o.Name) > 0 {
+		return fmt.Errorf(
+			"cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group)
+	}
+
 	// Names must be representable inside a backquoted string. The only
 	// limitation for raw string literals as per
 	// https://golang.org/ref/spec#raw_string_lit is that they cannot contain
 	// backquotes.
 	if strings.ContainsRune(o.Name, '`') {
 		return fmt.Errorf("invalid dig.Name(%q): names cannot contain backquotes", o.Name)
+	}
+	if strings.ContainsRune(o.Group, '`') {
+		return fmt.Errorf("invalid dig.Group(%q): group names cannot contain backquotes", o.Group)
 	}
 	return nil
 }
@@ -105,6 +114,18 @@ func (f provideOptionFunc) applyProvideOption(opts *provideOptions) { f(opts) }
 func Name(name string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Name = name
+	})
+}
+
+// Group is a ProvideOption that specifies that all values produced by a
+// constructor should be added to the specified group. See also the package
+// documentation about Value Groups.
+//
+// This option cannot be provided for constructors which produce result
+// objects.
+func Group(group string) ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.Group = group
 	})
 }
 
@@ -540,7 +561,13 @@ func (c *Container) verifyAcyclic() error {
 }
 
 func (c *Container) provide(ctor interface{}, opts provideOptions) error {
-	n, err := newNode(ctor, nodeOptions{ResultName: opts.Name})
+	n, err := newNode(
+		ctor,
+		nodeOptions{
+			ResultName:  opts.Name,
+			ResultGroup: opts.Group,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -712,8 +739,10 @@ type node struct {
 }
 
 type nodeOptions struct {
-	// If specified, all values produced by this node have the provided name.
-	ResultName string
+	// If specified, all values produced by this node have the provided name
+	// or belong to the specified value group
+	ResultName  string
+	ResultGroup string
 }
 
 func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
@@ -726,7 +755,13 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 		return nil, err
 	}
 
-	results, err := newResultList(ctype, resultOptions{Name: opts.ResultName})
+	results, err := newResultList(
+		ctype,
+		resultOptions{
+			Name:  opts.ResultName,
+			Group: opts.ResultGroup,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

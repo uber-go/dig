@@ -59,7 +59,8 @@ type resultOptions struct {
 	// If set, this is the name of the associated result value.
 	//
 	// For Result Objects, name:".." tags on fields override this.
-	Name string
+	Name  string
+	Group string
 }
 
 // newResult builds a result from the given type.
@@ -79,6 +80,8 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 		return nil, fmt.Errorf(
 			"cannot return a pointer to a result object, use a value instead: "+
 				"%v is a pointer to a struct that embeds dig.Out", t)
+	case len(opts.Group) > 0:
+		return resultGrouped{Type: t, Group: opts.Group}, nil
 	default:
 		return resultSingle{Type: t, Name: opts.Name}, nil
 	}
@@ -272,6 +275,11 @@ func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 	if len(opts.Name) > 0 {
 		return ro, fmt.Errorf(
 			"cannot specify a name for result objects: %v embeds dig.Out", t)
+	}
+
+	if len(opts.Group) > 0 {
+		return ro, fmt.Errorf(
+			"cannot specify a group for result objects: %v embeds dig.Out", t)
 	}
 
 	for i := 0; i < t.NumField(); i++ {
