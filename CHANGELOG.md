@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [1.7.0] - 2018-11-15
+## [1.7.0] - 2019-01-04
 ### Added
 - Added `Group` option for `Provide` to add value groups to the container without
 rewriting constructors. See package doucmentation for more information.
