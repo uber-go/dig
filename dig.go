@@ -151,6 +151,9 @@ type Container struct {
 	// Source of randomness.
 	rand *rand.Rand
 
+	// Flag indicating whether the graph is valid, or need for check and rebuild after deletion
+	isVerifiedValid bool
+
 	// Flag indicating whether the graph has been checked for cycles.
 	isVerifiedAcyclic bool
 
@@ -224,10 +227,11 @@ type provider interface {
 // New constructs a Container.
 func New(opts ...Option) *Container {
 	c := &Container{
-		providers: make(map[key][]*node),
-		values:    make(map[key]reflect.Value),
-		groups:    make(map[key][]reflect.Value),
-		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		providers:       make(map[key][]*node),
+		values:          make(map[key]reflect.Value),
+		groups:          make(map[key][]reflect.Value),
+		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
+		isVerifiedValid: true,
 	}
 
 	for _, opt := range opts {
@@ -378,6 +382,10 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 			Func:   digreflect.InspectFunc(function),
 			Reason: err,
 		}
+	}
+
+	if !c.isVerifiedValid {
+		c.eraseInvalidValues()
 	}
 
 	if !c.isVerifiedAcyclic {
@@ -589,6 +597,11 @@ type node struct {
 	// Whether the constructor owned by this node was already called.
 	called bool
 
+	// Whether the values created by this constructor is valid
+	// (called = true and valid = false) indicates the value may be affected
+	// by deletion and need to be checked
+	valid bool
+
 	// Type information about constructor parameters.
 	paramList paramList
 
@@ -771,4 +784,59 @@ func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
 		newItems[i] = items[j]
 	}
 	return newItems
+}
+
+// FIXME add comment
+// Only one of name or group will be set.
+func (c *Container) EraseValueProvider(t reflect.Type, name, group string) {
+	// FIXME: add checking on the name and group
+	k := key{
+		t:     t,
+		name:  name,
+		group: group,
+	}
+
+	// check if such provider exists
+	nodes, ok := c.providers[k]
+	if !ok {
+		// it is a shortcut
+		return
+	}
+
+	for _, n := range nodes {
+		if n.called == true {
+			// the constructor is called, thus we have to remove the corresponding value
+			if group != `` {
+				delete(c.groups, k)
+			} else {
+				delete(c.values, k)
+			}
+		}
+	}
+
+	// finally clear the providers and also rebuild the c.nodes
+	c.isVerifiedValid = false
+	delete(c.providers, k)
+	// FIXME: is it really needed?
+	c.nodes = []*node{}
+	for _, array := range c.providers {
+		c.nodes = append(c.nodes, array...)
+	}
+}
+
+// FIXME: implement it
+func (c *Container) eraseInvalidValues() {
+	// marks all called nodes as invalid first
+	for _, n := range c.nodes {
+		if n.called == true {
+			n.valid = false
+		}
+	}
+
+	// FIXME: implement it
+	// try to mark the node as valid, or remove the corresponding value
+	//	for _, n := range c.nodes
+
+	// finally mark the verifyValid
+	c.isVerifiedValid = true
 }
