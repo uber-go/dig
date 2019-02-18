@@ -331,4 +331,4 @@
 //
 // Note that values in a value group are unordered. Dig makes no guarantees
 // about the order in which these values will be produced.
-package dig // import "go.uber.org/dig"
+package dig // import "github.com/17media/dig"

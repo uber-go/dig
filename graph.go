@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"text/template"
 
-	"go.uber.org/dig/internal/dot"
+	"github.com/17media/dig/internal/dot"
 )
 
 // A VisualizeOption modifies the default behavior of Visualize.

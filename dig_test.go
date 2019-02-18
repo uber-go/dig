@@ -864,7 +864,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		err := c.Invoke(func(B) {})
 		require.Error(t, err, "invoking with B param should error out")
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestEndToEndSuccess.func\S+ \(\S+/src/go.uber.org/dig/dig_test.go:\d+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestEndToEndSuccess.func\S+ \(\S+/src/github.com/17media/dig/dig_test.go:\d+\):`,
 			"type dig.B is not in the container,",
 			"did you mean to Provide it?",
 		)
@@ -1208,9 +1208,9 @@ func TestGroups(t *testing.T) {
 		})
 		require.Error(t, err, "expected failure")
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestGroups`,
+			`could not build arguments for function "github.com/17media/dig".TestGroups`,
 			`could not build value group string\[group="x"\]:`,
-			`function "go.uber.org/dig".TestGroups\S+ \(\S+:\d+\) returned a non-nil error:`,
+			`function "github.com/17media/dig".TestGroups\S+ \(\S+:\d+\) returned a non-nil error:`,
 			"great sadness",
 		)
 		assert.Equal(t, gaveErr, RootCause(err))
@@ -1270,7 +1270,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 				err := c.Provide(tt.constructor)
 				require.Error(t, err, "provide should fail")
 				assertErrorMatches(t, err,
-					`function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
+					`function "github.com/17media/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
 					`bad argument 1:`,
 					`cannot depend on result objects:`,
 					tt.msg)
@@ -1294,7 +1294,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 		require.Error(t, err)
 
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
 			`bad result 1:`,
 			"cannot specify a name for result objects: dig.out embeds dig.Out",
 		)
@@ -1321,7 +1321,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 		require.Error(t, err)
 
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
 			`bad field "Result1" of dig.Result2:`,
 			"cannot specify a name for result objects: dig.Result1 embeds dig.Out",
 		)
@@ -1347,9 +1347,9 @@ func TestProvideRespectsConstructorErrors(t *testing.T) {
 		var called bool
 		err := c.Invoke(func(b *bytes.Buffer) { called = true })
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestProvideRespectsConstructorErrors\S+ \(\S+:\d+\):`,
+			`could not build arguments for function "github.com/17media/dig".TestProvideRespectsConstructorErrors\S+ \(\S+:\d+\):`,
 			`failed to build \*bytes.Buffer:`,
-			`function "go.uber.org/dig".TestProvideRespectsConstructorErrors\S+ \(\S+:\d+\) returned a non-nil error:`,
+			`function "github.com/17media/dig".TestProvideRespectsConstructorErrors\S+ \(\S+:\d+\) returned a non-nil error:`,
 			`oh no`)
 		assert.False(t, called, "shouldn't call invoked function when deps aren't available")
 	})
@@ -1493,7 +1493,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 		})
 		require.Error(t, err, "provide should fail")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestCantProvideParameterObjects\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestCantProvideParameterObjects\S+ \(\S+:\d+\) cannot be provided:`,
 			"bad result 1:",
 			`cannot provide parameter objects:`,
 			`dig.Args embeds a dig.In`,
@@ -1509,7 +1509,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 		err := c.Provide(func() (*Args, error) { return args, nil })
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestCantProvideParameterObjects\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestCantProvideParameterObjects\S+ \(\S+:\d+\) cannot be provided:`,
 			"bad result 1:",
 			`cannot provide parameter objects:`,
 			`\*dig.Args embeds a dig.In`,
@@ -1563,12 +1563,12 @@ func TestProvideCycleFails(t *testing.T) {
 		require.Error(t, err, "expected error when introducing cycle")
 		require.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
 			`this function introduces a cycle:`,
-			`\*dig.C provided by "go.uber.org/dig".TestProvideCycleFails\S+ \(\S+\)`,
-			`depends on \*dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.A provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`\*dig.C provided by "github.com/17media/dig".TestProvideCycleFails\S+ \(\S+\)`,
+			`depends on \*dig.B provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on \*dig.A provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on \*dig.C provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 
@@ -1609,12 +1609,12 @@ func TestProvideCycleFails(t *testing.T) {
 		require.Error(t, err, "expected error when introducing cycle")
 		require.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
 			`this function introduces a cycle:`,
-			`dig.C provided by "go.uber.org/dig".TestProvideCycleFails\S+ \(\S+\)`,
-			`depends on dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-			`depends on dig.A provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-			`depends on dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`dig.C provided by "github.com/17media/dig".TestProvideCycleFails\S+ \(\S+\)`,
+			`depends on dig.B provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on dig.A provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on dig.C provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 
@@ -1679,12 +1679,12 @@ func TestProvideCycleFails(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
 			`this function introduces a cycle:`,
-			`\*dig.D provided by "go.uber.org/dig".TestProvideCycleFails\S+ \(\S+\)`,
-			`depends on int\[group="bar"\] provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-			`depends on string\[group="foo"\] provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.D provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`\*dig.D provided by "github.com/17media/dig".TestProvideCycleFails\S+ \(\S+\)`,
+			`depends on int\[group="bar"\] provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on string\[group="foo"\] provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on \*dig.D provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 
@@ -1712,10 +1712,10 @@ func TestProvideCycleFails(t *testing.T) {
 		assert.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
 			`cycle detected in dependency graph:`,
-			`\*dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.A provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`\*dig.C provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on \*dig.B provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on \*dig.A provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on \*dig.C provided by "github.com/17media/dig".TestProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 }
@@ -1819,7 +1819,7 @@ func TestProvideFailures(t *testing.T) {
 		})
 		require.Error(t, err, "provide must return error")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
 			`cannot provide dig.A from \[0\].A2:`,
 			`already provided by \[0\].A1`,
 		)
@@ -1844,9 +1844,9 @@ func TestProvideFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected error on the second provide")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
 			`cannot provide \*dig.A\[name="foo"\] from \[0\].A:`,
-			`already provided by "go.uber.org/dig".TestProvideFailures\S+`,
+			`already provided by "github.com/17media/dig".TestProvideFailures\S+`,
 		)
 	})
 
@@ -1863,7 +1863,7 @@ func TestProvideFailures(t *testing.T) {
 		err := c.Provide(func() out1 { return out1{a2: A{77}} })
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
 			"bad result 1:",
 			`bad field "a2" of dig.out1:`,
 			`unexported fields not allowed in dig.Out, did you mean to export "a2" \(dig.A\)\?`,
@@ -1880,7 +1880,7 @@ func TestProvideFailures(t *testing.T) {
 		err := c.Provide(func() *out { return &out{String: "foo"} })
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
 			"bad result 1:",
 			`cannot return a pointer to a result object, use a value instead:`,
 			`\*dig.out is a pointer to a struct that embeds dig.Out`,
@@ -1899,7 +1899,7 @@ func TestProvideFailures(t *testing.T) {
 		err := c.Provide(func() out { return out{String: "foo"} })
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
 			"bad result 1:",
 			`cannot build a result object by embedding \*dig.Out, embed dig.Out instead:`,
 			`dig.out embeds \*dig.Out`,
@@ -1930,7 +1930,7 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(*bytes.Buffer) {})
 		require.Error(t, err, "expected failure")
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures\S+ \(\S+\):`,
 			`type \*bytes.Buffer is not in the container, did you mean to Provide it\?`,
 		)
 	})
@@ -1953,7 +1953,7 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err, "expected invoke error")
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures\S+ \(\S+\):`,
 			`type \*dig.type2 is not in the container, did you mean to Provide it\?`,
 		)
 	})
@@ -1970,7 +1970,7 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "invoke should fail")
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+\):`,
 			`type \*bytes.Buffer\[name="foo"\] is not in the container, did you mean to Provide it\?`,
 		)
 	})
@@ -1998,9 +1998,9 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "invoke must fail")
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
 			`failed to build \*dig.type3:`,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+\):`,
 			`type \*dig.type1 is not in the container, did you mean to Provide it\?`,
 		)
 		// We don't expect type2 to be mentioned in the list because it's
@@ -2028,9 +2028,9 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err, "invoke must fail")
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
 			`failed to build dig.type3:`,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+\):`,
 			`the following types are not in the container:`,
 			"dig.type1;",
 			`\*dig.type2 \(did you mean dig.type2\?\)`,
@@ -2078,7 +2078,7 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err, "expected provide error")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestInvokeFailures\S+ \(\S+:\d+\) cannot be provided:`,
 			"bad argument 1:",
 			`bad field "Args" of dig.args:`,
 			`bad field "Buffer" of dig.nestedArgs:`,
@@ -2146,11 +2146,11 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected invoke error")
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
 			`failed to build \*dig.dep:`,
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
 			`failed to build \*dig.failed:`,
-			`function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+:\d+\) returned a non-nil error:`,
+			`function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+:\d+\) returned a non-nil error:`,
 			`failed`,
 		)
 		assert.Equal(t, errFailed, RootCause(err), "root cause must match")
@@ -2188,7 +2188,7 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Invoke(func(param2) {})
 		require.Error(t, err, "provide should return error since cases don't match")
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
 			`type dig.A\[name="camelcase"\] is not in the container, did you mean to Provide it`)
 	})
 
@@ -2223,7 +2223,7 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Provide(func(in) int { return 0 })
 		require.Error(t, err, "Provide must fail")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`function "github.com/17media/dig".TestInvokeFailures\S+ \(\S+:\d+\) cannot be provided:`,
 			"bad argument 1:",
 			`bad field "foo" of dig.in:`,
 			`unexported fields not allowed in dig.In, did you mean to export "foo" \(string\)\?`,
@@ -2372,7 +2372,7 @@ func TestInvokeFailures(t *testing.T) {
 				err := c.Invoke(tc.invoke)
 				require.Error(t, err)
 				assertErrorMatches(t, err,
-					`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
+					`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+\):`,
 					tc.errContains,
 				)
 			})
@@ -2387,7 +2387,7 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+\):`,
 			`type io.Reader is not in the container, did you mean to use \*bytes.Reader\?`,
 		)
 	})
@@ -2403,7 +2403,7 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+\):`,
 			`type io.Reader is not in the container, did you mean to use one of \*bytes.Buffer, or \*bytes.Reader\?`,
 		)
 	})
@@ -2419,7 +2419,7 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+\):`,
 			`the following types are not in the container:`,
 			`io.Reader \(did you mean \*bytes.Buffer, or \*bytes.Reader\?\);`,
 			`io.Writer \(did you mean \*bytes.Buffer\?\)`,
@@ -2436,7 +2436,7 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+\):`,
 			`type \*bytes.Buffer is not in the container, did you mean to use io.Writer\?`,
 		)
 	})
@@ -2453,7 +2453,7 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+\):`,
 			`type \*bytes.Buffer is not in the container, did you mean to use one of io.Reader, or io.Writer\?`,
 		)
 	})
@@ -2471,7 +2471,7 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err, "expected Invoke error")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
+			`function "github.com/17media/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
 			"great sadness",
 		)
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
@@ -2495,11 +2495,11 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err, "expected Invoke error")
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures\S+`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures\S+`,
 			"failed to build dig.B",
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures\S+`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures\S+`,
 			"failed to build dig.A",
-			`function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
+			`function "github.com/17media/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
 			"great sadness",
 		)
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
@@ -2524,9 +2524,9 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err, "expected Invoke error")
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.func\S+`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures.func\S+`,
 			"failed to build dig.A:",
-			`function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
+			`function "github.com/17media/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
 			"great sadness",
 		)
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
@@ -2556,11 +2556,11 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err, "expected Invoke error")
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+:\d+\):`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures.func\S+ \(\S+:\d+\):`,
 			"failed to build dig.B:",
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.func\S+`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures.func\S+`,
 			"failed to build dig.A:",
-			`function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
+			`function "github.com/17media/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
 			"great sadness",
 		)
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
@@ -2594,9 +2594,9 @@ func TestInvokeFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected failure")
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
+			`could not build arguments for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
 			`could not build value group dig.B\[group="b"\]:`,
-			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
+			`missing dependencies for function "github.com/17media/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
 			"type dig.A is not in the container, did you mean to Provide it?",
 		)
 	})

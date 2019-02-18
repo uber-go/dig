@@ -12,7 +12,7 @@ dependencies:
 	glide --version || go get -u -f github.com/Masterminds/glide
 	glide install
 	@echo "Installing uber-license tool..."
-	command -v update-license >/dev/null || go get -u -f go.uber.org/tools/update-license
+	command -v update-license >/dev/null || go get -u -f github.com/17media/tools/update-license
 	@echo "Installing golint..."
 	command -v golint >/dev/null || go get -u -f github.com/golang/lint/golint
 

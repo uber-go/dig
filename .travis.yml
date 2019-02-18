@@ -1,6 +1,6 @@
 language: go
 sudo: false
-go_import_path: go.uber.org/dig
+go_import_path: github.com/17media/dig
 
 matrix:
   include:

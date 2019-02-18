@@ -24,9 +24,9 @@ import (
 	"strings"
 	"testing"
 
+	myrepository "github.com/17media/dig/internal/digreflect/tests/myrepository.git"
+	mypackage "github.com/17media/dig/internal/digreflect/tests/myrepository.git/mypackage"
 	"github.com/stretchr/testify/assert"
-	myrepository "go.uber.org/dig/internal/digreflect/tests/myrepository.git"
-	mypackage "go.uber.org/dig/internal/digreflect/tests/myrepository.git/mypackage"
 )
 
 func SomeExportedFunction() {}
@@ -61,57 +61,57 @@ func TestInspectFunc(t *testing.T) {
 			desc:           "exported function",
 			give:           SomeExportedFunction,
 			wantName:       "SomeExportedFunction",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantPackage:    "github.com/17media/dig/internal/digreflect",
+			wantFileSuffix: "github.com/17media/dig/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "unexported function",
 			give:           unexportedFunction,
 			wantName:       "unexportedFunction",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantPackage:    "github.com/17media/dig/internal/digreflect",
+			wantFileSuffix: "github.com/17media/dig/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "nested function",
 			give:           nested1,
 			wantName:       "nestedFunctions.func1",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantPackage:    "github.com/17media/dig/internal/digreflect",
+			wantFileSuffix: "github.com/17media/dig/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "second nested function",
 			give:           nested2,
 			wantName:       "nestedFunctions.func2",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantPackage:    "github.com/17media/dig/internal/digreflect",
+			wantFileSuffix: "github.com/17media/dig/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "nested inside a nested function",
 			give:           nested3,
 			wantName:       "nestedFunctions.func2.1",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantPackage:    "github.com/17media/dig/internal/digreflect",
+			wantFileSuffix: "github.com/17media/dig/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "inside a .git package",
 			give:           myrepository.Hello,
 			wantName:       "Hello",
-			wantPackage:    "go.uber.org/dig/internal/digreflect/tests/myrepository.git",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/tests/myrepository.git/hello.go",
+			wantPackage:    "github.com/17media/dig/internal/digreflect/tests/myrepository.git",
+			wantFileSuffix: "github.com/17media/dig/internal/digreflect/tests/myrepository.git/hello.go",
 		},
 		{
 			desc:           "subpackage of a .git package",
 			give:           mypackage.Add,
 			wantName:       "Add",
-			wantPackage:    "go.uber.org/dig/internal/digreflect/tests/myrepository.git/mypackage",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/tests/myrepository.git/mypackage/add.go",
+			wantPackage:    "github.com/17media/dig/internal/digreflect/tests/myrepository.git/mypackage",
+			wantFileSuffix: "github.com/17media/dig/internal/digreflect/tests/myrepository.git/mypackage/add.go",
 		},
 		{
 			desc:           "vendored dependency",
 			give:           assert.Contains,
 			wantName:       "Contains",
 			wantPackage:    "github.com/stretchr/testify/assert",
-			wantFileSuffix: "go.uber.org/dig/vendor/github.com/stretchr/testify/assert/assertions.go",
+			wantFileSuffix: "github.com/17media/dig/vendor/github.com/stretchr/testify/assert/assertions.go",
 		},
 	}
 
