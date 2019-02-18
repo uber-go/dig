@@ -842,12 +842,29 @@ func (c *Container) eraseInvalidValues() {
 	c.isVerifiedValid = true
 }
 
-// FIXME: to be implemented
 func getKeysFromParamList(c *Container, pl paramList) []key {
-	//		walkParam(n.ParamList(), paramVisitorFunc(fn))
+	result := []key{}
 
-	// FIXME: implement it
-	return nil
+	fn := func(param param) bool {
+		switch p := param.(type) {
+		case paramSingle:
+			k := key{name: p.Name, t: p.Type}
+			result = append(result, k)
+			return false
+		case paramGroupedSlice:
+			// NOTE: The key uses the element type, not the slice type.
+			k := key{group: p.Group, t: p.Type.Elem()}
+			result = append(result, k)
+			return false
+		default:
+			// Recurse for non-edge params.
+			return true
+		}
+	}
+
+	walkParam(pl, paramVisitorFunc(fn))
+
+	return result
 }
 
 func verifyNode(c *Container, k key) (needClear bool) {
