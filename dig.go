@@ -833,10 +833,54 @@ func (c *Container) eraseInvalidValues() {
 		}
 	}
 
-	// FIXME: implement it
 	// try to mark the node as valid, or remove the corresponding value
-	//	for _, n := range c.nodes
+	for k, _ := range c.providers {
+		verifyNode(c, k)
+	}
 
 	// finally mark the verifyValid
 	c.isVerifiedValid = true
+}
+
+// FIXME: to be implemented
+func getKeysFromParamList(c *Container, pl paramList) []key {
+	//		walkParam(n.ParamList(), paramVisitorFunc(fn))
+
+	// FIXME: implement it
+	return nil
+}
+
+func verifyNode(c *Container, k key) (needClear bool) {
+	nodes, ok := c.providers[k]
+	if !ok {
+		// should not reach this line
+		return false
+	}
+
+	for _, n := range nodes {
+		if n.called == false || n.valid == true {
+			// ignore valid node, or node without corresponding value
+			continue
+		}
+
+		nodeNeedClear := false
+
+		depKeys := getKeysFromParamList(c, n.ParamList())
+		for _, depK := range depKeys {
+			if result := verifyNode(c, depK); result {
+				nodeNeedClear = true
+				break
+			}
+		}
+
+		if nodeNeedClear {
+			// delete the corresponding value
+			n.called = false
+			delete(c.values, k)
+
+			return true
+		}
+	}
+
+	return false
 }
