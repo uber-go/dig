@@ -817,14 +817,12 @@ func (c *Container) EraseValueProvider(t reflect.Type, name, group string) {
 	// finally clear the providers and also rebuild the c.nodes
 	c.isVerifiedValid = false
 	delete(c.providers, k)
-	// FIXME: is it really needed?
 	c.nodes = []*node{}
 	for _, array := range c.providers {
 		c.nodes = append(c.nodes, array...)
 	}
 }
 
-// FIXME: implement it
 func (c *Container) eraseInvalidValues() {
 	// marks all called nodes as invalid first
 	for _, n := range c.nodes {
