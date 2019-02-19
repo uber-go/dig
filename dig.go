@@ -826,9 +826,7 @@ func (c *Container) EraseValueProvider(t reflect.Type, name, group string) {
 func (c *Container) eraseInvalidValues() {
 	// marks all called nodes as invalid first
 	for _, n := range c.nodes {
-		if n.called == true {
-			n.valid = false
-		}
+		n.valid = false
 	}
 
 	// try to mark the node as valid, or remove the corresponding value
@@ -872,14 +870,20 @@ func verifyNode(c *Container, k key) (needClear bool) {
 		return false
 	}
 
+	hasNonCalled := false
 	for _, n := range nodes {
-		if n.called == false || n.valid == true {
-			// ignore valid node, or node without corresponding value
+		// if the node has not called yet, the dependent object must based on
+		// some previous constructor, and thus it should be forced to rebuild
+		if n.called == false {
+			hasNonCalled = true
+		}
+		if n.valid == true {
+			// bypass the checked node
 			continue
 		}
+		n.valid = true
 
 		nodeNeedClear := false
-
 		depKeys := getKeysFromParamList(c, n.ParamList())
 		for _, depK := range depKeys {
 			if result := verifyNode(c, depK); result {
@@ -895,7 +899,8 @@ func verifyNode(c *Container, k key) (needClear bool) {
 
 			return true
 		}
+
 	}
 
-	return false
+	return hasNonCalled
 }
