@@ -786,10 +786,10 @@ func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
 	return newItems
 }
 
-// FIXME add comment
-// Only one of name or group will be set.
+// EraseValueProvider provides a hack to erase the constructor and object of specified return type and name
+// The object depends on the removed object will be removed recursively in the next Invoke() call
+// Only one of name or group should be set.
 func (c *Container) EraseValueProvider(t reflect.Type, name, group string) {
-	// FIXME: add checking on the name and group
 	k := key{
 		t:     t,
 		name:  name,
@@ -830,7 +830,7 @@ func (c *Container) eraseInvalidValues() {
 	}
 
 	// try to mark the node as valid, or remove the corresponding value
-	for k, _ := range c.providers {
+	for k := range c.providers {
 		verifyNode(c, k)
 	}
 
