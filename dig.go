@@ -62,6 +62,7 @@ func (f optionFunc) applyOption(c *Container) { f(c) }
 type provideOptions struct {
 	Name  string
 	Group string
+	As    []interface{}
 }
 
 func (o *provideOptions) Validate() error {
@@ -79,6 +80,23 @@ func (o *provideOptions) Validate() error {
 	}
 	if strings.ContainsRune(o.Group, '`') {
 		return fmt.Errorf("invalid dig.Group(%q): group names cannot contain backquotes", o.Group)
+	}
+
+	for _, i := range o.As {
+		t := reflect.TypeOf(i)
+
+		if t == nil {
+			return fmt.Errorf("invalid dig.As(nil): as needs to be ptr to interface")
+		}
+
+		if t.Kind() != reflect.Ptr {
+			return fmt.Errorf("invalid dig.As(%s): as needs to be ptr to interface", t.Kind())
+		}
+
+		pointingTo := reflect.Indirect(reflect.ValueOf(i))
+		if pointingTo.Kind() != reflect.Interface {
+			return fmt.Errorf("invalid dig.As(%s): as needs to be ptr to interface", pointingTo.Kind())
+		}
 	}
 	return nil
 }
@@ -124,6 +142,14 @@ func Name(name string) ProvideOption {
 func Group(group string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Group = group
+	})
+}
+
+// As is a ProvideOption that specifies that the struct produced by the constructor
+// implements the given interface
+func As(i ...interface{}) ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.As = append(opts.As, i...)
 	})
 }
 
@@ -424,6 +450,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		nodeOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
+			ResultAs:    opts.As,
 		},
 	)
 	if err != nil {
@@ -535,28 +562,13 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 	path := strings.Join(cv.currentResultPath, ".")
 
 	switch r := res.(type) {
+
 	case resultSingle:
 		k := key{name: r.Name, t: r.Type}
-
-		if conflict, ok := cv.keyPaths[k]; ok {
-			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, conflict)
+		if err := cv.checkKey(k, path); err != nil {
+			*cv.err = err
 			return nil
 		}
-
-		if ps := cv.c.providers[k]; len(ps) > 0 {
-			cons := make([]string, len(ps))
-			for i, p := range ps {
-				cons[i] = fmt.Sprint(p.Location())
-			}
-
-			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, strings.Join(cons, "; "))
-			return nil
-		}
-
 		cv.keyPaths[k] = path
 
 	case resultGrouped:
@@ -565,9 +577,46 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		// value there.
 		k := key{group: r.Group, t: r.Type}
 		cv.keyPaths[k] = path
+
+	case resultAs:
+		k := key{name: r.Name, t: r.Type}
+		if err := cv.checkKey(k, path); err != nil {
+			*cv.err = err
+			return nil
+		}
+		cv.keyPaths[k] = path
+
+		for _, as := range r.As {
+			asIndirectValue := reflect.Indirect(reflect.ValueOf(as))
+			k := key{name: r.Name, t: asIndirectValue.Type()}
+			if err := cv.checkKey(k, path); err != nil {
+				*cv.err = err
+				return nil
+			}
+			cv.keyPaths[k] = path
+		}
 	}
 
 	return cv
+}
+
+func (cv connectionVisitor) checkKey(k key, path string) error {
+	if conflict, ok := cv.keyPaths[k]; ok {
+		return fmt.Errorf(
+			"cannot provide %v from %v: already provided by %v",
+			k, path, conflict)
+	}
+	if ps := cv.c.providers[k]; len(ps) > 0 {
+		cons := make([]string, len(ps))
+		for i, p := range ps {
+			cons[i] = fmt.Sprint(p.Location())
+		}
+
+		return fmt.Errorf(
+			"cannot provide %v from %v: already provided by %v",
+			k, path, strings.Join(cons, "; "))
+	}
+	return nil
 }
 
 // node is a node in the dependency graph. Each node maps to a single
@@ -598,9 +647,10 @@ type node struct {
 
 type nodeOptions struct {
 	// If specified, all values produced by this node have the provided name
-	// or belong to the specified value group
+	// belong to the specified value group or implement any of the interfaces
 	ResultName  string
 	ResultGroup string
+	ResultAs    []interface{}
 }
 
 func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
@@ -618,6 +668,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 		resultOptions{
 			Name:  opts.ResultName,
 			Group: opts.ResultGroup,
+			As:    opts.ResultAs,
 		},
 	)
 	if err != nil {

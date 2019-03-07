@@ -37,6 +37,9 @@ import (
 //                 another result.
 //   resultGrouped A value produced by a constructor that is part of a value
 //                 group.
+//   resultAs      A single value produced by a constructor which implements
+//                 one or more interfaces.
+
 type result interface {
 	// Extracts the values for this result from the provided value and
 	// stores them into the provided containerWriter.
@@ -53,6 +56,7 @@ var (
 	_ result = resultObject{}
 	_ result = resultList{}
 	_ result = resultGrouped{}
+	_ result = resultAs{}
 )
 
 type resultOptions struct {
@@ -61,6 +65,7 @@ type resultOptions struct {
 	// For Result Objects, name:".." tags on fields override this.
 	Name  string
 	Group string
+	As    []interface{}
 }
 
 // newResult builds a result from the given type.
@@ -82,6 +87,8 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 				"%v is a pointer to a struct that embeds dig.Out", t)
 	case len(opts.Group) > 0:
 		return resultGrouped{Type: t, Group: opts.Group}, nil
+	case len(opts.As) > 0:
+		return resultAs{Type: t, Name: opts.Name, As: opts.As}, nil
 	default:
 		return resultSingle{Type: t, Name: opts.Name}, nil
 	}
@@ -134,7 +141,7 @@ func walkResult(r result, v resultVisitor) {
 	}
 
 	switch res := r.(type) {
-	case resultSingle, resultGrouped:
+	case resultSingle, resultGrouped, resultAs:
 		// No sub-results
 	case resultObject:
 		w := v
@@ -180,14 +187,15 @@ func (rl resultList) DotResult() []*dot.Result {
 }
 
 func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
+	numOut := ctype.NumOut()
 	rl := resultList{
 		ctype:         ctype,
-		Results:       make([]result, 0, ctype.NumOut()),
-		resultIndexes: make([]int, ctype.NumOut()),
+		Results:       make([]result, 0, numOut),
+		resultIndexes: make([]int, numOut),
 	}
 
 	resultIdx := 0
-	for i := 0; i < ctype.NumOut(); i++ {
+	for i := 0; i < numOut; i++ {
 		t := ctype.Out(i)
 		if isError(t) {
 			rl.resultIndexes[i] = -1
@@ -251,6 +259,49 @@ func (rs resultSingle) DotResult() []*dot.Result {
 
 func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
 	cw.setValue(rs.Name, rs.Type, v)
+}
+
+// resultAs is an explicit value produced by a constructor which implements
+// one or more interfaces
+//
+// This object is added to the graph as-is and each of the interfaces
+// that it implements will point to the same object.
+type resultAs struct {
+	Name string
+	Type reflect.Type
+	As   []interface{}
+}
+
+func (rs resultAs) DotResult() []*dot.Result {
+	dotResults := make([]*dot.Result, 0, len(rs.As)+1)
+	dotResults = append(dotResults, &dot.Result{
+		Node: &dot.Node{
+			Type: rs.Type,
+			Name: rs.Name,
+		},
+	})
+	for _, as := range rs.As {
+		asValue := reflect.Indirect(reflect.ValueOf(as))
+		dotResults = append(dotResults, &dot.Result{
+			Node: &dot.Node{
+				Type: asValue.Type(),
+				Name: rs.Name,
+			},
+		})
+	}
+	return dotResults
+}
+
+func (rs resultAs) Extract(cw containerWriter, v reflect.Value) {
+	cw.setValue(rs.Name, rs.Type, v)
+
+	for _, as := range rs.As {
+		asValue := reflect.Indirect(reflect.ValueOf(as))
+		if !v.Type().Implements(asValue.Type()) {
+			continue
+		}
+		cw.setValue(rs.Name, asValue.Type(), v)
+	}
 }
 
 // resultObject is a dig.Out struct where each field is another result.
