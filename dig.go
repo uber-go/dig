@@ -331,6 +331,46 @@ func setRand(r *rand.Rand) Option {
 	})
 }
 
+func (c *Container) Copy() *Container {
+	res := &Container{
+		providers: make(map[key][]*node, len(c.providers)),
+		nodes:     make([]*node, len(c.nodes)),
+		values:    make(map[key]reflect.Value, len(c.values)),
+		groups:    make(map[key][]reflect.Value, len(c.groups)),
+		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+
+	for k, v := range c.providers {
+		vCp := make([]*node, len(v))
+		copy(vCp, v)
+		res.providers[k] = vCp
+	}
+
+	for i, oldNode := range c.nodes {
+		newNode := oldNode.Copy()
+		res.nodes[i] = newNode
+		for k, v := range c.providers {
+			for j, providerNode := range v {
+				if oldNode == providerNode {
+					res.providers[k][j] = newNode
+				}
+			}
+		}
+	}
+
+	for k, v := range c.values {
+		res.values[k] = v
+	}
+
+	for k, v := range c.groups {
+		vCp := make([]reflect.Value, len(v))
+		copy(vCp, v)
+		res.groups[k] = vCp
+	}
+
+	return res
+}
+
 func (c *Container) knownTypes() []reflect.Type {
 	typeSet := make(map[reflect.Type]struct{}, len(c.providers))
 	for k := range c.providers {
@@ -680,6 +720,18 @@ type node struct {
 
 	// Type information about constructor results.
 	resultList resultList
+}
+
+func (n *node) Copy() *node {
+	return &node{
+		ctor:       n.ctor,
+		ctype:      n.ctype,
+		location:   n.location,
+		id:         n.id,
+		called:     n.called,
+		paramList:  n.paramList,
+		resultList: n.resultList,
+	}
 }
 
 type nodeOptions struct {
