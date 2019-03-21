@@ -1488,27 +1488,27 @@ func TestProvideInvalidAs(t *testing.T) {
 		{
 			name:        "as param is not an type interface",
 			param:       123,
-			expectedErr: "invalid dig.As(int): as needs to be ptr to interface",
+			expectedErr: "invalid dig.As(int): argument must be a pointer to an interface",
 		},
 		{
 			name:        "as param is a pointer to struct",
 			param:       ptrToStruct,
-			expectedErr: "invalid dig.As(struct): as needs to be ptr to interface",
+			expectedErr: "invalid dig.As(*struct { name string }): argument must be a pointer to an interface",
 		},
 		{
 			name:        "as param is a nil interface",
 			param:       nilInterface,
-			expectedErr: "invalid dig.As(nil): as needs to be ptr to interface",
+			expectedErr: "invalid dig.As(nil): argument must be a pointer to an interface",
 		},
 		{
 			name:        "as param is a nil",
 			param:       nil,
-			expectedErr: "invalid dig.As(nil): as needs to be ptr to interface",
+			expectedErr: "invalid dig.As(nil): argument must be a pointer to an interface",
 		},
 		{
 			name:        "as param is a func",
 			param:       func() {},
-			expectedErr: "invalid dig.As(func): as needs to be ptr to interface",
+			expectedErr: "invalid dig.As(func()): argument must be a pointer to an interface",
 		},
 	}
 	for _, tt := range tests {

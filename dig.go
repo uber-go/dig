@@ -86,16 +86,16 @@ func (o *provideOptions) Validate() error {
 		t := reflect.TypeOf(i)
 
 		if t == nil {
-			return fmt.Errorf("invalid dig.As(nil): as needs to be ptr to interface")
+			return fmt.Errorf("invalid dig.As(nil): argument must be a pointer to an interface")
 		}
 
 		if t.Kind() != reflect.Ptr {
-			return fmt.Errorf("invalid dig.As(%s): as needs to be ptr to interface", t.Kind())
+			return fmt.Errorf("invalid dig.As(%v): argument must be a pointer to an interface", t)
 		}
 
-		pointingTo := reflect.Indirect(reflect.ValueOf(i))
+		pointingTo := t.Elem()
 		if pointingTo.Kind() != reflect.Interface {
-			return fmt.Errorf("invalid dig.As(%s): as needs to be ptr to interface", pointingTo.Kind())
+			return fmt.Errorf("invalid dig.As(*%v): argument must be a pointer to an interface", pointingTo)
 		}
 	}
 	return nil
