@@ -37,8 +37,6 @@ import (
 //                 another result.
 //   resultGrouped A value produced by a constructor that is part of a value
 //                 group.
-//   resultAs      A single value produced by a constructor which implements
-//                 one or more interfaces.
 
 type result interface {
 	// Extracts the values for this result from the provided value and
@@ -56,7 +54,6 @@ var (
 	_ result = resultObject{}
 	_ result = resultList{}
 	_ result = resultGrouped{}
-	_ result = resultAs{}
 )
 
 type resultOptions struct {
@@ -87,10 +84,8 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 				"%v is a pointer to a struct that embeds dig.Out", t)
 	case len(opts.Group) > 0:
 		return resultGrouped{Type: t, Group: opts.Group}, nil
-	case len(opts.As) > 0:
-		return resultAs{Type: t, Name: opts.Name, As: opts.As}, nil
 	default:
-		return resultSingle{Type: t, Name: opts.Name}, nil
+		return newResultSingle(t, opts)
 	}
 }
 
@@ -141,7 +136,7 @@ func walkResult(r result, v resultVisitor) {
 	}
 
 	switch res := r.(type) {
-	case resultSingle, resultGrouped, resultAs:
+	case resultSingle, resultGrouped:
 		// No sub-results
 	case resultObject:
 		w := v
@@ -244,35 +239,30 @@ func (rl resultList) ExtractList(cw containerWriter, values []reflect.Value) err
 type resultSingle struct {
 	Name string
 	Type reflect.Type
+
+	// If specified, this is a list of types which the value will be made
+	// available as, in addition to its own type.
+	As []reflect.Type
+}
+
+func newResultSingle(t reflect.Type, opts resultOptions) (resultSingle, error) {
+	r := resultSingle{
+		Type: t,
+		Name: opts.Name,
+	}
+
+	for _, as := range opts.As {
+		ifaceType := reflect.TypeOf(as).Elem()
+		if !t.Implements(ifaceType) {
+			return r, fmt.Errorf("invalid dig.As: %v does not implement %v", t, ifaceType)
+		}
+		r.As = append(r.As, ifaceType)
+	}
+
+	return r, nil
 }
 
 func (rs resultSingle) DotResult() []*dot.Result {
-	return []*dot.Result{
-		{
-			Node: &dot.Node{
-				Type: rs.Type,
-				Name: rs.Name,
-			},
-		},
-	}
-}
-
-func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
-	cw.setValue(rs.Name, rs.Type, v)
-}
-
-// resultAs is an explicit value produced by a constructor which implements
-// one or more interfaces
-//
-// This object is added to the graph as-is and each of the interfaces
-// that it implements will point to the same object.
-type resultAs struct {
-	Name string
-	Type reflect.Type
-	As   []interface{}
-}
-
-func (rs resultAs) DotResult() []*dot.Result {
 	dotResults := make([]*dot.Result, 0, len(rs.As)+1)
 	dotResults = append(dotResults, &dot.Result{
 		Node: &dot.Node{
@@ -280,27 +270,21 @@ func (rs resultAs) DotResult() []*dot.Result {
 			Name: rs.Name,
 		},
 	})
-	for _, as := range rs.As {
-		asValue := reflect.Indirect(reflect.ValueOf(as))
+
+	for _, asType := range rs.As {
 		dotResults = append(dotResults, &dot.Result{
-			Node: &dot.Node{
-				Type: asValue.Type(),
-				Name: rs.Name,
-			},
+			Node: &dot.Node{Type: asType, Name: rs.Name},
 		})
 	}
+
 	return dotResults
 }
 
-func (rs resultAs) Extract(cw containerWriter, v reflect.Value) {
+func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
 	cw.setValue(rs.Name, rs.Type, v)
 
-	for _, as := range rs.As {
-		asValue := reflect.Indirect(reflect.ValueOf(as))
-		if !v.Type().Implements(asValue.Type()) {
-			continue
-		}
-		cw.setValue(rs.Name, asValue.Type(), v)
+	for _, asType := range rs.As {
+		cw.setValue(rs.Name, asType, v)
 	}
 }
 

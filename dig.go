@@ -66,9 +66,15 @@ type provideOptions struct {
 }
 
 func (o *provideOptions) Validate() error {
-	if len(o.Group) > 0 && len(o.Name) > 0 {
-		return fmt.Errorf(
-			"cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group)
+	if len(o.Group) > 0 {
+		if len(o.Name) > 0 {
+			return fmt.Errorf(
+				"cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group)
+		}
+		if len(o.As) > 0 {
+			return fmt.Errorf(
+				"cannot use dig.As with value groups: dig.As provided with group:%q", o.Group)
+		}
 	}
 
 	// Names must be representable inside a backquoted string. The only
@@ -147,6 +153,20 @@ func Group(group string) ProvideOption {
 
 // As is a ProvideOption that specifies that the struct produced by the constructor
 // implements the given interface
+
+// As is a ProvideOption that specifies that the value produced by the
+// constructor implements one or more other interfaces.  The value will be made
+// available as that interface in the container.
+//
+// As expects one or more pointers to the implemented interfaces.
+//
+// For example, the following will make the buffer available in the container
+// as an io.Reader.
+//
+//   c.Provide(newBuffer, dig.As(new(io.Reader)))
+//
+// This option cannot be provided for constructors which produce result
+// objects.
 func As(i ...interface{}) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.As = append(opts.As, i...)
@@ -571,6 +591,15 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		}
 		cv.keyPaths[k] = path
 
+		for _, asType := range r.As {
+			k := key{name: r.Name, t: asType}
+			if err := cv.checkKey(k, path); err != nil {
+				*cv.err = err
+				return nil
+			}
+			cv.keyPaths[k] = path
+		}
+
 	case resultGrouped:
 		// we don't really care about the path for this since conflicts are
 		// okay for group results. We'll track it for the sake of having a
@@ -578,23 +607,6 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		k := key{group: r.Group, t: r.Type}
 		cv.keyPaths[k] = path
 
-	case resultAs:
-		k := key{name: r.Name, t: r.Type}
-		if err := cv.checkKey(k, path); err != nil {
-			*cv.err = err
-			return nil
-		}
-		cv.keyPaths[k] = path
-
-		for _, as := range r.As {
-			asIndirectValue := reflect.Indirect(reflect.ValueOf(as))
-			k := key{name: r.Name, t: asIndirectValue.Type()}
-			if err := cv.checkKey(k, path); err != nil {
-				*cv.err = err
-				return nil
-			}
-			cv.keyPaths[k] = path
-		}
 	}
 
 	return cv
