@@ -14,7 +14,7 @@ dependencies:
 	@echo "Installing uber-license tool..."
 	command -v update-license >/dev/null || go get -u -f go.uber.org/tools/update-license
 	@echo "Installing golint..."
-	command -v golint >/dev/null || go get -u -f github.com/golang/lint/golint
+	command -v golint >/dev/null || go get -u -f golang.org/x/lint/golint
 
 .PHONY: license
 license: dependencies
