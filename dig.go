@@ -151,9 +151,6 @@ func Group(group string) ProvideOption {
 	})
 }
 
-// As is a ProvideOption that specifies that the struct produced by the constructor
-// implements the given interface
-
 // As is a ProvideOption that specifies that the value produced by the
 // constructor implements one or more other interfaces.  The value will be made
 // available as that interface in the container.
@@ -659,7 +656,7 @@ type node struct {
 
 type nodeOptions struct {
 	// If specified, all values produced by this node have the provided name
-	// belong to the specified value group or implement any of the interfaces
+	// belong to the specified value group or implement any of the interfaces.
 	ResultName  string
 	ResultGroup string
 	ResultAs    []interface{}
