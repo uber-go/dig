@@ -14,7 +14,7 @@ dependencies:
 	@echo "Installing uber-license tool..."
 	command -v update-license >/dev/null || go get -u -f go.uber.org/tools/update-license
 	@echo "Installing golint..."
-	command -v golint >/dev/null || go get -u -f github.com/golang/lint/golint
+	command -v golint >/dev/null || go get -u -f golang.org/x/lint/golint
 
 .PHONY: license
 license: dependencies
@@ -28,7 +28,7 @@ lint:
 	@echo "Installing test dependencies for vet..."
 	@go test -i $(PKGS)
 	@echo "Checking vet..."
-	@$(foreach dir,$(PKG_FILES),go tool vet $(VET_RULES) $(dir) 2>&1 | tee -a lint.log;)
+	@go vet ./...| tee -a lint.log
 	@echo "Checking lint..."
 	@$(foreach dir,$(PKGS),golint $(dir) 2>&1 | tee -a lint.log;)
 	@echo "Checking for unresolved FIXMEs..."
