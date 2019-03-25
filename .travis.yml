@@ -4,8 +4,8 @@ go_import_path: go.uber.org/dig
 
 matrix:
   include:
-    - go: "1.10"
     - go: "1.11"
+    - go: "1.12"
       env: LINT=1
 
 cache:
