@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -437,6 +438,19 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(in) out1 { return out1{} })
 		c.Provide(func() out2 { return out2{} })
 		VerifyVisualization(t, "named", c)
+	})
+
+	t.Run("dig.As two types", func(t *testing.T) {
+		c := New()
+
+		require.NoError(t, c.Provide(
+			func() *bytes.Buffer {
+				panic("this function should not be called")
+			},
+			As(new(io.Reader), new(io.Writer)),
+		))
+
+		VerifyVisualization(t, "dig_as_two", c)
 	})
 
 	t.Run("optional params", func(t *testing.T) {

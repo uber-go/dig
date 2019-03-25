@@ -1527,16 +1527,28 @@ func TestProvideInvalidAs(t *testing.T) {
 	}
 }
 
-func TestProvideGroupAndName(t *testing.T) {
+func TestProvideIncompatibleOptions(t *testing.T) {
 	t.Parallel()
 
-	c := New()
-	err := c.Provide(func() io.Reader {
-		panic("this function must not be called")
-	}, Group("foo"), Name("bar"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
-		"name:\"bar\" provided with group:\"foo\"")
+	t.Run("group and name", func(t *testing.T) {
+		c := New()
+		err := c.Provide(func() io.Reader {
+			panic("this function must not be called")
+		}, Group("foo"), Name("bar"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
+			"name:\"bar\" provided with group:\"foo\"")
+	})
+
+	t.Run("group and As", func(t *testing.T) {
+		c := New()
+		err := c.Provide(func() *bytes.Buffer {
+			panic("this function must not be called")
+		}, Group("foo"), As(new(io.Reader)))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use dig.As with value groups: "+
+			`dig.As provided with group:"foo"`)
+	})
 }
 
 func TestCantProvideUntypedNil(t *testing.T) {
