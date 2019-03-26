@@ -629,6 +629,36 @@ func TestEndToEndSuccess(t *testing.T) {
 		), "invoke failed")
 	})
 
+	t.Run("As with Name", func(t *testing.T) {
+		c := New()
+
+		require.NoError(t, c.Provide(
+			func() *bytes.Buffer {
+				return bytes.NewBufferString("foo")
+			},
+			As(new(io.Reader)),
+			Name("buff"),
+		), "failed to provide")
+
+		type in struct {
+			In
+
+			Buffer *bytes.Buffer `name:"buff"`
+			Reader io.Reader     `name:"buff"`
+		}
+
+		require.NoError(t, c.Invoke(func(got in) {
+			assert.NotNil(t, got.Buffer, "buffer must not be nil")
+
+			assert.True(t, got.Buffer == got.Reader,
+				"reader and buffer must be the same object")
+
+			body, err := ioutil.ReadAll(got.Reader)
+			require.NoError(t, err, "failed to read buffer body")
+			assert.Equal(t, "foo", string(body))
+		}))
+	})
+
 	t.Run("invoke on a type that depends on named parameters", func(t *testing.T) {
 		c := New()
 		type A struct{ idx int }

@@ -152,15 +152,45 @@ func Group(group string) ProvideOption {
 }
 
 // As is a ProvideOption that specifies that the value produced by the
-// constructor implements one or more other interfaces.  The value will be made
-// available as that interface in the container.
+// constructor implements one or more other interfaces.
 //
-// As expects one or more pointers to the implemented interfaces.
+// As expects one or more pointers to the implemented interfaces. Values
+// produced by constructors will be made available in the container as
+// implementations of all of those interfaces.
 //
 // For example, the following will make the buffer available in the container
-// as an io.Reader.
+// as io.Reader and io.Writer.
 //
-//   c.Provide(newBuffer, dig.As(new(io.Reader)))
+//   c.Provide(newBuffer, dig.As(new(io.Reader), new(io.Writer)))
+//
+// That is, the above is equivalent to the following.
+//
+//   c.Provide(func(...) (*bytes.Buffer, io.Reader, io.Writer) {
+//     b := newBuffer(...)
+//     return b, b, b
+//   })
+//
+// If used with dig.Name, the type produced by the constructor and the types
+// specified with dig.As will all use the same name. For example,
+//
+//   c.Provide(newFile, dig.As(new(io.Reader)), dig.Name("temp"))
+//
+// The above is equivalent to the following.
+//
+//   type Result struct {
+//     dig.Out
+//
+//     File   *os.File  `name:"temp"`
+//     Reader io.Reader `name:"temp"`
+//   }
+//
+//   c.Provide(func(...) Result {
+//     f := newFile(...)
+//     return Result{
+//       File: f,
+//       Reader: f,
+//     }
+//   })
 //
 // This option cannot be provided for constructors which produce result
 // objects.
@@ -587,7 +617,6 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 			return nil
 		}
 		cv.keyPaths[k] = path
-
 		for _, asType := range r.As {
 			k := key{name: r.Name, t: asType}
 			if err := cv.checkKey(k, path); err != nil {
@@ -603,7 +632,6 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		// value there.
 		k := key{group: r.Group, t: r.Type}
 		cv.keyPaths[k] = path
-
 	}
 
 	return cv
