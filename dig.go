@@ -62,12 +62,19 @@ func (f optionFunc) applyOption(c *Container) { f(c) }
 type provideOptions struct {
 	Name  string
 	Group string
+	As    []interface{}
 }
 
 func (o *provideOptions) Validate() error {
-	if len(o.Group) > 0 && len(o.Name) > 0 {
-		return fmt.Errorf(
-			"cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group)
+	if len(o.Group) > 0 {
+		if len(o.Name) > 0 {
+			return fmt.Errorf(
+				"cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group)
+		}
+		if len(o.As) > 0 {
+			return fmt.Errorf(
+				"cannot use dig.As with value groups: dig.As provided with group:%q", o.Group)
+		}
 	}
 
 	// Names must be representable inside a backquoted string. The only
@@ -79,6 +86,23 @@ func (o *provideOptions) Validate() error {
 	}
 	if strings.ContainsRune(o.Group, '`') {
 		return fmt.Errorf("invalid dig.Group(%q): group names cannot contain backquotes", o.Group)
+	}
+
+	for _, i := range o.As {
+		t := reflect.TypeOf(i)
+
+		if t == nil {
+			return fmt.Errorf("invalid dig.As(nil): argument must be a pointer to an interface")
+		}
+
+		if t.Kind() != reflect.Ptr {
+			return fmt.Errorf("invalid dig.As(%v): argument must be a pointer to an interface", t)
+		}
+
+		pointingTo := t.Elem()
+		if pointingTo.Kind() != reflect.Interface {
+			return fmt.Errorf("invalid dig.As(*%v): argument must be a pointer to an interface", pointingTo)
+		}
 	}
 	return nil
 }
@@ -124,6 +148,55 @@ func Name(name string) ProvideOption {
 func Group(group string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Group = group
+	})
+}
+
+// As is a ProvideOption that specifies that the value produced by the
+// constructor implements one or more other interfaces.
+//
+// As expects one or more pointers to the implemented interfaces. Values
+// produced by constructors will be made available in the container as
+// implementations of all of those interfaces.
+//
+// For example, the following will make the buffer available in the container
+// as io.Reader and io.Writer.
+//
+//   c.Provide(newBuffer, dig.As(new(io.Reader), new(io.Writer)))
+//
+// That is, the above is equivalent to the following.
+//
+//   c.Provide(func(...) (*bytes.Buffer, io.Reader, io.Writer) {
+//     b := newBuffer(...)
+//     return b, b, b
+//   })
+//
+// If used with dig.Name, the type produced by the constructor and the types
+// specified with dig.As will all use the same name. For example,
+//
+//   c.Provide(newFile, dig.As(new(io.Reader)), dig.Name("temp"))
+//
+// The above is equivalent to the following.
+//
+//   type Result struct {
+//     dig.Out
+//
+//     File   *os.File  `name:"temp"`
+//     Reader io.Reader `name:"temp"`
+//   }
+//
+//   c.Provide(func(...) Result {
+//     f := newFile(...)
+//     return Result{
+//       File: f,
+//       Reader: f,
+//     }
+//   })
+//
+// This option cannot be provided for constructors which produce result
+// objects.
+func As(i ...interface{}) ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.As = append(opts.As, i...)
 	})
 }
 
@@ -424,6 +497,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		nodeOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
+			ResultAs:    opts.As,
 		},
 	)
 	if err != nil {
@@ -535,29 +609,22 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 	path := strings.Join(cv.currentResultPath, ".")
 
 	switch r := res.(type) {
+
 	case resultSingle:
 		k := key{name: r.Name, t: r.Type}
-
-		if conflict, ok := cv.keyPaths[k]; ok {
-			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, conflict)
+		if err := cv.checkKey(k, path); err != nil {
+			*cv.err = err
 			return nil
 		}
-
-		if ps := cv.c.providers[k]; len(ps) > 0 {
-			cons := make([]string, len(ps))
-			for i, p := range ps {
-				cons[i] = fmt.Sprint(p.Location())
-			}
-
-			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, strings.Join(cons, "; "))
-			return nil
-		}
-
 		cv.keyPaths[k] = path
+		for _, asType := range r.As {
+			k := key{name: r.Name, t: asType}
+			if err := cv.checkKey(k, path); err != nil {
+				*cv.err = err
+				return nil
+			}
+			cv.keyPaths[k] = path
+		}
 
 	case resultGrouped:
 		// we don't really care about the path for this since conflicts are
@@ -568,6 +635,25 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 	}
 
 	return cv
+}
+
+func (cv connectionVisitor) checkKey(k key, path string) error {
+	if conflict, ok := cv.keyPaths[k]; ok {
+		return fmt.Errorf(
+			"cannot provide %v from %v: already provided by %v",
+			k, path, conflict)
+	}
+	if ps := cv.c.providers[k]; len(ps) > 0 {
+		cons := make([]string, len(ps))
+		for i, p := range ps {
+			cons[i] = fmt.Sprint(p.Location())
+		}
+
+		return fmt.Errorf(
+			"cannot provide %v from %v: already provided by %v",
+			k, path, strings.Join(cons, "; "))
+	}
+	return nil
 }
 
 // node is a node in the dependency graph. Each node maps to a single
@@ -598,9 +684,10 @@ type node struct {
 
 type nodeOptions struct {
 	// If specified, all values produced by this node have the provided name
-	// or belong to the specified value group
+	// belong to the specified value group or implement any of the interfaces.
 	ResultName  string
 	ResultGroup string
+	ResultAs    []interface{}
 }
 
 func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
@@ -618,6 +705,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 		resultOptions{
 			Name:  opts.ResultName,
 			Group: opts.ResultGroup,
+			As:    opts.ResultAs,
 		},
 	)
 	if err != nil {

@@ -21,8 +21,11 @@
 package dig
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,11 +61,14 @@ func TestDotGraph(t *testing.T) {
 	type t2 struct{}
 	type t3 struct{}
 	type t4 struct{}
+	type t5 strings.Reader
 
 	type1 := reflect.TypeOf(t1{})
 	type2 := reflect.TypeOf(t2{})
 	type3 := reflect.TypeOf(t3{})
 	type4 := reflect.TypeOf(t4{})
+	type5 := reflect.TypeOf(t5{})
+	type6 := reflect.Indirect(reflect.ValueOf(new(io.Reader))).Type()
 
 	p1 := tparam(type1, "", "", false)
 	p2 := tparam(type2, "", "", false)
@@ -73,6 +79,8 @@ func TestDotGraph(t *testing.T) {
 	r2 := tresult(type2, "", "", 0)
 	r3 := tresult(type3, "", "", 0)
 	r4 := tresult(type4, "", "", 0)
+	r5 := tresult(type5, "", "", 0)
+	r6 := tresult(type6, "", "", 0)
 
 	t.Parallel()
 
@@ -86,6 +94,21 @@ func TestDotGraph(t *testing.T) {
 
 		c := New()
 		c.Provide(func(A t1) t2 { return t2{} })
+
+		dg := c.createGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
+	})
+
+	t.Run("create graph with one constructor and as interface option", func(t *testing.T) {
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Param{p1},
+				Results: []*dot.Result{r5, r6},
+			},
+		}
+
+		c := New()
+		c.Provide(func(A t1) t5 { return t5{} }, As(new(io.Reader)))
 
 		dg := c.createGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -415,6 +438,19 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(in) out1 { return out1{} })
 		c.Provide(func() out2 { return out2{} })
 		VerifyVisualization(t, "named", c)
+	})
+
+	t.Run("dig.As two types", func(t *testing.T) {
+		c := New()
+
+		require.NoError(t, c.Provide(
+			func() *bytes.Buffer {
+				panic("this function should not be called")
+			},
+			As(new(io.Reader), new(io.Writer)),
+		))
+
+		VerifyVisualization(t, "dig_as_two", c)
 	})
 
 	t.Run("optional params", func(t *testing.T) {
