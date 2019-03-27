@@ -5,12 +5,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- No changes yet.
+### Added
+- Added `As` option for `Provide` to specify that the value produced by the
+  constructor should be made available as one or more interfaces that it
+  implements
 
 ## [1.7.0] - 2019-01-04
 ### Added
-- Added `Group` option for `Provide` to add value groups to the container without
-rewriting constructors. See package doucmentation for more information.
+- Added `Group` option for `Provide` to add value groups to the container
+  without rewriting constructors. See package doucmentation for more
+  information.
 
 ## [1.6.0] - 2018-11-06
 ### Changed
