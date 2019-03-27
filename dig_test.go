@@ -666,6 +666,13 @@ func TestEndToEndSuccess(t *testing.T) {
 		}, As(new(io.Reader))), "failed to provide")
 	})
 
+	t.Run("As different interface", func(t *testing.T) {
+		c := New()
+		require.NoError(t, c.Provide(func() io.ReadCloser {
+			panic("this function should not be called")
+		}, As(new(io.Reader), new(io.Closer))), "failed to provide")
+	})
+
 	t.Run("invoke on a type that depends on named parameters", func(t *testing.T) {
 		c := New()
 		type A struct{ idx int }
