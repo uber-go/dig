@@ -37,6 +37,7 @@ import (
 //                 another result.
 //   resultGrouped A value produced by a constructor that is part of a value
 //                 group.
+
 type result interface {
 	// Extracts the values for this result from the provided value and
 	// stores them into the provided containerWriter.
@@ -61,6 +62,7 @@ type resultOptions struct {
 	// For Result Objects, name:".." tags on fields override this.
 	Name  string
 	Group string
+	As    []interface{}
 }
 
 // newResult builds a result from the given type.
@@ -83,7 +85,7 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 	case len(opts.Group) > 0:
 		return resultGrouped{Type: t, Group: opts.Group}, nil
 	default:
-		return resultSingle{Type: t, Name: opts.Name}, nil
+		return newResultSingle(t, opts)
 	}
 }
 
@@ -180,14 +182,15 @@ func (rl resultList) DotResult() []*dot.Result {
 }
 
 func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
+	numOut := ctype.NumOut()
 	rl := resultList{
 		ctype:         ctype,
-		Results:       make([]result, 0, ctype.NumOut()),
-		resultIndexes: make([]int, ctype.NumOut()),
+		Results:       make([]result, 0, numOut),
+		resultIndexes: make([]int, numOut),
 	}
 
 	resultIdx := 0
-	for i := 0; i < ctype.NumOut(); i++ {
+	for i := 0; i < numOut; i++ {
 		t := ctype.Out(i)
 		if isError(t) {
 			rl.resultIndexes[i] = -1
@@ -236,21 +239,59 @@ func (rl resultList) ExtractList(cw containerWriter, values []reflect.Value) err
 type resultSingle struct {
 	Name string
 	Type reflect.Type
+
+	// If specified, this is a list of types which the value will be made
+	// available as, in addition to its own type.
+	As []reflect.Type
+}
+
+func newResultSingle(t reflect.Type, opts resultOptions) (resultSingle, error) {
+	r := resultSingle{
+		Type: t,
+		Name: opts.Name,
+	}
+
+	for _, as := range opts.As {
+		ifaceType := reflect.TypeOf(as).Elem()
+		if !t.Implements(ifaceType) {
+			return r, fmt.Errorf("invalid dig.As: %v does not implement %v", t, ifaceType)
+		}
+		if ifaceType == t {
+			// Special case:
+			//   c.Provide(func() io.Reader, As(new(io.Reader)))
+			// Ignore instead of erroring out.
+			continue
+		}
+		r.As = append(r.As, ifaceType)
+	}
+
+	return r, nil
 }
 
 func (rs resultSingle) DotResult() []*dot.Result {
-	return []*dot.Result{
-		{
-			Node: &dot.Node{
-				Type: rs.Type,
-				Name: rs.Name,
-			},
+	dotResults := make([]*dot.Result, 0, len(rs.As)+1)
+	dotResults = append(dotResults, &dot.Result{
+		Node: &dot.Node{
+			Type: rs.Type,
+			Name: rs.Name,
 		},
+	})
+
+	for _, asType := range rs.As {
+		dotResults = append(dotResults, &dot.Result{
+			Node: &dot.Node{Type: asType, Name: rs.Name},
+		})
 	}
+
+	return dotResults
 }
 
 func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
 	cw.setValue(rs.Name, rs.Type, v)
+
+	for _, asType := range rs.As {
+		cw.setValue(rs.Name, asType, v)
+	}
 }
 
 // resultObject is a dig.Out struct where each field is another result.
