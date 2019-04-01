@@ -331,28 +331,33 @@ func setRand(r *rand.Rand) Option {
 	})
 }
 
-func (c *Container) Copy() *Container {
+// Copy the container.
+// The copy will reuse all immutable structs but will do deepcopy of all maps
+// slices and structures there can change during the lifetime of the container
+func (c *Container) Copy(opts ...Option) *Container {
 	res := &Container{
-		providers: make(map[key][]*node, len(c.providers)),
-		nodes:     make([]*node, len(c.nodes)),
-		values:    make(map[key]reflect.Value, len(c.values)),
-		groups:    make(map[key][]reflect.Value, len(c.groups)),
-		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		providers:                make(map[key][]*node, len(c.providers)),
+		nodes:                    make([]*node, len(c.nodes)),
+		values:                   make(map[key]reflect.Value, len(c.values)),
+		groups:                   make(map[key][]reflect.Value, len(c.groups)),
+		rand:                     rand.New(rand.NewSource(time.Now().UnixNano())),
+		isVerifiedAcyclic:        c.isVerifiedAcyclic,
+		deferAcyclicVerification: c.deferAcyclicVerification,
 	}
 
-	for k, v := range c.providers {
-		vCp := make([]*node, len(v))
-		copy(vCp, v)
-		res.providers[k] = vCp
+	for key, nodes := range c.providers {
+		tmpProviderList := make([]*node, len(nodes))
+		copy(tmpProviderList, nodes)
+		res.providers[key] = tmpProviderList
 	}
 
 	for i, oldNode := range c.nodes {
 		newNode := oldNode.Copy()
 		res.nodes[i] = newNode
-		for k, v := range c.providers {
-			for j, providerNode := range v {
+		for key, nodes := range c.providers {
+			for j, providerNode := range nodes {
 				if oldNode == providerNode {
-					res.providers[k][j] = newNode
+					res.providers[key][j] = newNode
 				}
 			}
 		}
@@ -363,9 +368,13 @@ func (c *Container) Copy() *Container {
 	}
 
 	for k, v := range c.groups {
-		vCp := make([]reflect.Value, len(v))
-		copy(vCp, v)
-		res.groups[k] = vCp
+		tmpValues := make([]reflect.Value, len(v))
+		copy(tmpValues, v)
+		res.groups[k] = tmpValues
+	}
+
+	for _, opt := range opts {
+		opt.applyOption(res)
 	}
 
 	return res
@@ -722,6 +731,7 @@ type node struct {
 	resultList resultList
 }
 
+// Copy makes a shallow copy of the node.
 func (n *node) Copy() *node {
 	return &node{
 		ctor:       n.ctor,

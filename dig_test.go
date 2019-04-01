@@ -2805,6 +2805,121 @@ func TestInvokeFailures(t *testing.T) {
 	})
 }
 
+func TestCopy(t *testing.T) {
+	type type1 struct{}
+	f := func() type1 { return type1{} }
+	type type2 struct{}
+	g := func() type2 { return type2{} }
+
+	t.Run("New provider map", func(t *testing.T) {
+		c := New()
+		require.NoError(t, c.Provide(f))
+
+		copy := c.Copy()
+		assert.Len(t, copy.providers, 1)
+		assert.NotEqual(t, c.providers, copy.providers)
+	})
+
+	t.Run("New nodes slice", func(t *testing.T) {
+		c := New()
+		require.NoError(t, c.Provide(f))
+
+		copy := c.Copy()
+		assert.Len(t, copy.nodes, 1)
+		assert.NotEqual(t, c.nodes, copy.nodes)
+	})
+
+	t.Run("Copies values", func(t *testing.T) {
+		c := New()
+		require.NoError(t, c.Provide(f))
+
+		require.NoError(t, c.Invoke(func(t type1) {}))
+
+		copy := c.Copy()
+		assert.Len(t, copy.values, 1)
+		assert.Equal(t, c.values, copy.values)
+	})
+
+	t.Run("New values map", func(t *testing.T) {
+		c := New()
+		require.NoError(t, c.Provide(f))
+
+		require.NoError(t, c.Invoke(func(t type1) {}))
+
+		copy := c.Copy()
+		require.NoError(t, copy.Provide(g))
+
+		copy.Invoke(func(t type2) {})
+
+		assert.Len(t, copy.values, 2)
+		assert.NotEqual(t, c.values, copy.values)
+	})
+
+	t.Run("Groups", func(t *testing.T) {
+		type out struct {
+			Out
+
+			Value int `group:"val"`
+		}
+
+		provide := func(c *Container, i int) {
+			require.NoError(t, c.Provide(func() out {
+				return out{Value: i}
+			}), "failed to provide ")
+		}
+
+		type in struct {
+			In
+			Values []int `group:"val"`
+		}
+
+		expect := func(c *Container, values []int) {
+			require.NoError(t, c.Invoke(func(res in) {
+				require.Equal(t, values, res.Values)
+			}))
+		}
+
+		t.Run("Copies", func(t *testing.T) {
+			c := New(setRand(rand.New(rand.NewSource(0))))
+			provide(c, 1)
+			provide(c, 2)
+			provide(c, 3)
+
+			expect(c, []int{2, 3, 1})
+
+			copy := c.Copy()
+			require.Len(t, copy.groups, 1)
+			assert.Equal(t, c.groups, copy.groups)
+		})
+
+		t.Run("New map is created", func(t *testing.T) {
+			c := New(setRand(rand.New(rand.NewSource(0))))
+			provide(c, 1)
+			provide(c, 2)
+			provide(c, 3)
+
+			expect(c, []int{2, 3, 1})
+
+			copy := c.Copy(setRand(rand.New(rand.NewSource(0))))
+
+			provide(copy, 4)
+
+			expect(copy, []int{2, 3, 4, 1})
+
+			assert.NotEqual(t, c.groups, copy.groups)
+		})
+	})
+
+	t.Run("New Random slice", func(t *testing.T) {
+		c := New()
+		require.NoError(t, c.Provide(f))
+
+		copy := c.Copy()
+		assert.NotEqual(t, c.rand, copy.rand)
+	})
+
+}
+
 func TestNodeAlreadyCalled(t *testing.T) {
 	type type1 struct{}
 	f := func() type1 { return type1{} }
