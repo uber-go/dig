@@ -3488,6 +3488,34 @@ func TestProvideFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "cannot provide *bytes.Buffer")
 		assert.Contains(t, err.Error(), "already provided")
 	})
+
+	t.Run("provide multiple instances with the same name in different children", func(t *testing.T) {
+		c := New()
+
+		ca := c.Child("1")
+		cb := ca.Child("2")
+		type A struct{}
+		type ret1 struct {
+			Out
+			*A `name:"foo"`
+		}
+		type ret2 struct {
+			Out
+			*A `name:"foo"`
+		}
+		require.NoError(t, ca.Provide(func() ret1 {
+			return ret1{A: &A{}}
+		}))
+		err := cb.Provide(func() ret2 {
+			return ret2{A: &A{}}
+		})
+		require.Error(t, err, "expected error on the second provide")
+		assertErrorMatches(t, err,
+			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide \*dig.A\[name="foo"\] from \[0\].A:`,
+			`already provided by "go.uber.org/dig".TestProvideFailures\S+`,
+		)
+	})
 }
 
 func TestInvokeFailures(t *testing.T) {
