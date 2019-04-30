@@ -704,17 +704,6 @@ func (cv connectionVisitor) checkKey(k key, path string) error {
 			"cannot provide %v from %v: already provided by %v",
 			k, path, conflict)
 	}
-	if ps := cv.c.providers[k]; len(ps) > 0 {
-		cons := make([]string, len(ps))
-		for i, p := range ps {
-			cons[i] = fmt.Sprint(p.Location())
-		}
-
-		return fmt.Errorf(
-			"cannot provide %v from %v: already provided by %v",
-			k, path, strings.Join(cons, "; "))
-	}
-
 	if ps := cv.c.getRoot().getValueProviders(k.name, k.t); len(ps) > 0 {
 		cons := make([]string, len(ps))
 		for i, p := range ps {
