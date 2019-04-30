@@ -526,10 +526,6 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 // The name of the child is for observability purposes only. As such, it
 // does not have to be unique across different children of the container.
 func (c *Container) Child(name string) *Container {
-	if name == "" {
-		panic("dig: name should not be empty")
-	}
-
 	child := &Container{
 		providers: make(map[key][]*node),
 		values:    make(map[key]reflect.Value),
