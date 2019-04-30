@@ -229,6 +229,15 @@ type Container struct {
 
 	// Defer acyclic check on provide until Invoke.
 	deferAcyclicVerification bool
+
+	// Name of the container
+	name string
+
+	// Sub graphs of the container
+	children []*Container
+
+	// Parent is the container that spawned this
+	parent *Container
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -332,15 +341,25 @@ func setRand(r *rand.Rand) Option {
 }
 
 func (c *Container) knownTypes() []reflect.Type {
-	typeSet := make(map[reflect.Type]struct{}, len(c.providers))
-	for k := range c.providers {
-		typeSet[k.t] = struct{}{}
+	getKnowTypes := func(c *Container) []reflect.Type {
+		typeSet := make(map[reflect.Type]struct{}, len(c.providers))
+		for k := range c.providers {
+			typeSet[k.t] = struct{}{}
+		}
+
+		types := make([]reflect.Type, 0, len(typeSet))
+		for t := range typeSet {
+			types = append(types, t)
+		}
+
+		return types
 	}
 
-	types := make([]reflect.Type, 0, len(typeSet))
-	for t := range typeSet {
-		types = append(types, t)
+	types := make([]reflect.Type, 0)
+	for _, c := range append(c.children, c) {
+		types = append(types, getKnowTypes(c)...)
 	}
+
 	sort.Sort(byTypeName(types))
 	return types
 }
@@ -366,11 +385,23 @@ func (c *Container) submitGroupedValue(name string, t reflect.Type, v reflect.Va
 }
 
 func (c *Container) getValueProviders(name string, t reflect.Type) []provider {
-	return c.getProviders(key{name: name, t: t})
+	providers := c.getProviders(key{name: name, t: t})
+
+	for _, c := range c.children {
+		providers = append(providers, c.getValueProviders(name, t)...)
+	}
+
+	return providers
 }
 
 func (c *Container) getGroupProviders(name string, t reflect.Type) []provider {
-	return c.getProviders(key{group: name, t: t})
+	providers := c.getProviders(key{group: name, t: t})
+
+	for _, c := range c.children {
+		providers = append(providers, c.getGroupProviders(name, t)...)
+	}
+
+	return providers
 }
 
 func (c *Container) getProviders(k key) []provider {
@@ -380,6 +411,14 @@ func (c *Container) getProviders(k key) []provider {
 		providers[i] = n
 	}
 	return providers
+}
+
+func (c *Container) getRoot() *Container {
+	if c.parent == nil {
+		return c
+	}
+
+	return c.parent.getRoot()
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -433,6 +472,7 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
 func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
+	cp := c.getRoot() // run invoke on root to get access to all the graphs
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
 		return errors.New("can't invoke an untyped nil")
@@ -446,20 +486,20 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return err
 	}
 
-	if err := shallowCheckDependencies(c, pl); err != nil {
+	if err := shallowCheckDependencies(cp, pl); err != nil {
 		return errMissingDependencies{
 			Func:   digreflect.InspectFunc(function),
 			Reason: err,
 		}
 	}
 
-	if !c.isVerifiedAcyclic {
-		if err := c.verifyAcyclic(); err != nil {
+	if !cp.isVerifiedAcyclic {
+		if err := cp.verifyAcyclic(); err != nil {
 			return err
 		}
 	}
 
-	args, err := pl.BuildList(c)
+	args, err := pl.BuildList(cp)
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   digreflect.InspectFunc(function),
@@ -477,6 +517,25 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		}
 	}
 	return nil
+}
+
+func (c *Container) Child(name string) *Container {
+	if name == "" {
+		panic("dig: name should not be empty")
+	}
+
+	child := &Container{
+		providers: make(map[key][]*node),
+		values:    make(map[key]reflect.Value),
+		groups:    make(map[key][]reflect.Value),
+		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		name:      name,
+		parent:    c,
+	}
+
+	c.children = append(c.children, child)
+
+	return child
 }
 
 func (c *Container) verifyAcyclic() error {
