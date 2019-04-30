@@ -519,6 +519,12 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
+// Child returns a named child of this container. The child container has
+// full access to the parent's types, and any types provided to the child
+// will be made available to the parent.
+//
+// The name of the child is for observability purposes only. As such, it
+// does not have to be unique across different children of the container.
 func (c *Container) Child(name string) *Container {
 	if name == "" {
 		panic("dig: name should not be empty")
