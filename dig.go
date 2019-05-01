@@ -230,13 +230,13 @@ type Container struct {
 	// Defer acyclic check on provide until Invoke.
 	deferAcyclicVerification bool
 
-	// Name of the container
+	// Name of the container.
 	name string
 
-	// Sub graphs of the container
+	// Sub graphs of the container.
 	children []*Container
 
-	// Parent is the container that spawned this
+	// Parent is the container that spawned this.
 	parent *Container
 }
 
@@ -340,6 +340,8 @@ func setRand(r *rand.Rand) Option {
 	})
 }
 
+// knownTypes returns the types known to this container, including types known
+// by its descendants.
 func (c *Container) knownTypes() []reflect.Type {
 	getKnowTypes := func(c *Container) []reflect.Type {
 		typeSet := make(map[reflect.Type]struct{}, len(c.providers))
@@ -530,7 +532,7 @@ func (c *Container) Child(name string) *Container {
 		providers: make(map[key][]*node),
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
-		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		rand:      c.rand,
 		name:      name,
 		parent:    c,
 	}
