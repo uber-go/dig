@@ -343,23 +343,18 @@ func setRand(r *rand.Rand) Option {
 // knownTypes returns the types known to this container, including types known
 // by its descendants.
 func (c *Container) knownTypes() []reflect.Type {
-	getKnowTypes := func(c *Container) []reflect.Type {
-		typeSet := make(map[reflect.Type]struct{}, len(c.providers))
-		for k := range c.providers {
-			typeSet[k.t] = struct{}{}
-		}
-
-		types := make([]reflect.Type, 0, len(typeSet))
-		for t := range typeSet {
-			types = append(types, t)
-		}
-
-		return types
+	typeSet := make(map[reflect.Type]struct{}, len(c.providers))
+	for k := range c.providers {
+		typeSet[k.t] = struct{}{}
 	}
 
-	types := make([]reflect.Type, 0)
-	for _, c := range append(c.children, c) {
-		types = append(types, getKnowTypes(c)...)
+	types := make([]reflect.Type, 0, len(typeSet))
+	for t := range typeSet {
+		types = append(types, t)
+	}
+
+	for _, c := range append(c.children) {
+		types = append(types, c.knownTypes()...)
 	}
 
 	sort.Sort(byTypeName(types))
@@ -585,7 +580,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		if c.deferAcyclicVerification {
 			continue
 		}
-		if err := verifyAcyclic(c, n, k); err != nil {
+		if err := verifyAcyclic(c.getRoot(), n, k); err != nil {
 			c.providers[k] = oldProviders
 			return err
 		}
@@ -602,7 +597,7 @@ func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 	var err error
 	keyPaths := make(map[key]string)
 	walkResult(n.ResultList(), connectionVisitor{
-		c:        c,
+		c:        c.getRoot(),
 		n:        n,
 		err:      &err,
 		keyPaths: keyPaths,
@@ -706,7 +701,7 @@ func (cv connectionVisitor) checkKey(k key, path string) error {
 			"cannot provide %v from %v: already provided by %v",
 			k, path, conflict)
 	}
-	if ps := cv.c.getRoot().getValueProviders(k.name, k.t); len(ps) > 0 {
+	if ps := cv.c.getValueProviders(k.name, k.t); len(ps) > 0 {
 		cons := make([]string, len(ps))
 		for i, p := range ps {
 			cons[i] = fmt.Sprint(p.Location())

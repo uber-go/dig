@@ -37,17 +37,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type newFunc func(...Option) (func(interface{}, ...ProvideOption) error, func(interface{}, ...InvokeOption) error)
+
 func TestEndToEndSuccess(t *testing.T) {
+	testSubGraphs(t, testEndToEndSuccess)
+}
+
+func testEndToEndSuccess(t *testing.T, fp newFunc) {
 	t.Parallel()
 
 	t.Run("pointer constructor", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		var b *bytes.Buffer
-		require.NoError(t, c.Provide(func() *bytes.Buffer {
+		require.NoError(t, provide(func() *bytes.Buffer {
 			b = &bytes.Buffer{}
 			return b
 		}), "provide failed")
-		require.NoError(t, c.Invoke(func(got *bytes.Buffer) {
+		require.NoError(t, invoke(func(got *bytes.Buffer) {
 			require.NotNil(t, got, "invoke got nil buffer")
 			require.True(t, got == b, "invoke got wrong buffer")
 		}), "invoke failed")
@@ -57,34 +63,34 @@ func TestEndToEndSuccess(t *testing.T) {
 		// Dig shouldn't forbid this - it's perfectly reasonable to explicitly
 		// provide a typed nil, since that's often a convenient way to supply a
 		// default no-op implementation.
-		c := New()
-		require.NoError(t, c.Provide(func() *bytes.Buffer { return nil }), "provide failed")
-		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() *bytes.Buffer { return nil }), "provide failed")
+		require.NoError(t, invoke(func(b *bytes.Buffer) {
 			require.Nil(t, b, "expected to get nil buffer")
 		}), "invoke failed")
 	})
 
 	t.Run("struct constructor", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() bytes.Buffer {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() bytes.Buffer {
 			var buf bytes.Buffer
 			buf.WriteString("foo")
 			return buf
 		}), "provide failed")
-		require.NoError(t, c.Invoke(func(b bytes.Buffer) {
+		require.NoError(t, invoke(func(b bytes.Buffer) {
 			// ensure we're getting back the buffer we put in
 			require.Equal(t, "foo", b.String(), "invoke got new buffer")
 		}), "invoke failed")
 	})
 
 	t.Run("slice constructor", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		b1 := &bytes.Buffer{}
 		b2 := &bytes.Buffer{}
-		require.NoError(t, c.Provide(func() []*bytes.Buffer {
+		require.NoError(t, provide(func() []*bytes.Buffer {
 			return []*bytes.Buffer{b1, b2}
 		}), "provide failed")
-		require.NoError(t, c.Invoke(func(bs []*bytes.Buffer) {
+		require.NoError(t, invoke(func(bs []*bytes.Buffer) {
 			require.Equal(t, 2, len(bs), "invoke got unexpected number of buffers")
 			require.True(t, b1 == bs[0], "first item did not match")
 			require.True(t, b2 == bs[1], "second item did not match")
@@ -92,56 +98,56 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("array constructor", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		bufs := [1]*bytes.Buffer{{}}
-		require.NoError(t, c.Provide(func() [1]*bytes.Buffer { return bufs }), "provide failed")
-		require.NoError(t, c.Invoke(func(bs [1]*bytes.Buffer) {
+		require.NoError(t, provide(func() [1]*bytes.Buffer { return bufs }), "provide failed")
+		require.NoError(t, invoke(func(bs [1]*bytes.Buffer) {
 			require.NotNil(t, bs[0], "invoke got new array")
 		}), "invoke failed")
 	})
 
 	t.Run("map constructor", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() map[string]string {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() map[string]string {
 			return map[string]string{}
 		}), "provide failed")
-		require.NoError(t, c.Invoke(func(m map[string]string) {
+		require.NoError(t, invoke(func(m map[string]string) {
 			require.NotNil(t, m, "invoke got zero value map")
 		}), "invoke failed")
 	})
 
 	t.Run("channel constructor", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() chan int {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() chan int {
 			return make(chan int)
 		}), "provide failed")
-		require.NoError(t, c.Invoke(func(ch chan int) {
+		require.NoError(t, invoke(func(ch chan int) {
 			require.NotNil(t, ch, "invoke got nil chan")
 		}), "invoke failed")
 	})
 
 	t.Run("func constructor", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() func(int) {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() func(int) {
 			return func(int) {}
 		}), "provide failed")
-		require.NoError(t, c.Invoke(func(f func(int)) {
+		require.NoError(t, invoke(func(f func(int)) {
 			require.NotNil(t, f, "invoke got nil function pointer")
 		}), "invoke failed")
 	})
 
 	t.Run("interface constructor", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() io.Writer {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() io.Writer {
 			return &bytes.Buffer{}
 		}), "provide failed")
-		require.NoError(t, c.Invoke(func(w io.Writer) {
+		require.NoError(t, invoke(func(w io.Writer) {
 			require.NotNil(t, w, "invoke got nil interface")
 		}), "invoke failed")
 	})
 
 	t.Run("param", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		type contents string
 		type Args struct {
 			In
@@ -150,16 +156,16 @@ func TestEndToEndSuccess(t *testing.T) {
 		}
 
 		require.NoError(t,
-			c.Provide(func(args Args) *bytes.Buffer {
+			provide(func(args Args) *bytes.Buffer {
 				require.NotEmpty(t, args.Contents, "contents must not be empty")
 				return bytes.NewBufferString(string(args.Contents))
 			}), "provide constructor failed")
 
 		require.NoError(t,
-			c.Provide(func() contents { return "hello world" }),
+			provide(func() contents { return "hello world" }),
 			"provide value failed")
 
-		require.NoError(t, c.Invoke(func(buff *bytes.Buffer) {
+		require.NoError(t, invoke(func(buff *bytes.Buffer) {
 			out, err := ioutil.ReadAll(buff)
 			require.NoError(t, err, "read from buffer failed")
 			require.Equal(t, "hello world", string(out), "contents don't match")
@@ -167,8 +173,8 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("invoke param", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() *bytes.Buffer {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() *bytes.Buffer {
 			return new(bytes.Buffer)
 		}), "provide failed")
 
@@ -178,7 +184,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			*bytes.Buffer
 		}
 
-		require.NoError(t, c.Invoke(func(args Args) {
+		require.NoError(t, invoke(func(args Args) {
 			require.NotNil(t, args.Buffer, "invoke got nil buffer")
 		}))
 	})
@@ -189,8 +195,8 @@ func TestEndToEndSuccess(t *testing.T) {
 			called bool
 		)
 
-		c := New()
-		require.NoError(t, c.Provide(func() *bytes.Buffer {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() *bytes.Buffer {
 			require.False(t, called, "constructor must be called exactly once")
 			called = true
 			buff = new(bytes.Buffer)
@@ -205,7 +211,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			Buffer *bytes.Buffer
 		}
 
-		require.NoError(t, c.Invoke(func(args Args) {
+		require.NoError(t, invoke(func(args Args) {
 			require.True(t, called, "constructor must be called first")
 			require.NotNil(t, args.Buffer, "invoke got nil buffer")
 			require.True(t, args.Buffer == buff, "buffer must match constructor's return value")
@@ -231,15 +237,15 @@ func TestEndToEndSuccess(t *testing.T) {
 			called bool
 		)
 
-		c := New()
-		require.NoError(t, c.Provide(func() *bytes.Buffer {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() *bytes.Buffer {
 			require.False(t, called, "constructor must be called exactly once")
 			called = true
 			buff = new(bytes.Buffer)
 			return buff
 		}), "provide must not fail")
 
-		require.NoError(t, c.Invoke(func(p someParam) {
+		require.NoError(t, invoke(func(p someParam) {
 			require.True(t, called, "constructor must be called first")
 
 			require.NotNil(t, p.Buffer, "someParam.Buffer must not be nil")
@@ -251,7 +257,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("multiple-type constructor", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		constructor := func() (*bytes.Buffer, []int, error) {
 			return &bytes.Buffer{}, []int{42}, nil
 		}
@@ -259,12 +265,12 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.NotNil(t, b, "invoke got nil buffer")
 			assert.Equal(t, 1, len(nums), "invoke got empty slice")
 		}
-		require.NoError(t, c.Provide(constructor), "provide failed")
-		require.NoError(t, c.Invoke(consumer), "invoke failed")
+		require.NoError(t, provide(constructor), "provide failed")
+		require.NoError(t, invoke(consumer), "invoke failed")
 	})
 
 	t.Run("multiple-type constructor is called once", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		type A struct{}
 		type B struct{}
 		count := 0
@@ -278,15 +284,15 @@ func TestEndToEndSuccess(t *testing.T) {
 		getB := func(b *B) {
 			assert.NotNil(t, b, "got nil B")
 		}
-		require.NoError(t, c.Provide(constructor), "provide failed")
-		require.NoError(t, c.Invoke(getA), "A invoke failed")
-		require.NoError(t, c.Invoke(getB), "B invoke failed")
-		require.NoError(t, c.Invoke(func(a *A, b *B) {}), "AB invoke failed")
+		require.NoError(t, provide(constructor), "provide failed")
+		require.NoError(t, invoke(getA), "A invoke failed")
+		require.NoError(t, invoke(getB), "B invoke failed")
+		require.NoError(t, invoke(func(a *A, b *B) {}), "AB invoke failed")
 		require.Equal(t, 1, count, "Constructor must be called once")
 	})
 
 	t.Run("method invocation inside Invoke", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		type A struct{}
 		type B struct{}
 		cA := func() (*A, error) {
@@ -296,23 +302,23 @@ func TestEndToEndSuccess(t *testing.T) {
 			return &B{}, nil
 		}
 		getA := func(a *A) {
-			c.Invoke(func(b *B) {
+			invoke(func(b *B) {
 				assert.NotNil(t, b, "got nil B")
 			})
 			assert.NotNil(t, a, "got nil A")
 		}
 
-		require.NoError(t, c.Provide(cA), "provide failed")
-		require.NoError(t, c.Provide(cB), "provide failed")
-		require.NoError(t, c.Invoke(getA), "A invoke failed")
+		require.NoError(t, provide(cA), "provide failed")
+		require.NoError(t, provide(cB), "provide failed")
+		require.NoError(t, invoke(getA), "A invoke failed")
 	})
 
 	t.Run("collections and instances of same type", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() []*bytes.Buffer {
+		provide, _ := fp()
+		require.NoError(t, provide(func() []*bytes.Buffer {
 			return []*bytes.Buffer{{}}
 		}), "providing collection failed")
-		require.NoError(t, c.Provide(func() *bytes.Buffer {
+		require.NoError(t, provide(func() *bytes.Buffer {
 			return &bytes.Buffer{}
 		}), "providing pointer failed")
 	})
@@ -327,7 +333,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			return &type1{}, &type3{}, &type4{}
 		}
 
-		c := New()
+		provide, invoke := fp()
 		type param struct {
 			In
 
@@ -337,8 +343,8 @@ func TestEndToEndSuccess(t *testing.T) {
 			T4 *type4 `optional:"true"`                     // optional type present in the graph
 			T5 *type5 `optional:"t"`                        // optional type NOT in the graph with "yes"
 		}
-		require.NoError(t, c.Provide(constructor))
-		require.NoError(t, c.Invoke(func(p param) {
+		require.NoError(t, provide(constructor))
+		require.NoError(t, invoke(func(p param) {
 			require.NotNil(t, p.T1, "whole param struct should not be nil")
 			assert.Nil(t, p.T2, "optional type not in the graph should return nil")
 			assert.NotNil(t, p.T3, "required type with unrelated tag not in the graph")
@@ -358,11 +364,11 @@ func TestEndToEndSuccess(t *testing.T) {
 		myA := A{"string A"}
 		myB := &B{"string B"}
 
-		c := New()
-		require.NoError(t, c.Provide(func() Ret {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() Ret {
 			return Ret{A: myA, B: myB}
 		}), "provide for the Ret struct should succeed")
-		require.NoError(t, c.Invoke(func(a A, b *B) {
+		require.NoError(t, invoke(func(a A, b *B) {
 			assert.Equal(t, a.name, "string A", "value type should work for dig.Out")
 			assert.Equal(t, b.name, "string B", "pointer should work for dig.Out")
 			assert.True(t, myA == a, "should get the same pointer for &A")
@@ -380,31 +386,31 @@ func TestEndToEndSuccess(t *testing.T) {
 			T1 *type1 `optional:"true"`
 		}
 
-		c := New()
+		provide, invoke := fp()
 
 		var gave *type2
-		require.NoError(t, c.Provide(func(p param) *type2 {
+		require.NoError(t, provide(func(p param) *type2 {
 			require.Nil(t, p.T1, "T1 must be nil")
 			gave = &type2{}
 			return gave
 		}), "provide failed")
 
-		require.NoError(t, c.Invoke(func(got *type2) {
+		require.NoError(t, invoke(func(got *type2) {
 			require.True(t, got == gave, "type2 reference must be the same")
 		}), "invoke failed")
 	})
 
 	t.Run("nested dependencies", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 
 		type A struct{ name string }
 		type B struct{ name string }
 		type C struct{ name string }
 
-		require.NoError(t, c.Provide(func() A { return A{"->A"} }))
-		require.NoError(t, c.Provide(func(A) B { return B{"A->B"} }))
-		require.NoError(t, c.Provide(func(A, B) C { return C{"AB->C"} }))
-		require.NoError(t, c.Invoke(func(a A, b B, c C) {
+		require.NoError(t, provide(func() A { return A{"->A"} }))
+		require.NoError(t, provide(func(A) B { return B{"A->B"} }))
+		require.NoError(t, provide(func(A, B) C { return C{"AB->C"} }))
+		require.NoError(t, invoke(func(a A, b B, c C) {
 			assert.Equal(t, a, A{"->A"})
 			assert.Equal(t, b, B{"A->B"})
 			assert.Equal(t, c, C{"AB->C"})
@@ -412,14 +418,14 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("primitives", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() string { return "piper" }), "string provide failed")
-		require.NoError(t, c.Provide(func() int { return 42 }), "int provide failed")
-		require.NoError(t, c.Provide(func() int64 { return 24 }), "int provide failed")
-		require.NoError(t, c.Provide(func() time.Duration {
+		provide, invoke := fp()
+		require.NoError(t, provide(func() string { return "piper" }), "string provide failed")
+		require.NoError(t, provide(func() int { return 42 }), "int provide failed")
+		require.NoError(t, provide(func() int64 { return 24 }), "int provide failed")
+		require.NoError(t, provide(func() time.Duration {
 			return 10 * time.Second
 		}), "time.Duration provide failed")
-		require.NoError(t, c.Invoke(func(i64 int64, i int, s string, d time.Duration) {
+		require.NoError(t, invoke(func(i64 int64, i int, s string, d time.Duration) {
 			assert.Equal(t, 42, i)
 			assert.Equal(t, int64(24), i64)
 			assert.Equal(t, "piper", s)
@@ -442,9 +448,9 @@ func TestEndToEndSuccess(t *testing.T) {
 			*B
 			C
 		}
-		c := New()
+		provide, invoke := fp()
 
-		require.NoError(t, c.Provide(func() Ret2 {
+		require.NoError(t, provide(func() Ret2 {
 			return Ret2{
 				Ret1: Ret1{
 					A: &A{},
@@ -453,13 +459,13 @@ func TestEndToEndSuccess(t *testing.T) {
 				C: C{},
 			}
 		}), "provide for the Ret struct should succeed")
-		require.NoError(t, c.Invoke(func(a *A, b *B, c C) {
+		require.NoError(t, invoke(func(a *A, b *B, c C) {
 			require.NotNil(t, a, "*A should be part of the container through Ret2->Ret1")
 		}))
 	})
 
 	t.Run("named instances can be created with tags", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		type A struct{ idx int }
 
 		// returns three named instances of A
@@ -478,17 +484,17 @@ func TestEndToEndSuccess(t *testing.T) {
 			A1 A `name:"first"`
 			A3 A `name:"third"`
 		}
-		require.NoError(t, c.Provide(func() ret {
+		require.NoError(t, provide(func() ret {
 			return ret{A1: A{1}, A2: A{2}, A3: A{3}}
 		}), "provide for three named instances should succeed")
-		require.NoError(t, c.Invoke(func(p param) {
+		require.NoError(t, invoke(func(p param) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 3, p.A3.idx)
 		}), "invoke should succeed, pulling out two named instances")
 	})
 
 	t.Run("named instances can be created with Name option", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 
 		type A struct{ idx int }
 
@@ -496,9 +502,9 @@ func TestEndToEndSuccess(t *testing.T) {
 			return func() A { return A{idx: idx} }
 		}
 
-		require.NoError(t, c.Provide(buildConstructor(1), Name("first")))
-		require.NoError(t, c.Provide(buildConstructor(2), Name("second")))
-		require.NoError(t, c.Provide(buildConstructor(3), Name("third")))
+		require.NoError(t, provide(buildConstructor(1), Name("first")))
+		require.NoError(t, provide(buildConstructor(2), Name("second")))
+		require.NoError(t, provide(buildConstructor(3), Name("third")))
 
 		type param struct {
 			In
@@ -507,14 +513,14 @@ func TestEndToEndSuccess(t *testing.T) {
 			A3 A `name:"third"`
 		}
 
-		require.NoError(t, c.Invoke(func(p param) {
+		require.NoError(t, invoke(func(p param) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 3, p.A3.idx)
 		}), "invoke should succeed, pulling out two named instances")
 	})
 
 	t.Run("named and unnamed instances coexist", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		type A struct{ idx int }
 
 		type out struct {
@@ -523,8 +529,8 @@ func TestEndToEndSuccess(t *testing.T) {
 			A `name:"foo"`
 		}
 
-		require.NoError(t, c.Provide(func() out { return out{A: A{1}} }))
-		require.NoError(t, c.Provide(func() A { return A{2} }))
+		require.NoError(t, provide(func() out { return out{A: A{1}} }))
+		require.NoError(t, provide(func() A { return A{2} }))
 
 		type in struct {
 			In
@@ -532,14 +538,14 @@ func TestEndToEndSuccess(t *testing.T) {
 			A1 A `name:"foo"`
 			A2 A
 		}
-		require.NoError(t, c.Invoke(func(i in) {
+		require.NoError(t, invoke(func(i in) {
 			assert.Equal(t, 1, i.A1.idx)
 			assert.Equal(t, 2, i.A2.idx)
 		}))
 	})
 
 	t.Run("named instances recurse", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		type A struct{ idx int }
 
 		type Ret1 struct {
@@ -558,7 +564,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			A1 A `name:"first"`  // should come from ret1 through ret2
 			A2 A `name:"second"` // should come from ret2
 		}
-		require.NoError(t, c.Provide(func() Ret2 {
+		require.NoError(t, provide(func() Ret2 {
 			return Ret2{
 				Ret1: Ret1{
 					A1: A{1},
@@ -566,14 +572,14 @@ func TestEndToEndSuccess(t *testing.T) {
 				A2: A{2},
 			}
 		}))
-		require.NoError(t, c.Invoke(func(p param) {
+		require.NoError(t, invoke(func(p param) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
 		}), "invoke should succeed, pulling out two named instances")
 	})
 
 	t.Run("named instances do not cause cycles", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		type A struct{ idx int }
 		type param struct {
 			In
@@ -594,22 +600,22 @@ func TestEndToEndSuccess(t *testing.T) {
 			A `name:"dos"`
 		}
 
-		require.NoError(t, c.Provide(func() retUno {
+		require.NoError(t, provide(func() retUno {
 			return retUno{A: A{1}}
 		}), `should be able to provide A[name="uno"]`)
-		require.NoError(t, c.Provide(func(p param) retDos {
+		require.NoError(t, provide(func(p param) retDos {
 			return retDos{A: A{2}}
 		}), `A[name="dos"] should be able to rely on A[name="uno"]`)
-		require.NoError(t, c.Invoke(func(p paramBoth) {
+		require.NoError(t, invoke(func(p paramBoth) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
 		}), "both objects should be successfully resolved on Invoke")
 	})
 
 	t.Run("struct constructor with as interface option", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 
-		provider := c.Provide(
+		provider := provide(
 			func() *bytes.Buffer {
 				var buf bytes.Buffer
 				buf.WriteString("foo")
@@ -620,7 +626,7 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		require.NoError(t, provider, "provide failed")
 
-		require.NoError(t, c.Invoke(
+		require.NoError(t, invoke(
 			func(s fmt.Stringer, r io.Reader) {
 				require.Equal(t, "foo", s.String(), "invoke got new buffer")
 				got, err := ioutil.ReadAll(r)
@@ -631,9 +637,9 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("As with Name", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 
-		require.NoError(t, c.Provide(
+		require.NoError(t, provide(
 			func() *bytes.Buffer {
 				return bytes.NewBufferString("foo")
 			},
@@ -648,7 +654,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			Reader io.Reader     `name:"buff"`
 		}
 
-		require.NoError(t, c.Invoke(func(got in) {
+		require.NoError(t, invoke(func(got in) {
 			assert.NotNil(t, got.Buffer, "buffer must not be nil")
 
 			assert.True(t, got.Buffer == got.Reader,
@@ -661,21 +667,21 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("As same interface", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() io.Reader {
+		provide, _ := fp()
+		require.NoError(t, provide(func() io.Reader {
 			panic("this function should not be called")
 		}, As(new(io.Reader))), "failed to provide")
 	})
 
 	t.Run("As different interface", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() io.ReadCloser {
+		provide, _ := fp()
+		require.NoError(t, provide(func() io.ReadCloser {
 			panic("this function should not be called")
 		}, As(new(io.Reader), new(io.Closer))), "failed to provide")
 	})
 
 	t.Run("invoke on a type that depends on named parameters", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		type A struct{ idx int }
 		type B struct{ sum int }
 		type param struct {
@@ -691,16 +697,16 @@ func TestEndToEndSuccess(t *testing.T) {
 			A1 *A `name:"foo"`
 			A2 *A `name:"bar"`
 		}
-		require.NoError(t, c.Provide(func() (ret, error) {
+		require.NoError(t, provide(func() (ret, error) {
 			return ret{
 				A1: &A{1},
 				A2: &A{2},
 			}, nil
 		}), "should be able to provide A1 and A2 into the graph")
-		require.NoError(t, c.Provide(func(p param) *B {
+		require.NoError(t, provide(func(p param) *B {
 			return &B{sum: p.A1.idx + p.A2.idx}
 		}), "should be able to provide *B that relies on two named types")
-		require.NoError(t, c.Invoke(func(b *B) {
+		require.NoError(t, invoke(func(b *B) {
 			require.Equal(t, 3, b.sum)
 		}))
 	})
@@ -719,16 +725,16 @@ func TestEndToEndSuccess(t *testing.T) {
 		}
 
 		t.Run("optional", func(t *testing.T) {
-			c := New()
+			_, invoke := fp()
 
 			called1 := false
-			require.NoError(t, c.Invoke(func(p param1) {
+			require.NoError(t, invoke(func(p param1) {
 				called1 = true
 				assert.Nil(t, p.Foo)
 			}))
 
 			called2 := false
-			require.NoError(t, c.Invoke(func(p param2) {
+			require.NoError(t, invoke(func(p param2) {
 				called2 = true
 				assert.Nil(t, p.Foo)
 			}))
@@ -738,20 +744,20 @@ func TestEndToEndSuccess(t *testing.T) {
 		})
 
 		t.Run("named", func(t *testing.T) {
-			c := New()
+			provide, invoke := fp()
 
-			require.NoError(t, c.Provide(func() *struct{} {
+			require.NoError(t, provide(func() *struct{} {
 				return &struct{}{}
 			}, Name("foo")))
 
 			called1 := false
-			require.NoError(t, c.Invoke(func(p param1) {
+			require.NoError(t, invoke(func(p param1) {
 				called1 = true
 				assert.NotNil(t, p.Foo)
 			}))
 
 			called2 := false
-			require.NoError(t, c.Invoke(func(p param2) {
+			require.NoError(t, invoke(func(p param2) {
 				called2 = true
 				assert.NotNil(t, p.Foo)
 			}))
@@ -765,7 +771,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	t.Run("dynamically generated dig.In", func(t *testing.T) {
 		// This test verifies that a dig.In generated using reflect.StructOf
 		// works with our dig.In detection logic.
-		c := New()
+		provide, invoke := fp()
 
 		type type1 struct{}
 		type type2 struct{}
@@ -777,7 +783,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			return gave
 		}
 
-		require.NoError(t, c.Provide(new1), "failed to provide constructor")
+		require.NoError(t, provide(new1), "failed to provide constructor")
 
 		// We generate a struct that embeds dig.In.
 		//
@@ -820,14 +826,14 @@ func TestEndToEndSuccess(t *testing.T) {
 			},
 		)
 
-		require.NoError(t, c.Invoke(fn.Interface()), "invoke failed")
+		require.NoError(t, invoke(fn.Interface()), "invoke failed")
 	})
 
 	t.Run("dynamically generated dig.Out", func(t *testing.T) {
 		// This test verifies that a dig.Out generated using reflect.StructOf
 		// works with our dig.Out detection logic.
 
-		c := New()
+		provide, invoke := fp()
 
 		type A struct{ Value int }
 
@@ -854,7 +860,7 @@ func TestEndToEndSuccess(t *testing.T) {
 				return []reflect.Value{result}
 			},
 		)
-		require.NoError(t, c.Provide(fn.Interface()), "provide failed")
+		require.NoError(t, provide(fn.Interface()), "provide failed")
 
 		type params struct {
 			In
@@ -864,7 +870,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			Baz *A `name:"baz" optional:"true"`
 		}
 
-		require.NoError(t, c.Invoke(func(p params) {
+		require.NoError(t, invoke(func(p params) {
 			assert.Equal(t, &A{Value: 1}, p.Foo, "Foo must match")
 			assert.Equal(t, &A{Value: 2}, p.Bar, "Bar must match")
 			assert.Nil(t, p.Baz, "Baz must be unset")
@@ -872,21 +878,21 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("variadic arguments invoke", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 
 		type A struct{}
 
 		var gaveA *A
-		require.NoError(t, c.Provide(func() *A {
+		require.NoError(t, provide(func() *A {
 			gaveA = &A{}
 			return gaveA
 		}), "failed to provide A")
 
-		require.NoError(t, c.Provide(func() []*A {
+		require.NoError(t, provide(func() []*A {
 			panic("[]*A constructor must not be called.")
 		}), "failed to provide A slice")
 
-		require.NoError(t, c.Invoke(func(a *A, as ...*A) {
+		require.NoError(t, invoke(func(a *A, as ...*A) {
 			require.NotNil(t, a, "A must not be nil")
 			require.True(t, a == gaveA, "A must match")
 			require.Empty(t, as, "varargs must be empty")
@@ -894,23 +900,23 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("variadic arguments dependency", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 
 		type A struct{}
 		type B struct{}
 
 		var gaveA *A
-		require.NoError(t, c.Provide(func() *A {
+		require.NoError(t, provide(func() *A {
 			gaveA = &A{}
 			return gaveA
 		}), "failed to provide A")
 
-		require.NoError(t, c.Provide(func() []*A {
+		require.NoError(t, provide(func() []*A {
 			panic("[]*A constructor must not be called.")
 		}), "failed to provide A slice")
 
 		var gaveB *B
-		require.NoError(t, c.Provide(func(a *A, as ...*A) *B {
+		require.NoError(t, provide(func(a *A, as ...*A) *B {
 			require.NotNil(t, a, "A must not be nil")
 			require.True(t, a == gaveA, "A must match")
 			require.Empty(t, as, "varargs must be empty")
@@ -918,24 +924,24 @@ func TestEndToEndSuccess(t *testing.T) {
 			return gaveB
 		}), "failed to provide B")
 
-		require.NoError(t, c.Invoke(func(b *B) {
+		require.NoError(t, invoke(func(b *B) {
 			require.NotNil(t, b, "B must not be nil")
 			require.True(t, b == gaveB, "B must match")
 		}), "failed to invoke")
 	})
 
 	t.Run("non-error return arguments from invoke are ignored", func(t *testing.T) {
-		c := New()
+		provide, invoke := fp()
 		type A struct{}
 		type B struct{}
 
-		require.NoError(t, c.Provide(func() A { return A{} }))
-		require.NoError(t, c.Invoke(func(A) B { return B{} }))
+		require.NoError(t, provide(func() A { return A{} }))
+		require.NoError(t, invoke(func(A) B { return B{} }))
 
-		err := c.Invoke(func(B) {})
+		err := invoke(func(B) {})
 		require.Error(t, err, "invoking with B param should error out")
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestEndToEndSuccess.func\S+ \(\S+/src/go.uber.org/dig/dig_test.go:\d+\):`,
+			`missing dependencies for function "go.uber.org/dig".testEndToEndSuccess.func\S+ \(\S+/src/go.uber.org/dig/dig_test.go:\d+\):`,
 			"type dig.B is not in the container,",
 			"did you mean to Provide it?",
 		)
@@ -944,987 +950,6 @@ func TestEndToEndSuccess(t *testing.T) {
 
 func TestChildren(t *testing.T) {
 	t.Parallel()
-
-	t.Run("pointer constructor", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		var b *bytes.Buffer
-		require.NoError(t, ch.Provide(func() *bytes.Buffer {
-			b = &bytes.Buffer{}
-			return b
-		}), "provide failed")
-		require.NoError(t, c.Invoke(func(got *bytes.Buffer) {
-			require.NotNil(t, got, "invoke got nil buffer")
-			require.True(t, got == b, "invoke got wrong buffer")
-		}), "invoke failed")
-	})
-
-	t.Run("nil pointer constructor", func(t *testing.T) {
-		// Dig shouldn't forbid this - it's perfectly reasonable to explicitly
-		// provide a typed nil, since that's often a convenient way to supply a
-		// default no-op implementation.
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() *bytes.Buffer { return nil }), "provide failed")
-		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
-			require.Nil(t, b, "expected to get nil buffer")
-		}), "invoke failed")
-	})
-
-	t.Run("struct constructor", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() bytes.Buffer {
-			var buf bytes.Buffer
-			buf.WriteString("foo")
-			return buf
-		}), "provide failed")
-		require.NoError(t, c.Invoke(func(b bytes.Buffer) {
-			// ensure we're getting back the buffer we put in
-			require.Equal(t, "foo", b.String(), "invoke got new buffer")
-		}), "invoke failed")
-	})
-
-	t.Run("slice constructor", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		b1 := &bytes.Buffer{}
-		b2 := &bytes.Buffer{}
-		require.NoError(t, ch.Provide(func() []*bytes.Buffer {
-			return []*bytes.Buffer{b1, b2}
-		}), "provide failed")
-		require.NoError(t, c.Invoke(func(bs []*bytes.Buffer) {
-			require.Equal(t, 2, len(bs), "invoke got unexpected number of buffers")
-			require.True(t, b1 == bs[0], "first item did not match")
-			require.True(t, b2 == bs[1], "second item did not match")
-		}), "invoke failed")
-	})
-
-	t.Run("array constructor", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		bufs := [1]*bytes.Buffer{{}}
-		require.NoError(t, ch.Provide(func() [1]*bytes.Buffer { return bufs }), "provide failed")
-		require.NoError(t, c.Invoke(func(bs [1]*bytes.Buffer) {
-			require.NotNil(t, bs[0], "invoke got new array")
-		}), "invoke failed")
-	})
-
-	t.Run("map constructor", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() map[string]string {
-			return map[string]string{}
-		}), "provide failed")
-		require.NoError(t, c.Invoke(func(m map[string]string) {
-			require.NotNil(t, m, "invoke got zero value map")
-		}), "invoke failed")
-	})
-
-	t.Run("channel constructor", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() chan int {
-			return make(chan int)
-		}), "provide failed")
-		require.NoError(t, c.Invoke(func(ch chan int) {
-			require.NotNil(t, ch, "invoke got nil chan")
-		}), "invoke failed")
-	})
-
-	t.Run("func constructor", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() func(int) {
-			return func(int) {}
-		}), "provide failed")
-		require.NoError(t, c.Invoke(func(f func(int)) {
-			require.NotNil(t, f, "invoke got nil function pointer")
-		}), "invoke failed")
-	})
-
-	t.Run("interface constructor", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() io.Writer {
-			return &bytes.Buffer{}
-		}), "provide failed")
-		require.NoError(t, c.Invoke(func(w io.Writer) {
-			require.NotNil(t, w, "invoke got nil interface")
-		}), "invoke failed")
-	})
-
-	t.Run("param", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		type contents string
-		type Args struct {
-			In
-
-			Contents contents
-		}
-
-		require.NoError(t,
-			ch.Provide(func(args Args) *bytes.Buffer {
-				require.NotEmpty(t, args.Contents, "contents must not be empty")
-				return bytes.NewBufferString(string(args.Contents))
-			}), "provide constructor failed")
-
-		require.NoError(t,
-			ch.Provide(func() contents { return "hello world" }),
-			"provide value failed")
-
-		require.NoError(t, c.Invoke(func(buff *bytes.Buffer) {
-			out, err := ioutil.ReadAll(buff)
-			require.NoError(t, err, "read from buffer failed")
-			require.Equal(t, "hello world", string(out), "contents don't match")
-		}))
-	})
-
-	t.Run("invoke param", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() *bytes.Buffer {
-			return new(bytes.Buffer)
-		}), "provide failed")
-
-		type Args struct {
-			In
-
-			*bytes.Buffer
-		}
-
-		require.NoError(t, c.Invoke(func(args Args) {
-			require.NotNil(t, args.Buffer, "invoke got nil buffer")
-		}))
-	})
-
-	t.Run("param wrapper", func(t *testing.T) {
-		var (
-			buff   *bytes.Buffer
-			called bool
-		)
-
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() *bytes.Buffer {
-			require.False(t, called, "constructor must be called exactly once")
-			called = true
-			buff = new(bytes.Buffer)
-			return buff
-		}), "provide failed")
-
-		type MyParam struct{ In }
-
-		type Args struct {
-			MyParam
-
-			Buffer *bytes.Buffer
-		}
-
-		require.NoError(t, c.Invoke(func(args Args) {
-			require.True(t, called, "constructor must be called first")
-			require.NotNil(t, args.Buffer, "invoke got nil buffer")
-			require.True(t, args.Buffer == buff, "buffer must match constructor's return value")
-		}))
-	})
-
-	t.Run("param recurse", func(t *testing.T) {
-		type anotherParam struct {
-			In
-
-			Buffer *bytes.Buffer
-		}
-
-		type someParam struct {
-			In
-
-			Buffer  *bytes.Buffer
-			Another anotherParam
-		}
-
-		var (
-			buff   *bytes.Buffer
-			called bool
-		)
-
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() *bytes.Buffer {
-			require.False(t, called, "constructor must be called exactly once")
-			called = true
-			buff = new(bytes.Buffer)
-			return buff
-		}), "provide must not fail")
-
-		require.NoError(t, c.Invoke(func(p someParam) {
-			require.True(t, called, "constructor must be called first")
-
-			require.NotNil(t, p.Buffer, "someParam.Buffer must not be nil")
-			require.NotNil(t, p.Another.Buffer, "anotherParam.Buffer must not be nil")
-
-			require.True(t, p.Buffer == p.Another.Buffer, "buffers fields must match")
-			require.True(t, p.Buffer == buff, "buffer must match constructor's return value")
-		}), "invoke must not fail")
-	})
-
-	t.Run("multiple-type constructor", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		constructor := func() (*bytes.Buffer, []int, error) {
-			return &bytes.Buffer{}, []int{42}, nil
-		}
-		consumer := func(b *bytes.Buffer, nums []int) {
-			assert.NotNil(t, b, "invoke got nil buffer")
-			assert.Equal(t, 1, len(nums), "invoke got empty slice")
-		}
-		require.NoError(t, ch.Provide(constructor), "provide failed")
-		require.NoError(t, c.Invoke(consumer), "invoke failed")
-	})
-
-	t.Run("multiple-type constructor is called once", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		type A struct{}
-		type B struct{}
-		count := 0
-		constructor := func() (*A, *B, error) {
-			count++
-			return &A{}, &B{}, nil
-		}
-		getA := func(a *A) {
-			assert.NotNil(t, a, "got nil A")
-		}
-		getB := func(b *B) {
-			assert.NotNil(t, b, "got nil B")
-		}
-		require.NoError(t, ch.Provide(constructor), "provide failed")
-		require.NoError(t, c.Invoke(getA), "A invoke failed")
-		require.NoError(t, c.Invoke(getB), "B invoke failed")
-		require.NoError(t, c.Invoke(func(a *A, b *B) {}), "AB invoke failed")
-		require.Equal(t, 1, count, "Constructor must be called once")
-	})
-
-	t.Run("method invocation inside Invoke", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		type A struct{}
-		type B struct{}
-		cA := func() (*A, error) {
-			return &A{}, nil
-		}
-		cB := func() (*B, error) {
-			return &B{}, nil
-		}
-		getA := func(a *A) {
-			c.Invoke(func(b *B) {
-				assert.NotNil(t, b, "got nil B")
-			})
-			assert.NotNil(t, a, "got nil A")
-		}
-
-		require.NoError(t, ch.Provide(cA), "provide failed")
-		require.NoError(t, ch.Provide(cB), "provide failed")
-		require.NoError(t, c.Invoke(getA), "A invoke failed")
-	})
-
-	t.Run("collections and instances of same type", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() []*bytes.Buffer {
-			return []*bytes.Buffer{{}}
-		}), "providing collection failed")
-		require.NoError(t, ch.Provide(func() *bytes.Buffer {
-			return &bytes.Buffer{}
-		}), "providing pointer failed")
-	})
-
-	t.Run("optional param field", func(t *testing.T) {
-		type type1 struct{}
-		type type2 struct{}
-		type type3 struct{}
-		type type4 struct{}
-		type type5 struct{}
-		constructor := func() (*type1, *type3, *type4) {
-			return &type1{}, &type3{}, &type4{}
-		}
-
-		c := New()
-
-		ch := c.Child("child")
-		type param struct {
-			In
-
-			T1 *type1 // regular 'ol type
-			T2 *type2 `optional:"true" useless_tag:"false"` // optional type NOT in the graph
-			T3 *type3 `unrelated:"foo=42, optional"`        // type in the graph with unrelated tag
-			T4 *type4 `optional:"true"`                     // optional type present in the graph
-			T5 *type5 `optional:"t"`                        // optional type NOT in the graph with "yes"
-		}
-		require.NoError(t, ch.Provide(constructor))
-		require.NoError(t, c.Invoke(func(p param) {
-			require.NotNil(t, p.T1, "whole param struct should not be nil")
-			assert.Nil(t, p.T2, "optional type not in the graph should return nil")
-			assert.NotNil(t, p.T3, "required type with unrelated tag not in the graph")
-			assert.NotNil(t, p.T4, "optional type in the graph should not return nil")
-			assert.Nil(t, p.T5, "optional type not in the graph should return nil")
-		}))
-	})
-
-	t.Run("out type inserts multiple objects into the graph", func(t *testing.T) {
-		type A struct{ name string }
-		type B struct{ name string }
-		type Ret struct {
-			Out
-			A  // value type A
-			*B // pointer type *B
-		}
-		myA := A{"string A"}
-		myB := &B{"string B"}
-
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() Ret {
-			return Ret{A: myA, B: myB}
-		}), "provide for the Ret struct should succeed")
-		require.NoError(t, c.Invoke(func(a A, b *B) {
-			assert.Equal(t, a.name, "string A", "value type should work for dig.Out")
-			assert.Equal(t, b.name, "string B", "pointer should work for dig.Out")
-			assert.True(t, myA == a, "should get the same pointer for &A")
-			assert.Equal(t, b, myB, "b and myB should be uqual")
-		}))
-	})
-
-	t.Run("constructor with optional", func(t *testing.T) {
-		type type1 struct{}
-		type type2 struct{}
-
-		type param struct {
-			In
-
-			T1 *type1 `optional:"true"`
-		}
-
-		c := New()
-
-		ch := c.Child("child")
-
-		var gave *type2
-		require.NoError(t, ch.Provide(func(p param) *type2 {
-			require.Nil(t, p.T1, "T1 must be nil")
-			gave = &type2{}
-			return gave
-		}), "provide failed")
-
-		require.NoError(t, c.Invoke(func(got *type2) {
-			require.True(t, got == gave, "type2 reference must be the same")
-		}), "invoke failed")
-	})
-
-	t.Run("nested dependencies", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-
-		type A struct{ name string }
-		type B struct{ name string }
-		type C struct{ name string }
-
-		require.NoError(t, ch.Provide(func() A { return A{"->A"} }))
-		require.NoError(t, ch.Provide(func(A) B { return B{"A->B"} }))
-		require.NoError(t, ch.Provide(func(A, B) C { return C{"AB->C"} }))
-		require.NoError(t, c.Invoke(func(a A, b B, c C) {
-			assert.Equal(t, a, A{"->A"})
-			assert.Equal(t, b, B{"A->B"})
-			assert.Equal(t, c, C{"AB->C"})
-		}), "invoking should succeed")
-	})
-
-	t.Run("primitives", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() string { return "piper" }), "string provide failed")
-		require.NoError(t, ch.Provide(func() int { return 42 }), "int provide failed")
-		require.NoError(t, ch.Provide(func() int64 { return 24 }), "int provide failed")
-		require.NoError(t, ch.Provide(func() time.Duration {
-			return 10 * time.Second
-		}), "time.Duration provide failed")
-		require.NoError(t, c.Invoke(func(i64 int64, i int, s string, d time.Duration) {
-			assert.Equal(t, 42, i)
-			assert.Equal(t, int64(24), i64)
-			assert.Equal(t, "piper", s)
-			assert.Equal(t, 10*time.Second, d)
-		}))
-	})
-
-	t.Run("out types recurse", func(t *testing.T) {
-		type A struct{}
-		type B struct{}
-		type C struct{}
-		// Contains A
-		type Ret1 struct {
-			Out
-			*A
-		}
-		// Contains *A (through Ret1), *B and C
-		type Ret2 struct {
-			Ret1
-			*B
-			C
-		}
-		c := New()
-
-		ch := c.Child("child")
-
-		require.NoError(t, ch.Provide(func() Ret2 {
-			return Ret2{
-				Ret1: Ret1{
-					A: &A{},
-				},
-				B: &B{},
-				C: C{},
-			}
-		}), "provide for the Ret struct should succeed")
-		require.NoError(t, c.Invoke(func(a *A, b *B, c C) {
-			require.NotNil(t, a, "*A should be part of the container through Ret2->Ret1")
-		}))
-	})
-
-	t.Run("named instances can be created with tags", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		type A struct{ idx int }
-
-		// returns three named instances of A
-		type ret struct {
-			Out
-
-			A1 A `name:"first"`
-			A2 A `name:"second"`
-			A3 A `name:"third"`
-		}
-
-		// requires two specific named instances
-		type param struct {
-			In
-
-			A1 A `name:"first"`
-			A3 A `name:"third"`
-		}
-		require.NoError(t, ch.Provide(func() ret {
-			return ret{A1: A{1}, A2: A{2}, A3: A{3}}
-		}), "provide for three named instances should succeed")
-		require.NoError(t, c.Invoke(func(p param) {
-			assert.Equal(t, 1, p.A1.idx)
-			assert.Equal(t, 3, p.A3.idx)
-		}), "invoke should succeed, pulling out two named instances")
-	})
-
-	t.Run("named instances can be created with Name option", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-
-		type A struct{ idx int }
-
-		buildConstructor := func(idx int) func() A {
-			return func() A { return A{idx: idx} }
-		}
-
-		require.NoError(t, ch.Provide(buildConstructor(1), Name("first")))
-		require.NoError(t, ch.Provide(buildConstructor(2), Name("second")))
-		require.NoError(t, ch.Provide(buildConstructor(3), Name("third")))
-
-		type param struct {
-			In
-
-			A1 A `name:"first"`
-			A3 A `name:"third"`
-		}
-
-		require.NoError(t, c.Invoke(func(p param) {
-			assert.Equal(t, 1, p.A1.idx)
-			assert.Equal(t, 3, p.A3.idx)
-		}), "invoke should succeed, pulling out two named instances")
-	})
-
-	t.Run("named and unnamed instances coexist", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		type A struct{ idx int }
-
-		type out struct {
-			Out
-
-			A `name:"foo"`
-		}
-
-		require.NoError(t, ch.Provide(func() out { return out{A: A{1}} }))
-		require.NoError(t, ch.Provide(func() A { return A{2} }))
-
-		type in struct {
-			In
-
-			A1 A `name:"foo"`
-			A2 A
-		}
-		require.NoError(t, c.Invoke(func(i in) {
-			assert.Equal(t, 1, i.A1.idx)
-			assert.Equal(t, 2, i.A2.idx)
-		}))
-	})
-
-	t.Run("named instances recurse", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		type A struct{ idx int }
-
-		type Ret1 struct {
-			Out
-
-			A1 A `name:"first"`
-		}
-		type Ret2 struct {
-			Ret1
-
-			A2 A `name:"second"`
-		}
-		type param struct {
-			In
-
-			A1 A `name:"first"`  // should come from ret1 through ret2
-			A2 A `name:"second"` // should come from ret2
-		}
-		require.NoError(t, ch.Provide(func() Ret2 {
-			return Ret2{
-				Ret1: Ret1{
-					A1: A{1},
-				},
-				A2: A{2},
-			}
-		}))
-		require.NoError(t, c.Invoke(func(p param) {
-			assert.Equal(t, 1, p.A1.idx)
-			assert.Equal(t, 2, p.A2.idx)
-		}), "invoke should succeed, pulling out two named instances")
-	})
-
-	t.Run("named instances do not cause cycles", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		type A struct{ idx int }
-		type param struct {
-			In
-			A `name:"uno"`
-		}
-		type paramBoth struct {
-			In
-
-			A1 A `name:"uno"`
-			A2 A `name:"dos"`
-		}
-		type retUno struct {
-			Out
-			A `name:"uno"`
-		}
-		type retDos struct {
-			Out
-			A `name:"dos"`
-		}
-
-		require.NoError(t, ch.Provide(func() retUno {
-			return retUno{A: A{1}}
-		}), `should be able to provide A[name="uno"]`)
-		require.NoError(t, ch.Provide(func(p param) retDos {
-			return retDos{A: A{2}}
-		}), `A[name="dos"] should be able to rely on A[name="uno"]`)
-		require.NoError(t, c.Invoke(func(p paramBoth) {
-			assert.Equal(t, 1, p.A1.idx)
-			assert.Equal(t, 2, p.A2.idx)
-		}), "both objects should be successfully resolved on Invoke")
-	})
-
-	t.Run("struct constructor with as interface option", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-
-		provider := ch.Provide(
-			func() *bytes.Buffer {
-				var buf bytes.Buffer
-				buf.WriteString("foo")
-				return &buf
-			},
-			As(new(fmt.Stringer), new(io.Reader)),
-		)
-
-		require.NoError(t, provider, "provide failed")
-
-		require.NoError(t, c.Invoke(
-			func(s fmt.Stringer, r io.Reader) {
-				require.Equal(t, "foo", s.String(), "invoke got new buffer")
-				got, err := ioutil.ReadAll(r)
-				assert.NoError(t, err, "failed to read from reader")
-				require.Equal(t, "foo", string(got), "invoke got new buffer")
-			},
-		), "invoke failed")
-	})
-
-	t.Run("As with Name", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-
-		require.NoError(t, ch.Provide(
-			func() *bytes.Buffer {
-				return bytes.NewBufferString("foo")
-			},
-			As(new(io.Reader)),
-			Name("buff"),
-		), "failed to provide")
-
-		type in struct {
-			In
-
-			Buffer *bytes.Buffer `name:"buff"`
-			Reader io.Reader     `name:"buff"`
-		}
-
-		require.NoError(t, c.Invoke(func(got in) {
-			assert.NotNil(t, got.Buffer, "buffer must not be nil")
-
-			assert.True(t, got.Buffer == got.Reader,
-				"reader and buffer must be the same object")
-
-			body, err := ioutil.ReadAll(got.Reader)
-			require.NoError(t, err, "failed to read buffer body")
-			assert.Equal(t, "foo", string(body))
-		}))
-	})
-
-	t.Run("As same interface", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() io.Reader {
-			panic("this function should not be called")
-		}, As(new(io.Reader))), "failed to provide")
-	})
-
-	t.Run("As different interface", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		require.NoError(t, ch.Provide(func() io.ReadCloser {
-			panic("this function should not be called")
-		}, As(new(io.Reader), new(io.Closer))), "failed to provide")
-	})
-
-	t.Run("invoke on a type that depends on named parameters", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		type A struct{ idx int }
-		type B struct{ sum int }
-		type param struct {
-			In
-
-			A1 *A `name:"foo"`
-			A2 *A `name:"bar"`
-			A3 *A `name:"baz" optional:"true"`
-		}
-		type ret struct {
-			Out
-
-			A1 *A `name:"foo"`
-			A2 *A `name:"bar"`
-		}
-		require.NoError(t, ch.Provide(func() (ret, error) {
-			return ret{
-				A1: &A{1},
-				A2: &A{2},
-			}, nil
-		}), "should be able to provide A1 and A2 into the graph")
-		require.NoError(t, ch.Provide(func(p param) *B {
-			return &B{sum: p.A1.idx + p.A2.idx}
-		}), "should be able to provide *B that relies on two named types")
-		require.NoError(t, c.Invoke(func(b *B) {
-			require.Equal(t, 3, b.sum)
-		}))
-	})
-
-	t.Run("optional and named ordering doesn't matter", func(t *testing.T) {
-		type param1 struct {
-			In
-
-			Foo *struct{} `name:"foo" optional:"true"`
-		}
-
-		type param2 struct {
-			In
-
-			Foo *struct{} `optional:"true" name:"foo"`
-		}
-
-		t.Run("optional", func(t *testing.T) {
-			c := New()
-
-			ch := c.Child("child")
-
-			called1 := false
-			require.NoError(t, ch.Invoke(func(p param1) {
-				called1 = true
-				assert.Nil(t, p.Foo)
-			}))
-
-			called2 := false
-			require.NoError(t, ch.Invoke(func(p param2) {
-				called2 = true
-				assert.Nil(t, p.Foo)
-			}))
-
-			assert.True(t, called1)
-			assert.True(t, called2)
-		})
-
-		t.Run("named", func(t *testing.T) {
-			c := New()
-
-			ch := c.Child("child")
-
-			require.NoError(t, ch.Provide(func() *struct{} {
-				return &struct{}{}
-			}, Name("foo")))
-
-			called1 := false
-			require.NoError(t, c.Invoke(func(p param1) {
-				called1 = true
-				assert.NotNil(t, p.Foo)
-			}))
-
-			called2 := false
-			require.NoError(t, c.Invoke(func(p param2) {
-				called2 = true
-				assert.NotNil(t, p.Foo)
-			}))
-
-			assert.True(t, called1)
-			assert.True(t, called2)
-		})
-
-	})
-
-	t.Run("dynamically generated dig.In", func(t *testing.T) {
-		// This test verifies that a dig.In generated using reflect.StructOf
-		// works with our dig.In detection logic.
-		c := New()
-
-		ch := c.Child("child")
-
-		type type1 struct{}
-		type type2 struct{}
-
-		var gave *type1
-		new1 := func() *type1 {
-			require.Nil(t, gave, "constructor must be called only once")
-			gave = &type1{}
-			return gave
-		}
-
-		require.NoError(t, ch.Provide(new1), "failed to provide constructor")
-
-		// We generate a struct that embeds dig.In.
-		//
-		// Note that the fix for https://github.com/golang/go/issues/18780
-		// requires that StructField.Name is always set but versions of Go
-		// older than 1.9 expect Name to be empty for embedded fields.
-		//
-		// We use utils_for_go19_test and utils_for_pre_go19_test with build
-		// tags to implement this behavior differently in the two Go versions.
-
-		inType := reflect.StructOf([]reflect.StructField{
-			anonymousField(reflect.TypeOf(In{})),
-			{
-				Name: "Foo",
-				Type: reflect.TypeOf(&type1{}),
-			},
-			{
-				Name: "Bar",
-				Type: reflect.TypeOf(&type2{}),
-				Tag:  `optional:"true"`,
-			},
-		})
-
-		// We generate a function that relies on that struct and validates the
-		// result.
-		fn := reflect.MakeFunc(
-			reflect.FuncOf([]reflect.Type{inType}, nil /* returns */, false /* variadic */),
-			func(args []reflect.Value) []reflect.Value {
-				require.Len(t, args, 1, "expected only one argument")
-				require.Equal(t, reflect.Struct, args[0].Kind(), "argument must be a struct")
-				require.Equal(t, 3, args[0].NumField(), "struct must have two fields")
-
-				t1, ok := args[0].Field(1).Interface().(*type1)
-				require.True(t, ok, "field must be a type1")
-				require.NotNil(t, t1, "value must not be nil")
-				require.True(t, t1 == gave, "value must match constructor's return value")
-
-				require.True(t, args[0].Field(2).IsNil(), "type2 must be nil")
-				return nil
-			},
-		)
-
-		require.NoError(t, c.Invoke(fn.Interface()), "invoke failed")
-	})
-
-	t.Run("dynamically generated dig.Out", func(t *testing.T) {
-		// This test verifies that a dig.Out generated using reflect.StructOf
-		// works with our dig.Out detection logic.
-
-		c := New()
-
-		ch := c.Child("child")
-
-		type A struct{ Value int }
-
-		outType := reflect.StructOf([]reflect.StructField{
-			anonymousField(reflect.TypeOf(Out{})),
-			{
-				Name: "Foo",
-				Type: reflect.TypeOf(&A{}),
-				Tag:  `name:"foo"`,
-			},
-			{
-				Name: "Bar",
-				Type: reflect.TypeOf(&A{}),
-				Tag:  `name:"bar"`,
-			},
-		})
-
-		fn := reflect.MakeFunc(
-			reflect.FuncOf(nil /* params */, []reflect.Type{outType}, false /* variadic */),
-			func([]reflect.Value) []reflect.Value {
-				result := reflect.New(outType).Elem()
-				result.Field(1).Set(reflect.ValueOf(&A{Value: 1}))
-				result.Field(2).Set(reflect.ValueOf(&A{Value: 2}))
-				return []reflect.Value{result}
-			},
-		)
-		require.NoError(t, ch.Provide(fn.Interface()), "provide failed")
-
-		type params struct {
-			In
-
-			Foo *A `name:"foo"`
-			Bar *A `name:"bar"`
-			Baz *A `name:"baz" optional:"true"`
-		}
-
-		require.NoError(t, c.Invoke(func(p params) {
-			assert.Equal(t, &A{Value: 1}, p.Foo, "Foo must match")
-			assert.Equal(t, &A{Value: 2}, p.Bar, "Bar must match")
-			assert.Nil(t, p.Baz, "Baz must be unset")
-		}), "invoke failed")
-	})
-
-	t.Run("variadic arguments invoke", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-
-		type A struct{}
-
-		var gaveA *A
-		require.NoError(t, ch.Provide(func() *A {
-			gaveA = &A{}
-			return gaveA
-		}), "failed to provide A")
-
-		require.NoError(t, ch.Provide(func() []*A {
-			panic("[]*A constructor must not be called.")
-		}), "failed to provide A slice")
-
-		require.NoError(t, c.Invoke(func(a *A, as ...*A) {
-			require.NotNil(t, a, "A must not be nil")
-			require.True(t, a == gaveA, "A must match")
-			require.Empty(t, as, "varargs must be empty")
-		}), "failed to invoke")
-	})
-
-	t.Run("variadic arguments dependency", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-
-		type A struct{}
-		type B struct{}
-
-		var gaveA *A
-		require.NoError(t, ch.Provide(func() *A {
-			gaveA = &A{}
-			return gaveA
-		}), "failed to provide A")
-
-		require.NoError(t, ch.Provide(func() []*A {
-			panic("[]*A constructor must not be called.")
-		}), "failed to provide A slice")
-
-		var gaveB *B
-		require.NoError(t, ch.Provide(func(a *A, as ...*A) *B {
-			require.NotNil(t, a, "A must not be nil")
-			require.True(t, a == gaveA, "A must match")
-			require.Empty(t, as, "varargs must be empty")
-			gaveB = &B{}
-			return gaveB
-		}), "failed to provide B")
-
-		require.NoError(t, c.Invoke(func(b *B) {
-			require.NotNil(t, b, "B must not be nil")
-			require.True(t, b == gaveB, "B must match")
-		}), "failed to invoke")
-	})
-
-	t.Run("non-error return arguments from invoke are ignored", func(t *testing.T) {
-		c := New()
-
-		ch := c.Child("child")
-		type A struct{}
-		type B struct{}
-
-		require.NoError(t, ch.Provide(func() A { return A{} }))
-		require.NoError(t, c.Invoke(func(A) B { return B{} }))
-
-		err := c.Invoke(func(B) {})
-		require.Error(t, err, "invoking with B param should error out")
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestChildren.func\S+ \(\S+/src/go.uber.org/dig/dig_test.go:\d+\):`,
-			"type dig.B is not in the container,",
-			"did you mean to Provide it?",
-		)
-	})
 
 	t.Run("parent providers available to deeply nested children", func(t *testing.T) {
 		c := New()
@@ -1966,370 +991,51 @@ func TestChildren(t *testing.T) {
 }
 
 func TestGroups(t *testing.T) {
-	t.Run("empty slice received without provides", func(t *testing.T) {
-		c := New()
-
-		type in struct {
-			In
-
-			Values []int `group:"foo"`
-		}
-
-		require.NoError(t, c.Invoke(func(i in) {
-			require.Empty(t, i.Values)
-		}), "failed to invoke")
-	})
-
-	t.Run("values are provided", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		type out struct {
-			Out
-
-			Value int `group:"val"`
-		}
-
-		provide := func(i int) {
-			require.NoError(t, c.Provide(func() out {
-				return out{Value: i}
-			}), "failed to provide ")
-		}
-
-		provide(1)
-		provide(2)
-		provide(3)
-
-		type in struct {
-			In
-
-			Values []int `group:"val"`
-		}
-
-		require.NoError(t, c.Invoke(func(i in) {
-			assert.Equal(t, []int{2, 3, 1}, i.Values)
-		}), "invoke failed")
-	})
-
-	t.Run("groups are provided via option", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		provide := func(i int) {
-			require.NoError(t, c.Provide(func() int {
-				return i
-			}, Group("val")), "failed to provide ")
-		}
-
-		provide(1)
-		provide(2)
-		provide(3)
-
-		type in struct {
-			In
-
-			Values []int `group:"val"`
-		}
-
-		require.NoError(t, c.Invoke(func(i in) {
-			assert.Equal(t, []int{2, 3, 1}, i.Values)
-		}), "invoke failed")
-	})
-
-	t.Run("different types may be grouped", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		provide := func(i int, s string) {
-			require.NoError(t, c.Provide(func() (int, string) {
-				return i, s
-			}, Group("val")), "failed to provide ")
-		}
-
-		provide(1, "a")
-		provide(2, "b")
-		provide(3, "c")
-
-		type in struct {
-			In
-
-			Ivalues []int    `group:"val"`
-			Svalues []string `group:"val"`
-		}
-
-		require.NoError(t, c.Invoke(func(i in) {
-			assert.Equal(t, []int{2, 3, 1}, i.Ivalues)
-			assert.Equal(t, []string{"a", "c", "b"}, i.Svalues)
-		}), "invoke failed")
-	})
-
-	t.Run("group options may not be provided for result structs", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		type out struct {
-			Out
-
-			Value int `group:"val"`
-		}
-
-		func(i int) {
-			require.Error(t, c.Provide(func() {
-				t.Fatal("This should not be called")
-			}, Group("val")), "This Provide should fail")
-		}(1)
-	})
-
-	t.Run("constructor is called at most once", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		type out struct {
-			Out
-
-			Result string `group:"s"`
-		}
-
-		calls := make(map[string]int)
-
-		provide := func(i string) {
-			require.NoError(t, c.Provide(func() out {
-				calls[i]++
-				return out{Result: i}
-			}), "failed to provide")
-		}
-
-		provide("foo")
-		provide("bar")
-		provide("baz")
-
-		type in struct {
-			In
-
-			Results []string `group:"s"`
-		}
-
-		// Expected value of in.Results in consecutive calls.
-		expected := [][]string{
-			{"bar", "baz", "foo"},
-			{"foo", "baz", "bar"},
-			{"baz", "bar", "foo"},
-			{"bar", "foo", "baz"},
-		}
-
-		for i, want := range expected {
-			require.NoError(t, c.Invoke(func(i in) {
-				require.Equal(t, want, i.Results)
-			}), "invoke %d failed", i)
-		}
-
-		for s, v := range calls {
-			assert.Equal(t, 1, v, "constructor for %q called too many times", s)
-		}
-	})
-
-	t.Run("consume groups in constructor", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		type out struct {
-			Out
-
-			Result []string `group:"hi"`
-		}
-
-		provideStrings := func(strings ...string) {
-			require.NoError(t, c.Provide(func() out {
-				return out{Result: strings}
-			}), "failed to provide")
-		}
-
-		provideStrings("1", "2")
-		provideStrings("3", "4", "5")
-		provideStrings("6")
-		provideStrings("7", "8", "9", "10")
-
-		type setParams struct {
-			In
-
-			Strings [][]string `group:"hi"`
-		}
-		require.NoError(t, c.Provide(func(p setParams) map[string]struct{} {
-			m := make(map[string]struct{})
-			for _, ss := range p.Strings {
-				for _, s := range ss {
-					m[s] = struct{}{}
-				}
-			}
-			return m
-		}), "failed to provide set constructor")
-
-		require.NoError(t, c.Invoke(func(got map[string]struct{}) {
-			assert.Equal(t, map[string]struct{}{
-				"1": {}, "2": {}, "3": {}, "4": {}, "5": {},
-				"6": {}, "7": {}, "8": {}, "9": {}, "10": {},
-			}, got)
-		}), "failed to invoke")
-	})
-
-	t.Run("provide multiple values", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		type outInt struct {
-			Out
-			Int int `group:"foo"`
-		}
-
-		provideInt := func(i int) {
-			require.NoError(t, c.Provide(func() (outInt, error) {
-				return outInt{Int: i}, nil
-			}), "failed to provide int")
-		}
-
-		type outString struct {
-			Out
-			String string `group:"foo"`
-		}
-
-		provideString := func(s string) {
-			require.NoError(t, c.Provide(func() outString {
-				return outString{String: s}
-			}), "failed to provide string")
-		}
-
-		type outBoth struct {
-			Out
-
-			Int    int    `group:"foo"`
-			String string `group:"foo"`
-		}
-
-		provideBoth := func(i int, s string) {
-			require.NoError(t, c.Provide(func() (outBoth, error) {
-				return outBoth{Int: i, String: s}, nil
-			}), "failed to provide both")
-		}
-
-		provideInt(1)
-		provideString("foo")
-		provideBoth(2, "bar")
-		provideString("baz")
-		provideInt(3)
-		provideBoth(4, "qux")
-		provideBoth(5, "quux")
-		provideInt(6)
-		provideInt(7)
-
-		type in struct {
-			In
-
-			Ints    []int    `group:"foo"`
-			Strings []string `group:"foo"`
-		}
-
-		require.NoError(t, c.Invoke(func(got in) {
-			assert.Equal(t, in{
-				Ints:    []int{5, 3, 4, 1, 6, 7, 2},
-				Strings: []string{"foo", "bar", "baz", "quux", "qux"},
-			}, got)
-		}), "failed to invoke")
-	})
-
-	t.Run("duplicate values are supported", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		type out struct {
-			Out
-
-			Result string `group:"s"`
-		}
-
-		provide := func(i string) {
-			require.NoError(t, c.Provide(func() out {
-				return out{Result: i}
-			}), "failed to provide")
-		}
-
-		provide("a")
-		provide("b")
-		provide("c")
-		provide("a")
-		provide("d")
-		provide("d")
-		provide("a")
-		provide("e")
-
-		type stringSlice []string
-
-		type in struct {
-			In
-
-			Strings stringSlice `group:"s"`
-		}
-
-		require.NoError(t, c.Invoke(func(i in) {
-			assert.Equal(t,
-				stringSlice{"d", "c", "a", "a", "d", "e", "b", "a"},
-				i.Strings)
-		}), "failed to invoke")
-	})
-
-	t.Run("failure to build a grouped value fails everything", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-
-		type out struct {
-			Out
-
-			Result string `group:"x"`
-		}
-
-		require.NoError(t, c.Provide(func() (out, error) {
-			return out{Result: "foo"}, nil
-		}), "failed to provide")
-
-		var gaveErr error
-		require.NoError(t, c.Provide(func() (out, error) {
-			gaveErr = errors.New("great sadness")
-			return out{}, gaveErr
-		}), "failed to provide")
-
-		require.NoError(t, c.Provide(func() out {
-			return out{Result: "bar"}
-		}), "failed to provide")
-
-		type in struct {
-			In
-
-			Strings []string `group:"x"`
-		}
-
-		err := c.Invoke(func(i in) {
-			require.FailNow(t, "this function must not be called")
+	testSubGraphs(t, testGroups)
+}
+
+func testSubGraphs(t *testing.T, tf func(*testing.T, newFunc)) {
+	t.Run("root", func(t *testing.T) {
+		tf(t, func(oo ...Option) (func(interface{}, ...ProvideOption) error, func(interface{}, ...InvokeOption) error) {
+			c := New(oo...)
+			return c.Provide, c.Invoke
 		})
-		require.Error(t, err, "expected failure")
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestGroups`,
-			`could not build value group string\[group="x"\]:`,
-			`function "go.uber.org/dig".TestGroups\S+ \(\S+:\d+\) returned a non-nil error:`,
-			"great sadness",
-		)
-		assert.Equal(t, gaveErr, RootCause(err))
+	})
+
+	t.Run("provide in parent, invoke in child", func(t *testing.T) {
+		tf(t, func(oo ...Option) (func(interface{}, ...ProvideOption) error, func(interface{}, ...InvokeOption) error) {
+			parent := New(oo...)
+			child := parent.Child("child")
+			return parent.Provide, child.Invoke
+		})
+	})
+
+	t.Run("provide in child, invoke in parent", func(t *testing.T) {
+		tf(t, func(oo ...Option) (func(interface{}, ...ProvideOption) error, func(interface{}, ...InvokeOption) error) {
+			parent := New(oo...)
+			child := parent.Child("child")
+			return child.Provide, parent.Invoke
+		})
 	})
 }
 
-func TestChildrenGroups(t *testing.T) {
+func testGroups(t *testing.T, fp newFunc) {
 	t.Run("empty slice received without provides", func(t *testing.T) {
-		c := New()
+		_, invoke := fp()
 
-		ch := c.Child("child")
 		type in struct {
 			In
 
 			Values []int `group:"foo"`
 		}
 
-		require.NoError(t, ch.Invoke(func(i in) {
+		require.NoError(t, invoke(func(i in) {
 			require.Empty(t, i.Values)
 		}), "failed to invoke")
 	})
 
 	t.Run("values are provided", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		ch := c.Child("child")
+		provide, invoke := fp(setRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
 			Out
@@ -2337,15 +1043,15 @@ func TestChildrenGroups(t *testing.T) {
 			Value int `group:"val"`
 		}
 
-		provide := func(i int) {
-			require.NoError(t, ch.Provide(func() out {
+		p := func(i int) {
+			require.NoError(t, provide(func() out {
 				return out{Value: i}
 			}), "failed to provide ")
 		}
 
-		provide(1)
-		provide(2)
-		provide(3)
+		p(1)
+		p(2)
+		p(3)
 
 		type in struct {
 			In
@@ -2353,24 +1059,23 @@ func TestChildrenGroups(t *testing.T) {
 			Values []int `group:"val"`
 		}
 
-		require.NoError(t, c.Invoke(func(i in) {
+		require.NoError(t, invoke(func(i in) {
 			assert.Equal(t, []int{2, 3, 1}, i.Values)
 		}), "invoke failed")
 	})
 
 	t.Run("groups are provided via option", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		ch := c.Child("child")
+		provide, invoke := fp(setRand(rand.New(rand.NewSource(0))))
 
-		provide := func(i int) {
-			require.NoError(t, ch.Provide(func() int {
+		p := func(i int) {
+			require.NoError(t, provide(func() int {
 				return i
 			}, Group("val")), "failed to provide ")
 		}
 
-		provide(1)
-		provide(2)
-		provide(3)
+		p(1)
+		p(2)
+		p(3)
 
 		type in struct {
 			In
@@ -2378,24 +1083,23 @@ func TestChildrenGroups(t *testing.T) {
 			Values []int `group:"val"`
 		}
 
-		require.NoError(t, c.Invoke(func(i in) {
+		require.NoError(t, invoke(func(i in) {
 			assert.Equal(t, []int{2, 3, 1}, i.Values)
 		}), "invoke failed")
 	})
 
 	t.Run("different types may be grouped", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		ch := c.Child("child")
+		provide, invoke := fp(setRand(rand.New(rand.NewSource(0))))
 
-		provide := func(i int, s string) {
-			require.NoError(t, ch.Provide(func() (int, string) {
+		p := func(i int, s string) {
+			require.NoError(t, provide(func() (int, string) {
 				return i, s
 			}, Group("val")), "failed to provide ")
 		}
 
-		provide(1, "a")
-		provide(2, "b")
-		provide(3, "c")
+		p(1, "a")
+		p(2, "b")
+		p(3, "c")
 
 		type in struct {
 			In
@@ -2404,15 +1108,14 @@ func TestChildrenGroups(t *testing.T) {
 			Svalues []string `group:"val"`
 		}
 
-		require.NoError(t, c.Invoke(func(i in) {
+		require.NoError(t, invoke(func(i in) {
 			assert.Equal(t, []int{2, 3, 1}, i.Ivalues)
 			assert.Equal(t, []string{"a", "c", "b"}, i.Svalues)
 		}), "invoke failed")
 	})
 
 	t.Run("group options may not be provided for result structs", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		ch := c.Child("child")
+		provide, _ := fp(setRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
 			Out
@@ -2421,15 +1124,14 @@ func TestChildrenGroups(t *testing.T) {
 		}
 
 		func(i int) {
-			require.Error(t, ch.Provide(func() {
+			require.Error(t, provide(func() {
 				t.Fatal("This should not be called")
 			}, Group("val")), "This Provide should fail")
 		}(1)
 	})
 
 	t.Run("constructor is called at most once", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		ch := c.Child("child")
+		provide, invoke := fp(setRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
 			Out
@@ -2439,16 +1141,16 @@ func TestChildrenGroups(t *testing.T) {
 
 		calls := make(map[string]int)
 
-		provide := func(i string) {
-			require.NoError(t, ch.Provide(func() out {
+		p := func(i string) {
+			require.NoError(t, provide(func() out {
 				calls[i]++
 				return out{Result: i}
 			}), "failed to provide")
 		}
 
-		provide("foo")
-		provide("bar")
-		provide("baz")
+		p("foo")
+		p("bar")
+		p("baz")
 
 		type in struct {
 			In
@@ -2465,7 +1167,7 @@ func TestChildrenGroups(t *testing.T) {
 		}
 
 		for i, want := range expected {
-			require.NoError(t, c.Invoke(func(i in) {
+			require.NoError(t, invoke(func(i in) {
 				require.Equal(t, want, i.Results)
 			}), "invoke %d failed", i)
 		}
@@ -2476,8 +1178,7 @@ func TestChildrenGroups(t *testing.T) {
 	})
 
 	t.Run("consume groups in constructor", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		ch := c.Child("child")
+		provide, invoke := fp(setRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
 			Out
@@ -2486,7 +1187,7 @@ func TestChildrenGroups(t *testing.T) {
 		}
 
 		provideStrings := func(strings ...string) {
-			require.NoError(t, ch.Provide(func() out {
+			require.NoError(t, provide(func() out {
 				return out{Result: strings}
 			}), "failed to provide")
 		}
@@ -2501,7 +1202,7 @@ func TestChildrenGroups(t *testing.T) {
 
 			Strings [][]string `group:"hi"`
 		}
-		require.NoError(t, ch.Provide(func(p setParams) map[string]struct{} {
+		require.NoError(t, provide(func(p setParams) map[string]struct{} {
 			m := make(map[string]struct{})
 			for _, ss := range p.Strings {
 				for _, s := range ss {
@@ -2511,7 +1212,7 @@ func TestChildrenGroups(t *testing.T) {
 			return m
 		}), "failed to provide set constructor")
 
-		require.NoError(t, c.Invoke(func(got map[string]struct{}) {
+		require.NoError(t, invoke(func(got map[string]struct{}) {
 			assert.Equal(t, map[string]struct{}{
 				"1": {}, "2": {}, "3": {}, "4": {}, "5": {},
 				"6": {}, "7": {}, "8": {}, "9": {}, "10": {},
@@ -2520,8 +1221,7 @@ func TestChildrenGroups(t *testing.T) {
 	})
 
 	t.Run("provide multiple values", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		ch := c.Child("child")
+		provide, invoke := fp(setRand(rand.New(rand.NewSource(0))))
 
 		type outInt struct {
 			Out
@@ -2529,7 +1229,7 @@ func TestChildrenGroups(t *testing.T) {
 		}
 
 		provideInt := func(i int) {
-			require.NoError(t, ch.Provide(func() (outInt, error) {
+			require.NoError(t, provide(func() (outInt, error) {
 				return outInt{Int: i}, nil
 			}), "failed to provide int")
 		}
@@ -2540,7 +1240,7 @@ func TestChildrenGroups(t *testing.T) {
 		}
 
 		provideString := func(s string) {
-			require.NoError(t, ch.Provide(func() outString {
+			require.NoError(t, provide(func() outString {
 				return outString{String: s}
 			}), "failed to provide string")
 		}
@@ -2553,7 +1253,7 @@ func TestChildrenGroups(t *testing.T) {
 		}
 
 		provideBoth := func(i int, s string) {
-			require.NoError(t, ch.Provide(func() (outBoth, error) {
+			require.NoError(t, provide(func() (outBoth, error) {
 				return outBoth{Int: i, String: s}, nil
 			}), "failed to provide both")
 		}
@@ -2575,7 +1275,7 @@ func TestChildrenGroups(t *testing.T) {
 			Strings []string `group:"foo"`
 		}
 
-		require.NoError(t, c.Invoke(func(got in) {
+		require.NoError(t, invoke(func(got in) {
 			assert.Equal(t, in{
 				Ints:    []int{5, 3, 4, 1, 6, 7, 2},
 				Strings: []string{"foo", "bar", "baz", "quux", "qux"},
@@ -2584,8 +1284,7 @@ func TestChildrenGroups(t *testing.T) {
 	})
 
 	t.Run("duplicate values are supported", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		ch := c.Child("child")
+		provide, invoke := fp(setRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
 			Out
@@ -2593,20 +1292,20 @@ func TestChildrenGroups(t *testing.T) {
 			Result string `group:"s"`
 		}
 
-		provide := func(i string) {
-			require.NoError(t, ch.Provide(func() out {
+		p := func(i string) {
+			require.NoError(t, provide(func() out {
 				return out{Result: i}
 			}), "failed to provide")
 		}
 
-		provide("a")
-		provide("b")
-		provide("c")
-		provide("a")
-		provide("d")
-		provide("d")
-		provide("a")
-		provide("e")
+		p("a")
+		p("b")
+		p("c")
+		p("a")
+		p("d")
+		p("d")
+		p("a")
+		p("e")
 
 		type stringSlice []string
 
@@ -2616,7 +1315,7 @@ func TestChildrenGroups(t *testing.T) {
 			Strings stringSlice `group:"s"`
 		}
 
-		require.NoError(t, c.Invoke(func(i in) {
+		require.NoError(t, invoke(func(i in) {
 			assert.Equal(t,
 				stringSlice{"d", "c", "a", "a", "d", "e", "b", "a"},
 				i.Strings)
@@ -2624,8 +1323,7 @@ func TestChildrenGroups(t *testing.T) {
 	})
 
 	t.Run("failure to build a grouped value fails everything", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		ch := c.Child("child")
+		provide, invoke := fp(setRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
 			Out
@@ -2633,17 +1331,17 @@ func TestChildrenGroups(t *testing.T) {
 			Result string `group:"x"`
 		}
 
-		require.NoError(t, ch.Provide(func() (out, error) {
+		require.NoError(t, provide(func() (out, error) {
 			return out{Result: "foo"}, nil
 		}), "failed to provide")
 
 		var gaveErr error
-		require.NoError(t, ch.Provide(func() (out, error) {
+		require.NoError(t, provide(func() (out, error) {
 			gaveErr = errors.New("great sadness")
 			return out{}, gaveErr
 		}), "failed to provide")
 
-		require.NoError(t, ch.Provide(func() out {
+		require.NoError(t, provide(func() out {
 			return out{Result: "bar"}
 		}), "failed to provide")
 
@@ -2653,14 +1351,14 @@ func TestChildrenGroups(t *testing.T) {
 			Strings []string `group:"x"`
 		}
 
-		err := c.Invoke(func(i in) {
+		err := invoke(func(i in) {
 			require.FailNow(t, "this function must not be called")
 		})
 		require.Error(t, err, "expected failure")
 		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestChildrenGroups`,
+			`could not build arguments for function "go.uber.org/dig".testGroups`,
 			`could not build value group string\[group="x"\]:`,
-			`function "go.uber.org/dig".TestChildrenGroups\S+ \(\S+:\d+\) returned a non-nil error:`,
+			`function "go.uber.org/dig".testGroups\S+ \(\S+:\d+\) returned a non-nil error:`,
 			"great sadness",
 		)
 		assert.Equal(t, gaveErr, RootCause(err))
@@ -3057,6 +1755,18 @@ func TestProvideKnownTypesFails(t *testing.T) {
 		assert.NoError(t, c.Provide(func() *bytes.Buffer { return nil }))
 		assert.Error(t, c.Provide(func() *bytes.Buffer { return nil }))
 	})
+	t.Run("provide constructor twice first in parent and then in child", func(t *testing.T) {
+		parent := New()
+		child := parent.Child("child")
+		assert.NoError(t, parent.Provide(func() *bytes.Buffer { return nil }))
+		assert.Error(t, child.Provide(func() *bytes.Buffer { return nil }))
+	})
+	t.Run("provide constructor twice first in parent and then in child", func(t *testing.T) {
+		parent := New()
+		child := parent.Child("child")
+		assert.NoError(t, child.Provide(func() *bytes.Buffer { return nil }))
+		assert.Error(t, parent.Provide(func() *bytes.Buffer { return nil }))
+	})
 }
 
 func TestProvideCycleFails(t *testing.T) {
@@ -3294,11 +2004,15 @@ func TestTypeCheckingEquality(t *testing.T) {
 func TestInvokesUseCachedObjects(t *testing.T) {
 	t.Parallel()
 
-	c := New()
+	testSubGraphs(t, testInvokesUseCachedObjects)
+}
+
+func testInvokesUseCachedObjects(t *testing.T, fp newFunc) {
+	provide, invoke := fp()
 
 	constructorCalls := 0
 	buf := &bytes.Buffer{}
-	require.NoError(t, c.Provide(func() *bytes.Buffer {
+	require.NoError(t, provide(func() *bytes.Buffer {
 		assert.Equal(t, 0, constructorCalls, "constructor must not have been called before")
 		constructorCalls++
 		return buf
@@ -3306,7 +2020,7 @@ func TestInvokesUseCachedObjects(t *testing.T) {
 
 	calls := 0
 	for i := 0; i < 3; i++ {
-		assert.NoError(t, c.Invoke(func(b *bytes.Buffer) {
+		assert.NoError(t, invoke(func(b *bytes.Buffer) {
 			calls++
 			require.Equal(t, 1, constructorCalls, "constructor must be called exactly once")
 			require.Equal(t, buf, b, "invoke got different buffer pointer")
