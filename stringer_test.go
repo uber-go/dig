@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 
@@ -105,4 +106,14 @@ func TestStringer(t *testing.T) {
 	assert.Contains(t, s, `string[group="baz"] => foo`)
 	assert.Contains(t, s, `string[group="baz"] => bar`)
 	assert.Contains(t, s, `string[group="baz"] => baz`)
+
+	s = c.Child("child").String()
+
+	// Parent
+	assert.Contains(t, s, fmt.Sprintf("parent: %p", c))
+
+	s = c.String()
+	// Children
+	assert.Contains(t, s, "children: [")
+	assert.Contains(t, s, "child -> ")
 }

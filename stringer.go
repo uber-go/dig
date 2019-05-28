@@ -29,6 +29,9 @@ import (
 // String representation of the entire Container
 func (c *Container) String() string {
 	b := &bytes.Buffer{}
+	if c.parent != nil {
+		fmt.Fprintf(b, "parent: %p\n", c.parent)
+	}
 	fmt.Fprintln(b, "nodes: {")
 	for k, vs := range c.providers {
 		for _, v := range vs {
@@ -47,6 +50,14 @@ func (c *Container) String() string {
 		}
 	}
 	fmt.Fprintln(b, "}")
+
+	fmt.Fprintln(b, "children: [")
+	for _, v := range c.children {
+		fmt.Fprintln(b, "\t{")
+		fmt.Fprintln(b, "\t\t", v.name, "->", v)
+		fmt.Fprintln(b, "\t}")
+	}
+	fmt.Fprintln(b, "]")
 
 	return b.String()
 }
