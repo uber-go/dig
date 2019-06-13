@@ -15,10 +15,13 @@ A reflection based dependency injection toolkit for Go.
 
 ## Installation
 
-We recommend locking to [SemVer](http://semver.org/) range `^1` using [Glide](https://github.com/Masterminds/glide):
+We recommend consuming [SemVer](http://semver.org/) major version `1` using
+your dependency manager of choice.
 
 ```
-glide get 'go.uber.org/dig#^1'
+$ glide get 'go.uber.org/dig#^1'
+$ dep ensure -add "go.uber.org/dig@v1"
+$ go get 'go.uber.org/dig@v1'
 ```
 
 ## Stability
