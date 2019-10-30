@@ -62,56 +62,56 @@ func TestInspectFunc(t *testing.T) {
 			give:           SomeExportedFunction,
 			wantName:       "SomeExportedFunction",
 			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "unexported function",
 			give:           unexportedFunction,
 			wantName:       "unexportedFunction",
 			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "nested function",
 			give:           nested1,
 			wantName:       "nestedFunctions.func1",
 			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "second nested function",
 			give:           nested2,
 			wantName:       "nestedFunctions.func2",
 			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "nested inside a nested function",
 			give:           nested3,
 			wantName:       "nestedFunctions.func2.1",
 			wantPackage:    "go.uber.org/dig/internal/digreflect",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/func_test.go",
+			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "inside a .git package",
 			give:           myrepository.Hello,
 			wantName:       "Hello",
 			wantPackage:    "go.uber.org/dig/internal/digreflect/tests/myrepository.git",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/tests/myrepository.git/hello.go",
+			wantFileSuffix: "/internal/digreflect/tests/myrepository.git/hello.go",
 		},
 		{
 			desc:           "subpackage of a .git package",
 			give:           mypackage.Add,
 			wantName:       "Add",
 			wantPackage:    "go.uber.org/dig/internal/digreflect/tests/myrepository.git/mypackage",
-			wantFileSuffix: "go.uber.org/dig/internal/digreflect/tests/myrepository.git/mypackage/add.go",
+			wantFileSuffix: "/internal/digreflect/tests/myrepository.git/mypackage/add.go",
 		},
 		{
-			desc:           "vendored dependency",
+			desc:           "dependency",
 			give:           assert.Contains,
 			wantName:       "Contains",
 			wantPackage:    "github.com/stretchr/testify/assert",
-			wantFileSuffix: "go.uber.org/dig/vendor/github.com/stretchr/testify/assert/assertions.go",
+			wantFileSuffix: "/assert/assertions.go",
 		},
 	}
 
@@ -121,7 +121,7 @@ func TestInspectFunc(t *testing.T) {
 			assert.Equal(t, tt.wantName, f.Name, "function name did not match")
 			assert.Equal(t, tt.wantPackage, f.Package, "package name did not match")
 
-			assert.True(t, strings.HasSuffix(f.File, "src/"+tt.wantFileSuffix),
+			assert.True(t, strings.HasSuffix(f.File, tt.wantFileSuffix),
 				"file path %q does not end with src/%v", f.File, tt.wantFileSuffix)
 			assert.Contains(t, f.String(), tt.wantFileSuffix, "file path not in String output")
 		})
