@@ -2,17 +2,24 @@ language: go
 sudo: false
 go_import_path: go.uber.org/dig
 
+env:
+  global:
+    - GO111MODULE=on
+
 matrix:
   include:
-    - go: "1.11"
     - go: "1.12"
+    - go: "1.13"
       env: LINT=1
 
-cache:
-  directories:
-    - vendor
 install:
-  - make dependencies
+  - go mod download
+
 script:
-  - test -z "$LINT" && echo "Skipping lint" || make lint
-  - make ci
+  - test -z "$LINT" || make lint
+  - make test
+  - make bench
+
+after_success:
+  - make cover
+  - bash <(curl -s https://codecov.io/bash)
