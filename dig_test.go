@@ -864,7 +864,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		err := c.Invoke(func(B) {})
 		require.Error(t, err, "invoking with B param should error out")
 		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestEndToEndSuccess.func\S+ \(\S+/src/go.uber.org/dig/dig_test.go:\d+\):`,
+			`missing dependencies for function "go.uber.org/dig".TestEndToEndSuccess.func\S+ \(\S+/dig_test.go:\d+\):`,
 			"type dig.B is not in the container,",
 			"did you mean to Provide it?",
 		)
