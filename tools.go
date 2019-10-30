@@ -23,6 +23,5 @@
 package dig
 
 import (
-	_ "go.uber.org/tools/update-license"
 	_ "golang.org/x/lint/golint"
 )

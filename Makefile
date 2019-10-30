@@ -1,8 +1,6 @@
 export GOBIN ?= $(shell pwd)/bin
 
 BENCH_FLAGS ?= -cpuprofile=cpu.pprof -memprofile=mem.pprof -benchmem
-
-UPDATE_LICENSE = $(GOBIN)/update-license
 GOLINT = $(GOBIN)/golint
 
 GO_FILES := $(shell \
@@ -16,12 +14,8 @@ all: build lint test
 build:
 	go build ./...
 
-.PHONY: license
-license: $(UPDATE_LICENSE)
-	PATH=$(GOBIN):$$PATH ./check_license.sh | tee -a lint.log
-
 .PHONY: lint
-lint: $(GOLINT) $(UPDATE_LICENSE)
+lint: $(GOLINT)
 	@rm -rf lint.log
 	@echo "Checking formatting..."
 	@gofmt -d -s $(GO_FILES) 2>&1 | tee lint.log
@@ -32,15 +26,11 @@ lint: $(GOLINT) $(UPDATE_LICENSE)
 	@echo "Checking for unresolved FIXMEs..."
 	@git grep -i fixme | grep -v -e Makefile | tee -a lint.log
 	@echo "Checking for license headers..."
-	@PATH=$(GOBIN):$$PATH DRY_RUN=1 ./check_license.sh | tee -a lint.log
+	@./check_license.sh | tee -a lint.log
 	@[ ! -s lint.log ]
 
 $(GOLINT):
 	go install golang.org/x/lint/golint
-
-$(UPDATE_LICENSE):
-	go install go.uber.org/tools/update-license
-
 
 .PHONY: test
 test:
