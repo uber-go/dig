@@ -65,14 +65,12 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("struct constructor", func(t *testing.T) {
 		c := New()
-		require.NoError(t, c.Provide(func() bytes.Buffer {
-			var buf bytes.Buffer
-			buf.WriteString("foo")
-			return buf
-		}), "provide failed")
+		var buf bytes.Buffer
+		buf.WriteString("foo")
+		require.NoError(t, c.Provide(func() bytes.Buffer { return buf }), "provide failed")
 		require.NoError(t, c.Invoke(func(b bytes.Buffer) {
 			// ensure we're getting back the buffer we put in
-			require.Equal(t, "foo", b.String(), "invoke got new buffer")
+			require.Equal(t, "foo", buf.String(), "invoke got new buffer")
 		}), "invoke failed")
 	})
 
@@ -603,74 +601,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
 		}), "both objects should be successfully resolved on Invoke")
-	})
-
-	t.Run("struct constructor with as interface option", func(t *testing.T) {
-		c := New()
-
-		provider := c.Provide(
-			func() *bytes.Buffer {
-				var buf bytes.Buffer
-				buf.WriteString("foo")
-				return &buf
-			},
-			As(new(fmt.Stringer), new(io.Reader)),
-		)
-
-		require.NoError(t, provider, "provide failed")
-
-		require.NoError(t, c.Invoke(
-			func(s fmt.Stringer, r io.Reader) {
-				require.Equal(t, "foo", s.String(), "invoke got new buffer")
-				got, err := ioutil.ReadAll(r)
-				assert.NoError(t, err, "failed to read from reader")
-				require.Equal(t, "foo", string(got), "invoke got new buffer")
-			},
-		), "invoke failed")
-	})
-
-	t.Run("As with Name", func(t *testing.T) {
-		c := New()
-
-		require.NoError(t, c.Provide(
-			func() *bytes.Buffer {
-				return bytes.NewBufferString("foo")
-			},
-			As(new(io.Reader)),
-			Name("buff"),
-		), "failed to provide")
-
-		type in struct {
-			In
-
-			Buffer *bytes.Buffer `name:"buff"`
-			Reader io.Reader     `name:"buff"`
-		}
-
-		require.NoError(t, c.Invoke(func(got in) {
-			assert.NotNil(t, got.Buffer, "buffer must not be nil")
-
-			assert.True(t, got.Buffer == got.Reader,
-				"reader and buffer must be the same object")
-
-			body, err := ioutil.ReadAll(got.Reader)
-			require.NoError(t, err, "failed to read buffer body")
-			assert.Equal(t, "foo", string(body))
-		}))
-	})
-
-	t.Run("As same interface", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() io.Reader {
-			panic("this function should not be called")
-		}, As(new(io.Reader))), "failed to provide")
-	})
-
-	t.Run("As different interface", func(t *testing.T) {
-		c := New()
-		require.NoError(t, c.Provide(func() io.ReadCloser {
-			panic("this function should not be called")
-		}, As(new(io.Reader), new(io.Closer))), "failed to provide")
 	})
 
 	t.Run("invoke on a type that depends on named parameters", func(t *testing.T) {
@@ -1516,83 +1446,16 @@ func TestProvideInvalidGroup(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid dig.Group(\"foo`bar\"): group names cannot contain backquotes")
 }
 
-func TestProvideInvalidAs(t *testing.T) {
-	ptrToStruct := &struct {
-		name string
-	}{
-		name: "example",
-	}
-	var nilInterface io.Reader
-	c := New()
-	tests := []struct {
-		name        string
-		param       interface{}
-		expectedErr string
-	}{
-		{
-			name:        "as param is not an type interface",
-			param:       123,
-			expectedErr: "invalid dig.As(int): argument must be a pointer to an interface",
-		},
-		{
-			name:        "as param is a pointer to struct",
-			param:       ptrToStruct,
-			expectedErr: "invalid dig.As(*struct { name string }): argument must be a pointer to an interface",
-		},
-		{
-			name:        "as param is a nil interface",
-			param:       nilInterface,
-			expectedErr: "invalid dig.As(nil): argument must be a pointer to an interface",
-		},
-		{
-			name:        "as param is a nil",
-			param:       nil,
-			expectedErr: "invalid dig.As(nil): argument must be a pointer to an interface",
-		},
-		{
-			name:        "as param is a func",
-			param:       func() {},
-			expectedErr: "invalid dig.As(func()): argument must be a pointer to an interface",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := c.Provide(
-				func() *bytes.Buffer {
-					var buf bytes.Buffer
-					return &buf
-				},
-				As(tt.param),
-			)
-
-			require.Error(t, err, "provide must fail")
-			assert.Contains(t, err.Error(), tt.expectedErr)
-		})
-	}
-}
-
-func TestProvideIncompatibleOptions(t *testing.T) {
+func TestProvideGroupAndName(t *testing.T) {
 	t.Parallel()
 
-	t.Run("group and name", func(t *testing.T) {
-		c := New()
-		err := c.Provide(func() io.Reader {
-			panic("this function must not be called")
-		}, Group("foo"), Name("bar"))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
-			"name:\"bar\" provided with group:\"foo\"")
-	})
-
-	t.Run("group and As", func(t *testing.T) {
-		c := New()
-		err := c.Provide(func() *bytes.Buffer {
-			panic("this function must not be called")
-		}, Group("foo"), As(new(io.Reader)))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use dig.As with value groups: "+
-			`dig.As provided with group:"foo"`)
-	})
+	c := New()
+	err := c.Provide(func() io.Reader {
+		panic("this function must not be called")
+	}, Group("foo"), Name("bar"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
+		"name:\"bar\" provided with group:\"foo\"")
 }
 
 func TestCantProvideUntypedNil(t *testing.T) {
@@ -1962,32 +1825,6 @@ func TestProvideFailures(t *testing.T) {
 		)
 	})
 
-	t.Run("out returning multiple instances of the same type and As option", func(t *testing.T) {
-		c := New()
-		type A struct{ idx int }
-		type ret struct {
-			Out
-
-			A1 A // same type A provided three times
-			A2 A
-			A3 A
-		}
-
-		err := c.Provide(func() ret {
-			return ret{
-				A1: A{idx: 1},
-				A2: A{idx: 2},
-				A3: A{idx: 3},
-			}
-		}, As(new(interface{})))
-		require.Error(t, err, "provide must return error")
-		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
-			`cannot provide dig.A from \[0\].A2:`,
-			`already provided by \[0\].A1`,
-		)
-	})
-
 	t.Run("provide multiple instances with the same name", func(t *testing.T) {
 		c := New()
 		type A struct{}
@@ -2067,46 +1904,6 @@ func TestProvideFailures(t *testing.T) {
 			`cannot build a result object by embedding \*dig.Out, embed dig.Out instead:`,
 			`dig.out embeds \*dig.Out`,
 		)
-	})
-
-	t.Run("provide the same implemented interface", func(t *testing.T) {
-		c := New()
-		err := c.Provide(
-			func() *bytes.Buffer {
-				var buf bytes.Buffer
-				return &buf
-			},
-			As(new(io.Reader)),
-			As(new(io.Reader)),
-		)
-
-		require.Error(t, err, "provide must fail")
-		assert.Contains(t, err.Error(), "cannot provide io.Reader")
-		assert.Contains(t, err.Error(), "already provided")
-	})
-
-	t.Run("provide the same implementation with as interface", func(t *testing.T) {
-		c := New()
-		err := c.Provide(
-			func() *bytes.Buffer {
-				var buf bytes.Buffer
-				return &buf
-			},
-			As(new(io.Reader)),
-		)
-		require.NoError(t, err, "provide must not fail here")
-
-		err = c.Provide(
-			func() *bytes.Buffer {
-				var buf bytes.Buffer
-				return &buf
-			},
-			As(new(io.Reader)),
-		)
-
-		require.Error(t, err, "provide must fail")
-		assert.Contains(t, err.Error(), "cannot provide *bytes.Buffer")
-		assert.Contains(t, err.Error(), "already provided")
 	})
 }
 

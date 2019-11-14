@@ -7,7 +7,7 @@ digraph {
 		
 	
 		subgraph cluster_0 {
-			constructor_0 [shape=plaintext label="TestVisualize.func6.1"];
+			constructor_0 [shape=plaintext label="TestVisualize.func5.1"];
 			
 			"dig.t3[group=foo]0" [label=<dig.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>];
 			
@@ -15,7 +15,7 @@ digraph {
 		
 		
 		subgraph cluster_1 {
-			constructor_1 [shape=plaintext label="TestVisualize.func6.2"];
+			constructor_1 [shape=plaintext label="TestVisualize.func5.2"];
 			
 			"dig.t3[group=foo]1" [label=<dig.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>];
 			
@@ -23,7 +23,7 @@ digraph {
 		
 		
 		subgraph cluster_2 {
-			constructor_2 [shape=plaintext label="TestVisualize.func6.3"];
+			constructor_2 [shape=plaintext label="TestVisualize.func5.3"];
 			
 			"dig.t2" [label=<dig.t2>];
 			
