@@ -21,6 +21,8 @@
 package dig
 
 import (
+	"fmt"
+	"io"
 	"reflect"
 	"testing"
 
@@ -554,8 +556,23 @@ type nestedErr struct {
 	err error
 }
 
-func (err nestedErr) Error() string { return "oh no" }
-func (err nestedErr) cause() error  { return err.err }
+var _ causer = nestedErr{}
+
+func (e nestedErr) Error() string {
+	return fmt.Sprint(e)
+}
+
+func (e nestedErr) Format(w fmt.State, c rune) {
+	formatCauser(e, w, c)
+}
+
+func (e nestedErr) cause() error {
+	return e.err
+}
+
+func (e nestedErr) writeMessage(w io.Writer, _ string) {
+	io.WriteString(w, "oh no")
+}
 
 func TestCanVisualizeError(t *testing.T) {
 	tests := []struct {

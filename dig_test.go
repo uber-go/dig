@@ -1210,7 +1210,7 @@ func TestGroups(t *testing.T) {
 		assertErrorMatches(t, err,
 			`could not build arguments for function "go.uber.org/dig".TestGroups`,
 			`could not build value group string\[group="x"\]:`,
-			`function "go.uber.org/dig".TestGroups\S+ \(\S+:\d+\) returned a non-nil error:`,
+			`received non-nil error from function "go.uber.org/dig".TestGroups\S+ \(\S+:\d+\):`,
 			"great sadness",
 		)
 		assert.Equal(t, gaveErr, RootCause(err))
@@ -1270,7 +1270,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 				err := c.Provide(tt.constructor)
 				require.Error(t, err, "provide should fail")
 				assertErrorMatches(t, err,
-					`function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
+					`cannot provide function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\):`,
 					`bad argument 1:`,
 					`cannot depend on result objects:`,
 					tt.msg)
@@ -1294,7 +1294,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 		require.Error(t, err)
 
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\):`,
 			`bad result 1:`,
 			"cannot specify a name for result objects: dig.out embeds dig.Out",
 		)
@@ -1321,7 +1321,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 		require.Error(t, err)
 
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideConstructorErrors\S+ \(\S+:\d+\):`,
 			`bad field "Result1" of dig.Result2:`,
 			"cannot specify a name for result objects: dig.Result1 embeds dig.Out",
 		)
@@ -1349,7 +1349,7 @@ func TestProvideRespectsConstructorErrors(t *testing.T) {
 		assertErrorMatches(t, err,
 			`could not build arguments for function "go.uber.org/dig".TestProvideRespectsConstructorErrors\S+ \(\S+:\d+\):`,
 			`failed to build \*bytes.Buffer:`,
-			`function "go.uber.org/dig".TestProvideRespectsConstructorErrors\S+ \(\S+:\d+\) returned a non-nil error:`,
+			`received non-nil error from function "go.uber.org/dig".TestProvideRespectsConstructorErrors\S+ \(\S+:\d+\):`,
 			`oh no`)
 		assert.False(t, called, "shouldn't call invoked function when deps aren't available")
 	})
@@ -1493,7 +1493,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 		})
 		require.Error(t, err, "provide should fail")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestCantProvideParameterObjects\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestCantProvideParameterObjects\S+ \(\S+:\d+\):`,
 			"bad result 1:",
 			`cannot provide parameter objects:`,
 			`dig.Args embeds a dig.In`,
@@ -1509,7 +1509,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 		err := c.Provide(func() (*Args, error) { return args, nil })
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestCantProvideParameterObjects\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestCantProvideParameterObjects\S+ \(\S+:\d+\):`,
 			"bad result 1:",
 			`cannot provide parameter objects:`,
 			`\*dig.Args embeds a dig.In`,
@@ -1563,7 +1563,7 @@ func TestProvideCycleFails(t *testing.T) {
 		require.Error(t, err, "expected error when introducing cycle")
 		require.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\):`,
 			`this function introduces a cycle:`,
 			`\*dig.C provided by "go.uber.org/dig".TestProvideCycleFails\S+ \(\S+\)`,
 			`depends on \*dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
@@ -1609,7 +1609,7 @@ func TestProvideCycleFails(t *testing.T) {
 		require.Error(t, err, "expected error when introducing cycle")
 		require.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\):`,
 			`this function introduces a cycle:`,
 			`dig.C provided by "go.uber.org/dig".TestProvideCycleFails\S+ \(\S+\)`,
 			`depends on dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
@@ -1679,7 +1679,7 @@ func TestProvideCycleFails(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+:\d+\):`,
 			`this function introduces a cycle:`,
 			`\*dig.D provided by "go.uber.org/dig".TestProvideCycleFails\S+ \(\S+\)`,
 			`depends on int\[group="bar"\] provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
@@ -1819,7 +1819,7 @@ func TestProvideFailures(t *testing.T) {
 		})
 		require.Error(t, err, "provide must return error")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\):`,
 			`cannot provide dig.A from \[0\].A2:`,
 			`already provided by \[0\].A1`,
 		)
@@ -1844,7 +1844,7 @@ func TestProvideFailures(t *testing.T) {
 		})
 		require.Error(t, err, "expected error on the second provide")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\):`,
 			`cannot provide \*dig.A\[name="foo"\] from \[0\].A:`,
 			`already provided by "go.uber.org/dig".TestProvideFailures\S+`,
 		)
@@ -1863,7 +1863,7 @@ func TestProvideFailures(t *testing.T) {
 		err := c.Provide(func() out1 { return out1{a2: A{77}} })
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\):`,
 			"bad result 1:",
 			`bad field "a2" of dig.out1:`,
 			`unexported fields not allowed in dig.Out, did you mean to export "a2" \(dig.A\)\?`,
@@ -1880,7 +1880,7 @@ func TestProvideFailures(t *testing.T) {
 		err := c.Provide(func() *out { return &out{String: "foo"} })
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\):`,
 			"bad result 1:",
 			`cannot return a pointer to a result object, use a value instead:`,
 			`\*dig.out is a pointer to a struct that embeds dig.Out`,
@@ -1899,7 +1899,7 @@ func TestProvideFailures(t *testing.T) {
 		err := c.Provide(func() out { return out{String: "foo"} })
 		require.Error(t, err)
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\):`,
 			"bad result 1:",
 			`cannot build a result object by embedding \*dig.Out, embed dig.Out instead:`,
 			`dig.out embeds \*dig.Out`,
@@ -2078,7 +2078,7 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err, "expected provide error")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
 			"bad argument 1:",
 			`bad field "Args" of dig.args:`,
 			`bad field "Buffer" of dig.nestedArgs:`,
@@ -2150,7 +2150,7 @@ func TestInvokeFailures(t *testing.T) {
 			`failed to build \*dig.dep:`,
 			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
 			`failed to build \*dig.failed:`,
-			`function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+:\d+\) returned a non-nil error:`,
+			`received non-nil error from function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
 			`failed`,
 		)
 		assert.Equal(t, errFailed, RootCause(err), "root cause must match")
@@ -2223,7 +2223,7 @@ func TestInvokeFailures(t *testing.T) {
 		err := c.Provide(func(in) int { return 0 })
 		require.Error(t, err, "Provide must fail")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
 			"bad argument 1:",
 			`bad field "foo" of dig.in:`,
 			`unexported fields not allowed in dig.In, did you mean to export "foo" \(string\)\?`,
@@ -2471,7 +2471,7 @@ func TestInvokeFailures(t *testing.T) {
 
 		require.Error(t, err, "expected Invoke error")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
+			`received non-nil error from function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\):`,
 			"great sadness",
 		)
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
@@ -2499,7 +2499,7 @@ func TestInvokeFailures(t *testing.T) {
 			"failed to build dig.B",
 			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures\S+`,
 			"failed to build dig.A",
-			`function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
+			`received non-nil error from function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\):`,
 			"great sadness",
 		)
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
@@ -2526,7 +2526,7 @@ func TestInvokeFailures(t *testing.T) {
 		assertErrorMatches(t, err,
 			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.func\S+`,
 			"failed to build dig.A:",
-			`function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
+			`received non-nil error from function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\):`,
 			"great sadness",
 		)
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
@@ -2560,7 +2560,7 @@ func TestInvokeFailures(t *testing.T) {
 			"failed to build dig.B:",
 			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.func\S+`,
 			"failed to build dig.A:",
-			`function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\) returned a non-nil error:`,
+			`received non-nil error from function "go.uber.org/dig".TestInvokeFailures.func\S+ \(\S+\):`,
 			"great sadness",
 		)
 		assert.Equal(t, errors.New("great sadness"), RootCause(err))
