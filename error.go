@@ -21,7 +21,6 @@
 package dig
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -371,21 +370,77 @@ func (e errParamGroupFailed) updateGraph(g *dot.Graph) {
 	g.FailGroupNodes(e.Key.group, e.Key.t, e.CtorID)
 }
 
-// errMissingType is returned when a single value that was expected in the
-// container was not available.
-type errMissingType struct {
-	Key key
+// missingType holds information about a type that was missing in the
+// container.
+type missingType struct {
+	Key key // item that was missing
 
 	// If non-empty, we will include suggestions for what the user may have
 	// meant.
 	suggestions []key
 }
 
-func newErrMissingType(c containerStore, k key) errMissingType {
+// Format prints a string representation of missingType.
+//
+// With %v, it prints a short representation ideal for an itemized list.
+//
+//   io.Writer
+//   io.Writer: did you mean *bytes.Buffer?
+//   io.Writer: did you mean *bytes.Buffer, or *os.File?
+//
+// With %+v, it prints a longer representation ideal for standalone output.
+//
+//   io.Writer: did you mean to Provide it?
+//   io.Writer: did you mean to use *bytes.Buffer?
+//   io.Writer: did you mean to use one of *bytes.Buffer, or *os.File?
+func (mt missingType) Format(w fmt.State, v rune) {
+	plusV := w.Flag('+') && v == 'v'
+
+	fmt.Fprint(w, mt.Key)
+	switch len(mt.suggestions) {
+	case 0:
+		if plusV {
+			io.WriteString(w, " (did you mean to Provide it?)")
+		}
+	case 1:
+		sug := mt.suggestions[0]
+		if plusV {
+			fmt.Fprintf(w, " (did you mean to use %v?)", sug)
+		} else {
+			fmt.Fprintf(w, " (did you mean %v?)", sug)
+		}
+	default:
+		if plusV {
+			io.WriteString(w, " (did you mean to use one of ")
+		} else {
+			io.WriteString(w, " (did you mean ")
+		}
+
+		lastIdx := len(mt.suggestions) - 1
+		for i, sug := range mt.suggestions {
+			if i > 0 {
+				io.WriteString(w, ", ")
+				if i == lastIdx {
+					io.WriteString(w, "or ")
+				}
+			}
+			fmt.Fprint(w, sug)
+		}
+		io.WriteString(w, "?)")
+	}
+}
+
+// errMissingType is returned when one or more values that were expected in
+// the container were not available.
+//
+// Multiple instances of this error may be merged together by appending them.
+type errMissingTypes []missingType // inv: len > 0
+
+func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 	// Possible types we will look for in the container. We will always look
 	// for pointers to the requested type and some extras on a per-Kind basis.
-
 	suggestions := []reflect.Type{reflect.PtrTo(k.t)}
+
 	if k.t.Kind() == reflect.Ptr {
 		// The user requested a pointer but maybe we have a value.
 		suggestions = append(suggestions, k.t.Elem())
@@ -414,98 +469,60 @@ func newErrMissingType(c containerStore, k key) errMissingType {
 	// suggestions.
 	sort.Sort(byTypeName(suggestions))
 
-	err := errMissingType{Key: k}
+	mt := missingType{Key: k}
 	for _, t := range suggestions {
 		if len(c.getValueProviders(k.name, t)) > 0 {
 			k.t = t
-			err.suggestions = append(err.suggestions, k)
+			mt.suggestions = append(mt.suggestions, k)
 		}
 	}
 
-	return err
+	return errMissingTypes{mt}
 }
 
-func (e errMissingType) Error() string {
-	// Sample messages:
-	//
-	//   type io.Reader is not in the container, did you mean to Provide it?
-	//   type io.Reader is not in the container, did you mean to use one of *bytes.Buffer, *MyBuffer
-	//   type bytes.Buffer is not in the container, did you mean to use *bytes.Buffer?
-	//   type *foo[name="bar"] is not in the container, did you mean to use foo[name="bar"]?
-
-	b := new(bytes.Buffer)
-
-	fmt.Fprintf(b, "type %v is not in the container", e.Key)
-	switch len(e.suggestions) {
-	case 0:
-		b.WriteString(", did you mean to Provide it?")
-	case 1:
-		fmt.Fprintf(b, ", did you mean to use %v?", e.suggestions[0])
-	default:
-		b.WriteString(", did you mean to use one of ")
-		for i, k := range e.suggestions {
-			if i > 0 {
-				b.WriteString(", ")
-				if i == len(e.suggestions)-1 {
-					b.WriteString("or ")
-				}
-			}
-			fmt.Fprint(b, k)
-		}
-		b.WriteString("?")
-	}
-
-	return b.String()
+func (e errMissingTypes) Error() string {
+	return fmt.Sprint(e)
 }
 
-// errMissingManyTypes combines multiple errMissingType errors.
-type errMissingManyTypes []errMissingType // length must be non-zero
+func (e errMissingTypes) Format(w fmt.State, v rune) {
+	multiline := w.Flag('+') && v == 'v'
 
-func (e errMissingManyTypes) Error() string {
 	if len(e) == 1 {
-		return e[0].Error()
+		io.WriteString(w, "missing type:")
+	} else {
+		io.WriteString(w, "missing types:")
 	}
 
-	b := new(bytes.Buffer)
-
-	b.WriteString("the following types are not in the container: ")
-	for i, err := range e {
-		if i > 0 {
-			b.WriteString("; ")
-		}
-		fmt.Fprintf(b, "%v", err.Key)
-		switch len(err.suggestions) {
-		case 0:
-			// do nothing
-		case 1:
-			fmt.Fprintf(b, " (did you mean %v?)", err.suggestions[0])
-		default:
-			b.WriteString(" (did you mean ")
-			for i, k := range err.suggestions {
-				if i > 0 {
-					b.WriteString(", ")
-					if i == len(err.suggestions)-1 {
-						b.WriteString("or ")
-					}
-				}
-				fmt.Fprint(b, k)
-			}
-			b.WriteString("?)")
-		}
+	if !multiline {
+		// With %v, we need a space between : since the error
+		// won't be on a new line.
+		io.WriteString(w, " ")
 	}
 
-	return b.String()
+	for i, mt := range e {
+		if multiline {
+			io.WriteString(w, "\n\t- ")
+		} else if i > 0 {
+			io.WriteString(w, "; ")
+		}
+
+		if multiline {
+			fmt.Fprintf(w, "%+v", mt)
+		} else {
+			fmt.Fprintf(w, "%v", mt)
+		}
+	}
 }
 
-func (e errMissingManyTypes) updateGraph(g *dot.Graph) {
+func (e errMissingTypes) updateGraph(g *dot.Graph) {
 	missing := make([]*dot.Result, len(e))
 
-	for i, err := range e {
+	for i, mt := range e {
 		missing[i] = &dot.Result{
 			Node: &dot.Node{
-				Name:  err.Key.name,
-				Group: err.Key.group,
-				Type:  err.Key.t,
+				Name:  mt.Key.name,
+				Group: mt.Key.group,
+				Type:  mt.Key.t,
 			},
 		}
 	}

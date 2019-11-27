@@ -865,8 +865,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.Error(t, err, "invoking with B param should error out")
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestEndToEndSuccess.func\S+ \(\S+/dig_test.go:\d+\):`,
-			"type dig.B is not in the container,",
-			"did you mean to Provide it?",
+			"missing type: dig.B",
 		)
 	})
 }
@@ -1931,7 +1930,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err, "expected failure")
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+\):`,
-			`type \*bytes.Buffer is not in the container, did you mean to Provide it\?`,
+			`missing type: \*bytes.Buffer`,
 		)
 	})
 
@@ -1954,7 +1953,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err, "expected invoke error")
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+\):`,
-			`type \*dig.type2 is not in the container, did you mean to Provide it\?`,
+			`missing type: \*dig.type2`,
 		)
 	})
 
@@ -1971,7 +1970,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err, "invoke should fail")
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
-			`type \*bytes.Buffer\[name="foo"\] is not in the container, did you mean to Provide it\?`,
+			`missing type: \*bytes.Buffer\[name="foo"\]`,
 		)
 	})
 
@@ -2001,7 +2000,7 @@ func TestInvokeFailures(t *testing.T) {
 			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
 			`failed to build \*dig.type3:`,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
-			`type \*dig.type1 is not in the container, did you mean to Provide it\?`,
+			`missing type: \*dig.type1`,
 		)
 		// We don't expect type2 to be mentioned in the list because it's
 		// optional
@@ -2031,8 +2030,8 @@ func TestInvokeFailures(t *testing.T) {
 			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
 			`failed to build dig.type3:`,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
-			`the following types are not in the container:`,
-			"dig.type1;",
+			`missing types:`,
+			"dig.type1",
 			`\*dig.type2 \(did you mean dig.type2\?\)`,
 		)
 	})
@@ -2189,7 +2188,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err, "provide should return error since cases don't match")
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures\S+ \(\S+:\d+\):`,
-			`type dig.A\[name="camelcase"\] is not in the container, did you mean to Provide it`)
+			`missing type: dig.A\[name="camelcase"\]`)
 	})
 
 	t.Run("in unexported member gets an error", func(t *testing.T) {
@@ -2343,13 +2342,13 @@ func TestInvokeFailures(t *testing.T) {
 				name:        "value missing, pointer present",
 				provide:     func() *A { return &A{} },
 				invoke:      func(A) {},
-				errContains: `type dig.A is not in the container, did you mean to use \*dig.A\?`,
+				errContains: `missing type: dig.A \(did you mean \*dig.A\?\)`,
 			},
 			{
 				name:        "pointer missing, value present",
 				provide:     func() A { return A{} },
 				invoke:      func(*A) {},
-				errContains: `type \*dig.A is not in the container, did you mean to use dig.A?`,
+				errContains: `missing type: \*dig.A \(did you mean dig.A\?\)`,
 			},
 			{
 				name:    "named pointer missing, value present",
@@ -2360,7 +2359,7 @@ func TestInvokeFailures(t *testing.T) {
 					*A `name:"hello"`
 				}) {
 				},
-				errContains: `type \*dig.A\[name="hello"\] is not in the container, did you mean to use dig.A\[name="hello"\]?`,
+				errContains: `missing type: \*dig.A\[name="hello"\] \(did you mean dig.A\[name="hello"\]\?\)`,
 			},
 		}
 
@@ -2388,7 +2387,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err)
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
-			`type io.Reader is not in the container, did you mean to use \*bytes.Reader\?`,
+			`missing type: io.Reader \(did you mean \*bytes.Reader\?\)`,
 		)
 	})
 
@@ -2404,7 +2403,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err)
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
-			`type io.Reader is not in the container, did you mean to use one of \*bytes.Buffer, or \*bytes.Reader\?`,
+			`missing type: io.Reader \(did you mean \*bytes.Buffer, or \*bytes.Reader\?\)`,
 		)
 	})
 
@@ -2420,7 +2419,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err)
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
-			`the following types are not in the container:`,
+			`missing types:`,
 			`io.Reader \(did you mean \*bytes.Buffer, or \*bytes.Reader\?\);`,
 			`io.Writer \(did you mean \*bytes.Buffer\?\)`,
 		)
@@ -2437,7 +2436,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err)
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
-			`type \*bytes.Buffer is not in the container, did you mean to use io.Writer\?`,
+			`missing type: \*bytes.Buffer \(did you mean io.Writer\?\)`,
 		)
 	})
 
@@ -2454,7 +2453,7 @@ func TestInvokeFailures(t *testing.T) {
 		require.Error(t, err)
 		assertErrorMatches(t, err,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+\):`,
-			`type \*bytes.Buffer is not in the container, did you mean to use one of io.Reader, or io.Writer\?`,
+			`missing type: \*bytes.Buffer \(did you mean io.Reader, or io.Writer\?\)`,
 		)
 	})
 
@@ -2597,7 +2596,7 @@ func TestInvokeFailures(t *testing.T) {
 			`could not build arguments for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
 			`could not build value group dig.B\[group="b"\]:`,
 			`missing dependencies for function "go.uber.org/dig".TestInvokeFailures.\S+ \(\S+:\d+\):`,
-			"type dig.A is not in the container, did you mean to Provide it?",
+			"missing type: dig.A",
 		)
 	})
 }

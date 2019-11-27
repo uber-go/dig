@@ -695,7 +695,7 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 // Checks that all direct dependencies of the provided param are present in
 // the container. Returns an error if not.
 func shallowCheckDependencies(c containerStore, p param) error {
-	var missing errMissingManyTypes
+	var err errMissingTypes
 	var addMissingNodes []*dot.Param
 	walkParam(p, paramVisitorFunc(func(p param) bool {
 		ps, ok := p.(paramSingle)
@@ -704,15 +704,15 @@ func shallowCheckDependencies(c containerStore, p param) error {
 		}
 
 		if ns := c.getValueProviders(ps.Name, ps.Type); len(ns) == 0 && !ps.Optional {
-			missing = append(missing, newErrMissingType(c, key{name: ps.Name, t: ps.Type}))
+			err = append(err, newErrMissingTypes(c, key{name: ps.Name, t: ps.Type})...)
 			addMissingNodes = append(addMissingNodes, ps.DotParam()...)
 		}
 
 		return true
 	}))
 
-	if len(missing) > 0 {
-		return missing
+	if len(err) > 0 {
+		return err
 	}
 	return nil
 }

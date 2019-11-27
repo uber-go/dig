@@ -275,8 +275,60 @@ func (e errFormatted) Format(w fmt.State, c rune) {
 	}
 }
 
+func TestMissingTypeFormatting(t *testing.T) {
+	type type1 struct{}
+	type someInterface interface{ stuff() }
+
+	tests := []struct {
+		desc      string
+		give      missingType
+		wantV     string
+		wantPlusV string
+	}{
+		{
+			desc: "no suggestions",
+			give: missingType{
+				Key: key{t: reflect.TypeOf(type1{})},
+			},
+			wantV:     "dig.type1",
+			wantPlusV: "dig.type1 (did you mean to Provide it?)",
+		},
+		{
+			desc: "one suggestion",
+			give: missingType{
+				Key: key{t: reflect.TypeOf(type1{})},
+				suggestions: []key{
+					{t: reflect.TypeOf(&type1{})},
+				},
+			},
+			wantV:     "dig.type1 (did you mean *dig.type1?)",
+			wantPlusV: "dig.type1 (did you mean to use *dig.type1?)",
+		},
+		{
+			desc: "many suggestions",
+			give: missingType{
+				Key: key{t: reflect.TypeOf(type1{})},
+				suggestions: []key{
+					{t: reflect.TypeOf(&type1{})},
+					{t: reflect.TypeOf(new(someInterface)).Elem()},
+				},
+			},
+			wantV:     "dig.type1 (did you mean *dig.type1, or dig.someInterface?)",
+			wantPlusV: "dig.type1 (did you mean to use one of *dig.type1, or dig.someInterface?)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			assert.Equal(t, tt.wantV, fmt.Sprint(tt.give), "%v did not match")
+			assert.Equal(t, tt.wantPlusV, fmt.Sprintf("%+v", tt.give), "%+v did not match")
+		})
+	}
+}
+
 func TestErrorFormatting(t *testing.T) {
 	type someType struct{}
+	type anotherType struct{}
 
 	simpleErr := errors.New("great sadness")
 	richError := errFormatted{
@@ -409,6 +461,30 @@ func TestErrorFormatting(t *testing.T) {
 				"sadness so great",
 				"it needs multiple",
 				"lines",
+			),
+		},
+		{
+			desc: "errMissingTypes/single",
+			give: errMissingTypes{
+				{Key: key{t: reflect.TypeOf(someType{})}},
+			},
+			wantString: "missing type: dig.someType",
+			wantPlusV: joinLines(
+				"missing type:",
+				"	- dig.someType (did you mean to Provide it?)",
+			),
+		},
+		{
+			desc: "errMissingTypes/multiple",
+			give: errMissingTypes{
+				{Key: key{t: reflect.TypeOf(someType{})}},
+				{Key: key{t: reflect.TypeOf(&anotherType{})}},
+			},
+			wantString: "missing types: dig.someType; *dig.anotherType",
+			wantPlusV: joinLines(
+				"missing types:",
+				"	- dig.someType (did you mean to Provide it?)",
+				"	- *dig.anotherType (did you mean to Provide it?)",
 			),
 		},
 	}
