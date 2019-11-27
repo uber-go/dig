@@ -49,7 +49,7 @@ import (
 // Because "bar" is not after "baz" in the error message.
 //
 // Messages will be treated as regular expressions.
-func assertErrorMatches(t testing.TB, err error, msg string, msgs ...string) {
+func assertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
 	// We have one positional argument in addition to the variadic argument to
 	// ensure that there's at least one string to match against.
 	if err == nil {
@@ -66,23 +66,24 @@ func assertErrorMatches(t testing.TB, err error, msg string, msgs ...string) {
 		}
 	}
 
-	original := err.Error()
-	remaining := original
-	for _, f := range finders {
-		if newRemaining, ok := f.Find(remaining); ok {
-			remaining = newRemaining
-			continue
-		}
+	t.Run("single line", func(t *testing.T) {
+		original := err.Error()
+		assert.NoError(t, runFinders(original, finders))
+	})
 
-		// Match not found. Check if the order was wrong.
-		if _, ok := f.Find(original); ok {
-			// We won't use %q for the error message itself because we want it
-			// to be printed to the console as it would actually show.
-			t.Errorf(`"%v" contains %v in the wrong place`, original, f)
-		} else {
-			t.Errorf(`"%v" does not contain %v`, original, f)
+	// Intersperse "\n" finders between each message for the "%+v" check.
+	plusFinders := make([]consumingFinder, 0, len(finders)*2-1)
+	for i, f := range finders {
+		if i > 0 {
+			plusFinders = append(plusFinders, stringFinder("\n"))
 		}
+		plusFinders = append(plusFinders, f)
 	}
+
+	t.Run("multi line", func(t *testing.T) {
+		original := fmt.Sprintf("%+v", err)
+		assert.NoError(t, runFinders(original, plusFinders))
+	})
 }
 
 // consumingFinder matches a string and returns the rest of the string *after*
@@ -95,6 +96,26 @@ type consumingFinder interface {
 	// match. So if the finder matches "oo" in "foobar", the returned string
 	// must be just "bar".
 	Find(got string) (rest string, ok bool)
+}
+
+func runFinders(original string, finders []consumingFinder) error {
+	remaining := original
+	for _, f := range finders {
+		if newRemaining, ok := f.Find(remaining); ok {
+			remaining = newRemaining
+			continue
+		}
+
+		// Match not found. Check if the order was wrong.
+		if _, ok := f.Find(original); ok {
+			// We won't use %q for the error message itself
+			// because we want it to be printed to the console as
+			// it would actually show.
+			return errf(`"%v" contains %v in the wrong place`, original, f)
+		}
+		return errf(`"%v" does not contain %v`, original, f)
+	}
+	return nil
 }
 
 type regexpFinder struct{ r *regexp.Regexp }
