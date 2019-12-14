@@ -320,6 +320,13 @@ func TestEndToEndSuccess(t *testing.T) {
 		type type3 struct{}
 		type type4 struct{}
 		type type5 struct{}
+		type type6 struct {
+			Optional
+		}
+		type type7 struct {
+			Optional
+		}
+
 		constructor := func() (*type1, *type3, *type4) {
 			return &type1{}, &type3{}, &type4{}
 		}
@@ -333,6 +340,8 @@ func TestEndToEndSuccess(t *testing.T) {
 			T3 *type3 `unrelated:"foo=42, optional"`        // type in the graph with unrelated tag
 			T4 *type4 `optional:"true"`                     // optional type present in the graph
 			T5 *type5 `optional:"t"`                        // optional type NOT in the graph with "yes"
+			T6 *type6 // pointer to optional struct
+			T7 type7  // optional struct
 		}
 		require.NoError(t, c.Provide(constructor))
 		require.NoError(t, c.Invoke(func(p param) {
@@ -341,6 +350,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.NotNil(t, p.T3, "required type with unrelated tag not in the graph")
 			assert.NotNil(t, p.T4, "optional type in the graph should not return nil")
 			assert.Nil(t, p.T5, "optional type not in the graph should return nil")
+			assert.Nil(t, p.T6, "optional struct not in the graph should return nil")
 		}))
 	})
 
@@ -2600,6 +2610,28 @@ func TestInvokeFailures(t *testing.T) {
 			"type dig.A is not in the container, did you mean to Provide it?",
 		)
 	})
+
+	t.Run("optional struct dependency", func(t *testing.T) {
+		type missing struct{}
+
+		type params struct {
+			Optional
+
+			String string
+		}
+
+		c := New()
+
+		// Should still be able to invoke a function that takes params, since it's
+		// optional.
+		var count int
+		err := c.Invoke(func(p params) {
+			count++
+		})
+		assert.NoError(t, err, "unexpected invoke error")
+		assert.Equal(t, 1, count, "expected invoke function to be called")
+	})
+
 }
 
 func TestNodeAlreadyCalled(t *testing.T) {

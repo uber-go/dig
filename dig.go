@@ -673,6 +673,10 @@ func (n *node) Call(c containerStore) error {
 
 // Checks if a field of an In struct is optional.
 func isFieldOptional(f reflect.StructField) (bool, error) {
+	if IsOptional(f.Type) || (f.Type.Kind() == reflect.Ptr && IsOptional(f.Type.Elem())) {
+		return true, nil
+	}
+
 	tag := f.Tag.Get(_optionalTag)
 	if tag == "" {
 		return false, nil

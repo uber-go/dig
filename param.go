@@ -67,6 +67,8 @@ func newParam(t reflect.Type) (param, error) {
 		return nil, fmt.Errorf("cannot depend on result objects: %v embeds a dig.Out", t)
 	case IsIn(t):
 		return newParamObject(t)
+	case IsOptional(t) || (t.Kind() == reflect.Ptr && IsOptional(t.Elem())):
+		return paramSingle{Type: t, Optional: true}, nil
 	case embedsType(t, _inPtrType):
 		return nil, fmt.Errorf(
 			"cannot build a parameter object by embedding *dig.In, embed dig.In instead: "+

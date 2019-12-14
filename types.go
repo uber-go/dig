@@ -26,12 +26,14 @@ import (
 )
 
 var (
-	_noValue    reflect.Value
-	_errType    = reflect.TypeOf((*error)(nil)).Elem()
-	_inPtrType  = reflect.TypeOf((*In)(nil))
-	_inType     = reflect.TypeOf(In{})
-	_outPtrType = reflect.TypeOf((*Out)(nil))
-	_outType    = reflect.TypeOf(Out{})
+	_noValue         reflect.Value
+	_errType         = reflect.TypeOf((*error)(nil)).Elem()
+	_inPtrType       = reflect.TypeOf((*In)(nil))
+	_inType          = reflect.TypeOf(In{})
+	_outPtrType      = reflect.TypeOf((*Out)(nil))
+	_outType         = reflect.TypeOf(Out{})
+	_optionalPtrType = reflect.TypeOf((*Optional)(nil))
+	_optionalType    = reflect.TypeOf(Optional{})
 )
 
 // Special interface embedded inside dig sentinel values (dig.In, dig.Out) to
@@ -80,6 +82,11 @@ type In struct{ digSentinel }
 //               information.
 type Out struct{ digSentinel }
 
+// Optional may be embedded into structs to request dig to treat them as
+// optional structs. When a constructor accepts such a struct, it gracefully
+// handles its absence.
+type Optional struct{ digSentinel }
+
 func isError(t reflect.Type) bool {
 	return t.Implements(_errType)
 }
@@ -110,6 +117,11 @@ func IsIn(o interface{}) bool {
 // tags.
 func IsOut(o interface{}) bool {
 	return embedsType(o, _outType)
+}
+
+// IsOptional checks whether the given struct is a dig.Optional struct.
+func IsOptional(o interface{}) bool {
+	return embedsType(o, _optionalType)
 }
 
 // Returns true if t embeds e or if any of the types embedded by t embed e.

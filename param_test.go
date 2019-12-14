@@ -81,6 +81,24 @@ func TestParamObjectSuccess(t *testing.T) {
 
 	})
 
+	t.Run("optional struct", func(t *testing.T) {
+		type opt struct {
+			Optional
+
+			T1 type1
+		}
+
+		p, err := newParam(reflect.TypeOf(opt{}))
+		require.NoError(t, err)
+
+		assert.True(t, p.(paramSingle).Optional)
+
+		p, err = newParam(reflect.TypeOf(&opt{}))
+		require.NoError(t, err)
+
+		assert.True(t, p.(paramSingle).Optional)
+	})
+
 	t.Run("named value", func(t *testing.T) {
 		require.Equal(t, "T3", po.Fields[2].FieldName)
 		t3, ok := po.Fields[2].Param.(paramSingle)
