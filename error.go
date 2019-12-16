@@ -22,6 +22,7 @@ package dig
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -52,6 +53,120 @@ func RootCause(err error) error {
 			return err
 		}
 	}
+}
+
+// errf is a version of fmt.Errorf with support for a chain of multiple
+// formatted error messages.
+//
+// After msg, N arguments are consumed as formatting arguments for that
+// message, where N is the number of % symbols in msg. Following that, another
+// string may be added to become the next error in the chain. Each new error
+// is the `cause()` for the prior error.
+//
+//   err := errf(
+//     "could not process %v", thing,
+//     "name %q is invalid", thing.Name,
+//  )
+//  fmt.Println(err)  // could not process Thing: name Foo is invalid
+//  fmt.Println(RootCause(err))  // name Foo is invalid
+//
+// In place of a string, the last error can be another error, in which case it
+// will be treated as the cause of the prior error chain.
+//
+//   errf(
+//     "could not process %v", thing,
+//     "date %q could not be parsed", thing.Date,
+//     parseError,
+//  )
+func errf(msg string, args ...interface{}) error {
+	// By implementing buildErrf as a closure rather than a standalone
+	// function, we're able to ensure that it is called only from errf, or
+	// from itself (recursively). By controlling these invocations in such
+	// a tight space, we are able to easily verify manually that we
+	// checked len(args) > 0 before making the call.
+	var buildErrf func([]interface{}) error
+	buildErrf = func(args []interface{}) error {
+		arg, args := args[0], args[1:] // assume len(args) > 0
+		if arg == nil {
+			panic("It looks like you have found a bug in dig. " +
+				"Please file an issue at https://github.com/uber-go/dig/issues/ " +
+				"and provide the following message: " +
+				"arg must not be nil")
+		}
+
+		switch v := arg.(type) {
+		case string:
+			need := numFmtArgs(v)
+			if len(args) < need {
+				panic(fmt.Sprintf(
+					"It looks like you have found a bug in dig. "+
+						"Please file an issue at https://github.com/uber-go/dig/issues/ "+
+						"and provide the following message: "+
+						"string %q needs %v arguments, got %v", v, need, len(args)))
+			}
+
+			msg := fmt.Sprintf(v, args[:need]...)
+			args := args[need:]
+
+			// If we don't have anything left to chain with, build the
+			// final error.
+			if len(args) == 0 {
+				return errors.New(msg)
+			}
+
+			return wrappedError{
+				msg: msg,
+				err: buildErrf(args),
+			}
+		case error:
+			if len(args) > 0 {
+				panic(fmt.Sprintf(
+					"It looks like you have found a bug in dig. "+
+						"Please file an issue at https://github.com/uber-go/dig/issues/ "+
+						"and provide the following message: "+
+						"error must be the last element but got %v", args))
+			}
+
+			return v
+
+		default:
+			panic(fmt.Sprintf(
+				"It looks like you have found a bug in dig. "+
+					"Please file an issue at https://github.com/uber-go/dig/issues/ "+
+					"and provide the following message: "+
+					"unexpected errf-argument type %T", arg))
+		}
+	}
+
+	// Prepend msg to the args list so that we can re-use the same
+	// args processing logic. The msg is a string just for type-safety of
+	// the first error.
+	newArgs := make([]interface{}, len(args)+1)
+	newArgs[0] = msg
+	copy(newArgs[1:], args)
+	return buildErrf(newArgs)
+}
+
+// Returns the number of formatting arguments in the provided string. Does not
+// count escaped % symbols, specifically the string "%%".
+//
+//   fmt.Println(numFmtArgs("rate: %d%%"))  // 1
+func numFmtArgs(s string) int {
+	var (
+		count   int
+		percent bool // saw %
+	)
+	for _, c := range s {
+		if percent && c != '%' {
+			// Counts only if it's not a %%.
+			count++
+		}
+
+		// Next iteration should consider % only if the current %
+		// stands alone.
+		percent = !percent && c == '%'
+	}
+	return count
 }
 
 // errWrapf wraps an existing error with more contextual information.

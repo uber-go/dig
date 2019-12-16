@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestErrWrapf(t *testing.T) {
@@ -144,4 +145,120 @@ func (s stringFinder) Find(got string) (rest string, ok bool) {
 		return got, false
 	}
 	return got[i+len(s):], true
+}
+
+func TestErrf(t *testing.T) {
+	type args = []interface{}
+
+	tests := []struct {
+		desc string
+		give error
+
+		wantMsg       string
+		wantRootCause error
+	}{
+		{
+			desc:          "single unformatted error",
+			give:          errf("foo"),
+			wantMsg:       "foo",
+			wantRootCause: errors.New("foo"),
+		},
+		{
+			desc:          "single formatted error",
+			give:          errf("foo %d %s", 42, "bar"),
+			wantMsg:       "foo 42 bar",
+			wantRootCause: errors.New("foo 42 bar"),
+		},
+		{
+			desc:          "multiple unformatted errors",
+			give:          errf("foo", "bar", "baz"),
+			wantMsg:       "foo: bar: baz",
+			wantRootCause: errors.New("baz"),
+		},
+		{
+			desc:          "multiple formatted errors",
+			give:          errf("foo %d", 42, "bar %s", "baz", "qux %q", "quux"),
+			wantMsg:       `foo 42: bar baz: qux "quux"`,
+			wantRootCause: errors.New(`qux "quux"`),
+		},
+		{
+			desc:          "single error",
+			give:          errf("foo", "bar", errors.New("great sadness")),
+			wantMsg:       "foo: bar: great sadness",
+			wantRootCause: errors.New("great sadness"),
+		},
+		{
+			desc:          "multiple errors",
+			give:          errf("foo", "bar: %v", errors.New("baz"), errors.New("great sadness")),
+			wantMsg:       "foo: bar: baz: great sadness",
+			wantRootCause: errors.New("great sadness"),
+		},
+		{
+			desc:          "escaped percent",
+			give:          errf("foo %% %v", "bar"),
+			wantMsg:       "foo % bar",
+			wantRootCause: errors.New("foo % bar"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			err := tt.give
+			require.NotNil(t, err, "invalid test: must not be nil")
+
+			t.Run("Error", func(t *testing.T) {
+				assert.Equal(t, tt.wantMsg, err.Error())
+			})
+
+			t.Run("RootCause", func(t *testing.T) {
+				assert.Equal(t, tt.wantRootCause, RootCause(err))
+			})
+		})
+	}
+}
+
+func TestErrfInvalid(t *testing.T) {
+	t.Run("nil panics", func(t *testing.T) {
+		assert.Panics(t, func() {
+			errf("foo", nil)
+		})
+	})
+
+	t.Run("too few argumetns", func(t *testing.T) {
+		assert.Panics(t, func() {
+			errf("foo %v")
+		})
+	})
+
+	t.Run("error before last", func(t *testing.T) {
+		assert.Panics(t, func() {
+			errf("foo", errors.New("bar"), "baz %v", 42)
+		})
+	})
+
+	t.Run("unknown type", func(t *testing.T) {
+		assert.Panics(t, func() {
+			errf("foo %v", 42, 43)
+		})
+	})
+}
+
+func TestNumFmtArgs(t *testing.T) {
+	tests := []struct {
+		desc string
+		give string
+		want int
+	}{
+		{"empty", "", 0},
+		{"none", "foo bar", 0},
+		{"some", "foo %v b %d ar", 2},
+		{"trailing", "foo %v 100%", 1},
+		{"escaped", "foo %v bar %% baz %d", 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			assert.Equal(t, tt.want, numFmtArgs(tt.give))
+		})
+	}
 }
