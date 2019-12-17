@@ -411,7 +411,7 @@ func (c *Container) verifyAcyclic() error {
 	visited := make(map[key]struct{})
 	for _, n := range c.nodes {
 		if err := detectCycles(n, c, nil /* path */, visited); err != nil {
-			return errWrapf(err, "cycle detected in dependency graph")
+			return errf("cycle detected in dependency graph", err)
 		}
 	}
 
@@ -683,9 +683,10 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 
 	optional, err := strconv.ParseBool(tag)
 	if err != nil {
-		err = errWrapf(err,
+		err = errf(
 			"invalid value %q for %q tag on field %v",
-			tag, _optionalTag, f.Name)
+			tag, _optionalTag, f.Name, err)
+
 	}
 
 	return optional, err

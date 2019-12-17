@@ -68,7 +68,7 @@ func verifyAcyclic(c containerStore, n provider, k key) error {
 		{Key: k, Func: n.Location()},
 	}, visited)
 	if err != nil {
-		err = errWrapf(err, "this function introduces a cycle")
+		err = errf("this function introduces a cycle", err)
 	}
 	return err
 }

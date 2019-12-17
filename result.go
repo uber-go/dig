@@ -198,7 +198,7 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 
 		r, err := newResult(t, opts)
 		if err != nil {
-			return rl, errWrapf(err, "bad result %d", i+1)
+			return rl, errf("bad result %d", i+1, err)
 		}
 
 		rl.Results = append(rl.Results, r)
@@ -295,7 +295,7 @@ func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 
 		rof, err := newResultObjectField(i, f, opts)
 		if err != nil {
-			return ro, errWrapf(err, "bad field %q of %v", f.Name, t)
+			return ro, errf("bad field %q of %v", f.Name, t, err)
 		}
 
 		ro.Fields = append(ro.Fields, rof)

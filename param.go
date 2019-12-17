@@ -179,7 +179,7 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 	for i := 0; i < numArgs; i++ {
 		p, err := newParam(ctype.In(i))
 		if err != nil {
-			return pl, errWrapf(err, "bad argument %d", i+1)
+			return pl, errf("bad argument %d", i+1, err)
 		}
 		pl.Params = append(pl.Params, p)
 	}
@@ -298,7 +298,7 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 
 		pof, err := newParamObjectField(i, f)
 		if err != nil {
-			return po, errWrapf(err, "bad field %q of %v", f.Name, t)
+			return po, errf("bad field %q of %v", f.Name, t, err)
 		}
 
 		po.Fields = append(po.Fields, pof)

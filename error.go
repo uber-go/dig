@@ -169,25 +169,6 @@ func numFmtArgs(s string) int {
 	return count
 }
 
-// errWrapf wraps an existing error with more contextual information.
-//
-// The given error is treated as the cause of the returned error (see causer).
-//
-//   RootCause(errWrapf(errWrapf(err, ...), ...)) == err
-//
-// Use errWrapf instead of fmt.Errorf if the message ends with ": <original error>".
-func errWrapf(err error, msg string, args ...interface{}) error {
-	if err == nil {
-		return nil
-	}
-
-	if len(args) > 0 {
-		msg = fmt.Sprintf(msg, args...)
-	}
-
-	return wrappedError{err: err, msg: msg}
-}
-
 type wrappedError struct {
 	err error
 	msg string
