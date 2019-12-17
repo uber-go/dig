@@ -64,19 +64,17 @@ var (
 func newParam(t reflect.Type) (param, error) {
 	switch {
 	case IsOut(t) || (t.Kind() == reflect.Ptr && IsOut(t.Elem())) || embedsType(t, _outPtrType):
-		return nil, errf("cannot depend on result objects: %v embeds a dig.Out", t)
+		return nil, errf("cannot depend on result objects", "%v embeds a dig.Out", t)
 	case IsIn(t):
 		return newParamObject(t)
 	case embedsType(t, _inPtrType):
 		return nil, errf(
-			"cannot build a parameter object by embedding *dig.In, embed dig.In instead: "+
-				"%v embeds *dig.In", t)
-
+			"cannot build a parameter object by embedding *dig.In, embed dig.In instead",
+			"%v embeds *dig.In", t)
 	case t.Kind() == reflect.Ptr && IsIn(t.Elem()):
 		return nil, errf(
-			"cannot depend on a pointer to a parameter object, use a value instead: "+
-				"%v is a pointer to a struct that embeds dig.In", t)
-
+			"cannot depend on a pointer to a parameter object, use a value instead",
+			"%v is a pointer to a struct that embeds dig.In", t)
 	default:
 		return paramSingle{Type: t}, nil
 	}
@@ -422,12 +420,13 @@ func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
 	optional, _ := isFieldOptional(f)
 	switch {
 	case f.Type.Kind() != reflect.Slice:
-		return pg, errf("value groups may be consumed as slices only: "+
+		return pg, errf("value groups may be consumed as slices only",
 			"field %q (%v) is not a slice", f.Name, f.Type)
 
 	case name != "":
 		return pg, errf(
-			"cannot use named values with value groups: name:%q requested with group:%q", name, pg.Group)
+			"cannot use named values with value groups",
+			"name:%q requested with group:%q", name, pg.Group)
 
 	case optional:
 		return pg, errors.New("value groups cannot be optional")

@@ -67,8 +67,8 @@ type provideOptions struct {
 func (o *provideOptions) Validate() error {
 	if len(o.Group) > 0 && len(o.Name) > 0 {
 		return errf(
-			"cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group)
-
+			"cannot use named values with value groups",
+			"name:%q provided with group:%q", o.Name, o.Group)
 	}
 
 	// Names must be representable inside a backquoted string. The only
@@ -541,9 +541,9 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 
 		if conflict, ok := cv.keyPaths[k]; ok {
 			*cv.err = errf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, conflict)
-
+				"cannot provide %v from %v", k, path,
+				"already provided by %v", conflict,
+			)
 			return nil
 		}
 
@@ -554,9 +554,9 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 			}
 
 			*cv.err = errf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, strings.Join(cons, "; "))
-
+				"cannot provide %v from %v", k, path,
+				"already provided by %v", strings.Join(cons, "; "),
+			)
 			return nil
 		}
 
