@@ -21,6 +21,7 @@
 package digreflect
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -55,7 +56,6 @@ func TestInspectFunc(t *testing.T) {
 		// We don't match the exact file name because $GOPATH can be anywhere
 		// on someone's system. Instead we'll match the suffix.
 		wantFileSuffix string
-		wantStringLike string
 	}{
 		{
 			desc:           "exported function",
@@ -123,13 +123,36 @@ func TestInspectFunc(t *testing.T) {
 
 			assert.True(t, strings.HasSuffix(f.File, tt.wantFileSuffix),
 				"file path %q does not end with src/%v", f.File, tt.wantFileSuffix)
-			assert.Contains(t, f.String(), tt.wantFileSuffix, "file path not in String output")
 		})
 	}
 }
 
-func TestSplitFuncEmptyString(t *testing.T) {
-	pname, fname := splitFuncName("")
-	assert.Empty(t, pname, "package name must be empty")
-	assert.Empty(t, fname, "function name must be empty")
+func TestSplitFunc(t *testing.T) {
+	t.Run("empty string", func(t *testing.T) {
+		pname, fname := splitFuncName("")
+		assert.Empty(t, pname, "package name must be empty")
+		assert.Empty(t, fname, "function name must be empty")
+	})
+
+	t.Run("vendored dependency", func(t *testing.T) {
+		pname, fname := splitFuncName("go.uber.orgc/dig/vendor/example.com/foo/bar.Baz")
+		assert.Equal(t, "example.com/foo/bar", pname)
+		assert.Equal(t, "Baz", fname)
+	})
+}
+
+func TestFuncFormatting(t *testing.T) {
+	f := Func{
+		Package: "foo/bar/baz",
+		Name:    "Qux",
+		File:    "src/foo/bar/baz/qux.go",
+		Line:    42,
+	}
+
+	assert.Equal(t,
+		`"foo/bar/baz".Qux (src/foo/bar/baz/qux.go:42)`,
+		f.String(), "%v did not match")
+
+	assert.Equal(t, `"foo/bar/baz".Qux
+	src/foo/bar/baz/qux.go:42`, fmt.Sprintf("%+v", &f), "%v did not match")
 }
