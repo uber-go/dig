@@ -206,7 +206,7 @@
 // will receive a zero value for the field.
 //
 //   func NewUserGateway(p UserGatewayParams, log *log.Logger) (*UserGateway, error) {
-//     if p.Cache != nil {
+//     if p.Cache == nil {
 //       log.Print("Logging disabled")
 //     }
 //     // ...
