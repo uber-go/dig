@@ -359,7 +359,7 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 //
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
-func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
+func (c *Container) Invoke(function interface{}, providedParams ...interface{}) error {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
 		return errors.New("can't invoke an untyped nil")
@@ -368,7 +368,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return fmt.Errorf("can't invoke non-function %v (type %v)", function, ftype)
 	}
 
-	pl, err := newParamList(ftype)
+	pl, err := newParamList(ftype, providedParams...)
 	if err != nil {
 		return err
 	}
