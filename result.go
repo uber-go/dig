@@ -67,19 +67,19 @@ type resultOptions struct {
 func newResult(t reflect.Type, opts resultOptions) (result, error) {
 	switch {
 	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
-		return nil, fmt.Errorf("cannot provide parameter objects: %v embeds a dig.In", t)
+		return nil, errf("cannot provide parameter objects", "%v embeds a dig.In", t)
 	case isError(t):
-		return nil, fmt.Errorf("cannot return an error here, return it from the constructor instead")
+		return nil, errf("cannot return an error here, return it from the constructor instead")
 	case IsOut(t):
 		return newResultObject(t, opts)
 	case embedsType(t, _outPtrType):
-		return nil, fmt.Errorf(
-			"cannot build a result object by embedding *dig.Out, embed dig.Out instead: "+
-				"%v embeds *dig.Out", t)
+		return nil, errf(
+			"cannot build a result object by embedding *dig.Out, embed dig.Out instead",
+			"%v embeds *dig.Out", t)
 	case t.Kind() == reflect.Ptr && IsOut(t.Elem()):
-		return nil, fmt.Errorf(
-			"cannot return a pointer to a result object, use a value instead: "+
-				"%v is a pointer to a struct that embeds dig.Out", t)
+		return nil, errf(
+			"cannot return a pointer to a result object, use a value instead",
+			"%v is a pointer to a struct that embeds dig.Out", t)
 	case len(opts.Group) > 0:
 		return resultGrouped{Type: t, Group: opts.Group}, nil
 	default:
@@ -196,7 +196,7 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 
 		r, err := newResult(t, opts)
 		if err != nil {
-			return rl, errWrapf(err, "bad result %d", i+1)
+			return rl, errf("bad result %d", i+1, err)
 		}
 
 		rl.Results = append(rl.Results, r)
@@ -273,13 +273,13 @@ func (ro resultObject) DotResult() []*dot.Result {
 func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 	ro := resultObject{Type: t}
 	if len(opts.Name) > 0 {
-		return ro, fmt.Errorf(
-			"cannot specify a name for result objects: %v embeds dig.Out", t)
+		return ro, errf(
+			"cannot specify a name for result objects", "%v embeds dig.Out", t)
 	}
 
 	if len(opts.Group) > 0 {
-		return ro, fmt.Errorf(
-			"cannot specify a group for result objects: %v embeds dig.Out", t)
+		return ro, errf(
+			"cannot specify a group for result objects", "%v embeds dig.Out", t)
 	}
 
 	for i := 0; i < t.NumField(); i++ {
@@ -291,7 +291,7 @@ func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 
 		rof, err := newResultObjectField(i, f, opts)
 		if err != nil {
-			return ro, errWrapf(err, "bad field %q of %v", f.Name, t)
+			return ro, errf("bad field %q of %v", f.Name, t, err)
 		}
 
 		ro.Fields = append(ro.Fields, rof)
@@ -335,7 +335,7 @@ func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (r
 	var r result
 	switch {
 	case f.PkgPath != "":
-		return rof, fmt.Errorf(
+		return rof, errf(
 			"unexported fields not allowed in dig.Out, did you mean to export %q (%v)?", f.Name, f.Type)
 
 	case f.Tag.Get(_groupTag) != "":
@@ -392,8 +392,9 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	optional, _ := isFieldOptional(f)
 	switch {
 	case name != "":
-		return rg, fmt.Errorf(
-			"cannot use named values with value groups: name:%q provided with group:%q", name, rg.Group)
+		return rg, errf(
+			"cannot use named values with value groups",
+			"name:%q provided with group:%q", name, rg.Group)
 	case optional:
 		return rg, errors.New("value groups cannot be optional")
 	}

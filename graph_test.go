@@ -21,7 +21,6 @@
 package dig
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -498,7 +497,7 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(in1) out1 { return out1{} })
 		c.Provide(func(in2) t4 { return t4{} })
 		c.Provide(func() out2 { return out2{} })
-		c.Provide(func() (out3, error) { return out3{}, fmt.Errorf("great sadness") })
+		c.Provide(func() (out3, error) { return out3{}, errf("great sadness") })
 		err := c.Invoke(func(t4 t4) { return })
 
 		VerifyVisualization(t, "error", c, VisualizeError(err))
@@ -509,7 +508,7 @@ func TestVisualize(t *testing.T) {
 				c := New()
 				c.Provide(func(in1) out1 { return out1{} })
 				c.Provide(func(in2) t4 { return t4{} })
-				c.Provide(func() (out2, error) { return out2{}, fmt.Errorf("great sadness") })
+				c.Provide(func() (out2, error) { return out2{}, errf("great sadness") })
 				c.Provide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) { return })
 
@@ -519,7 +518,7 @@ func TestVisualize(t *testing.T) {
 			t.Run("if only the root node fails all node except for the root should be pruned", func(t *testing.T) {
 				c := New()
 				c.Provide(func(in1) out1 { return out1{} })
-				c.Provide(func(in2) (t4, error) { return t4{}, fmt.Errorf("great sadness") })
+				c.Provide(func(in2) (t4, error) { return t4{}, errf("great sadness") })
 				c.Provide(func() out2 { return out2{} })
 				c.Provide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) { return })
@@ -566,12 +565,12 @@ func TestCanVisualizeError(t *testing.T) {
 	}{
 		{
 			desc:         "unvisualizable error",
-			err:          fmt.Errorf("great sadness"),
+			err:          errf("great sadness"),
 			canVisualize: false,
 		},
 		{
 			desc:         "nested unvisualizable error",
-			err:          nestedErr{err: fmt.Errorf("great sadness")},
+			err:          nestedErr{err: errf("great sadness")},
 			canVisualize: false,
 		},
 		{

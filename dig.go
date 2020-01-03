@@ -66,8 +66,9 @@ type provideOptions struct {
 
 func (o *provideOptions) Validate() error {
 	if len(o.Group) > 0 && len(o.Name) > 0 {
-		return fmt.Errorf(
-			"cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group)
+		return errf(
+			"cannot use named values with value groups",
+			"name:%q provided with group:%q", o.Name, o.Group)
 	}
 
 	// Names must be representable inside a backquoted string. The only
@@ -75,10 +76,10 @@ func (o *provideOptions) Validate() error {
 	// https://golang.org/ref/spec#raw_string_lit is that they cannot contain
 	// backquotes.
 	if strings.ContainsRune(o.Name, '`') {
-		return fmt.Errorf("invalid dig.Name(%q): names cannot contain backquotes", o.Name)
+		return errf("invalid dig.Name(%q): names cannot contain backquotes", o.Name)
 	}
 	if strings.ContainsRune(o.Group, '`') {
-		return fmt.Errorf("invalid dig.Group(%q): group names cannot contain backquotes", o.Group)
+		return errf("invalid dig.Group(%q): group names cannot contain backquotes", o.Group)
 	}
 	return nil
 }
@@ -331,7 +332,7 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 		return errors.New("can't provide an untyped nil")
 	}
 	if ctype.Kind() != reflect.Func {
-		return fmt.Errorf("must provide constructor function, got %v (type %v)", constructor, ctype)
+		return errf("must provide constructor function, got %v (type %v)", constructor, ctype)
 	}
 
 	var options provideOptions
@@ -365,7 +366,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return errors.New("can't invoke an untyped nil")
 	}
 	if ftype.Kind() != reflect.Func {
-		return fmt.Errorf("can't invoke non-function %v (type %v)", function, ftype)
+		return errf("can't invoke non-function %v (type %v)", function, ftype)
 	}
 
 	pl, err := newParamList(ftype)
@@ -410,7 +411,7 @@ func (c *Container) verifyAcyclic() error {
 	visited := make(map[key]struct{})
 	for _, n := range c.nodes {
 		if err := detectCycles(n, c, nil /* path */, visited); err != nil {
-			return errWrapf(err, "cycle detected in dependency graph")
+			return errf("cycle detected in dependency graph", err)
 		}
 	}
 
@@ -437,7 +438,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 
 	ctype := reflect.TypeOf(ctor)
 	if len(keys) == 0 {
-		return fmt.Errorf("%v must provide at least one non-error type", ctype)
+		return errf("%v must provide at least one non-error type", ctype)
 	}
 
 	for k := range keys {
@@ -539,9 +540,10 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		k := key{name: r.Name, t: r.Type}
 
 		if conflict, ok := cv.keyPaths[k]; ok {
-			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, conflict)
+			*cv.err = errf(
+				"cannot provide %v from %v", k, path,
+				"already provided by %v", conflict,
+			)
 			return nil
 		}
 
@@ -551,9 +553,10 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 				cons[i] = fmt.Sprint(p.Location())
 			}
 
-			*cv.err = fmt.Errorf(
-				"cannot provide %v from %v: already provided by %v",
-				k, path, strings.Join(cons, "; "))
+			*cv.err = errf(
+				"cannot provide %v from %v", k, path,
+				"already provided by %v", strings.Join(cons, "; "),
+			)
 			return nil
 		}
 
@@ -680,9 +683,10 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 
 	optional, err := strconv.ParseBool(tag)
 	if err != nil {
-		err = errWrapf(err,
+		err = errf(
 			"invalid value %q for %q tag on field %v",
-			tag, _optionalTag, f.Name)
+			tag, _optionalTag, f.Name, err)
+
 	}
 
 	return optional, err
