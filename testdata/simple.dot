@@ -3,6 +3,7 @@ digraph {
 	graph [compound=true];
 	
 		subgraph cluster_0 {
+			label = "go.uber.org/dig";
 			constructor_0 [shape=plaintext label="TestVisualize.func2.1"];
 			
 			"dig.t1" [label=<dig.t1>];
@@ -12,6 +13,7 @@ digraph {
 		
 		
 		subgraph cluster_1 {
+			label = "go.uber.org/dig";
 			constructor_1 [shape=plaintext label="TestVisualize.func2.2"];
 			
 			"dig.t3" [label=<dig.t3>];
