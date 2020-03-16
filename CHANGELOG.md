@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - GraphViz visualization of the graph now includes names of packages next to
   constructors.
 
+### Changed
+- Drop library dependency on `golang.org/x/lint`.
+
 ## [1.8.0] - 2019-11-14
 ### Changed
 - Migrated to Go modules.
