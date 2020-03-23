@@ -361,21 +361,69 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
 func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
-	ftype := reflect.TypeOf(function)
-	if ftype == nil {
-		return errors.New("can't invoke an untyped nil")
-	}
-	if ftype.Kind() != reflect.Func {
-		return errf("can't invoke non-function %v (type %v)", function, ftype)
-	}
-
-	pl, err := newParamList(ftype)
+	returned, err := c.invoke(function, opts...)
 	if err != nil {
 		return err
 	}
 
+	if len(returned) == 0 {
+		return nil
+	}
+
+	if last := returned[len(returned)-1]; isError(last.Type()) {
+		if err, _ := last.Interface().(error); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// InvokeReturn runs the given function after instantiating its dependencies and
+// returns all values the called function returned or an error if something did go wrong.
+//
+// Any arguments that the function has are treated as its dependencies. The
+// dependencies are instantiated in an unspecified order along with any
+// dependencies that they might have.
+//
+// The function may return an error to indicate failure. The error will be
+// returned to the caller as-is.
+func (c *Container) InvokeReturn(function interface{}, opts ...InvokeOption) ([]interface{}, error) {
+	returned, err := c.invoke(function, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	var values []interface{}
+	for _, value := range returned {
+		if value.IsNil() {
+			continue
+		} else if isError(value.Type()) {
+			return nil, value.Interface().(error)
+		}
+
+		values = append(values, value.Interface())
+	}
+
+	return values, nil
+}
+
+func (c *Container) invoke(function interface{}, opts ...InvokeOption) ([]reflect.Value, error) {
+	ftype := reflect.TypeOf(function)
+	if ftype == nil {
+		return nil, errors.New("can't invoke an untyped nil")
+	}
+	if ftype.Kind() != reflect.Func {
+		return nil, errf("can't invoke non-function %v (type %v)", function, ftype)
+	}
+
+	pl, err := newParamList(ftype)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := shallowCheckDependencies(c, pl); err != nil {
-		return errMissingDependencies{
+		return nil, errMissingDependencies{
 			Func:   digreflect.InspectFunc(function),
 			Reason: err,
 		}
@@ -383,28 +431,19 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 
 	if !c.isVerifiedAcyclic {
 		if err := c.verifyAcyclic(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	args, err := pl.BuildList(c)
 	if err != nil {
-		return errArgumentsFailed{
+		return nil, errArgumentsFailed{
 			Func:   digreflect.InspectFunc(function),
 			Reason: err,
 		}
 	}
 
-	returned := reflect.ValueOf(function).Call(args)
-	if len(returned) == 0 {
-		return nil
-	}
-	if last := returned[len(returned)-1]; isError(last.Type()) {
-		if err, _ := last.Interface().(error); err != nil {
-			return err
-		}
-	}
-	return nil
+	return reflect.ValueOf(function).Call(args), nil
 }
 
 func (c *Container) verifyAcyclic() error {
