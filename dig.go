@@ -692,6 +692,36 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 	return optional, err
 }
 
+type group struct {
+	name    string
+	flatten bool
+}
+
+func parseGroup(f reflect.StructField) (group, error) {
+	tag := f.Tag.Get(_groupTag)
+	if tag == "" {
+		return group{}, nil
+	}
+
+	components := strings.Split(tag, ",")
+	var g group
+	for i, c := range components {
+		if i == 0 {
+			g.name = c
+			continue
+		}
+		switch c {
+		case "flatten":
+			g.flatten = true
+		default:
+			return group{}, errf(
+				"invalid value %q for %q tag on field %v",
+				c, _groupTag, f.Name)
+		}
+	}
+	return g, nil
+}
+
 // Checks that all direct dependencies of the provided param are present in
 // the container. Returns an error if not.
 func shallowCheckDependencies(c containerStore, p param) error {

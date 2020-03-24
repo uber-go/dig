@@ -1217,6 +1217,35 @@ func TestGroups(t *testing.T) {
 		)
 		assert.Equal(t, gaveErr, RootCause(err))
 	})
+
+	t.Run("flatten collects slices", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			Out
+
+			Value []int `group:"val,flatten"`
+		}
+
+		provide := func(i []int) {
+			require.NoError(t, c.Provide(func() out {
+				return out{Value: i}
+			}), "failed to provide ")
+		}
+
+		provide([]int{1, 2})
+		provide([]int{3, 4})
+
+		type in struct {
+			In
+
+			Values []int `group:"val"`
+		}
+
+		require.NoError(t, c.Invoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 4, 1}, i.Values)
+		}), "invoke failed")
+	})
 }
 
 // --- END OF END TO END TESTS
@@ -2696,6 +2725,47 @@ func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {
 	require.Error(t, c.Invoke(func(type1) {
 		require.FailNow(t, "second invoke must not call the function")
 	}), "second invoke must fail")
+}
+
+func TestParseGroup(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    reflect.StructField
+		wantG   group
+		wantErr string
+	}{
+		{
+			name:  "no group",
+			args:  reflect.StructField{},
+			wantG: group{},
+		},
+		{
+			name:  "simple group",
+			args:  reflect.StructField{Tag: `group:"somegroup"`},
+			wantG: group{name: "somegroup"},
+		},
+		{
+			name:  "flattened group",
+			args:  reflect.StructField{Tag: `group:"somegroup,flatten"`},
+			wantG: group{name: "somegroup", flatten: true},
+		},
+		{
+			name:    "error",
+			args:    reflect.StructField{Tag: `group:"somegroup,abc"`},
+			wantG:   group{},
+			wantErr: `invalid value "abc" for "group" tag on field`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotG, err := parseGroup(tt.args)
+			if tt.wantErr != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			}
+			assert.Equal(t, tt.wantG, gotG)
+		})
+	}
 }
 
 func BenchmarkProvideCycleDetection(b *testing.B) {

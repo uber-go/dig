@@ -371,6 +371,11 @@ type resultGrouped struct {
 
 	// Type of value produced.
 	Type reflect.Type
+
+	// Indicates elements of a value are to be injected individually, instead of
+	// as a group. Requires the value's slice to be a group. If set, Type will be
+	// the type of individual elements rather than the group.
+	flatten bool
 }
 
 func (rt resultGrouped) DotResult() []*dot.Result {
@@ -386,11 +391,17 @@ func (rt resultGrouped) DotResult() []*dot.Result {
 
 // newResultGrouped(f) builds a new resultGrouped from the provided field.
 func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
-	rg := resultGrouped{Group: f.Tag.Get(_groupTag), Type: f.Type}
-
+	g, err := parseGroup(f)
+	if err != nil {
+		return resultGrouped{}, err
+	}
+	rg := resultGrouped{Group: g.name}
 	name := f.Tag.Get(_nameTag)
 	optional, _ := isFieldOptional(f)
 	switch {
+	case g.flatten && f.Type.Kind() != reflect.Slice:
+		return rg, errf("flatten can be applied to slices only",
+			"field %q (%v) is not a slice", f.Name, f.Type)
 	case name != "":
 		return rg, errf(
 			"cannot use named values with value groups",
@@ -398,10 +409,22 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	case optional:
 		return rg, errors.New("value groups cannot be optional")
 	}
+	if g.flatten {
+		rg.Type = f.Type.Elem()
+		rg.flatten = true
+	} else {
+		rg.Type = f.Type
+	}
 
 	return rg, nil
 }
 
 func (rt resultGrouped) Extract(cw containerWriter, v reflect.Value) {
+	if rt.flatten {
+		for i := 0; i < v.Len(); i++ {
+			cw.submitGroupedValue(rt.Group, rt.Type, v.Index(i))
+		}
+		return
+	}
 	cw.submitGroupedValue(rt.Group, rt.Type, v)
 }
