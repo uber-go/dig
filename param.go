@@ -414,11 +414,11 @@ func (pt paramGroupedSlice) DotParam() []*dot.Param {
 //
 // The type MUST be a slice type.
 func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
-	g, err := parseGroup(f)
+	g, err := parseGroupTag(f)
 	if err != nil {
 		return paramGroupedSlice{}, err
 	}
-	pg := paramGroupedSlice{Group: g.name, Type: f.Type}
+	pg := paramGroupedSlice{Group: g.Name, Type: f.Type}
 
 	name := f.Tag.Get(_nameTag)
 	optional, _ := isFieldOptional(f)
@@ -426,7 +426,7 @@ func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
 	case f.Type.Kind() != reflect.Slice:
 		return pg, errf("value groups may be consumed as slices only",
 			"field %q (%v) is not a slice", f.Name, f.Type)
-	case g.flatten:
+	case g.Flatten:
 		return pg, errf("cannot use flatten in parameter value groups",
 			"field %q (%v) specifies flatten", f.Name, f.Type)
 	case name != "":

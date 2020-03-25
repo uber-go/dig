@@ -2727,47 +2727,6 @@ func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {
 	}), "second invoke must fail")
 }
 
-func TestParseGroup(t *testing.T) {
-	tests := []struct {
-		name    string
-		args    reflect.StructField
-		wantG   group
-		wantErr string
-	}{
-		{
-			name:  "no group",
-			args:  reflect.StructField{},
-			wantG: group{},
-		},
-		{
-			name:  "simple group",
-			args:  reflect.StructField{Tag: `group:"somegroup"`},
-			wantG: group{name: "somegroup"},
-		},
-		{
-			name:  "flattened group",
-			args:  reflect.StructField{Tag: `group:"somegroup,flatten"`},
-			wantG: group{name: "somegroup", flatten: true},
-		},
-		{
-			name:    "error",
-			args:    reflect.StructField{Tag: `group:"somegroup,abc"`},
-			wantG:   group{},
-			wantErr: `invalid value "abc" for "group" tag on field`,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotG, err := parseGroup(tt.args)
-			if tt.wantErr != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErr)
-			}
-			assert.Equal(t, tt.wantG, gotG)
-		})
-	}
-}
-
 func BenchmarkProvideCycleDetection(b *testing.B) {
 	// func TestBenchmarkProvideCycleDetection(b *testing.T) {
 	type A struct{}
