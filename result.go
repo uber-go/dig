@@ -81,7 +81,21 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 			"cannot return a pointer to a result object, use a value instead",
 			"%v is a pointer to a struct that embeds dig.Out", t)
 	case len(opts.Group) > 0:
-		return resultGrouped{Type: t, Group: opts.Group}, nil
+		g, err := parseGroupString(opts.Group)
+		if err != nil {
+			return nil, errf(
+				"cannot parse group %q: ", opts.Group, err)
+		}
+		rg := resultGrouped{Type: t, Group: g.Name, Flatten: g.Flatten}
+		if g.Flatten {
+			if t.Kind() != reflect.Slice {
+				return nil, errf(
+					"flatten can be applied to slices only",
+					"%v is not a slice", err)
+			}
+			rg.Type = rg.Type.Elem()
+		}
+		return rg, nil
 	default:
 		return resultSingle{Type: t, Name: opts.Name}, nil
 	}
@@ -391,7 +405,7 @@ func (rt resultGrouped) DotResult() []*dot.Result {
 
 // newResultGrouped(f) builds a new resultGrouped from the provided field.
 func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
-	g, err := parseGroupTag(f)
+	g, err := parseGroupString(f.Tag.Get(_groupTag))
 	if err != nil {
 		return resultGrouped{}, err
 	}

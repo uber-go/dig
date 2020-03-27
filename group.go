@@ -21,7 +21,7 @@
 package dig
 
 import (
-	"reflect"
+	"fmt"
 	"strings"
 )
 
@@ -34,25 +34,21 @@ type group struct {
 	Flatten bool
 }
 
-func parseGroupTag(f reflect.StructField) (group, error) {
-	tag := f.Tag.Get(_groupTag)
-	if tag == "" {
-		panic("It looks like you have found a bug in dig. " +
-			"Please file an issue at https://github.com/uber-go/dig/issues/ " +
-			"and provide the following message: " +
-			"parseGroupTag() must never be called without group tag")
-	}
+type errInvalidGroupOption struct{ Option string }
 
-	components := strings.Split(tag, ",")
+func (e errInvalidGroupOption) Error() string {
+	return fmt.Sprintf("invalid option %q", e.Option)
+}
+
+func parseGroupString(s string) (group, error) {
+	components := strings.Split(s, ",")
 	g := group{Name: components[0]}
 	for _, c := range components[1:] {
 		switch c {
 		case "flatten":
 			g.Flatten = true
 		default:
-			return group{}, errf(
-				"invalid option %q for %q tag on field %v",
-				c, _groupTag, f.Name)
+			return g, errInvalidGroupOption{Option: c}
 		}
 	}
 	return g, nil

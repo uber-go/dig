@@ -414,7 +414,7 @@ func (pt paramGroupedSlice) DotParam() []*dot.Param {
 //
 // The type MUST be a slice type.
 func newParamGroupedSlice(f reflect.StructField) (paramGroupedSlice, error) {
-	g, err := parseGroupTag(f)
+	g, err := parseGroupString(f.Tag.Get(_groupTag))
 	if err != nil {
 		return paramGroupedSlice{}, err
 	}

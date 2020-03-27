@@ -21,43 +21,37 @@
 package dig
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestParseGroup(t *testing.T) {
-	t.Run("no group tag on struct panics", func(t *testing.T) {
-		require.Panics(t, func() { parseGroupTag(reflect.StructField{}) })
-	})
-
 	tests := []struct {
 		name    string
-		args    reflect.StructField
+		group   string
 		wantG   group
 		wantErr string
 	}{
 		{
 			name:  "simple group",
-			args:  reflect.StructField{Tag: `group:"somegroup"`},
+			group: `somegroup`,
 			wantG: group{Name: "somegroup"},
 		},
 		{
 			name:  "flattened group",
-			args:  reflect.StructField{Tag: `group:"somegroup,flatten"`},
+			group: `somegroup,flatten`,
 			wantG: group{Name: "somegroup", Flatten: true},
 		},
 		{
 			name:    "error",
-			args:    reflect.StructField{Tag: `group:"somegroup,abc"`},
-			wantErr: `invalid option "abc" for "group" tag on field`,
+			group:   `somegroup,abc`,
+			wantErr: `invalid option "abc"`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotG, err := parseGroupTag(tt.args)
+			gotG, err := parseGroupString(tt.group)
 			if tt.wantErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

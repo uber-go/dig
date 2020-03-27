@@ -1246,6 +1246,22 @@ func TestGroups(t *testing.T) {
 			assert.Equal(t, []int{2, 3, 4, 1}, i.Values)
 		}), "invoke failed")
 	})
+
+	t.Run("flatten via option", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+		require.NoError(t, c.Provide(func() []int {
+			return []int{1, 2, 3}
+		}, Group("val,flatten")), "failed to provide ")
+		type in struct {
+			In
+
+			Values []int `group:"val"`
+		}
+
+		require.NoError(t, c.Invoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Values)
+		}), "invoke failed")
+	})
 }
 
 // --- END OF END TO END TESTS
