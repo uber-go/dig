@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - GraphViz visualization of the graph now includes names of packages next to
   constructors.
+- Added a `flatten` modifier to group tags for slices to allow providing
+  individual elements instead of the slice for a group value. See package
+  doucmentation for more information.
 
 ### Changed
 - Drop library dependency on `golang.org/x/lint`.

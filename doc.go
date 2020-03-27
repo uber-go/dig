@@ -331,4 +331,19 @@
 //
 // Note that values in a value group are unordered. Dig makes no guarantees
 // about the order in which these values will be produced.
+//
+// Value groups can be used to provide multiple values for a group from a
+// dig.Out using slices, however considering groups are retrieved by requesting
+// a slice this implies that the values must be retrieved using a slice of
+// slices. As of dig v1.9.0, if you want to provide individual elements to the
+// group instead of the slice itself, you can add the `flatten` modifier to the
+// group from a dig.Out.
+//
+//   type IntResult struct {
+//     dig.Out
+//
+//     Handler []int `group:"server"`         // [][]int from dig.In
+//     Handler []int `group:"server,flatten"` // []int from dig.In
+//   }
+//
 package dig // import "go.uber.org/dig"
