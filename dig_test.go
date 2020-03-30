@@ -1262,6 +1262,13 @@ func TestGroups(t *testing.T) {
 			assert.Equal(t, []int{2, 3, 1}, i.Values)
 		}), "invoke failed")
 	})
+
+	t.Run("flatten via option error if not a slice", func(t *testing.T) {
+		c := New(setRand(rand.New(rand.NewSource(0))))
+		err := c.Provide(func() int { return 1 }, Group("val,flatten"))
+		require.Error(t, err, "failed to provide")
+		assert.Contains(t, err.Error(), "flatten can be applied to slices only")
+	})
 }
 
 // --- END OF END TO END TESTS
@@ -1498,6 +1505,12 @@ func TestProvideInvalidGroup(t *testing.T) {
 	}, Group("foo`bar"))
 	require.Error(t, err, "Provide must fail")
 	assert.Contains(t, err.Error(), "invalid dig.Group(\"foo`bar\"): group names cannot contain backquotes")
+
+	err = c.Provide(func() io.Reader {
+		panic("this function must not be called")
+	}, Group("foo,bar"))
+	require.Error(t, err, "Provide must fail")
+	assert.Contains(t, err.Error(), `cannot parse group "foo,bar": invalid option "bar"`)
 }
 
 func TestProvideGroupAndName(t *testing.T) {

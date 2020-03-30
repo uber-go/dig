@@ -84,14 +84,14 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 		g, err := parseGroupString(opts.Group)
 		if err != nil {
 			return nil, errf(
-				"cannot parse group %q: ", opts.Group, err)
+				"cannot parse group %q", opts.Group, err)
 		}
 		rg := resultGrouped{Type: t, Group: g.Name, Flatten: g.Flatten}
 		if g.Flatten {
 			if t.Kind() != reflect.Slice {
 				return nil, errf(
 					"flatten can be applied to slices only",
-					"%v is not a slice", err)
+					"%v is not a slice", t)
 			}
 			rg.Type = rg.Type.Elem()
 		}
