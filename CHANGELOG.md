@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 - Drop library dependency on `golang.org/x/lint`.
+- Support printing multi-line error messages with `%+v`.
 
 ## [1.8.0] - 2019-11-14
 ### Changed
