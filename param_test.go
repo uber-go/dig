@@ -153,6 +153,15 @@ func TestParamGroupSliceErrors(t *testing.T) {
 			}{},
 			wantErr: "value groups cannot be optional",
 		},
+		{
+			desc: "no flatten in In",
+			shape: struct {
+				In
+
+				Foo []string `group:"foo,flatten"`
+			}{},
+			wantErr: "cannot use flatten in parameter value groups",
+		},
 	}
 
 	for _, tt := range tests {

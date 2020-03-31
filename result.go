@@ -81,7 +81,21 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 			"cannot return a pointer to a result object, use a value instead",
 			"%v is a pointer to a struct that embeds dig.Out", t)
 	case len(opts.Group) > 0:
-		return resultGrouped{Type: t, Group: opts.Group}, nil
+		g, err := parseGroupString(opts.Group)
+		if err != nil {
+			return nil, errf(
+				"cannot parse group %q", opts.Group, err)
+		}
+		rg := resultGrouped{Type: t, Group: g.Name, Flatten: g.Flatten}
+		if g.Flatten {
+			if t.Kind() != reflect.Slice {
+				return nil, errf(
+					"flatten can be applied to slices only",
+					"%v is not a slice", t)
+			}
+			rg.Type = rg.Type.Elem()
+		}
+		return rg, nil
 	default:
 		return resultSingle{Type: t, Name: opts.Name}, nil
 	}
@@ -371,6 +385,11 @@ type resultGrouped struct {
 
 	// Type of value produced.
 	Type reflect.Type
+
+	// Indicates elements of a value are to be injected individually, instead of
+	// as a group. Requires the value's slice to be a group. If set, Type will be
+	// the type of individual elements rather than the group.
+	Flatten bool
 }
 
 func (rt resultGrouped) DotResult() []*dot.Result {
@@ -386,11 +405,21 @@ func (rt resultGrouped) DotResult() []*dot.Result {
 
 // newResultGrouped(f) builds a new resultGrouped from the provided field.
 func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
-	rg := resultGrouped{Group: f.Tag.Get(_groupTag), Type: f.Type}
-
+	g, err := parseGroupString(f.Tag.Get(_groupTag))
+	if err != nil {
+		return resultGrouped{}, err
+	}
+	rg := resultGrouped{
+		Group:   g.Name,
+		Flatten: g.Flatten,
+		Type:    f.Type,
+	}
 	name := f.Tag.Get(_nameTag)
 	optional, _ := isFieldOptional(f)
 	switch {
+	case g.Flatten && f.Type.Kind() != reflect.Slice:
+		return rg, errf("flatten can be applied to slices only",
+			"field %q (%v) is not a slice", f.Name, f.Type)
 	case name != "":
 		return rg, errf(
 			"cannot use named values with value groups",
@@ -398,10 +427,19 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	case optional:
 		return rg, errors.New("value groups cannot be optional")
 	}
+	if g.Flatten {
+		rg.Type = f.Type.Elem()
+	}
 
 	return rg, nil
 }
 
 func (rt resultGrouped) Extract(cw containerWriter, v reflect.Value) {
-	cw.submitGroupedValue(rt.Group, rt.Type, v)
+	if !rt.Flatten {
+		cw.submitGroupedValue(rt.Group, rt.Type, v)
+		return
+	}
+	for i := 0; i < v.Len(); i++ {
+		cw.submitGroupedValue(rt.Group, rt.Type, v.Index(i))
+	}
 }

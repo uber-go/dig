@@ -279,6 +279,15 @@ func TestNewResultObjectErrors(t *testing.T) {
 			opts: resultOptions{Name: "foo"},
 			err:  `cannot specify a name for result objects`,
 		},
+		{
+			desc: "flatten on non-slice",
+			give: struct {
+				Out
+
+				Writer io.Writer `group:"writers,flatten"`
+			}{},
+			err: "flatten can be applied to slices only",
+		},
 	}
 
 	for _, tt := range tests {

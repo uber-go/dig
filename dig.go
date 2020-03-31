@@ -37,7 +37,6 @@ import (
 const (
 	_optionalTag = "optional"
 	_nameTag     = "name"
-	_groupTag    = "group"
 )
 
 // Unique identification of an object in the graph.
