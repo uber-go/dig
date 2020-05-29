@@ -1642,6 +1642,34 @@ func TestProvideCycleFails(t *testing.T) {
 		)
 	})
 
+	t.Run("parameters only on dry run", func(t *testing.T) {
+		// A <- B <- C
+		// |         ^
+		// |_________|
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		newA := func(*C) *A { return &A{} }
+		newB := func(*A) *B { return &B{} }
+		newC := func(*B) *C { return &C{} }
+
+		c := New(Dry(true))
+		assert.NoError(t, c.Provide(newA))
+		assert.NoError(t, c.Provide(newB))
+		err := c.Provide(newC)
+		require.Error(t, err, "expected error when introducing cycle")
+		require.True(t, IsCycleDetected(err))
+		assertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig".TestProvideCycleFails.\S+`,
+			`dig_test.go:\d+`, // file:line
+			`this function introduces a cycle:`,
+			`\*dig.C provided by "go.uber.org/dig".TestProvideCycleFails\S+ \(\S+\)`,
+			`depends on \*dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on \*dig.A provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on \*dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+		)
+	})
+
 	t.Run("dig.In based cycle", func(t *testing.T) {
 		// Same cycle as before but in terms of dig.Ins.
 
@@ -1672,6 +1700,53 @@ func TestProvideCycleFails(t *testing.T) {
 		newC := func(CParams) C { return C{} }
 
 		c := New()
+		require.NoError(t, c.Provide(newA))
+		require.NoError(t, c.Provide(newB))
+
+		err := c.Provide(newC)
+		require.Error(t, err, "expected error when introducing cycle")
+		require.True(t, IsCycleDetected(err))
+		assertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig".TestProvideCycleFails.\S+`,
+			`dig_test.go:\d+`, // file:line
+			`this function introduces a cycle:`,
+			`dig.C provided by "go.uber.org/dig".TestProvideCycleFails\S+ \(\S+\)`,
+			`depends on dig.B provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on dig.A provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+			`depends on dig.C provided by "go.uber.org/dig".TestProvideCycleFails.\S+ \(\S+\)`,
+		)
+	})
+
+	t.Run("dig.In based cycle dry run", func(t *testing.T) {
+		// Same cycle as before but in terms of dig.Ins.
+
+		type A struct{}
+		type B struct{}
+		type C struct{}
+
+		type AParams struct {
+			In
+
+			C C
+		}
+		newA := func(AParams) A { return A{} }
+
+		type BParams struct {
+			In
+
+			A A
+		}
+		newB := func(BParams) B { return B{} }
+
+		type CParams struct {
+			In
+
+			B B
+			W io.Writer
+		}
+		newC := func(CParams) C { return C{} }
+
+		c := New(Dry(true))
 		require.NoError(t, c.Provide(newA))
 		require.NoError(t, c.Provide(newB))
 
@@ -1873,6 +1948,33 @@ func TestInvokesUseCachedObjects(t *testing.T) {
 func TestProvideFailures(t *testing.T) {
 	t.Run("out returning multiple instances of the same type", func(t *testing.T) {
 		c := New()
+		type A struct{ idx int }
+		type ret struct {
+			Out
+
+			A1 A // sampe type A provided three times
+			A2 A
+			A3 A
+		}
+
+		err := c.Provide(func() ret {
+			return ret{
+				A1: A{idx: 1},
+				A2: A{idx: 2},
+				A3: A{idx: 3},
+			}
+		})
+		require.Error(t, err, "provide must return error")
+		assertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig".TestProvideFailures\S+`,
+			`dig_test.go:\d+`, // file:line
+			`cannot provide dig.A from \[0\].A2:`,
+			`already provided by \[0\].A1`,
+		)
+	})
+
+	t.Run("out returning multiple instances of the same type", func(t *testing.T) {
+		c := New(Dry(true))
 		type A struct{ idx int }
 		type ret struct {
 			Out

@@ -156,6 +156,9 @@ type Container struct {
 
 	// Defer acyclic check on provide until Invoke.
 	deferAcyclicVerification bool
+
+	// Whether container is being run in dry mode used for testing.
+	dry bool
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -228,6 +231,7 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		dry:       false,
 	}
 
 	for _, opt := range opts {
@@ -255,6 +259,13 @@ func DeferAcyclicVerification() Option {
 func setRand(r *rand.Rand) Option {
 	return optionFunc(func(c *Container) {
 		c.rand = r
+	})
+}
+
+// Dry sets container mode to dry used for testing graphs without invocation.
+func Dry(dry bool) Option {
+	return optionFunc(func(c *Container) {
+		c.dry = dry
 	})
 }
 
@@ -393,14 +404,16 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 			Reason: err,
 		}
 	}
-
-	returned := reflect.ValueOf(function).Call(args)
-	if len(returned) == 0 {
-		return nil
-	}
-	if last := returned[len(returned)-1]; isError(last.Type()) {
-		if err, _ := last.Interface().(error); err != nil {
-			return err
+	// Do not invoke if we are testing graph dependencies.
+	if !c.dry {
+		returned := reflect.ValueOf(function).Call(args)
+		if len(returned) == 0 {
+			return nil
+		}
+		if last := returned[len(returned)-1]; isError(last.Type()) {
+			if err, _ := last.Interface().(error); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
