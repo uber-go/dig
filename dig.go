@@ -156,6 +156,9 @@ type Container struct {
 
 	// Defer acyclic check on provide until Invoke.
 	deferAcyclicVerification bool
+
+	// invokerFn calls a function with arguments provided to Provide or Invoke.
+	invokerFn invokerFn
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -195,6 +198,9 @@ type containerStore interface {
 	getGroupProviders(name string, t reflect.Type) []provider
 
 	createGraph() *dot.Graph
+
+	// Returns invokerFn function to use when calling arguments.
+	invoker() invokerFn
 }
 
 // provider encapsulates a user-provided constructor.
@@ -228,6 +234,7 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		invokerFn: defaultInvoker,
 	}
 
 	for _, opt := range opts {
@@ -256,6 +263,36 @@ func setRand(r *rand.Rand) Option {
 	return optionFunc(func(c *Container) {
 		c.rand = r
 	})
+}
+
+// DryRun is an Option which, when set to true, disables invocation of functions supplied to
+// Provide and Invoke. Use this to build no-op containers.
+func DryRun(dry bool) Option {
+	return optionFunc(func(c *Container) {
+		if dry {
+			c.invokerFn = dryInvoker
+		} else {
+			c.invokerFn = defaultInvoker
+		}
+	})
+}
+
+// invokerFn specifies how the container calls user-supplied functions.
+type invokerFn func(fn reflect.Value, args []reflect.Value) (results []reflect.Value)
+
+func defaultInvoker(fn reflect.Value, args []reflect.Value) []reflect.Value {
+	return fn.Call(args)
+}
+
+// Generates zero values for results without calling the supplied function.
+func dryInvoker(fn reflect.Value, _ []reflect.Value) []reflect.Value {
+	ft := fn.Type()
+	results := make([]reflect.Value, ft.NumOut())
+	for i := 0; i < ft.NumOut(); i++ {
+		results[i] = reflect.Zero(fn.Type().Out(i))
+	}
+
+	return results
 }
 
 func (c *Container) knownTypes() []reflect.Type {
@@ -307,6 +344,12 @@ func (c *Container) getProviders(k key) []provider {
 		providers[i] = n
 	}
 	return providers
+}
+
+// invokerFn return a function to run when calling function provided to Provide or Invoke. Used for
+// running container in dry mode.
+func (c *Container) invoker() invokerFn {
+	return c.invokerFn
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -393,8 +436,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 			Reason: err,
 		}
 	}
-
-	returned := reflect.ValueOf(function).Call(args)
+	returned := c.invokerFn(reflect.ValueOf(function), args)
 	if len(returned) == 0 {
 		return nil
 	}
@@ -403,6 +445,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -664,12 +707,13 @@ func (n *node) Call(c containerStore) error {
 	}
 
 	receiver := newStagingContainerWriter()
-	results := reflect.ValueOf(n.ctor).Call(args)
+	results := c.invoker()(reflect.ValueOf(n.ctor), args)
 	if err := n.resultList.ExtractList(receiver, results); err != nil {
 		return errConstructorFailed{Func: n.location, Reason: err}
 	}
 	receiver.Commit(c)
 	n.called = true
+
 	return nil
 }
 
