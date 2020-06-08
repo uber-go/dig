@@ -198,6 +198,9 @@ type containerStore interface {
 	getGroupProviders(name string, t reflect.Type) []provider
 
 	createGraph() *dot.Graph
+
+	// Returns whether container is running in dry mode.
+	Dry() bool
 }
 
 // provider encapsulates a user-provided constructor.
@@ -318,6 +321,11 @@ func (c *Container) getProviders(k key) []provider {
 		providers[i] = n
 	}
 	return providers
+}
+
+// Dry returns whether container is set in dry mode and does not call Provide nor Invoke functions.
+func (c *Container) Dry() bool {
+	return c.dry
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -677,9 +685,12 @@ func (n *node) Call(c containerStore) error {
 	}
 
 	receiver := newStagingContainerWriter()
-	results := reflect.ValueOf(n.ctor).Call(args)
-	if err := n.resultList.ExtractList(receiver, results); err != nil {
-		return errConstructorFailed{Func: n.location, Reason: err}
+	// Do not call providers if we are in dry mode and  dont want anything to run.
+	if !c.Dry() {
+		results := reflect.ValueOf(n.ctor).Call(args)
+		if err := n.resultList.ExtractList(receiver, results); err != nil {
+			return errConstructorFailed{Func: n.location, Reason: err}
+		}
 	}
 	receiver.Commit(c)
 	n.called = true
