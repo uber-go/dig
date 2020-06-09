@@ -1611,14 +1611,27 @@ func TestProvideKnownTypesFails(t *testing.T) {
 	})
 }
 
-func TestDrySucceedsOnPanickingFn(t *testing.T) {
-	t.Run("dry mode should succeed on a function that panics if run", func(t *testing.T) {
+func TestDryModeSuccess(t *testing.T) {
+	t.Run("dry mode should succeed on Provide that panics if run", func(t *testing.T) {
 		type type1 struct{}
 		panics := func() *type1 {
 			t.Fatal("must not be called")
 			return &type1{}
 		}
 		invokes := func(*type1) {}
+		c := New(Dry(true))
+		assert.NoError(t, c.Provide(panics))
+		assert.NoError(t, c.Invoke(invokes))
+	})
+	t.Run("dry mode should succeed on functions that panic if run", func(t *testing.T) {
+		type type1 struct{}
+		panics := func() *type1 {
+			t.Fatal("must not be called")
+			return &type1{}
+		}
+		invokes := func(*type1) {
+			t.Fatal("must not be called")
+		}
 		c := New(Dry(true))
 		assert.NoError(t, c.Provide(panics))
 		assert.NoError(t, c.Invoke(invokes))
