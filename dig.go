@@ -265,7 +265,8 @@ func setRand(r *rand.Rand) Option {
 	})
 }
 
-// Dry sets container mode to dry used for testing graphs without invocation.
+// Dry is an Option when set to true, overrides default behavior of calling functions supplied by
+// Provide and Invoke and allows for validation of graph dependencies.
 func Dry(dry bool) Option {
 	return optionFunc(func(c *Container) {
 		c.dry = dry
