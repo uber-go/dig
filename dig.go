@@ -157,8 +157,8 @@ type Container struct {
 	// Defer acyclic check on provide until Invoke.
 	deferAcyclicVerification bool
 
-	// Whether container is being run in dry mode used for testing.
-	dry bool
+	// Invoker calls a function with arguments provided to Provide or Invoke.
+	invoker Invoker
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -199,8 +199,8 @@ type containerStore interface {
 
 	createGraph() *dot.Graph
 
-	// Returns whether container is running in dry mode.
-	Dry() bool
+	// Returns Invoker function to use when calling arguments.
+	Invoker() Invoker
 }
 
 // provider encapsulates a user-provided constructor.
@@ -234,7 +234,7 @@ func New(opts ...Option) *Container {
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		dry:       false,
+		invoker:   defaultInvoker,
 	}
 
 	for _, opt := range opts {
@@ -265,12 +265,30 @@ func setRand(r *rand.Rand) Option {
 	})
 }
 
-// Dry is an Option when set to true, overrides default behavior of calling functions supplied by
-// Provide and Invoke and allows for validation of graph dependencies.
-func Dry(dry bool) Option {
+// DryRun is an Option which, when set to true, disables invocation of functions supplied to
+// Provide and Invoke. Use this to build no-op containers.
+func DryRun(dry bool) Option {
 	return optionFunc(func(c *Container) {
-		c.dry = dry
+		if dry {
+			c.invoker = dryInvoker
+		}
 	})
+}
+
+// Invoker exports a function to call when invoking a function provided to Provide or Invoke.
+type Invoker func(fn reflect.Value, args []reflect.Value) (results []reflect.Value)
+
+func defaultInvoker(fn reflect.Value, args []reflect.Value) []reflect.Value {
+	return fn.Call(args)
+}
+
+func dryInvoker(fn reflect.Value, _ []reflect.Value) []reflect.Value {
+	results := make([]reflect.Value, fn.Type().NumOut())
+	for i := 0; i < fn.Type().NumOut(); i++ {
+		results[i] = reflect.Zero(fn.Type().Out(i))
+	}
+
+	return results
 }
 
 func (c *Container) knownTypes() []reflect.Type {
@@ -324,9 +342,10 @@ func (c *Container) getProviders(k key) []provider {
 	return providers
 }
 
-// Dry returns whether container is set in dry mode and does not call Provide nor Invoke functions.
-func (c *Container) Dry() bool {
-	return c.dry
+// Invoker return a function to run when calling function provided to Provide or Invoke. Used for
+// running container in dry mode.
+func (c *Container) Invoker() Invoker {
+	return c.invoker
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -413,18 +432,16 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 			Reason: err,
 		}
 	}
-	// Do not invoke if we are testing graph dependencies.
-	if !c.dry {
-		returned := reflect.ValueOf(function).Call(args)
-		if len(returned) == 0 {
-			return nil
-		}
-		if last := returned[len(returned)-1]; isError(last.Type()) {
-			if err, _ := last.Interface().(error); err != nil {
-				return err
-			}
+	returned := c.invoker(reflect.ValueOf(function), args)
+	if len(returned) == 0 {
+		return nil
+	}
+	if last := returned[len(returned)-1]; isError(last.Type()) {
+		if err, _ := last.Interface().(error); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 
@@ -686,15 +703,13 @@ func (n *node) Call(c containerStore) error {
 	}
 
 	receiver := newStagingContainerWriter()
-	// Do not call providers if we are in dry mode and  dont want anything to run.
-	if !c.Dry() {
-		results := reflect.ValueOf(n.ctor).Call(args)
-		if err := n.resultList.ExtractList(receiver, results); err != nil {
-			return errConstructorFailed{Func: n.location, Reason: err}
-		}
+	results := c.Invoker()(reflect.ValueOf(n.ctor), args)
+	if err := n.resultList.ExtractList(receiver, results); err != nil {
+		return errConstructorFailed{Func: n.location, Reason: err}
 	}
 	receiver.Commit(c)
 	n.called = true
+
 	return nil
 }
 
