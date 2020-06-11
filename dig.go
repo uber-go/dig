@@ -286,8 +286,9 @@ func defaultInvoker(fn reflect.Value, args []reflect.Value) []reflect.Value {
 
 // Generates zero values for results without calling the supplied function.
 func dryInvoker(fn reflect.Value, _ []reflect.Value) []reflect.Value {
-	results := make([]reflect.Value, fn.Type().NumOut())
-	for i := 0; i < fn.Type().NumOut(); i++ {
+	ft := fn.Type()
+	results := make([]reflect.Value, ft.NumOut())
+	for i := 0; i < ft.NumOut(); i++ {
 		results[i] = reflect.Zero(fn.Type().Out(i))
 	}
 

@@ -1614,18 +1614,18 @@ func TestProvideKnownTypesFails(t *testing.T) {
 func TestDryModeSuccess(t *testing.T) {
 	t.Run("does not call provides", func(t *testing.T) {
 		type type1 struct{}
-		panics := func() *type1 {
+		provides := func() *type1 {
 			t.Fatal("must not be called")
 			return &type1{}
 		}
 		invokes := func(*type1) {}
 		c := New(DryRun(true))
-		assert.NoError(t, c.Provide(panics))
+		assert.NoError(t, c.Provide(provides))
 		assert.NoError(t, c.Invoke(invokes))
 	})
 	t.Run("does not call invokes", func(t *testing.T) {
 		type type1 struct{}
-		panics := func() *type1 {
+		provides := func() *type1 {
 			t.Fatal("must not be called")
 			return &type1{}
 		}
@@ -1633,7 +1633,7 @@ func TestDryModeSuccess(t *testing.T) {
 			t.Fatal("must not be called")
 		}
 		c := New(DryRun(true))
-		assert.NoError(t, c.Provide(panics))
+		assert.NoError(t, c.Provide(provides))
 		assert.NoError(t, c.Invoke(invokes))
 	})
 }
