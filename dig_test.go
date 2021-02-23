@@ -344,6 +344,29 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
+	t.Run("allow unexported fields", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		constructor := func() (*type1, *type2) {
+			return &type1{}, &type2{}
+		}
+
+		c := New()
+		type param struct {
+			In `allowUnexported:"true"`
+
+			T1 *type1 // regular 'ol type
+			T2 *type2 `optional:"true"` // optional type present in the graph
+			t3 *type3
+		}
+		require.NoError(t, c.Provide(constructor))
+		require.NoError(t, c.Invoke(func(p param) {
+			require.NotNil(t, p.T1, "whole param struct should not be nil")
+			assert.NotNil(t, p.T2, "optional type in the graph should not return nil")
+		}))
+	})
+
 	t.Run("out type inserts multiple objects into the graph", func(t *testing.T) {
 		type A struct{ name string }
 		type B struct{ name string }
@@ -2911,4 +2934,58 @@ func BenchmarkProvideCycleDetection(b *testing.B) {
 		c.Provide(newB)
 		c.Provide(newA)
 	}
+}
+
+func TestUnexportedFieldsFailures(t *testing.T) {
+	t.Run("empty tag value", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		constructor := func() (*type1, *type2) {
+			return &type1{}, &type2{}
+		}
+
+		c := New()
+		type param struct {
+			In `allowUnexported:""`
+
+			T1 *type1 // regular 'ol type
+			T2 *type2 `optional:"true"` // optional type present in the graph
+			t3 *type3
+		}
+		require.NoError(t, c.Provide(constructor))
+		err := c.Invoke(func(p param) {
+			require.NotNil(t, p.T1, "whole param struct should not be nil")
+			assert.NotNil(t, p.T2, "optional type in the graph should not return nil")
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(),
+			`bad argument 1: bad field "t3" of dig.param: unexported fields not allowed in dig.In, did you mean to export "t3" (*dig.type3)`)
+	})
+
+	t.Run("invalid tag value", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		constructor := func() (*type1, *type2) {
+			return &type1{}, &type2{}
+		}
+
+		c := New()
+		type param struct {
+			In `allowUnexported:"foo"`
+
+			T1 *type1 // regular 'ol type
+			T2 *type2 `optional:"true"` // optional type present in the graph
+			t3 *type3
+		}
+		require.NoError(t, c.Provide(constructor))
+		err := c.Invoke(func(p param) {
+			require.NotNil(t, p.T1, "whole param struct should not be nil")
+			assert.NotNil(t, p.T2, "optional type in the graph should not return nil")
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(),
+			`bad argument 1: invalid value "foo" for "allowUnexported" tag on field In: strconv.ParseBool: parsing "foo": invalid syntax`)
+	})
 }

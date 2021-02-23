@@ -101,6 +101,29 @@ func TestParamObjectSuccess(t *testing.T) {
 	})
 }
 
+func TestParamObjectWithUnexportedFieldsSuccess(t *testing.T) {
+	type type1 struct{}
+	type type2 struct{}
+
+	type in struct {
+		In `allowUnexported:"true"`
+
+		T1 type1
+		t2 type2
+	}
+
+	po, err := newParamObject(reflect.TypeOf(in{}))
+	require.NoError(t, err)
+
+	require.Len(t, po.Fields, 1)
+
+	require.Equal(t, "T1", po.Fields[0].FieldName)
+	t1, ok := po.Fields[0].Param.(paramSingle)
+	require.True(t, ok, "T1 must be a paramSingle")
+	assert.Empty(t, t1.Name)
+	assert.False(t, t1.Optional)
+}
+
 func TestParamObjectFailure(t *testing.T) {
 	t.Run("unexported field gets an error", func(t *testing.T) {
 		type A struct{}
@@ -115,6 +138,36 @@ func TestParamObjectFailure(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
 			`bad field "a2" of dig.in: unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A)`)
+	})
+
+	t.Run("unexported field with empty tag value gets an error", func(t *testing.T) {
+		type A struct{}
+		type in struct {
+			In `allowUnexported:""`
+
+			A1 A
+			a2 A
+		}
+
+		_, err := newParamObject(reflect.TypeOf(in{}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(),
+			`bad field "a2" of dig.in: unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A)`)
+	})
+
+	t.Run("unexported field with invalid tag value gets an error", func(t *testing.T) {
+		type A struct{}
+		type in struct {
+			In `allowUnexported:"foo"`
+
+			A1 A
+			a2 A
+		}
+
+		_, err := newParamObject(reflect.TypeOf(in{}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(),
+			`invalid value "foo" for "allowUnexported" tag on field In: strconv.ParseBool: parsing "foo": invalid syntax`)
 	})
 }
 
