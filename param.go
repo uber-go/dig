@@ -289,10 +289,10 @@ func newParamObject(t reflect.Type) (paramObject, error) {
 
 	// Check if the In type supports unexported fields.
 	var allowUnexported bool
-	var err error
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		if f.Type == _inType {
+			var err error
 			allowUnexported, err = isUnexportedFieldAllowed(f)
 			if err != nil {
 				return po, err
