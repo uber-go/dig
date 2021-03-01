@@ -287,13 +287,30 @@ func (po paramObject) DotParam() []*dot.Param {
 func newParamObject(t reflect.Type) (paramObject, error) {
 	po := paramObject{Type: t}
 
+	// Check if the In type supports ignoring unexported fields.
+	var ignoreUnexported bool
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.Type == _inType {
+			var err error
+			ignoreUnexported, err = isIgnoreUnexportedSet(f)
+			if err != nil {
+				return po, err
+			}
+			break
+		}
+	}
+
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		if f.Type == _inType {
 			// Skip over the dig.In embed.
 			continue
 		}
-
+		if f.PkgPath != "" && ignoreUnexported {
+			// Skip over an unexported field if it is allowed.
+			continue
+		}
 		pof, err := newParamObjectField(i, f)
 		if err != nil {
 			return po, errf("bad field %q of %v", f.Name, t, err)
