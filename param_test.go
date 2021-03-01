@@ -106,7 +106,7 @@ func TestParamObjectWithUnexportedFieldsSuccess(t *testing.T) {
 	type type2 struct{}
 
 	type in struct {
-		In `allowUnexported:"true"`
+		In `ignore-unexported:"true"`
 
 		T1 type1
 		t2 type2
@@ -143,7 +143,7 @@ func TestParamObjectFailure(t *testing.T) {
 	t.Run("unexported field with empty tag value gets an error", func(t *testing.T) {
 		type A struct{}
 		type in struct {
-			In `allowUnexported:""`
+			In `ignore-unexported:""`
 
 			A1 A
 			a2 A
@@ -158,7 +158,7 @@ func TestParamObjectFailure(t *testing.T) {
 	t.Run("unexported field with invalid tag value gets an error", func(t *testing.T) {
 		type A struct{}
 		type in struct {
-			In `allowUnexported:"foo"`
+			In `ignore-unexported:"foo"`
 
 			A1 A
 			a2 A
@@ -167,7 +167,7 @@ func TestParamObjectFailure(t *testing.T) {
 		_, err := newParamObject(reflect.TypeOf(in{}))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
-			`invalid value "foo" for "allowUnexported" tag on field In: strconv.ParseBool: parsing "foo": invalid syntax`)
+			`invalid value "foo" for "ignore-unexported" tag on field In: strconv.ParseBool: parsing "foo": invalid syntax`)
 	})
 }
 

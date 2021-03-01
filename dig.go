@@ -35,9 +35,9 @@ import (
 )
 
 const (
-	_optionalTag        = "optional"
-	_nameTag            = "name"
-	_allowUnexportedTag = "allowUnexported"
+	_optionalTag         = "optional"
+	_nameTag             = "name"
+	_ignoreUnexportedTag = "ignore-unexported"
 )
 
 // Unique identification of an object in the graph.
@@ -736,10 +736,10 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 	return optional, err
 }
 
-// Checks if unexported fields in an In struct are allowed. The struct field
-// MUST be an _inType.
-func isUnexportedFieldAllowed(f reflect.StructField) (bool, error) {
-	tag := f.Tag.Get(_allowUnexportedTag)
+// Checks if ignoring unexported files in an In struct is allowed.
+// The struct field MUST be an _inType.
+func isIgnoreUnexportedSet(f reflect.StructField) (bool, error) {
+	tag := f.Tag.Get(_ignoreUnexportedTag)
 	if tag == "" {
 		return false, nil
 	}
@@ -748,7 +748,7 @@ func isUnexportedFieldAllowed(f reflect.StructField) (bool, error) {
 	if err != nil {
 		err = errf(
 			"invalid value %q for %q tag on field %v",
-			tag, _allowUnexportedTag, f.Name, err)
+			tag, _ignoreUnexportedTag, f.Name, err)
 	}
 
 	return allowed, err

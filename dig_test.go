@@ -344,7 +344,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
-	t.Run("allow unexported fields", func(t *testing.T) {
+	t.Run("ignore unexported fields", func(t *testing.T) {
 		type type1 struct{}
 		type type2 struct{}
 		type type3 struct{}
@@ -354,7 +354,7 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		c := New()
 		type param struct {
-			In `allowUnexported:"true"`
+			In `ignore-unexported:"true"`
 
 			T1 *type1 // regular 'ol type
 			T2 *type2 `optional:"true"` // optional type present in the graph
@@ -2947,7 +2947,7 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 
 		c := New()
 		type param struct {
-			In `allowUnexported:""`
+			In `ignore-unexported:""`
 
 			T1 *type1 // regular 'ol type
 			T2 *type2 `optional:"true"` // optional type present in the graph
@@ -2973,7 +2973,7 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 
 		c := New()
 		type param struct {
-			In `allowUnexported:"foo"`
+			In `ignore-unexported:"foo"`
 
 			T1 *type1 // regular 'ol type
 			T2 *type2 `optional:"true"` // optional type present in the graph
@@ -2986,6 +2986,6 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
-			`bad argument 1: invalid value "foo" for "allowUnexported" tag on field In: strconv.ParseBool: parsing "foo": invalid syntax`)
+			`bad argument 1: invalid value "foo" for "ignore-unexported" tag on field In: strconv.ParseBool: parsing "foo": invalid syntax`)
 	})
 }
