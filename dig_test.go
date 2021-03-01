@@ -348,8 +348,8 @@ func TestEndToEndSuccess(t *testing.T) {
 		type type1 struct{}
 		type type2 struct{}
 		type type3 struct{}
-		constructor := func() (*type1, *type2) {
-			return &type1{}, &type2{}
+		constructor := func() (*type1, *type2, *type3) {
+			return &type1{}, &type2{}, &type3{}
 		}
 
 		c := New()
@@ -364,6 +364,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Invoke(func(p param) {
 			require.NotNil(t, p.T1, "whole param struct should not be nil")
 			assert.NotNil(t, p.T2, "optional type in the graph should not return nil")
+			assert.Nil(t, p.t3, "unexported field should not be set")
 		}))
 	})
 
