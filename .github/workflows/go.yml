@@ -39,10 +39,11 @@ jobs:
       run: go mod download
 
     - name: Lint
+      if: matrix.latest
       run: make lint
 
     - name: Test
-      run: make test
+      run: make cover
 
     - name: Upload coverage to codecov.io
       uses: codecov/codecov-action@v1
