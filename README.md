@@ -36,8 +36,8 @@ No breaking changes will be made to exported APIs before `v2.0.0`.
 [release-img]: https://img.shields.io/github/release/uber-go/dig.svg
 [release]: https://github.com/uber-go/dig/releases
 
-[ci-img]: https://img.shields.io/travis/uber-go/dig/master.svg
-[ci]: https://travis-ci.com/uber-go/dig/branches
+[ci-img]: https://github.com/uber-go/dig/actions/workflows/go.yml/badge.svg
+[ci]: https://github.com/uber-go/dig/actions/workflows/go.yml
 
 [cov-img]: https://codecov.io/gh/uber-go/dig/branch/master/graph/badge.svg
 [cov]: https://codecov.io/gh/uber-go/dig/branch/master
