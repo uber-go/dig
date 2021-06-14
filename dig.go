@@ -62,7 +62,9 @@ func (f optionFunc) applyOption(c *Container) { f(c) }
 type provideOptions struct {
 	Name  string
 	Group string
+	Info  *ConstructorInfo
 }
+
 
 func (o *provideOptions) Validate() error {
 	if len(o.Group) > 0 && len(o.Name) > 0 {
@@ -125,6 +127,12 @@ func Name(name string) ProvideOption {
 func Group(group string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Group = group
+	})
+}
+
+func Info(info *ConstructorInfo) ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.Info = info
 	})
 }
 
@@ -499,6 +507,9 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		c.isVerifiedAcyclic = true
 	}
 
+	opts.Info.ID = int(n.ID())
+	opts.Info.Inputs = n.ParamList()
+	opts.Info.Outputs = n.ResultList()
 	c.nodes = append(c.nodes, n)
 
 	return nil

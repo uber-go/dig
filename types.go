@@ -157,3 +157,9 @@ func embedsType(i interface{}, e reflect.Type) bool {
 	// map[reflect.Type]struct{}.
 	return false
 }
+
+type ConstructorInfo struct {
+	ID int
+	Inputs []string
+	Outputs []string
+}
