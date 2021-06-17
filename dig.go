@@ -129,7 +129,16 @@ func Group(group string) ProvideOption {
 	})
 }
 
-// WithInfo is a ProvideOption that lets Info.
+// ConstructorInfo provides information about the constructor's inputs and outputs
+// types as strings, as well as the ID of the constructor supplied to the Container.
+type ConstructorInfo struct {
+	ID      int
+	Inputs  []string
+	Outputs []string
+}
+
+// WithInfo is a ProvideOption that writes info on what Dig was able to get out
+// out of the provided constructor into the provided ConstructorInfo.
 func WithInfo(info *ConstructorInfo) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Info = info

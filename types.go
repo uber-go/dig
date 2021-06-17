@@ -157,11 +157,3 @@ func embedsType(i interface{}, e reflect.Type) bool {
 	// map[reflect.Type]struct{}.
 	return false
 }
-
-// ConstructorInfo provides information about the constructor's inputs and outputs
-// types as strings, as well as the ID of the constructor supplied to the Container.
-type ConstructorInfo struct {
-	ID      int
-	Inputs  []string
-	Outputs []string
-}
