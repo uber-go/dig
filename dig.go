@@ -131,6 +131,10 @@ func Group(group string) ProvideOption {
 
 // ConstructorInfo provides information about the constructor's inputs and outputs
 // types as strings, as well as the ID of the constructor supplied to the Container.
+//
+// ID is a unique integer representing the constructor node in the dependency graph.
+// Inputs is a string slice with the types of the input parameters of the constructor.
+// Outputs is a string slice with the types of the results produced by the constructor.
 type ConstructorInfo struct {
 	ID      int
 	Inputs  []string
