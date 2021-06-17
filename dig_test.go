@@ -2990,3 +2990,114 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 			`bad argument 1: invalid value "foo" for "ignore-unexported" tag on field In: strconv.ParseBool: parsing "foo": invalid syntax`)
 	})
 }
+
+func TestConstructorInfoOption(t *testing.T) {
+	t.Run("two outputs", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		ctor := func() (*type1, *type2) {
+			return &type1{}, &type2{}
+		}
+
+		c := New()
+		info := ConstructorInfo{}
+		require.NoError(t, c.Provide(ctor, WithInfo(&info)))
+
+		assert.Equal(t, 0, len(info.Inputs))
+		assert.Equal(t, 2, len(info.Outputs))
+
+		assert.Equal(t, "*dig.type1", info.Outputs[0])
+		assert.Equal(t, "*dig.type2", info.Outputs[1])
+	})
+
+	t.Run("two inputs and one output", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		ctor := func(*type1, *type2) *type3 {
+			return &type3{}
+		}
+		c := New()
+		info := ConstructorInfo{}
+		require.NoError(t, c.Provide(ctor, WithInfo(&info)))
+
+		assert.Equal(t, 2, len(info.Inputs))
+		assert.Equal(t, 1, len(info.Outputs))
+
+		assert.Equal(t, "*dig.type3", info.Outputs[0])
+		assert.Equal(t, "*dig.type1", info.Inputs[0])
+		assert.Equal(t, "*dig.type2", info.Inputs[1])
+	})
+
+	t.Run("two inputs, output and error", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		ctor := func(*type1, *type2) (*type3, error) {
+			return &type3{}, nil
+		}
+		c := New()
+		info := ConstructorInfo{}
+		require.NoError(t, c.Provide(ctor, WithInfo(&info)))
+
+		assert.Equal(t, 2, len(info.Inputs))
+		assert.Equal(t, 1, len(info.Outputs))
+
+		assert.Equal(t, "*dig.type3", info.Outputs[0])
+		assert.Equal(t, "*dig.type1", info.Inputs[0])
+		assert.Equal(t, "*dig.type2", info.Inputs[1])
+	})
+
+	t.Run("two inputs, two outputs", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		type type4 struct{}
+		ctor := func(*type1, *type2) (*type3, *type4) {
+			return &type3{}, &type4{}
+		}
+		c := New()
+		info := ConstructorInfo{}
+		require.NoError(t, c.Provide(ctor, WithInfo(&info)))
+
+		assert.Equal(t, 2, len(info.Inputs))
+		assert.Equal(t, 2, len(info.Outputs))
+
+		assert.Equal(t, "*dig.type1", info.Inputs[0])
+		assert.Equal(t, "*dig.type2", info.Inputs[1])
+
+		assert.Equal(t, "*dig.type3", info.Outputs[0])
+		assert.Equal(t, "*dig.type4", info.Outputs[1])
+	})
+
+	t.Run("two ctors", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		type type4 struct{}
+		ctor1 := func(*type1) *type2 {
+			return &type2{}
+		}
+		ctor2 := func(*type3) *type4 {
+			return &type4{}
+		}
+		c := New()
+		info1 := ConstructorInfo{}
+		info2 := ConstructorInfo{}
+		require.NoError(t, c.Provide(ctor1, WithInfo(&info1)))
+		require.NoError(t, c.Provide(ctor2, WithInfo(&info2)))
+
+		assert.NotEqual(t, info1.ID, info2.ID)
+
+		assert.Equal(t, 1, len(info1.Inputs))
+		assert.Equal(t, 1, len(info1.Outputs))
+		assert.Equal(t, 1, len(info2.Inputs))
+		assert.Equal(t, 1, len(info2.Outputs))
+
+		assert.Equal(t, "*dig.type1", info1.Inputs[0])
+		assert.Equal(t, "*dig.type2", info1.Outputs[0])
+
+		assert.Equal(t, "*dig.type3", info2.Inputs[0])
+		assert.Equal(t, "*dig.type4", info2.Outputs[0])
+	})
+}

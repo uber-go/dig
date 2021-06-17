@@ -65,7 +65,6 @@ type provideOptions struct {
 	Info  *ConstructorInfo
 }
 
-
 func (o *provideOptions) Validate() error {
 	if len(o.Group) > 0 && len(o.Name) > 0 {
 		return errf(
@@ -130,7 +129,8 @@ func Group(group string) ProvideOption {
 	})
 }
 
-func Info(info *ConstructorInfo) ProvideOption {
+// WithInfo is a ProvideOption that lets Info.
+func WithInfo(info *ConstructorInfo) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Info = info
 	})
@@ -506,11 +506,22 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		}
 		c.isVerifiedAcyclic = true
 	}
-
-	opts.Info.ID = int(n.ID())
-	opts.Info.Inputs = n.ParamList()
-	opts.Info.Outputs = n.ResultList()
 	c.nodes = append(c.nodes, n)
+
+	// Record introspection info for caller if Info option is specified
+	if opts.Info != nil {
+		opts.Info.ID = (int)(n.id)
+		opts.Info.Inputs = make([]string, 0)
+		opts.Info.Outputs = make([]string, 0)
+
+		for _, res := range n.resultList.DotResult() {
+			opts.Info.Outputs = append(opts.Info.Outputs, res.Type.String())
+		}
+
+		for _, param := range n.paramList.DotParam() {
+			opts.Info.Inputs = append(opts.Info.Inputs, param.Type.String())
+		}
+	}
 
 	return nil
 }
