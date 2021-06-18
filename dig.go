@@ -527,11 +527,11 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		opts.Info.Inputs = make([]string, 0)
 		opts.Info.Outputs = make([]string, 0)
 
-		for _, res := range n.resultList.DotResult() {
+		for _, res := range n.ResultList().DotResult() {
 			opts.Info.Outputs = append(opts.Info.Outputs, res.Type.String())
 		}
 
-		for _, param := range n.paramList.DotParam() {
+		for _, param := range n.ParamList().DotParam() {
 			opts.Info.Inputs = append(opts.Info.Inputs, param.Type.String())
 		}
 	}

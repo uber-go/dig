@@ -2992,6 +2992,7 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 }
 
 func TestConstructorInfoOption(t *testing.T) {
+	t.Parallel()
 	t.Run("two outputs", func(t *testing.T) {
 		type type1 struct{}
 		type type2 struct{}
