@@ -1549,6 +1549,19 @@ func TestProvideGroupAndName(t *testing.T) {
 		"name:\"bar\" provided with group:\"foo\"")
 }
 
+func TestProvideLocation(t *testing.T) {
+	t.Parallel()
+
+	c := New()
+	err := c.Provide(func(x int) float64 {
+		return float64(x)
+	}, Location("Test1", "dig", "dig_test.go", 1556))
+	require.NoError(t, err)
+	err = c.Invoke(func(y float64) {})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `"dig".Test1 (dig_test.go:1556)`)
+}
+
 func TestCantProvideUntypedNil(t *testing.T) {
 	t.Parallel()
 	c := New()
