@@ -129,6 +129,13 @@ func Group(group string) ProvideOption {
 	})
 }
 
+// Location is a ProvideOption which specifies a custom value for the location
+// in which a constructor was defined. By default, reflection is used to determine
+// the name, package, file and line number at which a constructor was defined.
+// For constructors which were created with the reflect.MakeFunc method this not
+// work so well and error messages will be cryptic and hard for users to understand.
+// Frameworks which build constructors with reflection can use Location to provide
+// useful debug information in error messages and DOT graphs.
 func Location(name, pkg, file string, line int) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Location = &digreflect.Func{
