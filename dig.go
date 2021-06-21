@@ -60,8 +60,9 @@ type optionFunc func(*Container)
 func (f optionFunc) applyOption(c *Container) { f(c) }
 
 type provideOptions struct {
-	Name  string
-	Group string
+	Name     string
+	Group    string
+	Location *digreflect.Func
 }
 
 func (o *provideOptions) Validate() error {
@@ -125,6 +126,17 @@ func Name(name string) ProvideOption {
 func Group(group string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Group = group
+	})
+}
+
+func Location(name, pkg, file string, line int) ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.Location = &digreflect.Func{
+			Name:    name,
+			Package: pkg,
+			File:    file,
+			Line:    line,
+		}
 	})
 }
 
@@ -468,6 +480,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		nodeOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
+			Location:    opts.Location,
 		},
 	)
 	if err != nil {
@@ -647,6 +660,7 @@ type nodeOptions struct {
 	// or belong to the specified value group
 	ResultName  string
 	ResultGroup string
+	Location    *digreflect.Func
 }
 
 func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
@@ -670,10 +684,15 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 		return nil, err
 	}
 
+	location := opts.Location
+	if location == nil {
+		location = digreflect.InspectFunc(ctor)
+	}
+
 	return &node{
 		ctor:       ctor,
 		ctype:      ctype,
-		location:   digreflect.InspectFunc(ctor),
+		location:   location,
 		id:         dot.CtorID(cptr),
 		paramList:  params,
 		resultList: results,
