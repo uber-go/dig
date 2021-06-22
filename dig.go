@@ -150,7 +150,22 @@ type Input struct {
 }
 
 func (i *Input) String() string {
-	return i.t.String()
+	toks := make([]string, 1, 4)
+	toks[0] = i.t.String()
+	if i.optional {
+		toks = append(toks, "optional")
+	}
+	if i.name != "" {
+		toks = append(toks, fmt.Sprintf("name = %q", i.name))
+	}
+	if i.group != "" {
+		toks = append(toks, fmt.Sprintf("group = %q", i.group))
+	}
+
+	if len(toks) == 1 {
+		return toks[0]
+	}
+	return fmt.Sprintf("%v[%v]", toks[0], strings.Join(toks, ", "))
 }
 
 // Output is a stringer that report the types of an output produced by the constructor.
@@ -160,7 +175,19 @@ type Output struct {
 }
 
 func (o *Output) String() string {
-	return o.t.String()
+	toks := make([]string, 1, 3)
+	toks[0] = o.t.String()
+	if o.name != "" {
+		toks = append(toks, fmt.Sprintf("name = %q", o.name))
+	}
+	if o.group != "" {
+		toks = append(toks, fmt.Sprintf("group = %q", o.group))
+	}
+
+	if len(toks) == 1 {
+		return toks[0]
+	}
+	return fmt.Sprintf("%v[%v]", toks[0], strings.Join(toks, ", "))
 }
 
 // FillInfo is a ProvideOption that writes info on what Dig was able to get out
