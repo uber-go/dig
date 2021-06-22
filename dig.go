@@ -62,7 +62,7 @@ func (f optionFunc) applyOption(c *Container) { f(c) }
 type provideOptions struct {
 	Name  string
 	Group string
-	Info  *ConstructorInfo
+	Info  *ProvideInfo
 }
 
 func (o *provideOptions) Validate() error {
@@ -132,17 +132,17 @@ func Group(group string) ProvideOption {
 // ID is a unique integer representing the constructor node in the dependency graph.
 type ID int
 
-// ConstructorInfo provides information about the constructor's inputs and outputs
+// ProvideInfo provides information about the constructor's inputs and outputs
 // types as strings, as well as the ID of the constructor supplied to the Container.
 // It contains ID for the constructor, as well as slices of Input and Output types,
 // which are Stringers that report the types of the parameters and results respectively.
-type ConstructorInfo struct {
+type ProvideInfo struct {
 	ID      ID
 	Inputs  []*Input
 	Outputs []*Output
 }
 
-// Input is a stringer that report the type of an input parameters of the constructor.
+// Input contains information on an input parameter of the constructor.
 type Input struct {
 	t           reflect.Type
 	optional    bool
@@ -150,8 +150,8 @@ type Input struct {
 }
 
 func (i *Input) String() string {
-	toks := make([]string, 1, 4)
-	toks[0] = i.t.String()
+	toks := make([]string, 0, 3)
+	t := i.t.String()
 	if i.optional {
 		toks = append(toks, "optional")
 	}
@@ -162,21 +162,21 @@ func (i *Input) String() string {
 		toks = append(toks, fmt.Sprintf("group = %q", i.group))
 	}
 
-	if len(toks) == 1 {
-		return toks[0]
+	if len(toks) == 0 {
+		return t
 	}
-	return fmt.Sprintf("%v[%v]", toks[0], strings.Join(toks, ", "))
+	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
 }
 
-// Output is a stringer that report the types of an output produced by the constructor.
+// Output contains information on an output produced by the constructor.
 type Output struct {
 	t           reflect.Type
 	name, group string
 }
 
 func (o *Output) String() string {
-	toks := make([]string, 1, 3)
-	toks[0] = o.t.String()
+	toks := make([]string, 0, 2)
+	t := o.t.String()
 	if o.name != "" {
 		toks = append(toks, fmt.Sprintf("name = %q", o.name))
 	}
@@ -184,15 +184,15 @@ func (o *Output) String() string {
 		toks = append(toks, fmt.Sprintf("group = %q", o.group))
 	}
 
-	if len(toks) == 1 {
-		return toks[0]
+	if len(toks) == 0 {
+		return t
 	}
-	return fmt.Sprintf("%v[%v]", toks[0], strings.Join(toks, ", "))
+	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
 }
 
-// FillInfo is a ProvideOption that writes info on what Dig was able to get out
-// out of the provided constructor into the provided ConstructorInfo.
-func FillInfo(info *ConstructorInfo) ProvideOption {
+// FillProvideInfo is a ProvideOption that writes info on what Dig was able to get out
+// out of the provided constructor into the provided ProvideInfo.
+func FillProvideInfo(info *ProvideInfo) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Info = info
 	})
