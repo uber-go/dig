@@ -3002,13 +3002,13 @@ func TestConstructorInfoOption(t *testing.T) {
 
 		c := New()
 		info := ConstructorInfo{}
-		require.NoError(t, c.Provide(ctor, WithInfo(&info)))
+		require.NoError(t, c.Provide(ctor, FillInfo(&info)))
 
 		assert.Equal(t, 0, len(info.Inputs))
 		assert.Equal(t, 2, len(info.Outputs))
 
-		assert.Equal(t, "*dig.type1", info.Outputs[0])
-		assert.Equal(t, "*dig.type2", info.Outputs[1])
+		assert.Equal(t, "*dig.type1", info.Outputs[0].String())
+		assert.Equal(t, "*dig.type2", info.Outputs[1].String())
 	})
 
 	t.Run("two inputs and one output", func(t *testing.T) {
@@ -3020,14 +3020,14 @@ func TestConstructorInfoOption(t *testing.T) {
 		}
 		c := New()
 		info := ConstructorInfo{}
-		require.NoError(t, c.Provide(ctor, WithInfo(&info)))
+		require.NoError(t, c.Provide(ctor, FillInfo(&info)))
 
 		assert.Equal(t, 2, len(info.Inputs))
 		assert.Equal(t, 1, len(info.Outputs))
 
-		assert.Equal(t, "*dig.type3", info.Outputs[0])
-		assert.Equal(t, "*dig.type1", info.Inputs[0])
-		assert.Equal(t, "*dig.type2", info.Inputs[1])
+		assert.Equal(t, "*dig.type3", info.Outputs[0].String())
+		assert.Equal(t, "*dig.type1", info.Inputs[0].String())
+		assert.Equal(t, "*dig.type2", info.Inputs[1].String())
 	})
 
 	t.Run("two inputs, output and error", func(t *testing.T) {
@@ -3039,14 +3039,14 @@ func TestConstructorInfoOption(t *testing.T) {
 		}
 		c := New()
 		info := ConstructorInfo{}
-		require.NoError(t, c.Provide(ctor, WithInfo(&info)))
+		require.NoError(t, c.Provide(ctor, FillInfo(&info)))
 
 		assert.Equal(t, 2, len(info.Inputs))
 		assert.Equal(t, 1, len(info.Outputs))
 
-		assert.Equal(t, "*dig.type3", info.Outputs[0])
-		assert.Equal(t, "*dig.type1", info.Inputs[0])
-		assert.Equal(t, "*dig.type2", info.Inputs[1])
+		assert.Equal(t, "*dig.type3", info.Outputs[0].String())
+		assert.Equal(t, "*dig.type1", info.Inputs[0].String())
+		assert.Equal(t, "*dig.type2", info.Inputs[1].String())
 	})
 
 	t.Run("two inputs, two outputs", func(t *testing.T) {
@@ -3059,16 +3059,16 @@ func TestConstructorInfoOption(t *testing.T) {
 		}
 		c := New()
 		info := ConstructorInfo{}
-		require.NoError(t, c.Provide(ctor, WithInfo(&info)))
+		require.NoError(t, c.Provide(ctor, FillInfo(&info)))
 
 		assert.Equal(t, 2, len(info.Inputs))
 		assert.Equal(t, 2, len(info.Outputs))
 
-		assert.Equal(t, "*dig.type1", info.Inputs[0])
-		assert.Equal(t, "*dig.type2", info.Inputs[1])
+		assert.Equal(t, "*dig.type1", info.Inputs[0].String())
+		assert.Equal(t, "*dig.type2", info.Inputs[1].String())
 
-		assert.Equal(t, "*dig.type3", info.Outputs[0])
-		assert.Equal(t, "*dig.type4", info.Outputs[1])
+		assert.Equal(t, "*dig.type3", info.Outputs[0].String())
+		assert.Equal(t, "*dig.type4", info.Outputs[1].String())
 	})
 
 	t.Run("two ctors", func(t *testing.T) {
@@ -3085,8 +3085,8 @@ func TestConstructorInfoOption(t *testing.T) {
 		c := New()
 		info1 := ConstructorInfo{}
 		info2 := ConstructorInfo{}
-		require.NoError(t, c.Provide(ctor1, WithInfo(&info1)))
-		require.NoError(t, c.Provide(ctor2, WithInfo(&info2)))
+		require.NoError(t, c.Provide(ctor1, FillInfo(&info1)))
+		require.NoError(t, c.Provide(ctor2, FillInfo(&info2)))
 
 		assert.NotEqual(t, info1.ID, info2.ID)
 
@@ -3095,10 +3095,10 @@ func TestConstructorInfoOption(t *testing.T) {
 		assert.Equal(t, 1, len(info2.Inputs))
 		assert.Equal(t, 1, len(info2.Outputs))
 
-		assert.Equal(t, "*dig.type1", info1.Inputs[0])
-		assert.Equal(t, "*dig.type2", info1.Outputs[0])
+		assert.Equal(t, "*dig.type1", info1.Inputs[0].String())
+		assert.Equal(t, "*dig.type2", info1.Outputs[0].String())
 
-		assert.Equal(t, "*dig.type3", info2.Inputs[0])
-		assert.Equal(t, "*dig.type4", info2.Outputs[0])
+		assert.Equal(t, "*dig.type3", info2.Inputs[0].String())
+		assert.Equal(t, "*dig.type4", info2.Outputs[0].String())
 	})
 }

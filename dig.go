@@ -129,21 +129,40 @@ func Group(group string) ProvideOption {
 	})
 }
 
+// ID is a unique integer representing the constructor node in the dependency graph.
+type ID int
+
 // ConstructorInfo provides information about the constructor's inputs and outputs
 // types as strings, as well as the ID of the constructor supplied to the Container.
-//
-// ID is a unique integer representing the constructor node in the dependency graph.
-// Inputs is a string slice with the types of the input parameters of the constructor.
-// Outputs is a string slice with the types of the results produced by the constructor.
+// It contains ID for the constructor, as well as slices of Input and Output types,
+// which are Stringers that report the types of the parameters and results respectively.
 type ConstructorInfo struct {
-	ID      int
-	Inputs  []string
-	Outputs []string
+	ID      ID
+	Inputs  []*Input
+	Outputs []*Output
 }
 
-// WithInfo is a ProvideOption that writes info on what Dig was able to get out
+// Input is a stringer that report the type of an input parameters of the constructor.
+type Input struct {
+	t reflect.Type
+}
+
+func (i *Input) String() string {
+	return i.t.String()
+}
+
+// Output is a stringer that report the types of an output produced by the constructor.
+type Output struct {
+	t reflect.Type
+}
+
+func (o *Output) String() string {
+	return o.t.String()
+}
+
+// FillInfo is a ProvideOption that writes info on what Dig was able to get out
 // out of the provided constructor into the provided ConstructorInfo.
-func WithInfo(info *ConstructorInfo) ProvideOption {
+func FillInfo(info *ConstructorInfo) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Info = info
 	})
@@ -522,20 +541,22 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	c.nodes = append(c.nodes, n)
 
 	// Record introspection info for caller if Info option is specified
-	if opts.Info != nil {
-		opts.Info.ID = (int)(n.id)
-		opts.Info.Inputs = make([]string, 0)
-		opts.Info.Outputs = make([]string, 0)
+	if info := opts.Info; info != nil {
+		params := n.ParamList().DotParam()
+		results := n.ResultList().DotResult()
 
-		for _, res := range n.ResultList().DotResult() {
-			opts.Info.Outputs = append(opts.Info.Outputs, res.Type.String())
+		info.ID = (ID)(n.id)
+		info.Inputs = make([]*Input, len(params))
+		info.Outputs = make([]*Output, len(results))
+
+		for i, param := range params {
+			info.Inputs[i] = &Input{t: param.Type}
 		}
 
-		for _, param := range n.ParamList().DotParam() {
-			opts.Info.Inputs = append(opts.Info.Inputs, param.Type.String())
+		for i, res := range results {
+			info.Outputs[i] = &Output{t: res.Type}
 		}
 	}
-
 	return nil
 }
 
