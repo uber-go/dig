@@ -2990,3 +2990,125 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 			`bad argument 1: invalid value "foo" for "ignore-unexported" tag on field In: strconv.ParseBool: parsing "foo": invalid syntax`)
 	})
 }
+
+func TestProvideInfoOption(t *testing.T) {
+	t.Parallel()
+	t.Run("two outputs", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		ctor := func() (*type1, *type2) {
+			return &type1{}, &type2{}
+		}
+
+		c := New()
+		var info ProvideInfo
+		require.NoError(t, c.Provide(ctor, FillProvideInfo(&info)))
+
+		assert.Empty(t, info.Inputs)
+		assert.Equal(t, 2, len(info.Outputs))
+
+		assert.Equal(t, "*dig.type1", info.Outputs[0].String())
+		assert.Equal(t, "*dig.type2", info.Outputs[1].String())
+	})
+
+	t.Run("two inputs and one output", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		ctor := func(*type1, *type2) *type3 {
+			return &type3{}
+		}
+		c := New()
+		var info ProvideInfo
+		require.NoError(t, c.Provide(ctor, Name("n"), FillProvideInfo(&info)))
+
+		assert.Equal(t, 2, len(info.Inputs))
+		assert.Equal(t, 1, len(info.Outputs))
+
+		assert.Equal(t, `*dig.type3[name = "n"]`, info.Outputs[0].String())
+		assert.Equal(t, "*dig.type1", info.Inputs[0].String())
+		assert.Equal(t, "*dig.type2", info.Inputs[1].String())
+	})
+
+	t.Run("two inputs, output and error", func(t *testing.T) {
+		type type1 struct{}
+		type GatewayParams struct {
+			In
+
+			WriteToConn  *io.Writer `name:"rw" optional:"true"`
+			ReadFromConn *io.Reader `name:"ro"`
+			ConnNames    []string   `group:"server"`
+		}
+
+		type type3 struct{}
+
+		ctor := func(*type1, GatewayParams) (*type3, error) {
+			return &type3{}, nil
+		}
+		c := New()
+		var info ProvideInfo
+		require.NoError(t, c.Provide(ctor, FillProvideInfo(&info)))
+
+		assert.Equal(t, 4, len(info.Inputs))
+		assert.Equal(t, 1, len(info.Outputs))
+
+		assert.Equal(t, "*dig.type3", info.Outputs[0].String())
+		assert.Equal(t, "*dig.type1", info.Inputs[0].String())
+		assert.Equal(t, `*io.Writer[optional, name = "rw"]`, info.Inputs[1].String())
+		assert.Equal(t, `*io.Reader[name = "ro"]`, info.Inputs[2].String())
+		assert.Equal(t, `[]string[group = "server"]`, info.Inputs[3].String())
+	})
+
+	t.Run("two inputs, two outputs", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		type type4 struct{}
+		ctor := func(*type1, *type2) (*type3, *type4) {
+			return &type3{}, &type4{}
+		}
+		c := New()
+		info := ProvideInfo{}
+		require.NoError(t, c.Provide(ctor, Group("g"), FillProvideInfo(&info)))
+
+		assert.Equal(t, 2, len(info.Inputs))
+		assert.Equal(t, 2, len(info.Outputs))
+
+		assert.Equal(t, "*dig.type1", info.Inputs[0].String())
+		assert.Equal(t, "*dig.type2", info.Inputs[1].String())
+
+		assert.Equal(t, `*dig.type3[group = "g"]`, info.Outputs[0].String())
+		assert.Equal(t, `*dig.type4[group = "g"]`, info.Outputs[1].String())
+	})
+
+	t.Run("two ctors", func(t *testing.T) {
+		type type1 struct{}
+		type type2 struct{}
+		type type3 struct{}
+		type type4 struct{}
+		ctor1 := func(*type1) *type2 {
+			return &type2{}
+		}
+		ctor2 := func(*type3) *type4 {
+			return &type4{}
+		}
+		c := New()
+		info1 := ProvideInfo{}
+		info2 := ProvideInfo{}
+		require.NoError(t, c.Provide(ctor1, FillProvideInfo(&info1)))
+		require.NoError(t, c.Provide(ctor2, FillProvideInfo(&info2)))
+
+		assert.NotEqual(t, info1.ID, info2.ID)
+
+		assert.Equal(t, 1, len(info1.Inputs))
+		assert.Equal(t, 1, len(info1.Outputs))
+		assert.Equal(t, 1, len(info2.Inputs))
+		assert.Equal(t, 1, len(info2.Outputs))
+
+		assert.Equal(t, "*dig.type1", info1.Inputs[0].String())
+		assert.Equal(t, "*dig.type2", info1.Outputs[0].String())
+
+		assert.Equal(t, "*dig.type3", info2.Inputs[0].String())
+		assert.Equal(t, "*dig.type4", info2.Outputs[0].String())
+	})
+}

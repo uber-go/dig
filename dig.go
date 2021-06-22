@@ -62,6 +62,7 @@ func (f optionFunc) applyOption(c *Container) { f(c) }
 type provideOptions struct {
 	Name  string
 	Group string
+	Info  *ProvideInfo
 }
 
 func (o *provideOptions) Validate() error {
@@ -125,6 +126,75 @@ func Name(name string) ProvideOption {
 func Group(group string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Group = group
+	})
+}
+
+// ID is a unique integer representing the constructor node in the dependency graph.
+type ID int
+
+// ProvideInfo provides information about the constructor's inputs and outputs
+// types as strings, as well as the ID of the constructor supplied to the Container.
+// It contains ID for the constructor, as well as slices of Input and Output types,
+// which are Stringers that report the types of the parameters and results respectively.
+type ProvideInfo struct {
+	ID      ID
+	Inputs  []*Input
+	Outputs []*Output
+}
+
+// Input contains information on an input parameter of the constructor.
+type Input struct {
+	t           reflect.Type
+	optional    bool
+	name, group string
+}
+
+func (i *Input) String() string {
+	toks := make([]string, 0, 3)
+	t := i.t.String()
+	if i.optional {
+		toks = append(toks, "optional")
+	}
+	if i.name != "" {
+		toks = append(toks, fmt.Sprintf("name = %q", i.name))
+	}
+	if i.group != "" {
+		toks = append(toks, fmt.Sprintf("group = %q", i.group))
+	}
+
+	if len(toks) == 0 {
+		return t
+	}
+	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
+}
+
+// Output contains information on an output produced by the constructor.
+type Output struct {
+	t           reflect.Type
+	name, group string
+}
+
+func (o *Output) String() string {
+	toks := make([]string, 0, 2)
+	t := o.t.String()
+	if o.name != "" {
+		toks = append(toks, fmt.Sprintf("name = %q", o.name))
+	}
+	if o.group != "" {
+		toks = append(toks, fmt.Sprintf("group = %q", o.group))
+	}
+
+	if len(toks) == 0 {
+		return t
+	}
+	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
+}
+
+// FillProvideInfo is a ProvideOption that writes info on what Dig was able to get out
+// out of the provided constructor into the provided ProvideInfo.
+func FillProvideInfo(info *ProvideInfo) ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.Info = info
 	})
 }
 
@@ -498,9 +568,34 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		}
 		c.isVerifiedAcyclic = true
 	}
-
 	c.nodes = append(c.nodes, n)
 
+	// Record introspection info for caller if Info option is specified
+	if info := opts.Info; info != nil {
+		params := n.ParamList().DotParam()
+		results := n.ResultList().DotResult()
+
+		info.ID = (ID)(n.id)
+		info.Inputs = make([]*Input, len(params))
+		info.Outputs = make([]*Output, len(results))
+
+		for i, param := range params {
+			info.Inputs[i] = &Input{
+				t:        param.Type,
+				optional: param.Optional,
+				name:     param.Name,
+				group:    param.Group,
+			}
+		}
+
+		for i, res := range results {
+			info.Outputs[i] = &Output{
+				t:     res.Type,
+				name:  res.Name,
+				group: res.Group,
+			}
+		}
+	}
 	return nil
 }
 
@@ -730,7 +825,6 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 		err = errf(
 			"invalid value %q for %q tag on field %v",
 			tag, _optionalTag, f.Name, err)
-
 	}
 
 	return optional, err
