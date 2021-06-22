@@ -144,7 +144,9 @@ type ConstructorInfo struct {
 
 // Input is a stringer that report the type of an input parameters of the constructor.
 type Input struct {
-	t reflect.Type
+	t           reflect.Type
+	optional    bool
+	name, group string
 }
 
 func (i *Input) String() string {
@@ -153,7 +155,8 @@ func (i *Input) String() string {
 
 // Output is a stringer that report the types of an output produced by the constructor.
 type Output struct {
-	t reflect.Type
+	t           reflect.Type
+	name, group string
 }
 
 func (o *Output) String() string {
@@ -550,11 +553,20 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		info.Outputs = make([]*Output, len(results))
 
 		for i, param := range params {
-			info.Inputs[i] = &Input{t: param.Type}
+			info.Inputs[i] = &Input{
+				t:        param.Type,
+				optional: param.Optional,
+				name:     param.Name,
+				group:    param.Group,
+			}
 		}
 
 		for i, res := range results {
-			info.Outputs[i] = &Output{t: res.Type}
+			info.Outputs[i] = &Output{
+				t:     res.Type,
+				name:  res.Name,
+				group: res.Group,
+			}
 		}
 	}
 	return nil
@@ -786,7 +798,6 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 		err = errf(
 			"invalid value %q for %q tag on field %v",
 			tag, _optionalTag, f.Name, err)
-
 	}
 
 	return optional, err
