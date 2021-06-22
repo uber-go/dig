@@ -3001,10 +3001,10 @@ func TestProvideInfoOption(t *testing.T) {
 		}
 
 		c := New()
-		info := ProvideInfo{}
+		var info ProvideInfo
 		require.NoError(t, c.Provide(ctor, FillProvideInfo(&info)))
 
-		assert.Equal(t, 0, len(info.Inputs))
+		assert.Empty(t, info.Inputs)
 		assert.Equal(t, 2, len(info.Outputs))
 
 		assert.Equal(t, "*dig.type1", info.Outputs[0].String())
@@ -3019,7 +3019,7 @@ func TestProvideInfoOption(t *testing.T) {
 			return &type3{}
 		}
 		c := New()
-		info := ProvideInfo{}
+		var info ProvideInfo
 		require.NoError(t, c.Provide(ctor, Name("n"), FillProvideInfo(&info)))
 
 		assert.Equal(t, 2, len(info.Inputs))
@@ -3046,7 +3046,7 @@ func TestProvideInfoOption(t *testing.T) {
 			return &type3{}, nil
 		}
 		c := New()
-		info := ProvideInfo{}
+		var info ProvideInfo
 		require.NoError(t, c.Provide(ctor, FillProvideInfo(&info)))
 
 		assert.Equal(t, 4, len(info.Inputs))
