@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/dig/internal/digreflect"
-	"go.uber.org/dig/internal/dot"
+	"github.com/thhuang/dig/internal/digreflect"
+	"github.com/thhuang/dig/internal/dot"
 )
 
 const (

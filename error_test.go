@@ -32,7 +32,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/dig/internal/digreflect"
+	"github.com/thhuang/dig/internal/digreflect"
 )
 
 // assertErrorMatches matches error messages against the provided list of

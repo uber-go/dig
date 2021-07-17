@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"go.uber.org/dig/internal/dot"
+	"github.com/thhuang/dig/internal/dot"
 )
 
 // The param interface represents a dependency for a constructor.

@@ -1,7 +1,7 @@
-package: go.uber.org/dig
+package: github.com/thhuang/dig
 license: MIT
 testImport:
-- package: github.com/stretchr/testify
-  subpackages:
-  - assert
-  - require
+  - package: github.com/stretchr/testify
+    subpackages:
+      - assert
+      - require

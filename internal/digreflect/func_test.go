@@ -26,8 +26,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	myrepository "go.uber.org/dig/internal/digreflect/tests/myrepository.git"
-	mypackage "go.uber.org/dig/internal/digreflect/tests/myrepository.git/mypackage"
+	myrepository "github.com/thhuang/dig/internal/digreflect/tests/myrepository.git"
+	mypackage "github.com/thhuang/dig/internal/digreflect/tests/myrepository.git/mypackage"
 )
 
 func SomeExportedFunction() {}
@@ -61,49 +61,49 @@ func TestInspectFunc(t *testing.T) {
 			desc:           "exported function",
 			give:           SomeExportedFunction,
 			wantName:       "SomeExportedFunction",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
+			wantPackage:    "github.com/thhuang/dig/internal/digreflect",
 			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "unexported function",
 			give:           unexportedFunction,
 			wantName:       "unexportedFunction",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
+			wantPackage:    "github.com/thhuang/dig/internal/digreflect",
 			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "nested function",
 			give:           nested1,
 			wantName:       "nestedFunctions.func1",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
+			wantPackage:    "github.com/thhuang/dig/internal/digreflect",
 			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "second nested function",
 			give:           nested2,
 			wantName:       "nestedFunctions.func2",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
+			wantPackage:    "github.com/thhuang/dig/internal/digreflect",
 			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "nested inside a nested function",
 			give:           nested3,
 			wantName:       "nestedFunctions.func2.1",
-			wantPackage:    "go.uber.org/dig/internal/digreflect",
+			wantPackage:    "github.com/thhuang/dig/internal/digreflect",
 			wantFileSuffix: "/internal/digreflect/func_test.go",
 		},
 		{
 			desc:           "inside a .git package",
 			give:           myrepository.Hello,
 			wantName:       "Hello",
-			wantPackage:    "go.uber.org/dig/internal/digreflect/tests/myrepository.git",
+			wantPackage:    "github.com/thhuang/dig/internal/digreflect/tests/myrepository.git",
 			wantFileSuffix: "/internal/digreflect/tests/myrepository.git/hello.go",
 		},
 		{
 			desc:           "subpackage of a .git package",
 			give:           mypackage.Add,
 			wantName:       "Add",
-			wantPackage:    "go.uber.org/dig/internal/digreflect/tests/myrepository.git/mypackage",
+			wantPackage:    "github.com/thhuang/dig/internal/digreflect/tests/myrepository.git/mypackage",
 			wantFileSuffix: "/internal/digreflect/tests/myrepository.git/mypackage/add.go",
 		},
 		{
@@ -135,7 +135,7 @@ func TestSplitFunc(t *testing.T) {
 	})
 
 	t.Run("vendored dependency", func(t *testing.T) {
-		pname, fname := splitFuncName("go.uber.orgc/dig/vendor/example.com/foo/bar.Baz")
+		pname, fname := splitFuncName("github.com/thhuang/dig/vendor/example.com/foo/bar.Baz")
 		assert.Equal(t, "example.com/foo/bar", pname)
 		assert.Equal(t, "Baz", fname)
 	})

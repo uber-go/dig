@@ -19,9 +19,9 @@ We recommend consuming [SemVer](http://semver.org/) major version `1` using
 your dependency manager of choice.
 
 ```
-$ glide get 'go.uber.org/dig#^1'
-$ dep ensure -add "go.uber.org/dig@v1"
-$ go get 'go.uber.org/dig@v1'
+$ glide get 'github.com/thhuang/dig#^1'
+$ dep ensure -add "github.com/thhuang/dig@v1"
+$ go get 'github.com/thhuang/dig@v1'
 ```
 
 ## Stability
@@ -31,7 +31,7 @@ This library is `v1` and follows [SemVer](http://semver.org/) strictly.
 No breaking changes will be made to exported APIs before `v2.0.0`.
 
 [doc-img]: http://img.shields.io/badge/GoDoc-Reference-blue.svg
-[doc]: https://godoc.org/go.uber.org/dig
+[doc]: https://godoc.org/github.com/thhuang/dig
 
 [release-img]: https://img.shields.io/github/release/uber-go/dig.svg
 [release]: https://github.com/uber-go/dig/releases

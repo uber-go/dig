@@ -27,8 +27,8 @@ import (
 	"reflect"
 	"sort"
 
-	"go.uber.org/dig/internal/digreflect"
-	"go.uber.org/dig/internal/dot"
+	"github.com/thhuang/dig/internal/digreflect"
+	"github.com/thhuang/dig/internal/dot"
 )
 
 // Errors which know their underlying cause should implement this interface to

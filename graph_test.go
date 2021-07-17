@@ -28,8 +28,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/dig/internal/digreflect"
-	"go.uber.org/dig/internal/dot"
+	"github.com/thhuang/dig/internal/digreflect"
+	"github.com/thhuang/dig/internal/dot"
 )
 
 func TestDotGraph(t *testing.T) {

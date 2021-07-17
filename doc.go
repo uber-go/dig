@@ -346,4 +346,4 @@
 //     Handler []int `group:"server,flatten"` // []int from dig.In
 //   }
 //
-package dig // import "go.uber.org/dig"
+package dig // import "github.com/thhuang/dig"
