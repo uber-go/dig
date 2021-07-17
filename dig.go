@@ -222,6 +222,9 @@ type Container struct {
 	// Source of randomness.
 	rand *rand.Rand
 
+	// Flag indicating whether the graph is valid.
+	isVerifiedValid bool
+
 	// Flag indicating whether the graph has been checked for cycles.
 	isVerifiedAcyclic bool
 
@@ -301,11 +304,12 @@ type provider interface {
 // New constructs a Container.
 func New(opts ...Option) *Container {
 	c := &Container{
-		providers: make(map[key][]*node),
-		values:    make(map[key]reflect.Value),
-		groups:    make(map[key][]reflect.Value),
-		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		invokerFn: defaultInvoker,
+		providers:       make(map[key][]*node),
+		values:          make(map[key]reflect.Value),
+		groups:          make(map[key][]reflect.Value),
+		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
+		invokerFn:       defaultInvoker,
+		isVerifiedValid: true,
 	}
 
 	for _, opt := range opts {
@@ -465,6 +469,20 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	return nil
 }
 
+// VerifyDependencies will detect whether there is any missing dependency in the graph
+func (c *Container) VerifyDependencies() error {
+	if !c.isVerifiedValid {
+		c.eraseInvalidValues()
+	}
+	if !c.isVerifiedAcyclic {
+		if err := c.verifyAcyclic(); err != nil {
+			return err
+		}
+	}
+
+	return c.verifyDependencies()
+}
+
 // Invoke runs the given function after instantiating its dependencies.
 //
 // Any arguments that the function has are treated as its dependencies. The
@@ -513,6 +531,17 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	}
 	if last := returned[len(returned)-1]; isError(last.Type()) {
 		if err, _ := last.Interface().(error); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Container) verifyDependencies() error {
+	visited := make(map[key]struct{})
+	for _, n := range c.nodes {
+		if err := detectMissingDep(n, c, visited); err != nil {
 			return err
 		}
 	}
@@ -730,6 +759,11 @@ type node struct {
 	// Whether the constructor owned by this node was already called.
 	called bool
 
+	// Whether the values created by this constructor is valid
+	// If `called = true` and `valid = false`, it indicates that the value may be
+	// affected by a deletion and need to be checked.
+	valid bool
+
 	// Type information about constructor parameters.
 	paramList paramList
 
@@ -931,4 +965,123 @@ func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
 		newItems[i] = items[j]
 	}
 	return newItems
+}
+
+// EraseValueProvider provides a hack to erase the constructor and the object of specified return type and name
+// The object depends on the removed object will be removed recursively in the next Invoke() call
+// Only one of the name or the group should be set.
+func (c *Container) EraseValueProvider(t reflect.Type, name, group string) {
+	k := key{
+		t:     t,
+		name:  name,
+		group: group,
+	}
+
+	// check if such provider exists
+	nodes, ok := c.providers[k]
+	if !ok {
+		// it is a shortcut
+		return
+	}
+
+	for _, n := range nodes {
+		if n.called == true {
+			// the constructor is called, thus we have to remove the corresponding value
+			if group != `` {
+				delete(c.groups, k)
+			} else {
+				delete(c.values, k)
+			}
+		}
+	}
+
+	// finally clear the providers and also rebuild the c.nodes
+	c.isVerifiedValid = false
+	delete(c.providers, k)
+	c.nodes = []*node{}
+	for _, array := range c.providers {
+		c.nodes = append(c.nodes, array...)
+	}
+}
+
+func (c *Container) eraseInvalidValues() {
+	// marks all called nodes as invalid first
+	for _, n := range c.nodes {
+		n.valid = false
+	}
+
+	// try to mark the node as valid, or remove the corresponding value
+	for k := range c.providers {
+		verifyNode(c, k)
+	}
+
+	// finally mark the verifyValid
+	c.isVerifiedValid = true
+}
+
+func getKeysFromParamList(c *Container, pl paramList) []key {
+	result := []key{}
+
+	fn := func(param param) bool {
+		switch p := param.(type) {
+		case paramSingle:
+			k := key{name: p.Name, t: p.Type}
+			result = append(result, k)
+			return false
+		case paramGroupedSlice:
+			// NOTE: The key uses the element type, not the slice type.
+			k := key{group: p.Group, t: p.Type.Elem()}
+			result = append(result, k)
+			return false
+		default:
+			// Recurse for non-edge params.
+			return true
+		}
+	}
+
+	walkParam(pl, paramVisitorFunc(fn))
+
+	return result
+}
+
+func verifyNode(c *Container, k key) (needClear bool) {
+	nodes, ok := c.providers[k]
+	if !ok {
+		// should not reach this line
+		return false
+	}
+
+	hasNonCalled := false
+	for _, n := range nodes {
+		// if the node has not called yet, the dependent object must based on
+		// some previous constructor, and thus it should be forced to rebuild
+		if n.called == false {
+			hasNonCalled = true
+		}
+		if n.valid == true {
+			// bypass the checked node
+			continue
+		}
+		n.valid = true
+
+		nodeNeedClear := false
+		depKeys := getKeysFromParamList(c, n.ParamList())
+		for _, depK := range depKeys {
+			if result := verifyNode(c, depK); result {
+				nodeNeedClear = true
+				break
+			}
+		}
+
+		if nodeNeedClear {
+			// delete the corresponding value
+			n.called = false
+			delete(c.values, k)
+
+			return true
+		}
+
+	}
+
+	return hasNonCalled
 }
