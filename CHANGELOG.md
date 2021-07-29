@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2021-07-29
+### Added
+- Support for ProvideInfo and FillProvideInfo that allow the caller of
+  `Provide` to get info about what dig understood from the constructor.
+
 ## [1.11.0] - 2021-06-09
 ### Added
 - Support unexported fields on `dig.In` structs with the
