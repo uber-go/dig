@@ -23,6 +23,7 @@ package dig
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -127,6 +128,59 @@ func Group(group string) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Group = group
 	})
+}
+
+// GroupInvoke runs the given function after instantiating its dependencies within multiple containers
+func GroupInvoke(function interface{}, containers ...*Container) error {
+	arguments, err := resolve(function, containers...)
+	if err != nil {
+		return err
+	}
+
+	reflect.ValueOf(function).Call(arguments)
+	return nil
+}
+
+func resolve(function interface{}, containers ...*Container) ([]reflect.Value, error) {
+	var result []reflect.Value
+	ftype := reflect.TypeOf(function)
+	arguments := ftype.NumIn()
+	if ftype == nil {
+		return nil, errors.New("can't invoke an untyped nil")
+	}
+	if ftype.Kind() != reflect.Func {
+		return nil, errf("can't invoke non-function %v (type %v)", function, ftype)
+	}
+
+	pl, err := newParamList(ftype)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range containers {
+		if !c.isVerifiedAcyclic {
+			if err := c.verifyAcyclic(); err != nil {
+				return nil, err
+			}
+		}
+
+		args, err := pl.UnsafeBuildList(c)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, a := range args {
+			if a.IsValid() {
+				result = append(result, reflect.ValueOf(a.Interface()))
+			}
+		}
+	}
+
+	if len(result) != arguments {
+		log.Fatal("Parameters count does not match")
+	}
+
+	return result, nil
 }
 
 // ID is a unique integer representing the constructor node in the dependency graph.

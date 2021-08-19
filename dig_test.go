@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"os"
 	"reflect"
@@ -3111,4 +3112,38 @@ func TestProvideInfoOption(t *testing.T) {
 		assert.Equal(t, "*dig.type3", info2.Inputs[0].String())
 		assert.Equal(t, "*dig.type4", info2.Outputs[0].String())
 	})
+}
+
+func TestGroupInvoke(t *testing.T) {
+	type TestParam struct {
+		Name  string
+		Value string
+	}
+
+	type TestParam1 struct {
+		AdditionaInfo string
+	}
+
+	singletonIOC := New()
+	singletonIOC.Provide(func() *TestParam {
+		return &TestParam{
+			Name:  "TestName",
+			Value: "TestValue",
+		}
+	})
+
+	customIOC := New()
+	customIOC.Provide(func() *TestParam1 {
+		return &TestParam1{
+			AdditionaInfo: "Some info",
+		}
+	})
+
+	function := func(p *TestParam, p1 *TestParam1) {
+		fmt.Print("Test")
+	}
+
+	if err := GroupInvoke(function, singletonIOC, customIOC); err != nil {
+		log.Fatal(err)
+	}
 }

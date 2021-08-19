@@ -206,6 +206,20 @@ func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	return args, nil
 }
 
+// UnsafeBuildList returns an ordered list of values which may be passed directly
+// to the underlying constructor without interruption in case of missing field.
+func (pl paramList) UnsafeBuildList(c containerStore) ([]reflect.Value, error) {
+	args := make([]reflect.Value, len(pl.Params))
+	for i, p := range pl.Params {
+		var err error
+		args[i], err = p.Build(c)
+		if err != nil {
+			continue
+		}
+	}
+	return args, nil
+}
+
 // paramSingle is an explicitly requested type, optionally with a name.
 //
 // This object must be present in the graph as-is unless it's specified as
