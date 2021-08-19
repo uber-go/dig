@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"os"
 	"reflect"
@@ -3154,6 +3153,6 @@ func TestGroupInvoke(t *testing.T) {
 	}
 
 	if err := GroupInvoke(function, singletonIOC, customIOC); err != nil {
-		log.Fatal(err)
+		assert.FailNow(t, err.Error())
 	}
 }
