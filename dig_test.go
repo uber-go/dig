@@ -3140,7 +3140,17 @@ func TestGroupInvoke(t *testing.T) {
 	})
 
 	function := func(p *TestParam, p1 *TestParam1) {
-		fmt.Print("Test")
+		res1 := &TestParam{
+			Name:  "TestName",
+			Value: "TestValue",
+		}
+
+		res2 := &TestParam1{
+			AdditionaInfo: "Some info",
+		}
+
+		assert.Equal(t, res1, p)
+		assert.Equal(t, res2, p1)
 	}
 
 	if err := GroupInvoke(function, singletonIOC, customIOC); err != nil {
