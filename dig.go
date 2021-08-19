@@ -23,7 +23,6 @@ package dig
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -138,6 +137,7 @@ func GroupInvoke(function interface{}, containers ...*Container) error {
 	}
 
 	reflect.ValueOf(function).Call(arguments)
+
 	return nil
 }
 
@@ -177,7 +177,7 @@ func resolve(function interface{}, containers ...*Container) ([]reflect.Value, e
 	}
 
 	if len(result) != arguments {
-		log.Fatal("Parameters count does not match")
+		return nil, errors.New("parameters count does not match")
 	}
 
 	return result, nil
