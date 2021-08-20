@@ -142,9 +142,9 @@ func GroupInvoke(function interface{}, containers ...*Container) error {
 }
 
 func resolve(function interface{}, containers ...*Container) ([]reflect.Value, error) {
-	var result []reflect.Value
 	ftype := reflect.TypeOf(function)
 	arguments := ftype.NumIn()
+	result := make([]reflect.Value, arguments)
 	if ftype == nil {
 		return nil, errors.New("can't invoke an untyped nil")
 	}
@@ -169,9 +169,9 @@ func resolve(function interface{}, containers ...*Container) ([]reflect.Value, e
 			return nil, err
 		}
 
-		for _, a := range args {
+		for i, a := range args {
 			if a.IsValid() {
-				result = append(result, reflect.ValueOf(a.Interface()))
+				result[i] = reflect.ValueOf(a.Interface())
 			}
 		}
 	}
