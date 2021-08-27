@@ -219,7 +219,6 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 
 func (resultList) Extract(containerWriter, reflect.Value) {
 	digerror.BugPanicf("resultList.Extract() must never be called")
-	panic("") // Unreachable, as BugPanicf above will panic.
 }
 
 func (rl resultList) ExtractList(cw containerWriter, values []reflect.Value) error {
