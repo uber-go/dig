@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"sort"
 
+	"go.uber.org/dig/internal/digerror"
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
 )
@@ -121,21 +122,17 @@ func errf(msg string, args ...interface{}) error {
 	buildErrf = func(args []interface{}) error {
 		arg, args := args[0], args[1:] // assume len(args) > 0
 		if arg == nil {
-			panic("It looks like you have found a bug in dig. " +
-				"Please file an issue at https://github.com/uber-go/dig/issues/ " +
-				"and provide the following message: " +
-				"arg must not be nil")
+			digerror.BugPanicf("arg must not be nil")
 		}
 
 		switch v := arg.(type) {
 		case string:
 			need := numFmtArgs(v)
 			if len(args) < need {
-				panic(fmt.Sprintf(
-					"It looks like you have found a bug in dig. "+
-						"Please file an issue at https://github.com/uber-go/dig/issues/ "+
-						"and provide the following message: "+
-						"string %q needs %v arguments, got %v", v, need, len(args)))
+				digerror.BugPanicf("string %q needs %v arguments, got %v",
+					v,
+					need,
+					len(args))
 			}
 
 			msg := fmt.Sprintf(v, args[:need]...)
@@ -153,21 +150,12 @@ func errf(msg string, args ...interface{}) error {
 			}
 		case error:
 			if len(args) > 0 {
-				panic(fmt.Sprintf(
-					"It looks like you have found a bug in dig. "+
-						"Please file an issue at https://github.com/uber-go/dig/issues/ "+
-						"and provide the following message: "+
-						"error must be the last element but got %v", args))
+				digerror.BugPanicf("error must be the last element but got %v", args)
 			}
-
 			return v
-
 		default:
-			panic(fmt.Sprintf(
-				"It looks like you have found a bug in dig. "+
-					"Please file an issue at https://github.com/uber-go/dig/issues/ "+
-					"and provide the following message: "+
-					"unexpected errf-argument type %T", arg))
+			digerror.BugPanicf("unexpected errf-argument type %T", arg)
+			return nil
 		}
 	}
 

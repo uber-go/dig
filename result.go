@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Uber Technologies, Inc.
+// Copyright (c) 2019-2021 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,9 @@ package dig
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 
+	"go.uber.org/dig/internal/digerror"
 	"go.uber.org/dig/internal/dot"
 )
 
@@ -165,11 +165,7 @@ func walkResult(r result, v resultVisitor) {
 			}
 		}
 	default:
-		panic(fmt.Sprintf(
-			"It looks like you have found a bug in dig. "+
-				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
-				"and provide the following message: "+
-				"received unknown result type %T", res))
+		digerror.BugPanicf("received unknown result type %T", res)
 	}
 }
 
@@ -222,10 +218,7 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 }
 
 func (resultList) Extract(containerWriter, reflect.Value) {
-	panic("It looks like you have found a bug in dig. " +
-		"Please file an issue at https://github.com/uber-go/dig/issues/ " +
-		"and provide the following message: " +
-		"resultList.Extract() must never be called")
+	digerror.BugPanicf("resultList.Extract() must never be called")
 }
 
 func (rl resultList) ExtractList(cw containerWriter, values []reflect.Value) error {

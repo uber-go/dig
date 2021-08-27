@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Uber Technologies, Inc.
+// Copyright (c) 2019-2021 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"go.uber.org/dig/internal/digerror"
 	"go.uber.org/dig/internal/dot"
 )
 
@@ -131,11 +132,7 @@ func walkParam(p param, v paramVisitor) {
 			walkParam(p, v)
 		}
 	default:
-		panic(fmt.Sprintf(
-			"It looks like you have found a bug in dig. "+
-				"Please file an issue at https://github.com/uber-go/dig/issues/ "+
-				"and provide the following message: "+
-				"received unknown param type %T", p))
+		digerror.BugPanicf("received unknown param type %T", p)
 	}
 }
 
@@ -186,10 +183,8 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 }
 
 func (pl paramList) Build(containerStore) (reflect.Value, error) {
-	panic("It looks like you have found a bug in dig. " +
-		"Please file an issue at https://github.com/uber-go/dig/issues/ " +
-		"and provide the following message: " +
-		"paramList.Build() must never be called")
+	digerror.BugPanicf("paramList.Build() must never be called")
+	panic("") // Unreachable, as BugPanicf above will panic.
 }
 
 // BuildList returns an ordered list of values which may be passed directly
