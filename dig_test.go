@@ -2124,7 +2124,8 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		}, As(new(interface{})))
 		require.Error(t, err, "provide must return error")
 		assertErrorMatches(t, err,
-			`function "go.uber.org/dig".TestProvideFailures\S+ \(\S+:\d+\) cannot be provided:`,
+			`cannot provide function "go.uber.org/dig".testProvideFailures\S+`,
+			`dig_test.go:\d+`, // file:line
 			`cannot provide dig.A from \[0\].A2:`,
 			`already provided by \[0\].A1`,
 		)

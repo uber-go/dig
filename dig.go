@@ -778,9 +778,10 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 
 func (cv connectionVisitor) checkKey(k key, path string) error {
 	if conflict, ok := cv.keyPaths[k]; ok {
-		return fmt.Errorf(
-			"cannot provide %v from %v: already provided by %v",
-			k, path, conflict)
+		return errf(
+			"cannot provide %v from %v", k, path,
+			"already provided by %v", conflict,
+		)
 	}
 	if ps := cv.c.providers[k]; len(ps) > 0 {
 		cons := make([]string, len(ps))
@@ -788,9 +789,10 @@ func (cv connectionVisitor) checkKey(k key, path string) error {
 			cons[i] = fmt.Sprint(p.Location())
 		}
 
-		return fmt.Errorf(
-			"cannot provide %v from %v: already provided by %v",
-			k, path, strings.Join(cons, "; "))
+		return errf(
+			"cannot provide %v from %v", k, path,
+			"already provided by %v", strings.Join(cons, "; "),
+		)
 	}
 	return nil
 }
