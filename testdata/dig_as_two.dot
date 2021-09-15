@@ -6,7 +6,6 @@ digraph {
 			label = "go.uber.org/dig";
 			constructor_0 [shape=plaintext label="TestVisualize.func4.1"];
 			
-			"*bytes.Buffer" [label=<*bytes.Buffer>];
 			"io.Reader" [label=<io.Reader>];
 			"io.Writer" [label=<io.Writer>];
 			

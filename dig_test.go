@@ -671,12 +671,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			Reader io.Reader     `name:"buff"`
 		}
 
-		require.NoError(t, c.Invoke(func(got in) {
-			assert.NotNil(t, got.Buffer, "buffer must not be nil")
-
-			assert.True(t, got.Buffer == got.Reader,
-				"reader and buffer must be the same object")
-
+		require.Error(t, c.Invoke(func(got in) {
 			body, err := ioutil.ReadAll(got.Reader)
 			require.NoError(t, err, "failed to read buffer body")
 			assert.Equal(t, "foo", string(body))
@@ -1662,6 +1657,34 @@ func TestProvideInvalidAs(t *testing.T) {
 	}
 }
 
+func TestAsExpectingOriginalType(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fail on expecting original type", func(t *testing.T) {
+		c := New()
+
+		require.NoError(t, c.Provide(
+			func() *bytes.Buffer {
+				return bytes.NewBufferString("foo")
+			},
+			As(new(io.Reader)),
+			Name("buff"),
+		), "failed to provide")
+
+		type in struct {
+			In
+
+			Buffer *bytes.Buffer `name:"buff"`
+			Reader io.Reader     `name:"buff"`
+		}
+
+		require.Error(t, c.Invoke(func(got in) {
+			assert.Nil(t, got.Buffer, "buffer should not be provided.")
+			assert.NotNil(t, got.Reader, "reader should be provided.")
+		}))
+	})
+}
+
 func TestProvideIncompatibleOptions(t *testing.T) {
 	t.Parallel()
 
@@ -2126,7 +2149,7 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		assertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cannot provide dig.A from \[0\].A2:`,
+			`cannot provide interface {} from \[0\].A2:`,
 			`already provided by \[0\].A1`,
 		)
 	})
@@ -2252,7 +2275,7 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		)
 
 		require.Error(t, err, "provide must fail")
-		assert.Contains(t, err.Error(), "cannot provide *bytes.Buffer")
+		assert.Contains(t, err.Error(), "cannot provide io.Reader")
 		assert.Contains(t, err.Error(), "already provided")
 	})
 }

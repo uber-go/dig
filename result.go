@@ -259,6 +259,8 @@ func newResultSingle(t reflect.Type, opts resultOptions) (resultSingle, error) {
 		Name: opts.Name,
 	}
 
+	var asTypes []reflect.Type
+
 	for _, as := range opts.As {
 		ifaceType := reflect.TypeOf(as).Elem()
 		if !t.Implements(ifaceType) {
@@ -270,10 +272,18 @@ func newResultSingle(t reflect.Type, opts resultOptions) (resultSingle, error) {
 			// Ignore instead of erroring out.
 			continue
 		}
-		r.As = append(r.As, ifaceType)
+		asTypes = append(asTypes, ifaceType)
 	}
 
-	return r, nil
+	if len(asTypes) == 0 {
+		return r, nil
+	}
+
+	return resultSingle{
+		Type: asTypes[0],
+		Name: opts.Name,
+		As:   asTypes[1:],
+	}, nil
 }
 
 func (rs resultSingle) DotResult() []*dot.Result {
