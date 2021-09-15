@@ -222,22 +222,23 @@ func FillProvideInfo(info *ProvideInfo) ProvideOption {
 }
 
 // As is a ProvideOption that specifies that the value produced by the
-// constructor implements one or more other interfaces.
+// constructor implements one or more other interfaces and is provided
+// to the container as those interfaces.
 //
 // As expects one or more pointers to the implemented interfaces. Values
-// produced by constructors will be made available in the container as
-// implementations of all of those interfaces.
+// produced by constructors will be then available in the container as
+// implementations of all of those interfaces, but not as the value itself.
 //
-// For example, the following will make the buffer available in the container
-// as io.Reader and io.Writer.
+// For example, the following will make io.Reader and io.Writer available
+// in the container, but not buffer.
 //
 //   c.Provide(newBuffer, dig.As(new(io.Reader), new(io.Writer)))
 //
 // That is, the above is equivalent to the following.
 //
-//   c.Provide(func(...) (*bytes.Buffer, io.Reader, io.Writer) {
+//   c.Provide(func(...) (io.Reader, io.Writer) {
 //     b := newBuffer(...)
-//     return b, b, b
+//     return b, b
 //   })
 //
 // If used with dig.Name, the type produced by the constructor and the types
@@ -250,14 +251,12 @@ func FillProvideInfo(info *ProvideInfo) ProvideOption {
 //   type Result struct {
 //     dig.Out
 //
-//     File   *os.File  `name:"temp"`
 //     Reader io.Reader `name:"temp"`
 //   }
 //
 //   c.Provide(func(...) Result {
 //     f := newFile(...)
 //     return Result{
-//       File: f,
 //       Reader: f,
 //     }
 //   })
