@@ -4,7 +4,7 @@ digraph {
 	
 		subgraph cluster_0 {
 			label = "go.uber.org/dig";
-			constructor_0 [shape=plaintext label="TestVisualize.func6.6.2.2"];
+			constructor_0 [shape=plaintext label="TestVisualize.func7.6.2.2"];
 			color=red;
 			"dig.t4" [label=<dig.t4>];
 			
