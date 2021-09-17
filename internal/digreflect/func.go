@@ -73,6 +73,9 @@ func InspectFunc(function interface{}) *Func {
 // at the given program counter address.
 func InspectFuncPC(pc uintptr) *Func {
 	f := runtime.FuncForPC(pc)
+	if f == nil {
+		return nil
+	}
 	pkgName, funcName := splitFuncName(f.Name())
 	fileName, lineNum := f.FileLine(pc)
 	return &Func{

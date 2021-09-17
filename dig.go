@@ -207,7 +207,7 @@ func FillProvideInfo(info *ProvideInfo) ProvideOption {
 // understand
 func LocationForPC(pc uintptr) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
-		opts.Location = digreflect.InspectFuncPC(funcPc)
+		opts.Location = digreflect.InspectFuncPC(pc)
 	})
 }
 
