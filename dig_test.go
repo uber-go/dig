@@ -1549,6 +1549,24 @@ func TestProvideGroupAndName(t *testing.T) {
 		"name:\"bar\" provided with group:\"foo\"")
 }
 
+type testStruct struct{}
+
+func (testStruct) TestMethod(x int) float64 { return float64(x) }
+
+func TestProvideLocation(t *testing.T) {
+	t.Parallel()
+
+	c := New()
+	err := c.Provide(func(x int) float64 {
+		return testStruct{}.TestMethod(x)
+	}, LocationForPC(reflect.TypeOf(testStruct{}).Method(0).Func.Pointer()))
+	require.NoError(t, err)
+	err = c.Invoke(func(y float64) {})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `"go.uber.org/dig".testStruct.TestMethod`)
+	require.Contains(t, err.Error(), `dig/dig_test.go`)
+}
+
 func TestCantProvideUntypedNil(t *testing.T) {
 	t.Parallel()
 	c := New()
