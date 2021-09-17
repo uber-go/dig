@@ -205,7 +205,7 @@ func FillProvideInfo(info *ProvideInfo) ProvideOption {
 // and DOT graphs. This option is intended to be used with functions created
 // with the reflect.MakeFunc method whose error messages are otherwise hard to
 // understand
-func LocationForPC(funcPc uintptr) ProvideOption {
+func LocationForPC(pc uintptr) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.Location = digreflect.InspectFuncPC(funcPc)
 	})
