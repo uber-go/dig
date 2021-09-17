@@ -60,10 +60,11 @@ type optionFunc func(*Container)
 func (f optionFunc) applyOption(c *Container) { f(c) }
 
 type provideOptions struct {
-	Name  string
-	Group string
-	Info  *ProvideInfo
-	As    []interface{}
+	Name     string
+	Group    string
+	Info     *ProvideInfo
+	As       []interface{}
+	Location *digreflect.Func
 }
 
 func (o *provideOptions) Validate() error {
@@ -266,6 +267,18 @@ func FillProvideInfo(info *ProvideInfo) ProvideOption {
 func As(i ...interface{}) ProvideOption {
 	return provideOptionFunc(func(opts *provideOptions) {
 		opts.As = append(opts.As, i...)
+	})
+}
+
+// LocationForPC is a ProvideOption which specifies an alternate function program
+// counter address to be used for debug information. The package, name, file and
+// line number of this alternate function address will be used in error messages
+// and DOT graphs. This option is intended to be used with functions created
+// with the reflect.MakeFunc method whose error messages are otherwise hard to
+// understand
+func LocationForPC(pc uintptr) ProvideOption {
+	return provideOptionFunc(func(opts *provideOptions) {
+		opts.Location = digreflect.InspectFuncPC(pc)
 	})
 }
 
@@ -610,6 +623,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
 			ResultAs:    opts.As,
+			Location:    opts.Location,
 		},
 	)
 	if err != nil {
@@ -827,6 +841,7 @@ type nodeOptions struct {
 	ResultName  string
 	ResultGroup string
 	ResultAs    []interface{}
+	Location    *digreflect.Func
 }
 
 func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
@@ -851,10 +866,15 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 		return nil, err
 	}
 
+	location := opts.Location
+	if location == nil {
+		location = digreflect.InspectFunc(ctor)
+	}
+
 	return &node{
 		ctor:       ctor,
 		ctype:      ctype,
-		location:   digreflect.InspectFunc(ctor),
+		location:   location,
 		id:         dot.CtorID(cptr),
 		paramList:  params,
 		resultList: results,

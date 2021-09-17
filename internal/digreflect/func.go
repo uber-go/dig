@@ -66,9 +66,18 @@ func (f *Func) Format(w fmt.State, c rune) {
 // function.
 func InspectFunc(function interface{}) *Func {
 	fptr := reflect.ValueOf(function).Pointer()
-	f := runtime.FuncForPC(fptr)
+	return InspectFuncPC(fptr)
+}
+
+// InspectFuncPC inspects and returns runtime information about the function
+// at the given program counter address.
+func InspectFuncPC(pc uintptr) *Func {
+	f := runtime.FuncForPC(pc)
+	if f == nil {
+		return nil
+	}
 	pkgName, funcName := splitFuncName(f.Name())
-	fileName, lineNum := f.FileLine(fptr)
+	fileName, lineNum := f.FileLine(pc)
 	return &Func{
 		Name:    funcName,
 		Package: pkgName,
