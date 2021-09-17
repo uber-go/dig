@@ -263,14 +263,14 @@ func newResultSingle(t reflect.Type, opts resultOptions) (resultSingle, error) {
 
 	for _, as := range opts.As {
 		ifaceType := reflect.TypeOf(as).Elem()
-		if !t.Implements(ifaceType) {
-			return r, fmt.Errorf("invalid dig.As: %v does not implement %v", t, ifaceType)
-		}
 		if ifaceType == t {
 			// Special case:
 			//   c.Provide(func() io.Reader, As(new(io.Reader)))
 			// Ignore instead of erroring out.
 			continue
+		}
+		if !t.Implements(ifaceType) {
+			return r, fmt.Errorf("invalid dig.As: %v does not implement %v", t, ifaceType)
 		}
 		asTypes = append(asTypes, ifaceType)
 	}

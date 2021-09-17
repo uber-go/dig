@@ -1708,7 +1708,7 @@ func TestProvideIncompatibleOptions(t *testing.T) {
 		}, Group("foo"), Name("bar"))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
-			"name:\"bar\" provided with group:\"foo\"")
+			`name:"bar" provided with group:"foo"`)
 	})
 
 	t.Run("group and As", func(t *testing.T) {
