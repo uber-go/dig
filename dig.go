@@ -754,14 +754,12 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 			*cv.err = err
 			return nil
 		}
-		cv.keyPaths[k] = path
 		for _, asType := range r.As {
 			k := key{name: r.Name, t: asType}
 			if err := cv.checkKey(k, path); err != nil {
 				*cv.err = err
 				return nil
 			}
-			cv.keyPaths[k] = path
 		}
 
 	case resultGrouped:
@@ -776,6 +774,7 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 }
 
 func (cv connectionVisitor) checkKey(k key, path string) error {
+	defer func() { cv.keyPaths[k] = path }()
 	if conflict, ok := cv.keyPaths[k]; ok {
 		return errf(
 			"cannot provide %v from %v", k, path,

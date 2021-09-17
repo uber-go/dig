@@ -632,16 +632,14 @@ func TestEndToEndSuccess(t *testing.T) {
 	t.Run("struct constructor with as interface option", func(t *testing.T) {
 		c := New()
 
-		provider := c.Provide(
+		err := c.Provide(
 			func() *bytes.Buffer {
-				var buf bytes.Buffer
-				buf.WriteString("foo")
-				return &buf
+				return bytes.NewBufferString("foo")
 			},
 			As(new(fmt.Stringer), new(io.Reader)),
 		)
 
-		require.NoError(t, provider, "provide failed")
+		require.NoError(t, err, "provide failed")
 
 		require.NoError(t, c.Invoke(
 			func(s fmt.Stringer, r io.Reader) {
@@ -651,6 +649,11 @@ func TestEndToEndSuccess(t *testing.T) {
 				require.Equal(t, "foo", string(got), "invoke got new buffer")
 			},
 		), "invoke failed")
+
+		require.Error(t, c.Invoke(func(*bytes.Buffer) {
+			t.Fatalf("must not be called")
+		}), "must not have a *bytes.Buffer in the container")
+
 	})
 
 	t.Run("As with Name", func(t *testing.T) {
@@ -672,9 +675,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		}
 
 		require.Error(t, c.Invoke(func(got in) {
-			body, err := ioutil.ReadAll(got.Reader)
-			require.NoError(t, err, "failed to read buffer body")
-			assert.Equal(t, "foo", string(body))
+			t.Fatal("should not be called")
 		}))
 	})
 
@@ -1608,8 +1609,13 @@ func TestProvideInvalidAs(t *testing.T) {
 	}{
 		name: "example",
 	}
+	type out struct {
+		Out
+
+		name string
+	}
 	var nilInterface io.Reader
-	c := New()
+
 	tests := []struct {
 		name        string
 		param       interface{}
@@ -1640,9 +1646,17 @@ func TestProvideInvalidAs(t *testing.T) {
 			param:       func() {},
 			expectedErr: "invalid dig.As(func()): argument must be a pointer to an interface",
 		},
+		{
+			name:        "as param is a func returning dig.out",
+			param:       func() *out { return &out{name: "example"} },
+			expectedErr: "invalid dig.As(func() *dig.out): argument must be a pointer to an interface",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := New()
 			err := c.Provide(
 				func() *bytes.Buffer {
 					var buf bytes.Buffer
@@ -1679,8 +1693,7 @@ func TestAsExpectingOriginalType(t *testing.T) {
 		}
 
 		require.Error(t, c.Invoke(func(got in) {
-			assert.Nil(t, got.Buffer, "buffer should not be provided.")
-			assert.NotNil(t, got.Reader, "reader should be provided.")
+			t.Fatal("*bytes.Buffer with name buff shouldn't be provided")
 		}))
 	})
 }
