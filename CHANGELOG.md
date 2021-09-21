@@ -4,8 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-- No changes yet.
+## [1.13.0] - 2021-09-21
+### Added
+- Introduce `As` Option which supports providing a type as interface(s)
+  it implements to the container.
+- Add `LocationForPC` ProvideOption which overrides the function inspection
+  for a program counter address to a provided function info.
 
 ## [1.12.0] - 2021-07-29
 ### Added
