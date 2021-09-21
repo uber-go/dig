@@ -6,9 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [1.13.0] - 2021-09-21
 ### Added
-- Introduce `As` Option which supports providing a type as interface(s)
+- Introduce `As` option which supports providing a type as interface(s)
   it implements to the container.
-- Add `LocationForPC` ProvideOption which overrides the function inspection
+- Add `LocationForPC` option which overrides the function inspection
   for a program counter address to a provided function info.
 
 ## [1.12.0] - 2021-07-29
