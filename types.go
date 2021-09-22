@@ -117,7 +117,7 @@ func embedsType(i interface{}, e reflect.Type) bool {
 	// TODO: this function doesn't consider e being a pointer.
 	// given `type A foo { *In }`, this function would return false for
 	// embedding dig.In, which makes for some extra error checking in places
-	// that call this funciton. Might be worthwhile to consider reflect.Indirect
+	// that call this function. Might be worthwhile to consider reflect.Indirect
 	// usage to clean up the callers.
 
 	if i == nil {
