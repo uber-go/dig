@@ -65,6 +65,7 @@ type provideOptions struct {
 	Info     *ProvideInfo
 	As       []interface{}
 	Location *digreflect.Func
+	Names    []string
 }
 
 func (o *provideOptions) Validate() error {
@@ -300,10 +301,22 @@ type invokeOptionFunc func(*invokeOptions)
 
 func (f invokeOptionFunc) applyInvokeOption(opts *invokeOptions) { f(opts) }
 
-func Names(names ...string) InvokeOption {
-	return invokeOptionFunc(func(opts *invokeOptions) {
-		opts.Names = names
-	})
+type InvokeAndProvideOption interface {
+	InvokeOption
+	ProvideOption
+}
+
+type namesOption []string
+
+func (n namesOption) applyInvokeOption(opts *invokeOptions) {
+	opts.Names = n
+}
+func (n namesOption) applyProvideOption(opts *provideOptions) {
+	opts.Names = n
+}
+
+func Names(names ...string) InvokeAndProvideOption {
+	return namesOption(names)
 }
 
 // Container is a directed acyclic graph of types and their dependencies.
@@ -592,29 +605,10 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return err
 	}
 
-	pl, err := newParamList(ftype)
+	pl, err := newParamList(ftype, options.Names)
 	if err != nil {
 		return err
 	}
-
-	if len(pl.Params) < len(options.Names) {
-		return errf("can't invoke function with more names=%s than operands=%s", options.Names, ftype)
-	}
-
-	updatedParams := make([]param, len(pl.Params))
-	for i, p := range pl.Params {
-		if i < len(options.Names) {
-			if ps, ok := pl.Params[i].(paramSingle); ok {
-				ps.Name = options.Names[i]
-				updatedParams[i] = ps
-			} else {
-				return errf("can't have a named param (%s) that is not a paramSingle (%s)", options.Names[i], pl.Params[i])
-			}
-		} else {
-			updatedParams[i] = p
-		}
-	}
-	pl.Params = updatedParams
 
 	if err := shallowCheckDependencies(c, pl); err != nil {
 		return errMissingDependencies{
@@ -669,6 +663,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 			ResultGroup: opts.Group,
 			ResultAs:    opts.As,
 			Location:    opts.Location,
+			ParamNames:  opts.Names,
 		},
 	)
 	if err != nil {
@@ -887,6 +882,7 @@ type nodeOptions struct {
 	ResultGroup string
 	ResultAs    []interface{}
 	Location    *digreflect.Func
+	ParamNames  []string
 }
 
 func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
@@ -894,7 +890,7 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 	ctype := cval.Type()
 	cptr := cval.Pointer()
 
-	params, err := newParamList(ctype)
+	params, err := newParamList(ctype, opts.ParamNames)
 	if err != nil {
 		return nil, err
 	}

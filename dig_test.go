@@ -536,6 +536,26 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "invoke should succeed, pulling out two named instances")
 	})
 
+	t.Run("named instances can be used to Provide another instance", func(t *testing.T) {
+		c := New()
+
+		type A struct{ idx int }
+
+		buildConstructor := func(idx int) func() A {
+			return func() A { return A{idx: idx} }
+		}
+
+		require.NoError(t, c.Provide(buildConstructor(1), Name("first")))
+		require.NoError(t, c.Provide(buildConstructor(2), Name("second")))
+		require.NoError(t, c.Provide(func(a A) int {
+			return a.idx + 5
+		}, Names("first")))
+
+		require.NoError(t, c.Invoke(func(i int) {
+			assert.Equal(t, 6, i)
+		}), "invoke should succeed, pulling out one named instances")
+	})
+
 	t.Run("named instances can be invoked Name option", func(t *testing.T) {
 		c := New()
 
