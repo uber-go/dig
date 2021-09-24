@@ -536,6 +536,25 @@ func TestEndToEndSuccess(t *testing.T) {
 		}), "invoke should succeed, pulling out two named instances")
 	})
 
+	t.Run("named instances can be invoked Name option", func(t *testing.T) {
+		c := New()
+
+		type A struct{ idx int }
+
+		buildConstructor := func(idx int) func() A {
+			return func() A { return A{idx: idx} }
+		}
+
+		require.NoError(t, c.Provide(buildConstructor(1), Name("first")))
+		require.NoError(t, c.Provide(buildConstructor(2), Name("second")))
+		require.NoError(t, c.Provide(buildConstructor(3), Name("third")))
+
+		require.NoError(t, c.Invoke(func(a1 A, a3 A) {
+			assert.Equal(t, 1, a1.idx)
+			assert.Equal(t, 3, a3.idx)
+		}, Names("first", "third")), "invoke should succeed, using two named instances")
+	})
+
 	t.Run("named and unnamed instances coexist", func(t *testing.T) {
 		c := New()
 		type A struct{ idx int }
@@ -559,6 +578,25 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 1, i.A1.idx)
 			assert.Equal(t, 2, i.A2.idx)
 		}))
+	})
+
+	t.Run("named and unnamed instances can be invoked with Names option", func(t *testing.T) {
+		c := New()
+
+		type A struct{ idx int }
+
+		buildConstructor := func(idx int) func() A {
+			return func() A { return A{idx: idx} }
+		}
+
+		require.NoError(t, c.Provide(buildConstructor(1), Name("first")))
+		require.NoError(t, c.Provide(buildConstructor(2), Name("second")))
+		require.NoError(t, c.Provide(buildConstructor(3)))
+
+		require.NoError(t, c.Invoke(func(a1 A, a3 A) {
+			assert.Equal(t, 1, a1.idx)
+			assert.Equal(t, 3, a3.idx)
+		}, Names("first")), "invoke should succeed, using two named instances")
 	})
 
 	t.Run("named instances recurse", func(t *testing.T) {

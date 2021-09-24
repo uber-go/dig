@@ -282,10 +282,28 @@ func LocationForPC(pc uintptr) ProvideOption {
 	})
 }
 
+type invokeOptions struct {
+	Names []string
+}
+
+func (*invokeOptions) Validate() error {
+	return nil
+}
+
 // An InvokeOption modifies the default behavior of Invoke. It's included for
 // future functionality; currently, there are no concrete implementations.
 type InvokeOption interface {
-	unimplemented()
+	applyInvokeOption(*invokeOptions)
+}
+
+type invokeOptionFunc func(*invokeOptions)
+
+func (f invokeOptionFunc) applyInvokeOption(opts *invokeOptions) { f(opts) }
+
+func Names(names ...string) InvokeOption {
+	return invokeOptionFunc(func(opts *invokeOptions) {
+		opts.Names = names
+	})
 }
 
 // Container is a directed acyclic graph of types and their dependencies.
@@ -566,10 +584,37 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return errf("can't invoke non-function %v (type %v)", function, ftype)
 	}
 
+	var options invokeOptions
+	for _, o := range opts {
+		o.applyInvokeOption(&options)
+	}
+	if err := options.Validate(); err != nil {
+		return err
+	}
+
 	pl, err := newParamList(ftype)
 	if err != nil {
 		return err
 	}
+
+	if len(pl.Params) < len(options.Names) {
+		return errf("can't invoke function with more names=%s than operands=%s", options.Names, ftype)
+	}
+
+	updatedParams := make([]param, len(pl.Params))
+	for i, p := range pl.Params {
+		if i < len(options.Names) {
+			if ps, ok := pl.Params[i].(paramSingle); ok {
+				ps.Name = options.Names[i]
+				updatedParams[i] = ps
+			} else {
+				return errf("can't have a named param (%s) that is not a paramSingle (%s)", options.Names[i], pl.Params[i])
+			}
+		} else {
+			updatedParams[i] = p
+		}
+	}
+	pl.Params = updatedParams
 
 	if err := shallowCheckDependencies(c, pl); err != nil {
 		return errMissingDependencies{
