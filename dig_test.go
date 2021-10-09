@@ -389,7 +389,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, a.name, "string A", "value type should work for dig.Out")
 			assert.Equal(t, b.name, "string B", "pointer should work for dig.Out")
 			assert.True(t, myA == a, "should get the same pointer for &A")
-			assert.Equal(t, b, myB, "b and myB should be uqual")
+			assert.Equal(t, b, myB, "b and myB should be equal")
 		}))
 	})
 
