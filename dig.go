@@ -604,6 +604,9 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
+// What is the motivation for introducing a function very similar to
+// `verifyAcyclic(c containerStore, n provider, k key)` and why is
+// the path set to nil in this case?
 func (c *Container) verifyAcyclic() error {
 	visited := make(map[key]struct{})
 	for _, n := range c.nodes {

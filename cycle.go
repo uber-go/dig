@@ -73,6 +73,9 @@ func verifyAcyclic(c containerStore, n provider, k key) error {
 	return err
 }
 
+// When first called from `(c *Container) verifyAcyclic()` (`DeferAcyclicVerification()`
+// option is used and this is triggered lazily in `Invoke()`) the `path` here
+// is set to nil.
 func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[key]struct{}) error {
 	var err error
 	walkParam(n.ParamList(), paramVisitorFunc(func(param param) bool {
@@ -121,6 +124,7 @@ func detectCycles(n provider, c containerStore, path []cycleEntry, visited map[k
 			// Alternatively, if deferAcyclicVerification was set and detectCycles
 			// is only being called before the first Invoke, each node in the
 			// graph will be tested as the first element of the path, so any
+			//                             ^^^^^^^^^^^^^^^^^^^^^^^^^ WHY?
 			// cycle that exists is guaranteed to trip the following condition.
 			if path[0].Key == k {
 				err = errCycleDetected{Path: append(path, entry)}
