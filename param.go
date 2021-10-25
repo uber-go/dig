@@ -62,11 +62,14 @@ var (
 
 // newParam builds a param from the given type. If the provided type is a
 // dig.In struct, an paramObject will be returned.
-func newParam(t reflect.Type) (param, error) {
+func newParam(t reflect.Type, paramName string) (param, error) {
 	switch {
 	case IsOut(t) || (t.Kind() == reflect.Ptr && IsOut(t.Elem())) || embedsType(t, _outPtrType):
 		return nil, errf("cannot depend on result objects", "%v embeds a dig.Out", t)
 	case IsIn(t):
+		if paramName != "" {
+			return nil, errf("cannot have a paramName (%s) with a struct that has dig.In", paramName)
+		}
 		return newParamObject(t)
 	case embedsType(t, _inPtrType):
 		return nil, errf(
@@ -77,7 +80,7 @@ func newParam(t reflect.Type) (param, error) {
 			"cannot depend on a pointer to a parameter object, use a value instead",
 			"%v is a pointer to a struct that embeds dig.In", t)
 	default:
-		return paramSingle{Type: t}, nil
+		return paramSingle{Type: t, Name: paramName}, nil
 	}
 }
 
@@ -158,7 +161,7 @@ func (pl paramList) DotParam() []*dot.Param {
 //
 // Variadic arguments of a constructor are ignored and not included as
 // dependencies.
-func newParamList(ctype reflect.Type) (paramList, error) {
+func newParamList(ctype reflect.Type, names []string) (paramList, error) {
 	numArgs := ctype.NumIn()
 	if ctype.IsVariadic() {
 		// NOTE: If the function is variadic, we skip the last argument
@@ -171,8 +174,16 @@ func newParamList(ctype reflect.Type) (paramList, error) {
 		Params: make([]param, 0, numArgs),
 	}
 
+	if numArgs < len(names) {
+		return pl, errf("can't create a constructor with more names=%s than args=%s", names, ctype)
+	}
+
 	for i := 0; i < numArgs; i++ {
-		p, err := newParam(ctype.In(i))
+		name := ""
+		if i < len(names) {
+			name = names[i]
+		}
+		p, err := newParam(ctype.In(i), name)
 		if err != nil {
 			return pl, errf("bad argument %d", i+1, err)
 		}
@@ -370,7 +381,7 @@ func newParamObjectField(idx int, f reflect.StructField) (paramObjectField, erro
 
 	default:
 		var err error
-		p, err = newParam(f.Type)
+		p, err = newParam(f.Type, "")
 		if err != nil {
 			return pof, err
 		}

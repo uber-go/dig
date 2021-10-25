@@ -30,7 +30,7 @@ import (
 )
 
 func TestParamListBuild(t *testing.T) {
-	p, err := newParamList(reflect.TypeOf(func() io.Writer { return nil }))
+	p, err := newParamList(reflect.TypeOf(func() io.Writer { return nil }), []string{})
 	require.NoError(t, err)
 	assert.Panics(t, func() {
 		p.Build(New())
@@ -238,7 +238,7 @@ func TestParamVisitorChecksEverything(t *testing.T) {
 
 	pl, err := newParamList(reflect.TypeOf(func(io.Reader, params, io.Writer) {
 		t.Fatalf("this function should not be called")
-	}))
+	}), []string{})
 	require.NoError(t, err)
 
 	idx := 0
