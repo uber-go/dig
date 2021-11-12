@@ -32,6 +32,7 @@ import (
 
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
+	"go.uber.org/dig/internal/graph"
 )
 
 const (
@@ -314,6 +315,8 @@ type Container struct {
 
 	// invokerFn calls a function with arguments provided to Provide or Invoke.
 	invokerFn invokerFn
+
+	allNodes []*graphNode
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -380,6 +383,8 @@ type provider interface {
 	// The values produced by this provider should be submitted into the
 	// containerStore.
 	Call(containerStore) error
+
+	Order() int
 }
 
 // New constructs a Container.
@@ -566,7 +571,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return errf("can't invoke non-function %v (type %v)", function, ftype)
 	}
 
-	pl, err := newParamList(ftype)
+	pl, err := newParamList(ftype, &c.allNodes)
 	if err != nil {
 		return err
 	}
@@ -617,8 +622,9 @@ func (c *Container) verifyAcyclic() error {
 }
 
 func (c *Container) provide(ctor interface{}, opts provideOptions) error {
-	n, err := newNode(
+	newC, err := newConstructorNode(
 		ctor,
+		&c.allNodes,
 		nodeOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
@@ -641,20 +647,16 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	}
 
 	for k := range keys {
-		c.isVerifiedAcyclic = false
-		oldProviders := c.providers[k]
 		c.providers[k] = append(c.providers[k], n)
+	}
+	c.nodes = append(c.nodes, n)
 
-		if c.deferAcyclicVerification {
-			continue
-		}
-		if err := verifyAcyclic(c, n, k); err != nil {
-			c.providers[k] = oldProviders
-			return err
+	if !c.deferAcyclicVerification {
+		if !graph.IsAcyclic(c) {
+			return errf("this node introduces a cycle.")
 		}
 		c.isVerifiedAcyclic = true
 	}
-	c.nodes = append(c.nodes, n)
 
 	// Record introspection info for caller if Info option is specified
 	if info := opts.Info; info != nil {
@@ -705,6 +707,30 @@ func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 		keys[k] = struct{}{}
 	}
 	return keys, nil
+}
+
+// Order ...
+func (c *Container) Order() int {
+	return len(c.allNodes)
+}
+
+// Visit ...
+func (c *Container) Visit(u int, do func(v int) bool) {
+	graphNode := c.allNodes[u]
+	switch w := graphNode.Wrapped.(type) {
+	case *node:
+	case *paramObject:
+		w.Visit(do)
+	case *paramList:
+		w.Visit(do)
+	case *paramGroupedSlice:
+		providers := c.getGroupProviders(w.Group, w.Type.Elem())
+		for _, n := range providers {
+			if ok := do(n.Order()); ok {
+				return
+			}
+		}
+	}
 }
 
 // Visits the results of a node and compiles a collection of all the keys
@@ -833,6 +859,8 @@ type node struct {
 
 	// Type information about constructor results.
 	resultList resultList
+
+	order int
 }
 
 type nodeOptions struct {
@@ -844,47 +872,38 @@ type nodeOptions struct {
 	Location    *digreflect.Func
 }
 
-func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
+func newConstructorNode(ctor interface{}, nodes *[]*graphNode, opts nodeOptions) (*node, error) {
 	cval := reflect.ValueOf(ctor)
 	ctype := cval.Type()
 	cptr := cval.Pointer()
-
-	params, err := newParamList(ctype)
-	if err != nil {
-		return nil, err
-	}
-
-	results, err := newResultList(
-		ctype,
-		resultOptions{
-			Name:  opts.ResultName,
-			Group: opts.ResultGroup,
-			As:    opts.ResultAs,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
 
 	location := opts.Location
 	if location == nil {
 		location = digreflect.InspectFunc(ctor)
 	}
 
-	return &node{
-		ctor:       ctor,
-		ctype:      ctype,
-		location:   location,
-		id:         dot.CtorID(cptr),
-		paramList:  params,
-		resultList: results,
-	}, err
+	n := &node{
+		ctor:     ctor,
+		ctype:    ctype,
+		location: location,
+		id:       dot.CtorID(cptr),
+		order:    len(*nodes),
+	}
+	*nodes = append(*nodes, &graphNode{
+		Order:   len(*nodes),
+		Wrapped: n,
+	})
+	return n, err
 }
 
 func (n *node) Location() *digreflect.Func { return n.location }
 func (n *node) ParamList() paramList       { return n.paramList }
 func (n *node) ResultList() resultList     { return n.resultList }
 func (n *node) ID() dot.CtorID             { return n.id }
+func (n *node) Order() int                 { return n.order }
+
+func (n *node) MakeParamNodes() error {
+}
 
 // Call calls this node's constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
@@ -1037,4 +1056,9 @@ func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
 		newItems[i] = items[j]
 	}
 	return newItems
+}
+
+type graphNode struct {
+	Order   int
+	Wrapped interface{}
 }
