@@ -649,7 +649,7 @@ func (c *Container) Visit(u int, do func(int) bool) {
 				}
 		*/
 	case *paramGroupedSlice:
-		providers := c.getGroupProviders(w.Group, w.Type)
+		providers := c.getGroupProviders(w.Group, w.Type.Elem())
 		for _, provider := range providers {
 			v := c.orders[key{t: provider.CType()}]
 			do(v)
@@ -659,8 +659,9 @@ func (c *Container) Visit(u int, do func(int) bool) {
 
 func (n *node) Visit(c *Container, do func(int) bool) {
 	for _, param := range n.paramList.Params {
-		if v, found := getParamOrder(c, param); found {
-			do(v)
+		orders := getParamOrder(c, param)
+		for _, order := range orders {
+			do(order)
 		}
 	}
 }

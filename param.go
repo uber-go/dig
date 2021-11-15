@@ -278,24 +278,24 @@ func (po paramObject) DotParam() []*dot.Param {
 	return types
 }
 
-func getParamOrder(c *Container, param param) (int, bool) {
+func getParamOrder(c *Container, param param) []int {
+	var orders []int
 	switch p := param.(type) {
 	case paramSingle:
 		providers := c.getValueProviders(p.Name, p.Type)
 		for _, provider := range providers {
 			v := c.orders[key{t: provider.CType()}]
-			return v, true
+			orders = append(orders, v)
 		}
 	case paramGroupedSlice:
 		v := c.orders[key{t: p.Type, group: p.Group}]
-		return v, true
+		orders = append(orders, v)
 	case paramObject:
-		v := c.orders[key{t: p.Type}]
-		return v, true
-	default:
-		return -1, false
+		for _, pf := range p.Fields {
+			orders = append(orders, getParamOrder(c, pf.Param)...)
+		}
 	}
-	return -1, false
+	return orders
 }
 
 // newParamObject builds an paramObject from the provided type. The type MUST
