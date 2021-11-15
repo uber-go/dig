@@ -51,6 +51,8 @@ type param interface {
 
 	// DotParam returns a slice of dot.Param(s).
 	DotParam() []*dot.Param
+
+	ProviderOrders() []int
 }
 
 var (
@@ -62,22 +64,22 @@ var (
 
 // newParam builds a param from the given type. If the provided type is a
 // dig.In struct, an paramObject will be returned.
-func newParam(t reflect.Type, nodes *[]*graphNode) (param, int, error) {
+func newParam(t reflect.Type, c containerStore) (param, error) {
 	switch {
 	case IsOut(t) || (t.Kind() == reflect.Ptr && IsOut(t.Elem())) || embedsType(t, _outPtrType):
-		return nil, -1, errf("cannot depend on result objects", "%v embeds a dig.Out", t)
+		return nil, errf("cannot depend on result objects", "%v embeds a dig.Out", t)
 	case IsIn(t):
-		return newParamObject(t, nodes)
+		return newParamObject(t, c)
 	case embedsType(t, _inPtrType):
-		return nil, -1, errf(
+		return nil, errf(
 			"cannot build a parameter object by embedding *dig.In, embed dig.In instead",
 			"%v embeds *dig.In", t)
 	case t.Kind() == reflect.Ptr && IsIn(t.Elem()):
-		return nil, -1, errf(
+		return nil, errf(
 			"cannot depend on a pointer to a parameter object, use a value instead",
 			"%v is a pointer to a struct that embeds dig.In", t)
 	default:
-		return paramSingle{Type: t}, -1, nil
+		return paramSingle{Type: t}, nil
 	}
 }
 
@@ -143,8 +145,7 @@ func walkParam(p param, v paramVisitor) {
 type paramList struct {
 	ctype reflect.Type // type of the constructor
 
-	Params      []param
-	ParamOrders []int
+	Params []param
 }
 
 func (pl paramList) DotParam() []*dot.Param {
@@ -159,7 +160,7 @@ func (pl paramList) DotParam() []*dot.Param {
 //
 // Variadic arguments of a constructor are ignored and not included as
 // dependencies.
-func newParamList(ctype reflect.Type, nodes *[]*graphNode) (paramList, error) {
+func newParamList(ctype reflect.Type, c containerStore) (paramList, error) {
 	numArgs := ctype.NumIn()
 	if ctype.IsVariadic() {
 		// NOTE: If the function is variadic, we skip the last argument
@@ -173,14 +174,11 @@ func newParamList(ctype reflect.Type, nodes *[]*graphNode) (paramList, error) {
 	}
 
 	for i := 0; i < numArgs; i++ {
-		p, order, err := newParam(ctype.In(i), nodes)
+		p, err := newParam(ctype.In(i), c)
 		if err != nil {
 			return pl, errf("bad argument %d", i+1, err)
 		}
 		pl.Params = append(pl.Params, p)
-		if order >= 0 {
-			pl.ParamOrders = append(pl.ParamOrders, order)
-		}
 	}
 
 	return pl, nil
@@ -292,7 +290,7 @@ func (po paramObject) DotParam() []*dot.Param {
 
 // newParamObject builds an paramObject from the provided type. The type MUST
 // be a dig.In struct.
-func newParamObject(t reflect.Type, nodes *[]*graphNode) (paramObject, int, error) {
+func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 	po := paramObject{Type: t}
 
 	// Check if the In type supports ignoring unexported fields.
@@ -303,7 +301,7 @@ func newParamObject(t reflect.Type, nodes *[]*graphNode) (paramObject, int, erro
 			var err error
 			ignoreUnexported, err = isIgnoreUnexportedSet(f)
 			if err != nil {
-				return po, -1, err
+				return po, err
 			}
 			break
 		}
@@ -319,24 +317,14 @@ func newParamObject(t reflect.Type, nodes *[]*graphNode) (paramObject, int, erro
 			// Skip over an unexported field if it is allowed.
 			continue
 		}
-		pof, order, err := newParamObjectField(i, f, nodes)
+		pof, err := newParamObjectField(i, f, c)
 		if err != nil {
-			return po, -1, errf("bad field %q of %v", f.Name, t, err)
+			return po, errf("bad field %q of %v", f.Name, t, err)
 		}
-
 		po.Fields = append(po.Fields, pof)
-		if order >= 0 {
-			po.FieldOrders = append(po.FieldOrders, order)
-		}
 	}
-
-	newOrder := len(*nodes)
-	*nodes = append(*nodes, &graphNode{
-		Wrapped: po,
-		Order:   newOrder,
-	})
-
-	return po, newOrder, nil
+	c.newGraphNode(key{t: t}, &po)
+	return po, nil
 }
 
 func (po paramObject) Build(c containerStore) (reflect.Value, error) {
@@ -378,32 +366,31 @@ func (pof paramObjectField) DotParam() []*dot.Param {
 	return pof.Param.DotParam()
 }
 
-func newParamObjectField(idx int, f reflect.StructField, nodes *[]*graphNode) (paramObjectField, int, error) {
+func newParamObjectField(idx int, f reflect.StructField, c containerStore) (paramObjectField, error) {
 	pof := paramObjectField{
 		FieldName:  f.Name,
 		FieldIndex: idx,
 	}
 
 	var p param
-	order := -1
 	switch {
 	case f.PkgPath != "":
-		return pof, -1, errf(
+		return pof, errf(
 			"unexported fields not allowed in dig.In, did you mean to export %q (%v)?",
 			f.Name, f.Type)
 
 	case f.Tag.Get(_groupTag) != "":
 		var err error
-		p, order, err = newParamGroupedSlice(f, nodes)
+		p, err = newParamGroupedSlice(f, c)
 		if err != nil {
-			return pof, order, err
+			return pof, err
 		}
 
 	default:
 		var err error
-		p, order, err = newParam(f.Type, nodes)
+		p, err = newParam(f.Type, c)
 		if err != nil {
-			return pof, order, err
+			return pof, err
 		}
 	}
 
@@ -413,14 +400,14 @@ func newParamObjectField(idx int, f reflect.StructField, nodes *[]*graphNode) (p
 		var err error
 		ps.Optional, err = isFieldOptional(f)
 		if err != nil {
-			return pof, order, err
+			return pof, err
 		}
 
 		p = ps
 	}
 
 	pof.Param = p
-	return pof, order, nil
+	return pof, nil
 }
 
 func (pof paramObjectField) Build(c containerStore) (reflect.Value, error) {
@@ -456,10 +443,10 @@ func (pt paramGroupedSlice) DotParam() []*dot.Param {
 // the given name.
 //
 // The type MUST be a slice type.
-func newParamGroupedSlice(f reflect.StructField, nodes *[]*graphNode) (paramGroupedSlice, int, error) {
+func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGroupedSlice, error) {
 	g, err := parseGroupString(f.Tag.Get(_groupTag))
 	if err != nil {
-		return paramGroupedSlice{}, -1, err
+		return paramGroupedSlice{}, err
 	}
 	pg := paramGroupedSlice{Group: g.Name, Type: f.Type}
 
@@ -467,27 +454,25 @@ func newParamGroupedSlice(f reflect.StructField, nodes *[]*graphNode) (paramGrou
 	optional, _ := isFieldOptional(f)
 	switch {
 	case f.Type.Kind() != reflect.Slice:
-		return pg, -1, errf("value groups may be consumed as slices only",
+		return pg, errf("value groups may be consumed as slices only",
 			"field %q (%v) is not a slice", f.Name, f.Type)
 	case g.Flatten:
-		return pg, -1, errf("cannot use flatten in parameter value groups",
+		return pg, errf("cannot use flatten in parameter value groups",
 			"field %q (%v) specifies flatten", f.Name, f.Type)
 	case name != "":
-		return pg, -1, errf(
+		return pg, errf(
 			"cannot use named values with value groups",
 			"name:%q requested with group:%q", name, pg.Group)
 
 	case optional:
-		return pg, -1, errors.New("value groups cannot be optional")
+		return pg, errors.New("value groups cannot be optional")
 	}
+	c.newGraphNode(key{
+		t:     f.Type,
+		group: g.Name,
+	}, &pg)
 
-	newOrder := len(*nodes)
-	*nodes = append(*nodes, &graphNode{
-		Wrapped: pg,
-		Order:   newOrder,
-	})
-
-	return pg, newOrder, nil
+	return pg, nil
 }
 
 func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
