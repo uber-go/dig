@@ -51,8 +51,6 @@ type param interface {
 
 	// DotParam returns a slice of dot.Param(s).
 	DotParam() []*dot.Param
-
-	ProviderOrders() []int
 }
 
 var (
@@ -203,14 +201,6 @@ func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	return args, nil
 }
 
-func (pl paramList) Visit(do func(v int) bool) {
-	for _, v := range pl.ParamOrders {
-		if ok := do(v); ok {
-			return
-		}
-	}
-}
-
 // paramSingle is an explicitly requested type, optionally with a name.
 //
 // This object must be present in the graph as-is unless it's specified as
@@ -288,6 +278,26 @@ func (po paramObject) DotParam() []*dot.Param {
 	return types
 }
 
+func getParamOrder(c *Container, param param) (int, bool) {
+	switch p := param.(type) {
+	case paramSingle:
+		providers := c.getValueProviders(p.Name, p.Type)
+		for _, provider := range providers {
+			v := c.orders[key{t: provider.CType()}]
+			return v, true
+		}
+	case paramGroupedSlice:
+		v := c.orders[key{t: p.Type, group: p.Group}]
+		return v, true
+	case paramObject:
+		v := c.orders[key{t: p.Type}]
+		return v, true
+	default:
+		return -1, false
+	}
+	return -1, false
+}
+
 // newParamObject builds an paramObject from the provided type. The type MUST
 // be a dig.In struct.
 func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
@@ -323,7 +333,7 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 		}
 		po.Fields = append(po.Fields, pof)
 	}
-	c.newGraphNode(key{t: t}, &po)
+	//c.newGraphNode(key{t: t}, &po)
 	return po, nil
 }
 

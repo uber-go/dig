@@ -295,6 +295,8 @@ type Container struct {
 	// key.
 	providers map[key][]*node
 
+	nodes []*node
+
 	// Values that have already been generated in the container.
 	values map[key]reflect.Value
 
@@ -367,7 +369,7 @@ type containerStore interface {
 	// Returns invokerFn function to use when calling arguments.
 	invoker() invokerFn
 
-	newGraphNode(g *graphNode)
+	newGraphNode(k key, w interface{})
 }
 
 // provider encapsulates a user-provided constructor.
@@ -393,7 +395,7 @@ type provider interface {
 	// containerStore.
 	Call(containerStore) error
 
-	Order() int
+	CType() reflect.Type
 }
 
 // New constructs a Container.
@@ -404,6 +406,7 @@ func New(opts ...Option) *Container {
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
 		invokerFn: defaultInvoker,
+		orders:    make(map[key]int),
 	}
 
 	for _, opt := range opts {
@@ -630,13 +633,35 @@ func (c *Container) verifyAcyclic() error {
 	return nil
 }
 
+// Visit ...
 func (c *Container) Visit(u int, do func(int) bool) {
-	node := c.allNodes[u]
-	switch n := node.Wrapped.(type) {
+	n := c.allNodes[u]
+
+	switch w := n.Wrapped.(type) {
 	case *node:
-		return n.Visit(do)
-	case *paramObject:
-		return n.Visit(do)
+		w.Visit(c, do)
+		/*
+			case *paramObject:
+				for _, pf := range w.Fields {
+					if v, found := getParamOrder(c, pf.Param); found {
+						do(v)
+					}
+				}
+		*/
+	case *paramGroupedSlice:
+		providers := c.getGroupProviders(w.Group, w.Type)
+		for _, provider := range providers {
+			v := c.orders[key{t: provider.CType()}]
+			do(v)
+		}
+	}
+}
+
+func (n *node) Visit(c *Container, do func(int) bool) {
+	for _, param := range n.paramList.Params {
+		if v, found := getParamOrder(c, param); found {
+			do(v)
+		}
 	}
 }
 
@@ -740,19 +765,6 @@ func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 // Order ...
 func (c *Container) Order() int {
 	return len(c.allNodes)
-}
-
-// Visit ...
-func (c *Container) Visit(u int, do func(v int) bool) {
-	graphNode := c.allNodes[u]
-	switch w := graphNode.Wrapped.(type) {
-	case *node:
-		node.ParamList().Visit(do)
-	case *paramObject:
-		w.Visit(do)
-	case *paramGroupedSlice:
-		w.Visit(do)
-	}
 }
 
 // Visits the results of a node and compiles a collection of all the keys
@@ -931,7 +943,7 @@ func newNode(ctor interface{}, c containerStore, opts nodeOptions) (*node, error
 	}
 	c.newGraphNode(key{
 		t: ctype,
-	}, &n)
+	}, n)
 	return n, nil
 }
 
@@ -939,7 +951,7 @@ func (n *node) Location() *digreflect.Func { return n.location }
 func (n *node) ParamList() paramList       { return n.paramList }
 func (n *node) ResultList() resultList     { return n.resultList }
 func (n *node) ID() dot.CtorID             { return n.id }
-func (n *node) Order() int                 { return n.order }
+func (n *node) CType() reflect.Type        { return n.ctype }
 
 // Call calls this node's constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
@@ -965,7 +977,7 @@ func (n *node) Call(c containerStore) error {
 
 	receiver := newStagingContainerWriter()
 	results := c.invoker()(reflect.ValueOf(n.ctor), args)
-	if err := n.resultList.ExtractList(n, receiver, results); err != nil {
+	if err := n.resultList.ExtractList(receiver, results); err != nil {
 		return errConstructorFailed{Func: n.location, Reason: err}
 	}
 	receiver.Commit(c)

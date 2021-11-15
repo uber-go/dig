@@ -225,10 +225,10 @@ func (resultList) Extract(containerWriter, reflect.Value) {
 	digerror.BugPanicf("resultList.Extract() must never be called")
 }
 
-func (rl resultList) ExtractList(n *node, cw containerWriter, values []reflect.Value) error {
+func (rl resultList) ExtractList(cw containerWriter, values []reflect.Value) error {
 	for i, v := range values {
 		if resultIdx := rl.resultIndexes[i]; resultIdx >= 0 {
-			rl.Results[resultIdx].Extract(n, cw, v)
+			rl.Results[resultIdx].Extract(cw, v)
 			continue
 		}
 
@@ -304,7 +304,7 @@ func (rs resultSingle) DotResult() []*dot.Result {
 	return dotResults
 }
 
-func (rs resultSingle) Extract(n *node, cw containerWriter, v reflect.Value) {
+func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
 	cw.setValue(rs.Name, rs.Type, v)
 
 	for _, asType := range rs.As {

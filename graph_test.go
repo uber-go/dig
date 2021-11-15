@@ -375,9 +375,8 @@ func assertCtorsEqual(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
 func TestNewDotCtor(t *testing.T) {
 	type t1 struct{}
 	type t2 struct{}
-	var nodes []*graphNode
 
-	n, err := newNode(func(A t1) t2 { return t2{} }, &nodes, nodeOptions{})
+	n, err := newNode(func(A t1) t2 { return t2{} }, New(), nodeOptions{})
 	require.NoError(t, err)
 
 	n.location = &digreflect.Func{

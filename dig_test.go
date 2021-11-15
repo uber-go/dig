@@ -3064,9 +3064,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 func TestNodeAlreadyCalled(t *testing.T) {
 	type type1 struct{}
 	f := func() type1 { return type1{} }
-	var nodes []*graphNode
 
-	n, err := newNode(f, &nodes, nodeOptions{})
+	n, err := newNode(f, New(), nodeOptions{})
 	require.NoError(t, err, "failed to build node")
 	require.False(t, n.called, "node must not have been called")
 
