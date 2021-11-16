@@ -57,9 +57,8 @@ func TestGraphIsAcyclic1(t *testing.T) {
 	g.Nodes[0] = []int{1, 2}
 	g.Nodes[1] = []int{2}
 	g.Nodes[2] = nil
-	ok, cycle := IsAcyclic(g)
+	ok, _ := IsAcyclic(g)
 	assert.True(t, ok)
-	assert.Equal(t, nil, cycle)
 }
 
 func TestGraphIsAcyclic2(t *testing.T) {

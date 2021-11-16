@@ -315,11 +315,18 @@ type Container struct {
 	// invokerFn calls a function with arguments provided to Provide or Invoke.
 	invokerFn invokerFn
 
+	gh *graphHolder
+}
+
+type graphHolder struct {
 	// all the nodes defined in the graph.
 	allNodes []*graphNode
 
 	// Maps each graphNode to its order.
 	orders map[key]int
+
+	// Container whose graph this holder contains.
+	c *Container
 }
 
 type graphNodeKey struct {
@@ -406,8 +413,14 @@ func New(opts ...Option) *Container {
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
 		invokerFn: defaultInvoker,
-		orders:    make(map[key]int),
 	}
+
+	gh := &graphHolder{
+		orders: make(map[key]int),
+		c:      c,
+	}
+
+	c.gh = gh
 
 	for _, opt := range opts {
 		opt.applyOption(c)
@@ -633,52 +646,52 @@ func (c *Container) verifyAcyclic() error {
 	return nil
 }
 
+func (gh *graphHolder) Order() int {
+	return len(gh.allNodes)
+}
+
 // Visit ...
-func (c *Container) Visit(u int, do func(int) bool) {
-	n := c.allNodes[u]
+func (gh *graphHolder) Visit(u int, do func(int) bool) {
+	n := gh.allNodes[u]
 
 	switch w := n.Wrapped.(type) {
 	case *node:
-		w.Visit(c, do)
-		/*
-			case *paramObject:
-				for _, pf := range w.Fields {
-					if v, found := getParamOrder(c, pf.Param); found {
-						do(v)
-					}
-				}
-		*/
+		w.Visit(gh, do)
 	case *paramGroupedSlice:
-		providers := c.getGroupProviders(w.Group, w.Type.Elem())
+		providers := gh.c.getGroupProviders(w.Group, w.Type.Elem())
 		for _, provider := range providers {
-			v := c.orders[key{t: provider.CType()}]
-			do(v)
+			v := gh.orders[key{t: provider.CType()}]
+			if ok := do(v); !ok {
+				return
+			}
 		}
 	}
 }
 
-func (n *node) Visit(c *Container, do func(int) bool) {
+func (n *node) Visit(gh *graphHolder, do func(int) bool) {
 	for _, param := range n.paramList.Params {
-		orders := getParamOrder(c, param)
+		orders := getParamOrder(gh, param)
 		for _, order := range orders {
-			do(order)
+			if ok := do(order); !ok {
+				return
+			}
 		}
 	}
 }
 
 func (c *Container) newGraphNode(k key, wrapped interface{}) {
-	order := len(c.allNodes)
-	c.allNodes = append(c.allNodes, &graphNode{
+	order := len(c.gh.allNodes)
+	c.gh.allNodes = append(c.gh.allNodes, &graphNode{
 		Order:   order,
 		Wrapped: wrapped,
 	})
-	c.orders[k] = order
+	c.gh.orders[k] = order
 }
 
 func (c *Container) cycleDetectedError(cycle []int) error {
 	var path []cycleEntry
 	for _, n := range cycle {
-		if n, ok := c.allNodes[n].Wrapped.(*node); ok {
+		if n, ok := c.gh.allNodes[n].Wrapped.(*node); ok {
 			path = append(path, cycleEntry{
 				Key: key{
 					t: n.CType(),
@@ -721,7 +734,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	c.nodes = append(c.nodes, n)
 
 	if !c.deferAcyclicVerification {
-		if ok, cycle := graph.IsAcyclic(c); !ok {
+		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
 			return errf("this function introduces a cycle", c.cycleDetectedError(cycle))
 		}
 		c.isVerifiedAcyclic = true
@@ -776,11 +789,6 @@ func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 		keys[k] = struct{}{}
 	}
 	return keys, nil
-}
-
-// Order ...
-func (c *Container) Order() int {
-	return len(c.allNodes)
 }
 
 // Visits the results of a node and compiles a collection of all the keys

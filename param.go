@@ -278,21 +278,21 @@ func (po paramObject) DotParam() []*dot.Param {
 	return types
 }
 
-func getParamOrder(c *Container, param param) []int {
+func getParamOrder(gh *graphHolder, param param) []int {
 	var orders []int
 	switch p := param.(type) {
 	case paramSingle:
-		providers := c.getValueProviders(p.Name, p.Type)
+		providers := gh.c.getValueProviders(p.Name, p.Type)
 		for _, provider := range providers {
-			v := c.orders[key{t: provider.CType()}]
+			v := gh.orders[key{t: provider.CType()}]
 			orders = append(orders, v)
 		}
 	case paramGroupedSlice:
-		v := c.orders[key{t: p.Type, group: p.Group}]
+		v := gh.orders[key{t: p.Type, group: p.Group}]
 		orders = append(orders, v)
 	case paramObject:
 		for _, pf := range p.Fields {
-			orders = append(orders, getParamOrder(c, pf.Param)...)
+			orders = append(orders, getParamOrder(gh, pf.Param)...)
 		}
 	}
 	return orders
