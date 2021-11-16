@@ -20,10 +20,17 @@
 
 package graph
 
-// Iterator TODO
+// Iterator represents a simple interface for representation
+// of a directed graph.
+// It is assumed that each node in the graph is uniquely
+// identified with an incremental integer (i.e. 0, 1, 2...).
 type Iterator interface {
+	// Order returns the total number of nodes in the graph
 	Order() int
 
+	// Visit executes a given function on all of the neighbors
+	// of the given node u. If the function returns false,
+	// it stops iterating and returns immediately.
 	Visit(u int, do func(v int) bool)
 }
 
@@ -67,6 +74,7 @@ func IsAcyclic(g Iterator) (bool, []int) {
 		return true, nil
 	}
 
+	// Cycle is reverse-order.
 	cycle := []int{cycleStart}
 	curr = cycleStart
 	for {

@@ -634,18 +634,6 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
-func (c *Container) verifyAcyclic() error {
-	visited := make(map[key]struct{})
-	for _, n := range c.nodes {
-		if err := detectCycles(n, c, nil /* path */, visited); err != nil {
-			return errf("cycle detected in dependency graph", err)
-		}
-	}
-
-	c.isVerifiedAcyclic = true
-	return nil
-}
-
 func (gh *graphHolder) Order() int {
 	return len(gh.allNodes)
 }
