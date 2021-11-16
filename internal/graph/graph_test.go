@@ -44,66 +44,118 @@ func (g TestGraph) EdgesFrom(u int) []int {
 	return g.Nodes[u]
 }
 
-// TODO (sungyoon): Refactor these into table tests.
-func TestGraphIsAcyclic1(t *testing.T) {
-	g := newTestGraph()
-	g.Nodes[0] = []int{1, 2}
-	g.Nodes[1] = []int{2}
-	g.Nodes[2] = nil
-	ok, _ := IsAcyclic(g)
-	assert.True(t, ok)
+func TestGraphIsAcyclic(t *testing.T) {
+	testCases := []struct {
+		edges [][]int
+	}{
+		//
+		// 0
+		//
+		{
+			edges: [][]int{
+				nil,
+			},
+		},
+		//
+		// 0 --> 1 --> 2
+		{
+			edges: [][]int{
+				{1},
+				{2},
+				nil,
+			},
+		},
+		//
+		// 0 ---> 1 -------> 2
+		//  \           /
+		//    ----------
+		{
+			edges: [][]int{
+				{1, 2},
+				{2},
+				nil,
+			},
+		},
+		//  --------
+		// /        \
+		// 0 --> 1 --> 2    4 --> 5
+		//  \              /
+		//   ---> 3 -------
+		{
+			edges: [][]int{
+				{1, 2, 3},
+				{2},
+				nil,
+				{4},
+				{5},
+				nil,
+			},
+		},
+	}
+	for _, tt := range testCases {
+		g := newTestGraph()
+		for i, neighbors := range tt.edges {
+			g.Nodes[i] = neighbors
+		}
+		ok, _ := IsAcyclic(g)
+		assert.True(t, ok)
+	}
 }
 
-func TestGraphIsAcyclic2(t *testing.T) {
-	g := newTestGraph()
-	g.Nodes[0] = []int{1, 2, 3, 4, 5}
-	g.Nodes[1] = []int{2, 4, 5}
-	g.Nodes[2] = []int{3, 4, 5}
-	g.Nodes[3] = []int{4, 5}
-	g.Nodes[4] = []int{5}
-	g.Nodes[5] = nil
-	ok, _ := IsAcyclic(g)
-	assert.True(t, ok)
-}
-
-// TODO (sungyoon) maybe use randomly generated graph such that each iterator only has edges to numbers higher than its own degree?
-func TestGraphIsAcyclic3(t *testing.T) {
-	g := newTestGraph()
-	g.Nodes[0] = nil
-	g.Nodes[1] = nil
-	g.Nodes[2] = nil
-	ok, _ := IsAcyclic(g)
-	assert.True(t, ok)
-}
-
-func TestGraphIsCyclic1(t *testing.T) {
-	g := newTestGraph()
-	g.Nodes[0] = []int{1}
-	g.Nodes[1] = []int{2}
-	g.Nodes[2] = []int{3}
-	g.Nodes[3] = []int{0}
-	ok, cycle := IsAcyclic(g)
-	assert.False(t, ok)
-	assert.Contains(t, cycle, 0)
-	assert.Contains(t, cycle, 1)
-	assert.Contains(t, cycle, 2)
-	assert.Contains(t, cycle, 3)
-}
-
-func TestGraphIsCyclic2(t *testing.T) {
-	g := newTestGraph()
-	g.Nodes[0] = []int{1, 2, 3}
-	g.Nodes[1] = []int{0, 2, 3}
-	g.Nodes[2] = []int{0, 1, 3}
-	g.Nodes[3] = []int{0, 1, 2}
-	ok, _ := IsAcyclic(g)
-	assert.False(t, ok)
-}
-
-func TestGraphIsCyclic3(t *testing.T) {
-	g := newTestGraph()
-	g.Nodes[0] = []int{0}
-	ok, cycle := IsAcyclic(g)
-	assert.False(t, ok)
-	assert.Contains(t, cycle, 0)
+func TestGraphIsCyclic(t *testing.T) {
+	testCases := []struct {
+		edges [][]int
+		cycle []int
+	}{
+		//
+		// 0 ---> 1 ---> 2
+		// ^             |
+		// |-------------|
+		{
+			edges: [][]int{
+				{1},
+				{2},
+				{3},
+				{0},
+			},
+			cycle: []int{0, 1, 2, 3},
+		},
+		//
+		// 0 ---> 1 ---> 2
+		//        ^      |
+		//        |------|
+		{
+			edges: [][]int{
+				{1},
+				{2},
+				{1},
+			},
+			cycle: []int{1, 2},
+		},
+		//
+		// 0 ---> 1 ---> 2 ----> 3
+		// |      ^      |       ^
+		// |      |------|       |
+		// -----------------------
+		{
+			edges: [][]int{
+				{1, 3},
+				{2},
+				{1, 3},
+				nil,
+			},
+			cycle: []int{1, 2},
+		},
+	}
+	for _, tt := range testCases {
+		g := newTestGraph()
+		for i, neighbors := range tt.edges {
+			g.Nodes[i] = neighbors
+		}
+		ok, c := IsAcyclic(g)
+		assert.False(t, ok)
+		for _, node := range tt.cycle {
+			assert.Contains(t, c, node)
+		}
+	}
 }
