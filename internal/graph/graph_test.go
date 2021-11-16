@@ -26,34 +26,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type Graph struct {
+type TestGraph struct {
 	Nodes map[int][]int
 }
 
-func newGraph() *Graph {
-	return &Graph{
+func newTestGraph() *TestGraph {
+	return &TestGraph{
 		Nodes: make(map[int][]int),
 	}
 }
 
-func (g Graph) Order() int {
+func (g TestGraph) Order() int {
 	return len(g.Nodes)
 }
 
-func (g Graph) Visit(u int, do func(v int) bool) {
-	if _, ok := g.Nodes[u]; !ok {
-		return
-	}
-	for _, v := range g.Nodes[u] {
-		if ret := do(v); !ret {
-			return
-		}
-	}
+func (g TestGraph) EdgesFrom(u int) []int {
+	return g.Nodes[u]
 }
 
 // TODO (sungyoon): Refactor these into table tests.
 func TestGraphIsAcyclic1(t *testing.T) {
-	g := newGraph()
+	g := newTestGraph()
 	g.Nodes[0] = []int{1, 2}
 	g.Nodes[1] = []int{2}
 	g.Nodes[2] = nil
@@ -62,7 +55,7 @@ func TestGraphIsAcyclic1(t *testing.T) {
 }
 
 func TestGraphIsAcyclic2(t *testing.T) {
-	g := newGraph()
+	g := newTestGraph()
 	g.Nodes[0] = []int{1, 2, 3, 4, 5}
 	g.Nodes[1] = []int{2, 4, 5}
 	g.Nodes[2] = []int{3, 4, 5}
@@ -75,7 +68,7 @@ func TestGraphIsAcyclic2(t *testing.T) {
 
 // TODO (sungyoon) maybe use randomly generated graph such that each iterator only has edges to numbers higher than its own degree?
 func TestGraphIsAcyclic3(t *testing.T) {
-	g := newGraph()
+	g := newTestGraph()
 	g.Nodes[0] = nil
 	g.Nodes[1] = nil
 	g.Nodes[2] = nil
@@ -84,7 +77,7 @@ func TestGraphIsAcyclic3(t *testing.T) {
 }
 
 func TestGraphIsCyclic1(t *testing.T) {
-	g := newGraph()
+	g := newTestGraph()
 	g.Nodes[0] = []int{1}
 	g.Nodes[1] = []int{2}
 	g.Nodes[2] = []int{3}
@@ -98,7 +91,7 @@ func TestGraphIsCyclic1(t *testing.T) {
 }
 
 func TestGraphIsCyclic2(t *testing.T) {
-	g := newGraph()
+	g := newTestGraph()
 	g.Nodes[0] = []int{1, 2, 3}
 	g.Nodes[1] = []int{0, 2, 3}
 	g.Nodes[2] = []int{0, 1, 3}
@@ -108,7 +101,7 @@ func TestGraphIsCyclic2(t *testing.T) {
 }
 
 func TestGraphIsCyclic3(t *testing.T) {
-	g := newGraph()
+	g := newTestGraph()
 	g.Nodes[0] = []int{0}
 	ok, cycle := IsAcyclic(g)
 	assert.False(t, ok)

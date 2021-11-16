@@ -333,21 +333,23 @@ func (gh *graphHolder) Order() int {
 	return len(gh.allNodes)
 }
 
-func (gh *graphHolder) Visit(u int, do func(int) bool) {
+func (gh *graphHolder) EdgesFrom(u int) []int {
 	n := gh.allNodes[u]
+
+	var orders []int
 
 	switch w := n.Wrapped.(type) {
 	case *constructorNode:
-		w.Visit(gh, do)
+		for _, param := range w.paramList.Params {
+			orders = append(orders, getParamOrder(gh, param)...)
+		}
 	case *paramGroupedSlice:
 		providers := gh.c.getGroupProviders(w.Group, w.Type.Elem())
 		for _, provider := range providers {
-			v := gh.orders[key{t: provider.CType()}]
-			if cont := do(v); !cont {
-				return
-			}
+			orders = append(orders, gh.orders[key{t: provider.CType()}])
 		}
 	}
+	return orders
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -980,17 +982,6 @@ func (n *constructorNode) Call(c containerStore) error {
 	return nil
 }
 
-func (n *constructorNode) Visit(gh *graphHolder, do func(int) bool) {
-	for _, param := range n.paramList.Params {
-		orders := getParamOrder(gh, param)
-		for _, order := range orders {
-			if cont := do(order); !cont {
-				return
-			}
-		}
-	}
-}
-
 // Checks if a field of an In struct is optional.
 func isFieldOptional(f reflect.StructField) (bool, error) {
 	tag := f.Tag.Get(_optionalTag)
@@ -1026,29 +1017,43 @@ func isIgnoreUnexportedSet(f reflect.StructField) (bool, error) {
 	return allowed, err
 }
 
-// Checks that all direct dependencies of the provided param are present in
+// Checks that all direct dependencies of the provided parameters are present in
 // the container. Returns an error if not.
-func shallowCheckDependencies(c containerStore, p param) error {
+func shallowCheckDependencies(c containerStore, pl paramList) error {
 	var err errMissingTypes
 	var addMissingNodes []*dot.Param
-	walkParam(p, paramVisitorFunc(func(p param) bool {
-		ps, ok := p.(paramSingle)
-		if !ok {
-			return true
-		}
 
-		if ns := c.getValueProviders(ps.Name, ps.Type); len(ns) == 0 && !ps.Optional {
-			err = append(err, newErrMissingTypes(c, key{name: ps.Name, t: ps.Type})...)
-			addMissingNodes = append(addMissingNodes, ps.DotParam()...)
-		}
-
-		return true
-	}))
+	missingDeps := findMissingDependencies(c, pl.Params...)
+	for _, dep := range missingDeps {
+		err = append(err, newErrMissingTypes(c, key{name: dep.Name, t: dep.Type})...)
+		addMissingNodes = append(addMissingNodes, dep.DotParam()...)
+	}
 
 	if len(err) > 0 {
 		return err
 	}
 	return nil
+}
+
+func findMissingDependencies(c containerStore, params ...param) []paramSingle {
+	var missingDeps []paramSingle
+
+	for _, param := range params {
+		switch p := param.(type) {
+		case paramSingle:
+			if ns := c.getValueProviders(p.Name, p.Type); len(ns) == 0 && !p.Optional {
+				missingDeps = append(missingDeps, p)
+			}
+		case paramObject:
+			for _, f := range p.Fields {
+				missingDeps = append(missingDeps, findMissingDependencies(c, f.Param)...)
+
+			}
+		case paramList:
+			missingDeps = append(missingDeps, findMissingDependencies(c, p.Params...)...)
+		}
+	}
+	return missingDeps
 }
 
 // stagingContainerWriter is a containerWriter that records the changes that

@@ -20,63 +20,49 @@
 
 package graph
 
-// Iterator represents a simple interface for representation
+// Graph represents a simple interface for representation
 // of a directed graph.
 // It is assumed that each node in the graph is uniquely
 // identified with an incremental integer (i.e. 0, 1, 2...).
-type Iterator interface {
+type Graph interface {
 	// Order returns the total number of nodes in the graph
 	Order() int
 
-	// Visit executes a given function on all of the neighbors
-	// of the given node u. If the function returns false,
-	// it stops iterating and returns immediately.
-	Visit(u int, do func(v int) bool)
+	// EdgesFrom returns a list of integers that each
+	// represents a node that has an edge from node u.
+	EdgesFrom(u int) []int
 }
 
 // IsAcyclic uses depth-first search to find cycles
 // in a generic graph represented by Iterator interface.
 // If a cycle is found, it returns a list of nodes that
 // are in the cyclic path, identified by their orders.
-func IsAcyclic(g Iterator) (bool, []int) {
-	// special case
-	if g.Order() < 1 {
-		return true, nil
-	}
-
-	visited := make(map[int]bool)
-	start := 0
-	queue := []int{start}
-	backtrack := make(map[int]int)
-
+func IsAcyclic(g Graph) (bool, []int) {
 	var cycleStart int
-	var curr int
-	isAcyclic := true
+	var visited []bool
+	var onStack []bool
+	var backtrack map[int]int
+	acyclic := true
 
-	for len(queue) > 0 {
-		curr = queue[0]
-		queue = queue[1:]
+	for i := 0; i < g.Order(); i++ {
+		visited = make([]bool, g.Order())
+		onStack = make([]bool, g.Order())
+		backtrack = make(map[int]int, g.Order())
 
-		if visited[curr] {
-			isAcyclic = false
+		acyclic, cycleStart = isAcyclicHelper(g, i, visited, onStack, backtrack)
+		if !acyclic {
 			break
 		}
-
-		visited[curr] = true
-		g.Visit(curr, func(v int) bool {
-			backtrack[v] = curr
-			queue = append(queue, v)
-			// return false to do DFS, not BFS.
-			return false
-		})
 	}
-	if isAcyclic {
+
+	if acyclic {
 		return true, nil
 	}
 
+	// compute cycle path using backtrack
 	// Cycle is reverse-order.
 	cycle := []int{cycleStart}
-	curr = cycleStart
+	curr := cycleStart
 	for {
 		curr = backtrack[curr]
 		cycle = append([]int{curr}, cycle...)
@@ -85,4 +71,29 @@ func IsAcyclic(g Iterator) (bool, []int) {
 		}
 	}
 	return false, cycle
+}
+
+func isAcyclicHelper(
+	g Graph,
+	u int,
+	visited []bool,
+	onStack []bool,
+	backtrack map[int]int,
+) (bool, int) {
+	visited[u] = true
+	onStack[u] = true
+
+	for _, v := range g.EdgesFrom(u) {
+		if !visited[v] {
+			backtrack[v] = u
+			if ok, start := isAcyclicHelper(g, v, visited, onStack, backtrack); !ok {
+				return ok, start
+			}
+		} else if onStack[v] {
+			backtrack[v] = u
+			return false, v
+		}
+	}
+	onStack[u] = false
+	return true, -1
 }
