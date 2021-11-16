@@ -34,22 +34,18 @@ type Graph interface {
 }
 
 // IsAcyclic uses depth-first search to find cycles
-// in a generic graph represented by Iterator interface.
+// in a generic graph represented by Graph interface.
 // If a cycle is found, it returns a list of nodes that
 // are in the cyclic path, identified by their orders.
 func IsAcyclic(g Graph) (bool, []int) {
 	var cycleStart int
-	var visited []bool
-	var onStack []bool
-	var backtrack map[int]int
+	info := newCycleInfo(g.Order())
 	acyclic := true
 
 	for i := 0; i < g.Order(); i++ {
-		visited = make([]bool, g.Order())
-		onStack = make([]bool, g.Order())
-		backtrack = make(map[int]int, g.Order())
+		info.Reset()
 
-		acyclic, cycleStart = isAcyclicHelper(g, i, visited, onStack, backtrack)
+		acyclic, cycleStart = isAcyclicHelper(g, i, info)
 		if !acyclic {
 			break
 		}
@@ -64,7 +60,7 @@ func IsAcyclic(g Graph) (bool, []int) {
 	cycle := []int{cycleStart}
 	curr := cycleStart
 	for {
-		curr = backtrack[curr]
+		curr = info.backtrack[curr]
 		cycle = append([]int{curr}, cycle...)
 		if curr == cycleStart {
 			break
@@ -73,27 +69,44 @@ func IsAcyclic(g Graph) (bool, []int) {
 	return false, cycle
 }
 
-func isAcyclicHelper(
-	g Graph,
-	u int,
-	visited []bool,
-	onStack []bool,
-	backtrack map[int]int,
-) (bool, int) {
-	visited[u] = true
-	onStack[u] = true
+func isAcyclicHelper(g Graph, u int, info *cycleInfo) (bool, int) {
+	info.visited[u] = true
+	info.onStack[u] = true
 
 	for _, v := range g.EdgesFrom(u) {
-		if !visited[v] {
-			backtrack[v] = u
-			if ok, start := isAcyclicHelper(g, v, visited, onStack, backtrack); !ok {
+		if !info.visited[v] {
+			info.backtrack[v] = u
+			if ok, start := isAcyclicHelper(g, v, info); !ok {
 				return ok, start
 			}
-		} else if onStack[v] {
-			backtrack[v] = u
+		} else if info.onStack[v] {
+			info.backtrack[v] = u
 			return false, v
 		}
 	}
-	onStack[u] = false
+	info.onStack[u] = false
 	return true, -1
+}
+
+// cycleInfo contains helpful info for cycle detection.
+type cycleInfo struct {
+	// order is the number of nodes in the graph
+	order int
+
+	// records whether ith node has been visited.
+	visited []bool
+	// records whether ith node is currently on the recursion stack.
+	onStack []bool
+	// back-tracks each edge info to form cycle path if one is detected.
+	backtrack map[int]int
+}
+
+func newCycleInfo(order int) *cycleInfo {
+	return &cycleInfo{order: order}
+}
+
+func (i *cycleInfo) Reset() {
+	i.visited = make([]bool, i.order)
+	i.onStack = make([]bool, i.order)
+	i.backtrack = make(map[int]int, i.order)
 }
