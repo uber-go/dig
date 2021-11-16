@@ -171,7 +171,7 @@ func (c *Container) createGraph() *dot.Graph {
 	return dg
 }
 
-func newDotCtor(n *node) *dot.Ctor {
+func newDotCtor(n *constructorNode) *dot.Ctor {
 	return &dot.Ctor{
 		ID:      n.id,
 		Name:    n.location.Name,

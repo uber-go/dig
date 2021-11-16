@@ -291,11 +291,11 @@ type InvokeOption interface {
 
 // Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
-	// Mapping from key to all the nodes that can provide a value for that
+	// Mapping from key to all the constructor node that can provide a value for that
 	// key.
-	providers map[key][]*node
+	providers map[key][]*constructorNode
 
-	nodes []*node
+	nodes []*constructorNode
 
 	// Values that have already been generated in the container.
 	values map[key]reflect.Value
@@ -329,10 +329,25 @@ type graphHolder struct {
 	c *Container
 }
 
-type graphNodeKey struct {
-	// TODO (sungyoon): Decide if this is the best way to uniquely identify each node.
-	nodeType    string
-	nodePointer int64
+func (gh *graphHolder) Order() int {
+	return len(gh.allNodes)
+}
+
+func (gh *graphHolder) Visit(u int, do func(int) bool) {
+	n := gh.allNodes[u]
+
+	switch w := n.Wrapped.(type) {
+	case *constructorNode:
+		w.Visit(gh, do)
+	case *paramGroupedSlice:
+		providers := gh.c.getGroupProviders(w.Group, w.Type.Elem())
+		for _, provider := range providers {
+			v := gh.orders[key{t: provider.CType()}]
+			if cont := do(v); !cont {
+				return
+			}
+		}
+	}
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -346,6 +361,9 @@ type containerWriter interface {
 	// submitGroupedValue submits a value to the value group with the provided
 	// name.
 	submitGroupedValue(name string, t reflect.Type, v reflect.Value)
+
+	// Adds a new graph node to the Container.
+	newGraphNode(k key, w interface{})
 }
 
 // containerStore provides access to the Container's underlying data store.
@@ -375,8 +393,6 @@ type containerStore interface {
 
 	// Returns invokerFn function to use when calling arguments.
 	invoker() invokerFn
-
-	newGraphNode(k key, w interface{})
 }
 
 // provider encapsulates a user-provided constructor.
@@ -408,7 +424,7 @@ type provider interface {
 // New constructs a Container.
 func New(opts ...Option) *Container {
 	c := &Container{
-		providers: make(map[key][]*node),
+		providers: make(map[key][]*constructorNode),
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -634,38 +650,6 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
-func (gh *graphHolder) Order() int {
-	return len(gh.allNodes)
-}
-
-func (gh *graphHolder) Visit(u int, do func(int) bool) {
-	n := gh.allNodes[u]
-
-	switch w := n.Wrapped.(type) {
-	case *node:
-		w.Visit(gh, do)
-	case *paramGroupedSlice:
-		providers := gh.c.getGroupProviders(w.Group, w.Type.Elem())
-		for _, provider := range providers {
-			v := gh.orders[key{t: provider.CType()}]
-			if ok := do(v); !ok {
-				return
-			}
-		}
-	}
-}
-
-func (n *node) Visit(gh *graphHolder, do func(int) bool) {
-	for _, param := range n.paramList.Params {
-		orders := getParamOrder(gh, param)
-		for _, order := range orders {
-			if ok := do(order); !ok {
-				return
-			}
-		}
-	}
-}
-
 func (c *Container) newGraphNode(k key, wrapped interface{}) {
 	order := len(c.gh.allNodes)
 	c.gh.allNodes = append(c.gh.allNodes, &graphNode{
@@ -678,7 +662,7 @@ func (c *Container) newGraphNode(k key, wrapped interface{}) {
 func (c *Container) cycleDetectedError(cycle []int) error {
 	var path []cycleEntry
 	for _, n := range cycle {
-		if n, ok := c.gh.allNodes[n].Wrapped.(*node); ok {
+		if n, ok := c.gh.allNodes[n].Wrapped.(*constructorNode); ok {
 			path = append(path, cycleEntry{
 				Key: key{
 					t: n.CType(),
@@ -691,10 +675,10 @@ func (c *Container) cycleDetectedError(cycle []int) error {
 }
 
 func (c *Container) provide(ctor interface{}, opts provideOptions) error {
-	n, err := newNode(
+	n, err := newConstructorNode(
 		ctor,
 		c,
-		nodeOptions{
+		constructorOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
 			ResultAs:    opts.As,
@@ -718,14 +702,15 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	for k := range keys {
 		c.providers[k] = append(c.providers[k], n)
 	}
-	c.nodes = append(c.nodes, n)
 
+	c.isVerifiedAcyclic = false
 	if !c.deferAcyclicVerification {
 		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
 			return errf("this function introduces a cycle", c.cycleDetectedError(cycle))
 		}
 		c.isVerifiedAcyclic = true
 	}
+	c.nodes = append(c.nodes, n)
 
 	// Record introspection info for caller if Info option is specified
 	if info := opts.Info; info != nil {
@@ -756,8 +741,8 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	return nil
 }
 
-// Builds a collection of all result types produced by this node.
-func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
+// Builds a collection of all result types produced by this constructor.
+func (c *Container) findAndValidateResults(n *constructorNode) (map[key]struct{}, error) {
 	var err error
 	keyPaths := make(map[key]string)
 	walkResult(n.ResultList(), connectionVisitor{
@@ -782,7 +767,7 @@ func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 // produced by that node.
 type connectionVisitor struct {
 	c *Container
-	n *node
+	n *constructorNode
 
 	// If this points to a non-nil value, we've already encountered an error
 	// and should stop traversing.
@@ -880,13 +865,13 @@ func (cv connectionVisitor) checkKey(k key, path string) error {
 	return nil
 }
 
-// node is a node in the dependency graph. Each node maps to a single
-// constructor provided by the user.
+// constructorNode is a node in the dependency graph that represents
+// a constructor provided by the user.
 //
-// Nodes can produce zero or more values that they store into the container.
-// For the Provide path, we verify that nodes produce at least one value,
+// constructorNodes can produce zero or more values that they store into the container.
+// For the Provide path, we verify that constructorNodes produce at least one value,
 // otherwise the function will never be called.
-type node struct {
+type constructorNode struct {
 	ctor  interface{}
 	ctype reflect.Type
 
@@ -904,12 +889,10 @@ type node struct {
 
 	// Type information about constructor results.
 	resultList resultList
-
-	order int
 }
 
-type nodeOptions struct {
-	// If specified, all values produced by this node have the provided name
+type constructorOptions struct {
+	// If specified, all values produced by this constructor have the provided name
 	// belong to the specified value group or implement any of the interfaces.
 	ResultName  string
 	ResultGroup string
@@ -917,7 +900,7 @@ type nodeOptions struct {
 	Location    *digreflect.Func
 }
 
-func newNode(ctor interface{}, c containerStore, opts nodeOptions) (*node, error) {
+func newConstructorNode(ctor interface{}, c containerStore, opts constructorOptions) (*constructorNode, error) {
 	cval := reflect.ValueOf(ctor)
 	ctype := cval.Type()
 	cptr := cval.Pointer()
@@ -944,7 +927,7 @@ func newNode(ctor interface{}, c containerStore, opts nodeOptions) (*node, error
 		location = digreflect.InspectFunc(ctor)
 	}
 
-	n := &node{
+	n := &constructorNode{
 		ctor:       ctor,
 		ctype:      ctype,
 		location:   location,
@@ -958,15 +941,15 @@ func newNode(ctor interface{}, c containerStore, opts nodeOptions) (*node, error
 	return n, nil
 }
 
-func (n *node) Location() *digreflect.Func { return n.location }
-func (n *node) ParamList() paramList       { return n.paramList }
-func (n *node) ResultList() resultList     { return n.resultList }
-func (n *node) ID() dot.CtorID             { return n.id }
-func (n *node) CType() reflect.Type        { return n.ctype }
+func (n *constructorNode) Location() *digreflect.Func { return n.location }
+func (n *constructorNode) ParamList() paramList       { return n.paramList }
+func (n *constructorNode) ResultList() resultList     { return n.resultList }
+func (n *constructorNode) ID() dot.CtorID             { return n.id }
+func (n *constructorNode) CType() reflect.Type        { return n.ctype }
 
-// Call calls this node's constructor if it hasn't already been called and
+// Call calls this constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
-func (n *node) Call(c containerStore) error {
+func (n *constructorNode) Call(c containerStore) error {
 	if n.called {
 		return nil
 	}
@@ -995,6 +978,17 @@ func (n *node) Call(c containerStore) error {
 	n.called = true
 
 	return nil
+}
+
+func (n *constructorNode) Visit(gh *graphHolder, do func(int) bool) {
+	for _, param := range n.paramList.Params {
+		orders := getParamOrder(gh, param)
+		for _, order := range orders {
+			if cont := do(order); !cont {
+				return
+			}
+		}
+	}
 }
 
 // Checks if a field of an In struct is optional.
@@ -1060,8 +1054,10 @@ func shallowCheckDependencies(c containerStore, p param) error {
 // stagingContainerWriter is a containerWriter that records the changes that
 // would be made to a containerWriter and defers them until Commit is called.
 type stagingContainerWriter struct {
-	values map[key]reflect.Value
-	groups map[key][]reflect.Value
+	values          map[key]reflect.Value
+	groups          map[key][]reflect.Value
+	graphNodeKeys   []key
+	graphNodeValues []interface{}
 }
 
 var _ containerWriter = (*stagingContainerWriter)(nil)
@@ -1082,6 +1078,11 @@ func (sr *stagingContainerWriter) submitGroupedValue(group string, t reflect.Typ
 	sr.groups[k] = append(sr.groups[k], v)
 }
 
+func (sr *stagingContainerWriter) newGraphNode(k key, w interface{}) {
+	sr.graphNodeKeys = append(sr.graphNodeKeys, k)
+	sr.graphNodeValues = append(sr.graphNodeValues, w)
+}
+
 // Commit commits the received results to the provided containerWriter.
 func (sr *stagingContainerWriter) Commit(cw containerWriter) {
 	for k, v := range sr.values {
@@ -1092,6 +1093,10 @@ func (sr *stagingContainerWriter) Commit(cw containerWriter) {
 		for _, v := range vs {
 			cw.submitGroupedValue(k.group, k.t, v)
 		}
+	}
+
+	for i := 0; i < len(sr.graphNodeKeys); i++ {
+		cw.newGraphNode(sr.graphNodeKeys[i], sr.graphNodeValues[i])
 	}
 }
 
