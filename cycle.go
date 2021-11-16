@@ -39,10 +39,10 @@ type errCycleDetected struct {
 func (e errCycleDetected) Error() string {
 	// We get something like,
 	//
-	//   foo provided by "path/to/package".NewFoo (path/to/file.go:42)
-	//   	depends on bar provided by "another/package".NewBar (somefile.go:1)
-	//   	depends on baz provided by "somepackage".NewBar (anotherfile.go:2)
-	//   	depends on foo provided by "path/to/package".NewFoo (path/to/file.go:42)
+	//   func(*bar) *foo provided by "path/to/package".NewFoo (path/to/file.go:42)
+	//   	depends on func(*baz) *bar provided by "another/package".NewBar (somefile.go:1)
+	//   	depends on func(*foo) baz provided by "somepackage".NewBar (anotherfile.go:2)
+	//   	depends on func(*bar) *foo provided by "path/to/package".NewFoo (path/to/file.go:42)
 	//
 	b := new(bytes.Buffer)
 

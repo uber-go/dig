@@ -638,7 +638,6 @@ func (gh *graphHolder) Order() int {
 	return len(gh.allNodes)
 }
 
-// Visit ...
 func (gh *graphHolder) Visit(u int, do func(int) bool) {
 	n := gh.allNodes[u]
 
