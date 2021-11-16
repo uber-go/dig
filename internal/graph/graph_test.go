@@ -45,7 +45,7 @@ func (g Graph) Visit(u int, do func(v int) bool) {
 		return
 	}
 	for _, v := range g.Nodes[u] {
-		if ret := do(v); ret {
+		if ret := do(v); !ret {
 			return
 		}
 	}
@@ -57,7 +57,9 @@ func TestGraphIsAcyclic1(t *testing.T) {
 	g.Nodes[0] = []int{1, 2}
 	g.Nodes[1] = []int{2}
 	g.Nodes[2] = nil
-	assert.True(t, IsAcyclic(g))
+	ok, cycle := IsAcyclic(g)
+	assert.True(t, ok)
+	assert.Equal(t, nil, cycle)
 }
 
 func TestGraphIsAcyclic2(t *testing.T) {
@@ -68,7 +70,8 @@ func TestGraphIsAcyclic2(t *testing.T) {
 	g.Nodes[3] = []int{4, 5}
 	g.Nodes[4] = []int{5}
 	g.Nodes[5] = nil
-	assert.True(t, IsAcyclic(g))
+	ok, _ := IsAcyclic(g)
+	assert.True(t, ok)
 }
 
 // TODO (sungyoon) maybe use randomly generated graph such that each iterator only has edges to numbers higher than its own degree?
@@ -77,7 +80,8 @@ func TestGraphIsAcyclic3(t *testing.T) {
 	g.Nodes[0] = nil
 	g.Nodes[1] = nil
 	g.Nodes[2] = nil
-	assert.True(t, IsAcyclic(g))
+	ok, _ := IsAcyclic(g)
+	assert.True(t, ok)
 }
 
 func TestGraphIsCyclic1(t *testing.T) {
@@ -86,7 +90,12 @@ func TestGraphIsCyclic1(t *testing.T) {
 	g.Nodes[1] = []int{2}
 	g.Nodes[2] = []int{3}
 	g.Nodes[3] = []int{0}
-	assert.False(t, IsAcyclic(g))
+	ok, cycle := IsAcyclic(g)
+	assert.False(t, ok)
+	assert.Contains(t, cycle, 0)
+	assert.Contains(t, cycle, 1)
+	assert.Contains(t, cycle, 2)
+	assert.Contains(t, cycle, 3)
 }
 
 func TestGraphIsCyclic2(t *testing.T) {
@@ -95,11 +104,14 @@ func TestGraphIsCyclic2(t *testing.T) {
 	g.Nodes[1] = []int{0, 2, 3}
 	g.Nodes[2] = []int{0, 1, 3}
 	g.Nodes[3] = []int{0, 1, 2}
-	assert.False(t, IsAcyclic(g))
+	ok, _ := IsAcyclic(g)
+	assert.False(t, ok)
 }
 
 func TestGraphIsCyclic3(t *testing.T) {
 	g := newGraph()
 	g.Nodes[0] = []int{0}
-	assert.False(t, IsAcyclic(g))
+	ok, cycle := IsAcyclic(g)
+	assert.False(t, ok)
+	assert.Contains(t, cycle, 0)
 }

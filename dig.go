@@ -675,6 +675,21 @@ func (c *Container) newGraphNode(k key, wrapped interface{}) {
 	c.orders[k] = order
 }
 
+func (c *Container) cycleDetectedError(cycle []int) error {
+	var path []cycleEntry
+	for _, n := range cycle {
+		if n, ok := c.allNodes[n].Wrapped.(*node); ok {
+			path = append(path, cycleEntry{
+				Key: key{
+					t: n.CType(),
+				},
+				Func: n.Location(),
+			})
+		}
+	}
+	return errCycleDetected{Path: path}
+}
+
 func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	n, err := newNode(
 		ctor,
@@ -706,8 +721,8 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	c.nodes = append(c.nodes, n)
 
 	if !c.deferAcyclicVerification {
-		if !graph.IsAcyclic(c) {
-			return errf("this node introduces a cycle.")
+		if ok, cycle := graph.IsAcyclic(c); !ok {
+			return errf("this function introduces a cycle", c.cycleDetectedError(cycle))
 		}
 		c.isVerifiedAcyclic = true
 	}

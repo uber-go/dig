@@ -27,8 +27,56 @@ type Iterator interface {
 	Visit(u int, do func(v int) bool)
 }
 
-// IsAcyclic TODO
-func IsAcyclic(g Iterator) bool {
+// IsAcyclic ...
+func IsAcyclic(g Iterator) (bool, []int) {
+	visited := make(map[int]bool)
+	start := 0
+	queue := []int{start}
+	backtrack := make(map[int]int)
+
+	var cycleStart int
+	var curr int
+	isAcyclic := true
+
+	for len(queue) > 0 {
+		curr = queue[0]
+		queue = queue[1:]
+
+		if visited[curr] {
+			isAcyclic = false
+			break
+		}
+
+		visited[curr] = true
+		g.Visit(curr, func(v int) bool {
+			backtrack[v] = curr
+			queue = append(queue, v)
+			// return false to do DFS, not BFS.
+			return false
+		})
+	}
+	if isAcyclic {
+		return true, nil
+	}
+
+	cycle := []int{cycleStart}
+	curr = cycleStart
+	for {
+		curr = backtrack[curr]
+		cycle = append([]int{curr}, cycle...)
+		if curr == cycleStart {
+			break
+		}
+	}
+	return false, cycle
+}
+
+// IsAcyclic2 verifies whether the given directed graph is acyclic using
+// topological sort based on Kahn's algorithm (ref: Topological sorting
+// of large networks: https://dl.acm.org/doi/abs/10.1145/368996.369025)
+// If the graph is not acyclic, it returns a list of ints that identifies
+// a cycle in the graph.
+func IsAcyclic2(g Iterator) (bool, []int) {
 	// use topological sort to check if DAG is acyclic.
 	degrees := make([]int, g.Order())
 	var q []int
@@ -61,5 +109,51 @@ func IsAcyclic(g Iterator) bool {
 			return false
 		})
 	}
-	return vertexCount == g.Order()
+
+	if vertexCount == g.Order() {
+		return true, nil
+	}
+
+	// If the graph contains a cycle, we can get the precise
+	// cycle by examining each node's degree (nodes whose
+	// degree is not 0 is part of the cycle).
+	maxDegree := -1
+	start := -1
+	for u, degree := range degrees {
+		if degree != 0 && degree > maxDegree {
+			start = u
+			maxDegree = degree
+		}
+	}
+
+	// DFS to find cycle path from remaining cycles.
+	curr := start
+	backtrack := make(map[int]int)
+	visited := make(map[int]bool)
+	queue := []int{curr}
+
+	for len(queue) > 0 {
+		curr = queue[0]
+		queue = queue[1:]
+
+		g.Visit(curr, func(v int) bool {
+			visited[curr] = true
+			backtrack[v] = curr
+			if !visited[v] {
+				queue = append(queue, v)
+			}
+			return false
+		})
+	}
+
+	var cycle []int
+	for {
+		cycle = append(cycle, curr)
+		curr = backtrack[curr]
+		if curr == start {
+			cycle = append(cycle, curr)
+			break
+		}
+	}
+	return false, cycle
 }
