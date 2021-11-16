@@ -29,6 +29,11 @@ type Iterator interface {
 
 // IsAcyclic ...
 func IsAcyclic(g Iterator) (bool, []int) {
+	// special case
+	if g.Order() < 1 {
+		return true, nil
+	}
+
 	visited := make(map[int]bool)
 	start := 0
 	queue := []int{start}

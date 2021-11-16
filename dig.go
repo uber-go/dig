@@ -609,8 +609,8 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	}
 
 	if !c.isVerifiedAcyclic {
-		if err := c.verifyAcyclic(); err != nil {
-			return err
+		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
+			return errf("cycle detected in dependency graph", c.cycleDetectedError(cycle))
 		}
 	}
 
