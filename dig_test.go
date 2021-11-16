@@ -1887,10 +1887,10 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			`cannot provide function "go.uber.org/dig".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`this function introduces a cycle:`,
-			`\*dig.C provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
-			`depends on \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
+			`depends on func\(\*dig.B\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 
@@ -1934,10 +1934,10 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			`cannot provide function "go.uber.org/dig".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`this function introduces a cycle:`,
-			`\S+ dig.C provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
-			`depends on \S+ dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \S+ dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \S+ dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(dig.AParams\) dig.A provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
+			`depends on func\(dig.CParams\) dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(dig.BParams\) dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(dig.AParams\) dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 
@@ -2005,10 +2005,10 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			`cannot provide function "go.uber.org/dig".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`this function introduces a cycle:`,
-			`\S+ \*dig.D provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
-			`depends on int\[group="bar"\] provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on string\[group="foo"\] provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.D provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig.D\) dig.outB provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
+			`depends on func\(dig.inD\) \*dig.D provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(dig.inC\) dig.outC provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.D\) dig.outB provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 
@@ -2036,10 +2036,10 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		assert.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
 			`cycle detected in dependency graph:`,
-			`\*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.B\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 }
