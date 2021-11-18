@@ -48,15 +48,12 @@ func TestGraphIsAcyclic(t *testing.T) {
 	testCases := []struct {
 		edges [][]int
 	}{
-		//
 		// 0
-		//
 		{
 			edges: [][]int{
 				nil,
 			},
 		},
-		//
 		// 0 --> 1 --> 2
 		{
 			edges: [][]int{
@@ -65,10 +62,9 @@ func TestGraphIsAcyclic(t *testing.T) {
 				nil,
 			},
 		},
-		//
 		// 0 ---> 1 -------> 2
-		//  \           /
-		//    ----------
+		// |                 ^
+		// ------------------|
 		{
 			edges: [][]int{
 				{1, 2},
@@ -76,11 +72,10 @@ func TestGraphIsAcyclic(t *testing.T) {
 				nil,
 			},
 		},
-		//  --------
-		// /        \
 		// 0 --> 1 --> 2    4 --> 5
-		//  \              /
-		//   ---> 3 -------
+		// |     ^          ^
+		// |-----|          |
+		// ---------> 3 -----
 		{
 			edges: [][]int{
 				{1, 2, 3},

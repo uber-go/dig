@@ -294,14 +294,6 @@ func (po paramObject) Build(c containerStore) (reflect.Value, error) {
 	return dest, nil
 }
 
-func (po paramObject) Visit(do func(v int) bool) {
-	for _, order := range po.FieldOrders {
-		if ok := do(order); ok {
-			return
-		}
-	}
-}
-
 // paramObjectField is a single field of a dig.In struct.
 type paramObjectField struct {
 	// Name of the field in the struct.

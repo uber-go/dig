@@ -318,6 +318,11 @@ type Container struct {
 	gh *graphHolder
 }
 
+// graphHolder represents the dependency graph for a Container. Specifically,
+// it saves constructorNodes and paramGroupedSlices (value groups) as graphNodes
+// and implements the Graph interface defined in internal/graph to run graph
+// algorithms on it. It has a 1-to-1 correspondence with a Container whose graph
+// it represents.
 type graphHolder struct {
 	// all the nodes defined in the graph.
 	allNodes []*graphNode
