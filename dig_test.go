@@ -2013,6 +2013,37 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 	})
 
 	t.Run("DeferAcyclicVerification bypasses cycle check, VerifyAcyclic catches cycle", func(t *testing.T) {
+		// A <- B <- C <- D
+		// |         ^
+		// |_________|
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		type D struct{}
+		newA := func(*C) *A { return &A{} }
+		newB := func(*A) *B { return &B{} }
+		newC := func(*B) *C { return &C{} }
+		newD := func(*C) *D { return &D{} }
+
+		c := New(DeferAcyclicVerification())
+		assert.NoError(t, c.Provide(newA))
+		assert.NoError(t, c.Provide(newB))
+		assert.NoError(t, c.Provide(newC))
+		assert.NoError(t, c.Provide(newD))
+
+		err := c.Invoke(func(*A) {})
+		require.Error(t, err, "expected error when introducing cycle")
+		assert.True(t, IsCycleDetected(err))
+		assertErrorMatches(t, err,
+			`cycle detected in dependency graph:`,
+			`func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.B\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+		)
+	})
+
+	t.Run("DeferAcyclicVerification eventually catches cycle with self-cycle", func(t *testing.T) {
 		// The offending node `C` is now *not* the first on the dependency `path`
 		// of `detectCycles()` (`D` is: we first call `detectCycles()` for the
 		// inovked `A` with the initial path set to nil, the following call for
@@ -2038,10 +2069,8 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		assert.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
 			`cycle detected in dependency graph:`,
-			`func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.B\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig.C\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.C\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 }
