@@ -68,18 +68,12 @@ func assertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
 		}
 	}
 
-	defaultMsg := err.Error()
-	assert.NoError(t, runFinders(defaultMsg, finders),
-		"error message with %v does not match")
+	t.Run("single line", func(t *testing.T) {
+		original := err.Error()
+		assert.NoError(t, runFinders(original, finders))
+	})
 
-	richMsg := fmt.Sprintf("%+v", err)
-	if richMsg == defaultMsg {
-		return
-	}
-
-	// If the %+v form is different, it's a multi-line message.
-	// Intersperse "\n" finders between each finder to ensure these
-	// newlines exist.
+	// Intersperse "\n" finders between each message for the "%+v" check.
 	plusFinders := make([]consumingFinder, 0, len(finders)*2-1)
 	for i, f := range finders {
 		if i > 0 {
@@ -88,8 +82,10 @@ func assertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
 		plusFinders = append(plusFinders, f)
 	}
 
-	assert.NoError(t, runFinders(richMsg, plusFinders),
-		"error message with %+v does not match")
+	t.Run("multi line", func(t *testing.T) {
+		original := fmt.Sprintf("%+v", err)
+		assert.NoError(t, runFinders(original, plusFinders))
+	})
 }
 
 // consumingFinder matches a string and returns the rest of the string *after*

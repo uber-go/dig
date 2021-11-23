@@ -38,54 +38,70 @@ type Graph interface {
 // If a cycle is found, it returns a list of nodes that
 // are in the cyclic path, identified by their orders.
 func IsAcyclic(g Graph) (bool, []int) {
-	var cycleStart int
+	// cycleStart is a node that introduces a cycle in
+	// the graph. Values in the range [0, g.Order()] mean
+	// that there exists a cycle in g.
+	cycleStart := -1
 	info := newCycleInfo(g.Order())
-	acyclic := true
 
 	for i := 0; i < g.Order(); i++ {
 		info.Reset()
 
-		acyclic, cycleStart = isAcyclicHelper(g, i, info)
-		if !acyclic {
+		cycleStart = isAcyclic(g, i, info)
+		if cycleStart >= 0 {
 			break
 		}
 	}
 
-	if acyclic {
+	if cycleStart < 0 {
 		return true, nil
 	}
 
 	// compute cycle path using backtrack
-	// Cycle is reverse-order.
 	cycle := []int{cycleStart}
 	curr := cycleStart
 	for {
 		curr = info.backtrack[curr]
-		cycle = append([]int{curr}, cycle...)
+		cycle = append(cycle, curr)
 		if curr == cycleStart {
 			break
 		}
 	}
+
+	// cycle is reverse-order.
+	i, j := 0, len(cycle)-1
+	for i < j {
+		cycle[i], cycle[j] = cycle[j], cycle[i]
+		i++
+		j--
+	}
 	return false, cycle
 }
 
-func isAcyclicHelper(g Graph, u int, info *cycleInfo) (bool, int) {
+// isAcyclic traverses the given graph starting from a specific node
+// using depth-first search using recursion. If a cycle is detected,
+// it returns the node that contains the "last" edge that introduces
+// a cycle.
+// For example, running isAcyclic starting from 1 on the following
+// graph will return 3.
+// 	1 -> 2 -> 3 -> 1
+func isAcyclic(g Graph, u int, info *cycleInfo) int {
 	info.visited[u] = true
 	info.onStack[u] = true
 
 	for _, v := range g.EdgesFrom(u) {
 		if !info.visited[v] {
 			info.backtrack[v] = u
-			if ok, start := isAcyclicHelper(g, v, info); !ok {
-				return ok, start
+			if start := isAcyclic(g, v, info); start >= 0 {
+				return start
 			}
 		} else if info.onStack[v] {
 			info.backtrack[v] = u
-			return false, v
+			return v
 		}
 	}
 	info.onStack[u] = false
-	return true, -1
+	return -1
 }
 
 // cycleInfo contains helpful info for cycle detection.
