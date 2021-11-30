@@ -318,45 +318,6 @@ type Container struct {
 	gh *graphHolder
 }
 
-// graphHolder represents the dependency graph for a Container. Specifically,
-// it saves constructorNodes and paramGroupedSlices (value groups) as graphNodes
-// and implements the Graph interface defined in internal/graph to run graph
-// algorithms on it. It has a 1-to-1 correspondence with a Container whose graph
-// it represents.
-type graphHolder struct {
-	// all the nodes defined in the graph.
-	allNodes []*graphNode
-
-	// Maps each graphNode to its order.
-	orders map[key]int
-
-	// Container whose graph this holder contains.
-	c *Container
-}
-
-func (gh *graphHolder) Order() int {
-	return len(gh.allNodes)
-}
-
-func (gh *graphHolder) EdgesFrom(u int) []int {
-	n := gh.allNodes[u]
-
-	var orders []int
-
-	switch w := n.Wrapped.(type) {
-	case *constructorNode:
-		for _, param := range w.paramList.Params {
-			orders = append(orders, getParamOrder(gh, param)...)
-		}
-	case *paramGroupedSlice:
-		providers := gh.c.getGroupProviders(w.Group, w.Type.Elem())
-		for _, provider := range providers {
-			orders = append(orders, gh.orders[key{t: provider.CType()}])
-		}
-	}
-	return orders
-}
-
 // containerWriter provides write access to the Container's underlying data
 // store.
 type containerWriter interface {
@@ -438,12 +399,10 @@ func New(opts ...Option) *Container {
 		invokerFn: defaultInvoker,
 	}
 
-	gh := &graphHolder{
+	c.gh = &graphHolder{
 		orders: make(map[key]int),
 		c:      c,
 	}
-
-	c.gh = gh
 
 	for _, opt := range opts {
 		opt.applyOption(c)
@@ -1054,8 +1013,6 @@ func findMissingDependencies(c containerStore, params ...param) []paramSingle {
 				missingDeps = append(missingDeps, findMissingDependencies(c, f.Param)...)
 
 			}
-		case paramList:
-			missingDeps = append(missingDeps, findMissingDependencies(c, p.Params...)...)
 		}
 	}
 	return missingDeps
@@ -1130,9 +1087,4 @@ func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
 		newItems[i] = items[j]
 	}
 	return newItems
-}
-
-type graphNode struct {
-	Order   int
-	Wrapped interface{}
 }
