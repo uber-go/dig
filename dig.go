@@ -639,6 +639,10 @@ func (c *Container) cycleDetectedError(cycle []int) error {
 }
 
 func (c *Container) provide(ctor interface{}, opts provideOptions) error {
+	// take a snapshot of the current graph state before
+	// we start making changes to it as we may need to
+	// undo them upon encountering errors.
+	c.gh.Snapshot()
 	n, err := newConstructorNode(
 		ctor,
 		c,
@@ -650,27 +654,44 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		},
 	)
 	if err != nil {
+		c.gh.Rollback()
 		return err
 	}
 
 	keys, err := c.findAndValidateResults(n)
 	if err != nil {
+		c.gh.Rollback()
 		return err
 	}
 
 	ctype := reflect.TypeOf(ctor)
 	if len(keys) == 0 {
+		c.gh.Rollback()
 		return errf("%v must provide at least one non-error type", ctype)
 	}
 
+	oldProviders := make(map[key][]*constructorNode)
 	for k := range keys {
+		// Cache old providers before running cycle detection.
+		oldProviders[k] = c.providers[k]
 		c.providers[k] = append(c.providers[k], n)
 	}
 
 	c.isVerifiedAcyclic = false
 	if !c.deferAcyclicVerification {
 		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
-			return errf("this function introduces a cycle", c.cycleDetectedError(cycle))
+			// When a cycle is detected, recover the old providers to reset
+			// the providers map back to what it was before this node was
+			// introduced.
+			for k, ops := range oldProviders {
+				c.providers[k] = ops
+			}
+
+			// form the error message first before rolling back.
+			err := errf("this function introduces a cycle", c.cycleDetectedError(cycle))
+			// Rollback the graph state to snapshotted state.
+			c.gh.Rollback()
+			return err
 		}
 		c.isVerifiedAcyclic = true
 	}

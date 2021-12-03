@@ -41,6 +41,11 @@ type graphHolder struct {
 
 	// Container whose graph this holder contains.
 	c *Container
+
+	// Used for snapshots and rollbacks.
+	snapshot      bool
+	ssNodesLength int
+	ssOrders      map[key]int
 }
 
 func newGraphHolder(c *Container) *graphHolder {
@@ -88,4 +93,37 @@ func (gh *graphHolder) EdgesFrom(u int) []int {
 		}
 	}
 	return orders
+}
+
+// Snapshot is a helper used for taking a temporary snapshot of the current state
+// of the graph. Rollback() can be called subsequently to roll back the graph to
+// the snapshotted state. Only one snapshot can exist per graph, so calling Snapshot
+// many times overwrites the previous snapshotted state.
+func (gh *graphHolder) Snapshot() {
+	gh.snapshot = true
+	gh.ssNodesLength = len(gh.allNodes)
+	gh.ssOrders = make(map[key]int, len(gh.orders))
+	for key, order := range gh.orders {
+		gh.ssOrders[key] = order
+	}
+}
+
+// Rollback is a method used for rolling back the state of the current graphHolder
+// back to a snapshotted state, if one exists. It is a no-op if there is no snapshot.
+func (gh *graphHolder) Rollback() {
+	if !gh.snapshot {
+		return
+	}
+	gh.snapshot = false
+	// recover allNodes
+	rollbackNodes := make([]*graphNode, gh.ssNodesLength)
+	for i := 0; i < gh.ssNodesLength; i++ {
+		rollbackNodes[i] = gh.allNodes[i]
+	}
+	gh.allNodes = rollbackNodes
+	// recover orders
+	gh.orders = make(map[key]int, len(gh.ssOrders))
+	for key, order := range gh.ssOrders {
+		gh.orders[key] = order
+	}
 }
