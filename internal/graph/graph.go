@@ -63,17 +63,17 @@ func IsAcyclic(g Graph) (bool, []int) {
 // For example, running isAcyclic starting from 1 on the following
 // graph will return 3.
 // 	1 -> 2 -> 3 -> 1
-func isAcyclic(g Graph, u int, info *cycleInfo, path []int) []int {
-	info.nodes[u].Visited = true
-	info.nodes[u].OnStack = true
+func isAcyclic(g Graph, u int, info cycleInfo, path []int) []int {
+	info[u].Visited = true
+	info[u].OnStack = true
 
 	path = append(path, u)
 	for _, v := range g.EdgesFrom(u) {
-		if !info.nodes[v].Visited {
+		if !info[v].Visited {
 			if cycle := isAcyclic(g, v, info, path); len(cycle) > 0 {
 				return cycle
 			}
-		} else if info.nodes[v].OnStack {
+		} else if info[v].OnStack {
 			// We've found a cycle, and we have a full path back.
 			// Prune it down to just the cyclic nodes.
 			cycle := path
@@ -88,7 +88,7 @@ func isAcyclic(g Graph, u int, info *cycleInfo, path []int) []int {
 			return append(cycle, v)
 		}
 	}
-	info.nodes[u].OnStack = false
+	info[u].OnStack = false
 	return nil
 }
 
@@ -98,25 +98,16 @@ type cycleNode struct {
 	OnStack bool
 }
 
-// cycleInfo contains helpful info for cycle detection.
-type cycleInfo struct {
-	// order is the number of nodes in the graph
-	order int
+// cycleInfo contains information about each node while we're trying to find
+// cycles.
+type cycleInfo []cycleNode
 
-	// nodes is the information for a given node.
-	nodes []cycleNode
+func newCycleInfo(order int) cycleInfo {
+	return make(cycleInfo, order+1) // +1 because 0 is sentinel value
 }
 
-func newCycleInfo(order int) *cycleInfo {
-	return &cycleInfo{
-		order: order,
-		// +1 because 0 is always a sentinel value.
-		nodes: make([]cycleNode, order+1),
-	}
-}
-
-func (info *cycleInfo) Reset() {
-	for i := 1; i < info.order; i++ {
-		info.nodes[i] = cycleNode{}
+func (info cycleInfo) Reset() {
+	for i := range info {
+		info[i] = cycleNode{}
 	}
 }
