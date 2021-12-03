@@ -42,41 +42,18 @@ func IsAcyclic(g Graph) (bool, []int) {
 	// cycleStart is a node that introduces a cycle in
 	// the graph. Values in the range [1, g.Order()) mean
 	// that there exists a cycle in g.
-	cycleStart := -1
 	info := newCycleInfo(g.Order())
 
-	for i := 1; i < g.Order(); i++ {
+	for i := 0; i < g.Order(); i++ {
 		info.Reset()
 
-		cycleStart = isAcyclic(g, i, info)
-		if cycleStart >= 0 {
-			break
+		cycle := isAcyclic(g, i, info, nil /* cycle path */)
+		if len(cycle) > 0 {
+			return false, cycle
 		}
 	}
 
-	if cycleStart < 0 {
-		return true, nil
-	}
-
-	// compute cycle path using backtrack
-	cycle := []int{cycleStart}
-	curr := cycleStart
-	for {
-		curr = info.nodes[curr].Backtrack
-		cycle = append(cycle, curr)
-		if curr == cycleStart {
-			break
-		}
-	}
-
-	// cycle is reverse-order.
-	i, j := 0, len(cycle)-1
-	for i < j {
-		cycle[i], cycle[j] = cycle[j], cycle[i]
-		i++
-		j--
-	}
-	return false, cycle
+	return true, nil
 }
 
 // isAcyclic traverses the given graph starting from a specific node
@@ -86,51 +63,55 @@ func IsAcyclic(g Graph) (bool, []int) {
 // For example, running isAcyclic starting from 1 on the following
 // graph will return 3.
 // 	1 -> 2 -> 3 -> 1
-func isAcyclic(g Graph, u int, info *cycleInfo) int {
-	info.nodes[u].Visited = true
-	info.nodes[u].OnStack = true
+func isAcyclic(g Graph, u int, info cycleInfo, path []int) []int {
+	// We've already verified that there are no cycles from this node.
+	if info[u].Visited {
+		return nil
+	}
+	info[u].Visited = true
+	info[u].OnStack = true
 
+	path = append(path, u)
 	for _, v := range g.EdgesFrom(u) {
-		if !info.nodes[v].Visited {
-			info.nodes[v].Backtrack = u
-			if start := isAcyclic(g, v, info); start >= 0 {
-				return start
+		if !info[v].Visited {
+			if cycle := isAcyclic(g, v, info, path); len(cycle) > 0 {
+				return cycle
 			}
-		} else if info.nodes[v].OnStack {
-			info.nodes[v].Backtrack = u
-			return v
+		} else if info[v].OnStack {
+			// We've found a cycle, and we have a full path back.
+			// Prune it down to just the cyclic nodes.
+			cycle := path
+			for i := len(cycle) - 1; i >= 0; i-- {
+				if cycle[i] == v {
+					cycle = cycle[i:]
+					break
+				}
+			}
+
+			// Complete the cycle by adding this node to it.
+			return append(cycle, v)
 		}
 	}
-	info.nodes[u].OnStack = false
-	return -1
+	info[u].OnStack = false
+	return nil
 }
 
 // cycleNode keeps track of a single node's info for cycle detection.
 type cycleNode struct {
-	Visited   bool
-	OnStack   bool
-	Backtrack int
+	Visited bool
+	OnStack bool
 }
 
-// cycleInfo contains helpful info for cycle detection.
-type cycleInfo struct {
-	// order is the number of nodes in the graph
-	order int
+// cycleInfo contains information about each node while we're trying to find
+// cycles.
+type cycleInfo []cycleNode
 
-	// nodes is the information for a given node.
-	nodes []cycleNode
+func newCycleInfo(order int) cycleInfo {
+	return make(cycleInfo, order)
 }
 
-func newCycleInfo(order int) *cycleInfo {
-	return &cycleInfo{
-		order: order,
-		// +1 because 0 is always a sentinel value.
-		nodes: make([]cycleNode, order+1),
-	}
-}
-
-func (info *cycleInfo) Reset() {
-	for i := 1; i < info.order; i++ {
-		info.nodes[i] = cycleNode{}
+func (info cycleInfo) Reset() {
+	for i := range info {
+		info[i].OnStack = false
 	}
 }
