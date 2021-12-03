@@ -223,6 +223,7 @@ func (po paramObject) DotParam() []*dot.Param {
 	return types
 }
 
+// getParamOrder returns the order(s) of a parameter type.
 func getParamOrder(gh *graphHolder, param param) []int {
 	var orders []int
 	switch p := param.(type) {
@@ -233,6 +234,8 @@ func getParamOrder(gh *graphHolder, param param) []int {
 			orders = append(orders, v)
 		}
 	case paramGroupedSlice:
+		// value group parameters have nodes of their own.
+		// We can directly return that here.
 		v := gh.orders[key{t: p.Type, group: p.Group}]
 		orders = append(orders, v)
 	case paramObject:

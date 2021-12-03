@@ -61,6 +61,11 @@ func (gh *graphHolder) Order() int {
 	return len(gh.allNodes)
 }
 
+// EdgesFrom returns the indices of nodes that are dependencies of node u. To do that,
+// it needs to do one of the following:
+// 1. For a constructor node, iterate through its parameters and get the orders of its direct
+// dependencies' providers.
+// 2. For a value group node, look at the group providers and get their orders.
 func (gh *graphHolder) EdgesFrom(u int) []int {
 	n := gh.allNodes[u]
 
