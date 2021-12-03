@@ -40,7 +40,7 @@ type Graph interface {
 // are in the cyclic path, identified by their orders.
 func IsAcyclic(g Graph) (bool, []int) {
 	// cycleStart is a node that introduces a cycle in
-	// the graph. Values in the range [0, g.Order()] mean
+	// the graph. Values in the range [1, g.Order()) mean
 	// that there exists a cycle in g.
 	cycleStart := -1
 	info := newCycleInfo(g.Order())
@@ -131,8 +131,6 @@ func newCycleInfo(order int) *cycleInfo {
 
 func (info *cycleInfo) Reset() {
 	for i := 1; i < info.order; i++ {
-		info.nodes[i].Visited = false
-		info.nodes[i].OnStack = false
-		info.nodes[i].Backtrack = 0
+		info.nodes[i] = cycleNode{}
 	}
 }

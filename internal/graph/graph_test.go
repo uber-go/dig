@@ -64,7 +64,7 @@ func TestGraphIsAcyclic(t *testing.T) {
 		},
 		// 1 ---> 2 -------> 3
 		// |                 ^
-		// ------------------|
+		// '-----------------'
 		{
 			edges: [][]int{
 				{2, 3},
@@ -74,8 +74,8 @@ func TestGraphIsAcyclic(t *testing.T) {
 		},
 		// 1 --> 2 --> 3    5 --> 6
 		// |           ^    ^
-		// |-----------|    |
-		// ----------> 4 ----
+		// +-----------'    |
+		// '---------> 4 ---'
 		{
 			edges: [][]int{
 				{2, 3, 4},
@@ -92,8 +92,8 @@ func TestGraphIsAcyclic(t *testing.T) {
 		for i, neighbors := range tt.edges {
 			g.Nodes[i+1] = neighbors
 		}
-		ok, _ := IsAcyclic(g)
-		assert.True(t, ok)
+		ok, cycle := IsAcyclic(g)
+		assert.True(t, ok, "expected acyclic, got cycle %v", cycle)
 	}
 }
 
@@ -105,7 +105,7 @@ func TestGraphIsCyclic(t *testing.T) {
 		//
 		// 0 ---> 1 ---> 2
 		// ^             |
-		// |-------------|
+		// '-------------'
 		{
 			edges: [][]int{
 				{1},
@@ -118,7 +118,7 @@ func TestGraphIsCyclic(t *testing.T) {
 		//
 		// 0 ---> 1 ---> 2
 		//        ^      |
-		//        |------|
+		//        '------'
 		{
 			edges: [][]int{
 				{1},
@@ -130,8 +130,8 @@ func TestGraphIsCyclic(t *testing.T) {
 		//
 		// 0 ---> 1 ---> 2 ----> 3
 		// |      ^      |       ^
-		// |      |------|       |
-		// -----------------------
+		// |      '------'       |
+		// '---------------------'
 		{
 			edges: [][]int{
 				{1, 3},
@@ -149,8 +149,6 @@ func TestGraphIsCyclic(t *testing.T) {
 		}
 		ok, c := IsAcyclic(g)
 		assert.False(t, ok)
-		for _, node := range tt.cycle {
-			assert.Contains(t, c, node)
-		}
+		assert.Equal(t, tt.cycle, c)
 	}
 }
