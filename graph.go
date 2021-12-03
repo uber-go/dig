@@ -48,7 +48,7 @@ func newGraphHolder(c *Container) *graphHolder {
 		orders: make(map[key]int),
 		c:      c,
 		allNodes: []*graphNode{
-			&graphNode{
+			{
 				Order:   0,
 				Wrapped: nil,
 			},
