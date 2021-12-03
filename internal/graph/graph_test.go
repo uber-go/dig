@@ -103,9 +103,9 @@ func TestGraphIsCyclic(t *testing.T) {
 		cycle []int
 	}{
 		//
-		// 0 ---> 1 ---> 2
-		// ^             |
-		// '-------------'
+		// 0 ---> 1 ---> 2 ---> 3
+		// ^                    |
+		// '--------------------'
 		{
 			edges: [][]int{
 				{1},
@@ -113,7 +113,7 @@ func TestGraphIsCyclic(t *testing.T) {
 				{3},
 				{0},
 			},
-			cycle: []int{0, 1, 2, 3},
+			cycle: []int{0, 1, 2, 3, 0},
 		},
 		//
 		// 0 ---> 1 ---> 2
@@ -125,7 +125,7 @@ func TestGraphIsCyclic(t *testing.T) {
 				{2},
 				{1},
 			},
-			cycle: []int{1, 2},
+			cycle: []int{1, 2, 1},
 		},
 		//
 		// 0 ---> 1 ---> 2 ----> 3
@@ -139,7 +139,7 @@ func TestGraphIsCyclic(t *testing.T) {
 				{1, 3},
 				nil,
 			},
-			cycle: []int{1, 2},
+			cycle: []int{1, 2, 1},
 		},
 	}
 	for _, tt := range testCases {
