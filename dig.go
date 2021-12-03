@@ -624,10 +624,10 @@ func (c *Container) newGraphNode(k key, wrapped interface{}) {
 }
 
 func (c *Container) cycleDetectedError(cycle []int) error {
-	var path []cycleEntry
+	var path []cycleErrPathEntry
 	for _, n := range cycle {
 		if n, ok := c.gh.allNodes[n].Wrapped.(*constructorNode); ok {
-			path = append(path, cycleEntry{
+			path = append(path, cycleErrPathEntry{
 				Key: key{
 					t: n.CType(),
 				},

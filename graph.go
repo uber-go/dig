@@ -48,6 +48,11 @@ func newGraphHolder(c *Container) *graphHolder {
 		orders: make(map[key]int),
 		c:      c,
 		allNodes: []*graphNode{
+			// This is a sentinel node to represent an error node.
+			// We use map[key]int to look up orders, so in case of
+			// a nonexistent key lookup, it will return an order of 0.
+			// To avoid any issues that may cause, we always add a
+			// sentinel node in index 0.
 			{
 				Order:   0,
 				Wrapped: nil,

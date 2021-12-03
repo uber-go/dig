@@ -2044,10 +2044,6 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 	})
 
 	t.Run("DeferAcyclicVerification eventually catches cycle with self-cycle", func(t *testing.T) {
-		// The offending node `C` is now *not* the first on the dependency `path`
-		// of `detectCycles()` (`D` is: we first call `detectCycles()` for the
-		// inovked `A` with the initial path set to nil, the following call for
-		// its dependency `D` will be in path[0]).
 		// A      <-- C <- D
 		// |      |__^    ^
 		// |______________|
@@ -2063,7 +2059,6 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		assert.NoError(t, c.Provide(newC))
 		assert.NoError(t, c.Provide(newD))
 
-		// Will stack overflow in this call:
 		err := c.Invoke(func(*A) {})
 		require.Error(t, err, "expected error when introducing cycle")
 		assert.True(t, IsCycleDetected(err))

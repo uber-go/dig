@@ -50,6 +50,9 @@ func TestGraphIsAcyclic(t *testing.T) {
 	}{
 		// 0
 		{
+			// Edges is an adjacency list representation of
+			// a directed graph. i.e. edges[u] is a list of
+			// nodes that node u has edges pointing to.
 			edges: [][]int{
 				nil,
 			},

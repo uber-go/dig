@@ -27,13 +27,13 @@ import (
 	"go.uber.org/dig/internal/digreflect"
 )
 
-type cycleEntry struct {
+type cycleErrPathEntry struct {
 	Key  key
 	Func *digreflect.Func
 }
 
 type errCycleDetected struct {
-	Path []cycleEntry
+	Path []cycleErrPathEntry
 }
 
 func (e errCycleDetected) Error() string {
