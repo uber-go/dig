@@ -64,6 +64,10 @@ func IsAcyclic(g Graph) (bool, []int) {
 // graph will return 3.
 // 	1 -> 2 -> 3 -> 1
 func isAcyclic(g Graph, u int, info cycleInfo, path []int) []int {
+	// We've already verified that there are no cycles from this node.
+	if info[u].Visited {
+		return nil
+	}
 	info[u].Visited = true
 	info[u].OnStack = true
 
@@ -108,6 +112,6 @@ func newCycleInfo(order int) cycleInfo {
 
 func (info cycleInfo) Reset() {
 	for i := range info {
-		info[i] = cycleNode{}
+		info[i].OnStack = false
 	}
 }
