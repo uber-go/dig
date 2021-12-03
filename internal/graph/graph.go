@@ -23,7 +23,8 @@ package graph
 // Graph represents a simple interface for representation
 // of a directed graph.
 // It is assumed that each node in the graph is uniquely
-// identified with an incremental integer (i.e. 0, 1, 2...).
+// identified with an incremental positive integer (i.e. 1, 2, 3...).
+// A value of 0 for a node represents a sentinel error value.
 type Graph interface {
 	// Order returns the total number of nodes in the graph
 	Order() int
@@ -44,7 +45,7 @@ func IsAcyclic(g Graph) (bool, []int) {
 	cycleStart := -1
 	info := newCycleInfo(g.Order())
 
-	for i := 0; i < g.Order(); i++ {
+	for i := 1; i < g.Order(); i++ {
 		info.Reset()
 
 		cycleStart = isAcyclic(g, i, info)
@@ -61,7 +62,7 @@ func IsAcyclic(g Graph) (bool, []int) {
 	cycle := []int{cycleStart}
 	curr := cycleStart
 	for {
-		curr = info.backtrack[curr]
+		curr = info.nodes[curr].Backtrack
 		cycle = append(cycle, curr)
 		if curr == cycleStart {
 			break
@@ -86,22 +87,29 @@ func IsAcyclic(g Graph) (bool, []int) {
 // graph will return 3.
 // 	1 -> 2 -> 3 -> 1
 func isAcyclic(g Graph, u int, info *cycleInfo) int {
-	info.visited[u] = true
-	info.onStack[u] = true
+	info.nodes[u].Visited = true
+	info.nodes[u].OnStack = true
 
 	for _, v := range g.EdgesFrom(u) {
-		if !info.visited[v] {
-			info.backtrack[v] = u
+		if !info.nodes[v].Visited {
+			info.nodes[v].Backtrack = u
 			if start := isAcyclic(g, v, info); start >= 0 {
 				return start
 			}
-		} else if info.onStack[v] {
-			info.backtrack[v] = u
+		} else if info.nodes[v].OnStack {
+			info.nodes[v].Backtrack = u
 			return v
 		}
 	}
-	info.onStack[u] = false
+	info.nodes[u].OnStack = false
 	return -1
+}
+
+// cycleNode keeps track of a single node's info for cycle detection.
+type cycleNode struct {
+	Visited   bool
+	OnStack   bool
+	Backtrack int
 }
 
 // cycleInfo contains helpful info for cycle detection.
@@ -109,20 +117,22 @@ type cycleInfo struct {
 	// order is the number of nodes in the graph
 	order int
 
-	// records whether ith node has been visited.
-	visited []bool
-	// records whether ith node is currently on the recursion stack.
-	onStack []bool
-	// back-tracks each edge info to form cycle path if one is detected.
-	backtrack map[int]int
+	// nodes is the information for a given node.
+	nodes []cycleNode
 }
 
 func newCycleInfo(order int) *cycleInfo {
-	return &cycleInfo{order: order}
+	return &cycleInfo{
+		order: order,
+		// +1 because 0 is always a sentinel value.
+		nodes: make([]cycleNode, order+1),
+	}
 }
 
-func (i *cycleInfo) Reset() {
-	i.visited = make([]bool, i.order)
-	i.onStack = make([]bool, i.order)
-	i.backtrack = make(map[int]int, i.order)
+func (info *cycleInfo) Reset() {
+	for i := 1; i < info.order; i++ {
+		info.nodes[i].Visited = false
+		info.nodes[i].OnStack = false
+		info.nodes[i].Backtrack = 0
+	}
 }

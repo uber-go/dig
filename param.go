@@ -278,7 +278,6 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 		}
 		po.Fields = append(po.Fields, pof)
 	}
-	//c.newGraphNode(key{t: t}, &po)
 	return po, nil
 }
 

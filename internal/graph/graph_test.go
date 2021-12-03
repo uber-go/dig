@@ -48,41 +48,41 @@ func TestGraphIsAcyclic(t *testing.T) {
 	testCases := []struct {
 		edges [][]int
 	}{
-		// 0
+		// 1
 		{
 			edges: [][]int{
 				nil,
 			},
 		},
-		// 0 --> 1 --> 2
+		// 1 --> 2 --> 3
 		{
 			edges: [][]int{
-				{1},
 				{2},
+				{3},
 				nil,
 			},
 		},
-		// 0 ---> 1 -------> 2
+		// 1 ---> 2 -------> 3
 		// |                 ^
 		// ------------------|
 		{
 			edges: [][]int{
-				{1, 2},
-				{2},
+				{2, 3},
+				{3},
 				nil,
 			},
 		},
-		// 0 --> 1 --> 2    4 --> 5
-		// |     ^          ^
-		// |-----|          |
-		// ---------> 3 -----
+		// 1 --> 2 --> 3    5 --> 6
+		// |           ^    ^
+		// |-----------|    |
+		// ----------> 4 ----
 		{
 			edges: [][]int{
-				{1, 2, 3},
-				{2},
+				{2, 3, 4},
+				{3},
 				nil,
-				{4},
 				{5},
+				{6},
 				nil,
 			},
 		},
@@ -90,7 +90,7 @@ func TestGraphIsAcyclic(t *testing.T) {
 	for _, tt := range testCases {
 		g := newTestGraph()
 		for i, neighbors := range tt.edges {
-			g.Nodes[i] = neighbors
+			g.Nodes[i+1] = neighbors
 		}
 		ok, _ := IsAcyclic(g)
 		assert.True(t, ok)

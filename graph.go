@@ -43,6 +43,20 @@ type graphHolder struct {
 	c *Container
 }
 
+func newGraphHolder(c *Container) *graphHolder {
+	return &graphHolder{
+		orders: make(map[key]int),
+		c:      c,
+		allNodes: []*graphNode{
+			&graphNode{
+				Order:   0,
+				Wrapped: nil,
+			},
+		},
+	}
+
+}
+
 func (gh *graphHolder) Order() int {
 	return len(gh.allNodes)
 }

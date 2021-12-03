@@ -399,10 +399,7 @@ func New(opts ...Option) *Container {
 		invokerFn: defaultInvoker,
 	}
 
-	c.gh = &graphHolder{
-		orders: make(map[key]int),
-		c:      c,
-	}
+	c.gh = newGraphHolder(c)
 
 	for _, opt := range opts {
 		opt.applyOption(c)
@@ -594,6 +591,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
 			return errf("cycle detected in dependency graph", c.cycleDetectedError(cycle))
 		}
+		c.isVerifiedAcyclic = true
 	}
 
 	args, err := pl.BuildList(c)
