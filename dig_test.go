@@ -1880,7 +1880,6 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		c := New(DryRun(dryRun))
 		assert.NoError(t, c.Provide(newA))
 		assert.NoError(t, c.Provide(newB))
-		assert.Equal(t, c.gh.Order(), 3)
 		err := c.Provide(newC)
 		require.Error(t, err, "expected error when introducing cycle")
 		require.True(t, IsCycleDetected(err))
@@ -1893,7 +1892,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
-		assert.Equal(t, c.gh.Order(), 3, "expected the order of graph to stay the same after a provide causes an error")
+		assert.Error(t, c.Invoke(func(c *C) {}), "expected invoking a function that uses a type that failed to provide to fail.")
 	})
 
 	t.Run("dig.In based cycle", func(t *testing.T) {
@@ -1928,7 +1927,6 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		c := New(DryRun(dryRun))
 		require.NoError(t, c.Provide(newA))
 		require.NoError(t, c.Provide(newB))
-		require.Equal(t, 3, c.gh.Order())
 
 		err := c.Provide(newC)
 		require.Error(t, err, "expected error when introducing cycle")
@@ -1942,7 +1940,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			`depends on func\(dig.BParams\) dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 			`depends on func\(dig.AParams\) dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
-		assert.Equal(t, 3, c.gh.Order())
+		assert.Error(t, c.Invoke(func(c C) {}), "expected invoking a function that uses a type that failed to provide to fail.")
 	})
 
 	t.Run("group based cycle", func(t *testing.T) {
