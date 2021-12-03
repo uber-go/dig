@@ -103,7 +103,7 @@ type cycleNode struct {
 type cycleInfo []cycleNode
 
 func newCycleInfo(order int) cycleInfo {
-	return make(cycleInfo, order+1) // +1 because 0 is sentinel value
+	return make(cycleInfo, order)
 }
 
 func (info cycleInfo) Reset() {
