@@ -25,7 +25,6 @@ import (
 	"reflect"
 
 	"go.uber.org/dig/internal/digreflect"
-	"go.uber.org/dig/internal/dot"
 	"go.uber.org/dig/internal/graph"
 )
 
@@ -95,12 +94,10 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 // the container. Returns an error if not.
 func shallowCheckDependencies(c containerStore, pl paramList) error {
 	var err errMissingTypes
-	var addMissingNodes []*dot.Param
 
 	missingDeps := findMissingDependencies(c, pl.Params...)
 	for _, dep := range missingDeps {
 		err = append(err, newErrMissingTypes(c, key{name: dep.Name, t: dep.Type})...)
-		addMissingNodes = append(addMissingNodes, dep.DotParam()...)
 	}
 
 	if len(err) > 0 {

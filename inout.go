@@ -35,12 +35,10 @@ var (
 	_outType    = reflect.TypeOf(Out{})
 )
 
-// Special interface embedded inside dig sentinel values (dig.In, dig.Out) to
-// make their special nature obvious in the godocs. Otherwise they will appear
-// as plain empty structs.
-type digSentinel interface {
-	digSentinel()
-}
+// Placeholder type placed in dig.In/dig.out to make their special nature
+// obvious in godocs.
+// Otherwise they will appear as plain empty structs.
+type digSentinel struct{}
 
 // In may be embedded into structs to request dig to treat them as special
 // parameter structs. When a constructor accepts such a struct, instead of the
@@ -58,7 +56,7 @@ type digSentinel interface {
 //   group       Name of the Value Group from which this field will be filled.
 //               The field must be a slice type. See Value Groups in the
 //               package documentation for more information.
-type In struct{ digSentinel }
+type In struct{ _ digSentinel }
 
 // Out is an embeddable type that signals to dig that the returned
 // struct should be treated differently. Instead of the struct itself
@@ -79,7 +77,7 @@ type In struct{ digSentinel }
 //   group       Name of the Value Group to which this field's value is being
 //               sent. See Value Groups in the package documentation for more
 //               information.
-type Out struct{ digSentinel }
+type Out struct{ _ digSentinel }
 
 func isError(t reflect.Type) bool {
 	return t.Implements(_errType)
