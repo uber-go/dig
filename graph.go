@@ -112,7 +112,7 @@ func (gh *graphHolder) Rollback() {
 		return
 	}
 
-	// nodes is an append-only list To rollback, we just drop the
+	// nodes is an append-only list. To rollback, we just drop the
 	// extraneous entries from the slice.
 	gh.nodes = gh.nodes[:gh.snap]
 	gh.snap = -1
