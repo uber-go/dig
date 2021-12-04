@@ -99,6 +99,23 @@ func (gh *graphHolder) EdgesFrom(u int) []int {
 	return orders
 }
 
+// NewNode adds a new value to the graph and returns its order.
+func (gh *graphHolder) NewNode(k key, wrapped interface{}) int {
+	order := len(gh.allNodes)
+	gh.allNodes = append(gh.allNodes, &graphNode{
+		Order:   order,
+		Wrapped: wrapped,
+	})
+	gh.orders[k] = order
+	return order
+}
+
+// Lookup retrieves the value for the node with the given order.
+// Lookup panics if i is invalid.
+func (gh *graphHolder) Lookup(i int) interface{} {
+	return gh.allNodes[i].Wrapped
+}
+
 // Snapshot is a helper used for taking a temporary snapshot of the current state
 // of the graph. Rollback() can be called subsequently to roll back the graph to
 // the snapshotted state. Only one snapshot can exist per graph, so calling Snapshot

@@ -615,18 +615,13 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 }
 
 func (c *Container) newGraphNode(k key, wrapped interface{}) {
-	order := len(c.gh.allNodes)
-	c.gh.allNodes = append(c.gh.allNodes, &graphNode{
-		Order:   order,
-		Wrapped: wrapped,
-	})
-	c.gh.orders[k] = order
+	c.gh.NewNode(k, wrapped)
 }
 
 func (c *Container) cycleDetectedError(cycle []int) error {
 	var path []cycleErrPathEntry
 	for _, n := range cycle {
-		if n, ok := c.gh.allNodes[n].Wrapped.(*constructorNode); ok {
+		if n, ok := c.gh.Lookup(n).(*constructorNode); ok {
 			path = append(path, cycleErrPathEntry{
 				Key: key{
 					t: n.CType(),
