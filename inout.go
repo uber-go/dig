@@ -23,6 +23,7 @@ package dig
 import (
 	"container/list"
 	"reflect"
+	"strconv"
 )
 
 var (
@@ -156,4 +157,21 @@ func embedsType(i interface{}, e reflect.Type) bool {
 	// If perf is an issue, we can cache known In objects and Out objects in a
 	// map[reflect.Type]struct{}.
 	return false
+}
+
+// Checks if a field of an In struct is optional.
+func isFieldOptional(f reflect.StructField) (bool, error) {
+	tag := f.Tag.Get(_optionalTag)
+	if tag == "" {
+		return false, nil
+	}
+
+	optional, err := strconv.ParseBool(tag)
+	if err != nil {
+		err = errf(
+			"invalid value %q for %q tag on field %v",
+			tag, _optionalTag, f.Name, err)
+	}
+
+	return optional, err
 }
