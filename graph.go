@@ -20,18 +20,20 @@
 
 package dig
 
-// graphNode represents a single node in the dependency graph's graph representation.
+import "go.uber.org/dig/internal/graph"
+
+// graphNode is a single node in the dependency graph.
 type graphNode struct {
 	// The index of this node in the graphHolder's nodes.
 	Order   int
 	Wrapped interface{}
 }
 
-// graphHolder represents the dependency graph for a Container. Specifically,
-// it saves constructorNodes and paramGroupedSlices (value groups) as graphNodes
-// and implements the Graph interface defined in internal/graph to run graph
-// algorithms on it. It has a 1-to-1 correspondence with a Container whose graph
-// it represents.
+// graphHolder is the dependency graph of the container.
+// It saves constructorNodes and paramGroupedSlice (value groups)
+// as nodes in the graph.
+// It implements the graph interface defined by internal/graph.
+// It has 1-1 correspondence with the Container whose graph it represents.
 type graphHolder struct {
 	// all the nodes defined in the graph.
 	nodes []*graphNode
@@ -43,26 +45,27 @@ type graphHolder struct {
 	ss *graphSnapshot
 }
 
+var _ graph.Graph = (*graphHolder)(nil)
+
 func newGraphHolder(c *Container) *graphHolder {
 	return &graphHolder{c: c}
 
 }
 
-func (gh *graphHolder) Order() int {
-	return len(gh.nodes)
-}
+func (gh *graphHolder) Order() int { return len(gh.nodes) }
 
-// EdgesFrom returns the indices of nodes that are dependencies of node u. To do that,
-// it needs to do one of the following:
-// 1. For a constructor node, iterate through its parameters and get the orders of its direct
-// dependencies' providers.
-// 2. For a value group node, look at the group providers and get their orders.
+// EdgesFrom returns the indices of nodes that are dependencies of node u.
+//
+// To do that, it needs to do one of the following:
+//
+// For constructor nodes, it retrieves the providers of the constructor's
+// parameters from the container and reports their orders.
+//
+// For value group nodes, it retrieves the group providers from the container
+// and reports their orders.
 func (gh *graphHolder) EdgesFrom(u int) []int {
-	n := gh.nodes[u]
-
 	var orders []int
-
-	switch w := n.Wrapped.(type) {
+	switch w := gh.Lookup(u).(type) {
 	case *constructorNode:
 		for _, param := range w.paramList.Params {
 			orders = append(orders, getParamOrder(gh, param)...)
@@ -97,18 +100,19 @@ type graphSnapshot struct {
 	nodesLength int
 }
 
-// Snapshot is a helper used for taking a temporary snapshot of the current state
-// of the graph. Rollback() can be called subsequently to roll back the graph to
-// the snapshotted state. Only one snapshot can exist per graph, so calling Snapshot
-// many times overwrites the previous snapshotted state.
+// Snapshot takes a temporary snapshot of the current state of the graph.
+// Use with Rollback to undo changes to the graph.
+//
+// Only one snapshot is allowed at a time.
+// Multiple calls to snapshot will overwrite prior snapshots.
 func (gh *graphHolder) Snapshot() {
 	gh.ss = &graphSnapshot{
 		nodesLength: len(gh.nodes),
 	}
 }
 
-// Rollback is a method used for rolling back the state of the current graphHolder
-// back to a snapshotted state, if one exists. It is a no-op if there is no snapshot.
+// Rollback rolls back a snapshot to a previously captured state.
+// This is a no-op if no snapshot was captured.
 func (gh *graphHolder) Rollback() {
 	if gh.ss == nil {
 		return
