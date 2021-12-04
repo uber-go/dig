@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"go.uber.org/dig/internal/digerror"
 	"go.uber.org/dig/internal/dot"
@@ -99,6 +101,14 @@ func (pl paramList) DotParam() []*dot.Param {
 	return types
 }
 
+func (pl paramList) String() string {
+	args := make([]string, len(pl.Params))
+	for i, p := range pl.Params {
+		args[i] = p.String()
+	}
+	return fmt.Sprint(args)
+}
+
 // newParamList builds a paramList from the provided constructor type.
 //
 // Variadic arguments of a constructor are ignored and not included as
@@ -168,6 +178,24 @@ func (ps paramSingle) DotParam() []*dot.Param {
 	}
 }
 
+func (ps paramSingle) String() string {
+	// tally.Scope[optional] means optional
+	// tally.Scope[optional, name="foo"] means named optional
+
+	var opts []string
+	if ps.Optional {
+		opts = append(opts, "optional")
+	}
+	if ps.Name != "" {
+		opts = append(opts, fmt.Sprintf("name=%q", ps.Name))
+	}
+
+	if len(opts) == 0 {
+		return fmt.Sprint(ps.Type)
+	}
+
+	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
+}
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	if v, ok := c.getValue(ps.Name, ps.Type); ok {
 		return v, nil
@@ -221,6 +249,14 @@ func (po paramObject) DotParam() []*dot.Param {
 		types = append(types, field.DotParam()...)
 	}
 	return types
+}
+
+func (po paramObject) String() string {
+	fields := make([]string, len(po.Fields))
+	for i, f := range po.Fields {
+		fields[i] = f.Param.String()
+	}
+	return strings.Join(fields, " ")
 }
 
 // getParamOrder returns the order(s) of a parameter type.
@@ -377,6 +413,11 @@ type paramGroupedSlice struct {
 	order int
 }
 
+func (pt paramGroupedSlice) String() string {
+	// io.Reader[group="foo"] refers to a group of io.Readers called 'foo'
+	return fmt.Sprintf("%v[group=%q]", pt.Type.Elem(), pt.Group)
+}
+
 func (pt paramGroupedSlice) DotParam() []*dot.Param {
 	return []*dot.Param{
 		{
@@ -438,4 +479,22 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 		result.Index(i).Set(v)
 	}
 	return result, nil
+}
+
+// Checks if ignoring unexported files in an In struct is allowed.
+// The struct field MUST be an _inType.
+func isIgnoreUnexportedSet(f reflect.StructField) (bool, error) {
+	tag := f.Tag.Get(_ignoreUnexportedTag)
+	if tag == "" {
+		return false, nil
+	}
+
+	allowed, err := strconv.ParseBool(tag)
+	if err != nil {
+		err = errf(
+			"invalid value %q for %q tag on field %v",
+			tag, _ignoreUnexportedTag, f.Name, err)
+	}
+
+	return allowed, err
 }
