@@ -637,11 +637,17 @@ func (c *Container) cycleDetectedError(cycle []int) error {
 	return errCycleDetected{Path: path}
 }
 
-func (c *Container) provide(ctor interface{}, opts provideOptions) error {
+func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
 	// take a snapshot of the current graph state before
 	// we start making changes to it as we may need to
 	// undo them upon encountering errors.
 	c.gh.Snapshot()
+	defer func() {
+		if err != nil {
+			c.gh.Rollback()
+		}
+	}()
+
 	n, err := newConstructorNode(
 		ctor,
 		c,
@@ -653,19 +659,16 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		},
 	)
 	if err != nil {
-		c.gh.Rollback()
 		return err
 	}
 
 	keys, err := c.findAndValidateResults(n)
 	if err != nil {
-		c.gh.Rollback()
 		return err
 	}
 
 	ctype := reflect.TypeOf(ctor)
 	if len(keys) == 0 {
-		c.gh.Rollback()
 		return errf("%v must provide at least one non-error type", ctype)
 	}
 
@@ -686,11 +689,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 				c.providers[k] = ops
 			}
 
-			// form the error message first before rolling back.
-			err := errf("this function introduces a cycle", c.cycleDetectedError(cycle))
-			// Rollback the graph state to snapshotted state.
-			c.gh.Rollback()
-			return err
+			return errf("this function introduces a cycle", c.cycleDetectedError(cycle))
 		}
 		c.isVerifiedAcyclic = true
 	}
