@@ -178,23 +178,23 @@ func (ps paramSingle) DotParam() []*dot.Param {
 	}
 }
 
-func (sp paramSingle) String() string {
+func (ps paramSingle) String() string {
 	// tally.Scope[optional] means optional
 	// tally.Scope[optional, name="foo"] means named optional
 
 	var opts []string
-	if sp.Optional {
+	if ps.Optional {
 		opts = append(opts, "optional")
 	}
-	if sp.Name != "" {
-		opts = append(opts, fmt.Sprintf("name=%q", sp.Name))
+	if ps.Name != "" {
+		opts = append(opts, fmt.Sprintf("name=%q", ps.Name))
 	}
 
 	if len(opts) == 0 {
-		return fmt.Sprint(sp.Type)
+		return fmt.Sprint(ps.Type)
 	}
 
-	return fmt.Sprintf("%v[%v]", sp.Type, strings.Join(opts, ", "))
+	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
 }
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	if v, ok := c.getValue(ps.Name, ps.Type); ok {
@@ -251,9 +251,9 @@ func (po paramObject) DotParam() []*dot.Param {
 	return types
 }
 
-func (op paramObject) String() string {
-	fields := make([]string, len(op.Fields))
-	for i, f := range op.Fields {
+func (po paramObject) String() string {
+	fields := make([]string, len(po.Fields))
+	for i, f := range po.Fields {
 		fields[i] = f.Param.String()
 	}
 	return strings.Join(fields, " ")
