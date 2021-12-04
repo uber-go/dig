@@ -112,6 +112,8 @@ func TestParamObjectWithUnexportedFieldsSuccess(t *testing.T) {
 		t2 type2
 	}
 
+	_ = in{}.t2 // unused
+
 	po, err := newParamObject(reflect.TypeOf(in{}), New())
 	require.NoError(t, err)
 
@@ -134,6 +136,8 @@ func TestParamObjectFailure(t *testing.T) {
 			a2 A
 		}
 
+		_ = in{}.a2 // unused but needed
+
 		_, err := newParamObject(reflect.TypeOf(in{}), New())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
@@ -149,6 +153,8 @@ func TestParamObjectFailure(t *testing.T) {
 			a2 A
 		}
 
+		_ = in{}.a2 // unused but needed
+
 		_, err := newParamObject(reflect.TypeOf(in{}), New())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
@@ -163,6 +169,8 @@ func TestParamObjectFailure(t *testing.T) {
 			A1 A
 			a2 A
 		}
+
+		_ = in{}.a2 // unused but needed
 
 		_, err := newParamObject(reflect.TypeOf(in{}), New())
 		require.Error(t, err)
