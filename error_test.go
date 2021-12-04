@@ -50,6 +50,8 @@ import (
 //
 // Messages will be treated as regular expressions.
 func assertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
+	t.Helper()
+
 	// We have one positional argument in addition to the variadic argument to
 	// ensure that there's at least one string to match against.
 	if err == nil {

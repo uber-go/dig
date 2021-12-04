@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Uber Technologies, Inc.
+// Copyright (c) 2021 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,163 +20,100 @@
 
 package dig
 
-import (
-	"io"
-	"strconv"
-	"text/template"
+import "go.uber.org/dig/internal/graph"
 
-	"go.uber.org/dig/internal/dot"
-)
-
-// A VisualizeOption modifies the default behavior of Visualize.
-type VisualizeOption interface {
-	applyVisualizeOption(*visualizeOptions)
+// graphNode is a single node in the dependency graph.
+type graphNode struct {
+	// The index of this node in the graphHolder's nodes.
+	Order   int
+	Wrapped interface{}
 }
 
-type visualizeOptions struct {
-	VisualizeError error
+// graphHolder is the dependency graph of the container.
+// It saves constructorNodes and paramGroupedSlice (value groups)
+// as nodes in the graph.
+// It implements the graph interface defined by internal/graph.
+// It has 1-1 correspondence with the Container whose graph it represents.
+type graphHolder struct {
+	// all the nodes defined in the graph.
+	nodes []*graphNode
+
+	// Container whose graph this holder contains.
+	c *Container
+
+	// Number of nodes in the graph at last snapshot.
+	// -1 if no snapshot has been taken.
+	snap int
 }
 
-type visualizeOptionFunc func(*visualizeOptions)
+var _ graph.Graph = (*graphHolder)(nil)
 
-func (f visualizeOptionFunc) applyVisualizeOption(opts *visualizeOptions) { f(opts) }
+func newGraphHolder(c *Container) *graphHolder {
+	return &graphHolder{c: c, snap: -1}
 
-// VisualizeError includes a visualization of the given error in the output of
-// Visualize if an error was returned by Invoke or Provide.
+}
+
+func (gh *graphHolder) Order() int { return len(gh.nodes) }
+
+// EdgesFrom returns the indices of nodes that are dependencies of node u.
 //
-//   if err := c.Provide(...); err != nil {
-//     dig.Visualize(c, w, dig.VisualizeError(err))
-//   }
+// To do that, it needs to do one of the following:
 //
-// This option has no effect if the error was nil or if it didn't contain any
-// information to visualize.
-func VisualizeError(err error) VisualizeOption {
-	return visualizeOptionFunc(func(opts *visualizeOptions) {
-		opts.VisualizeError = err
+// For constructor nodes, it retrieves the providers of the constructor's
+// parameters from the container and reports their orders.
+//
+// For value group nodes, it retrieves the group providers from the container
+// and reports their orders.
+func (gh *graphHolder) EdgesFrom(u int) []int {
+	var orders []int
+	switch w := gh.Lookup(u).(type) {
+	case *constructorNode:
+		for _, param := range w.paramList.Params {
+			orders = append(orders, getParamOrder(gh, param)...)
+		}
+	case *paramGroupedSlice:
+		providers := gh.c.getGroupProviders(w.Group, w.Type.Elem())
+		for _, provider := range providers {
+			orders = append(orders, provider.Order())
+		}
+	}
+	return orders
+}
+
+// NewNode adds a new value to the graph and returns its order.
+func (gh *graphHolder) NewNode(wrapped interface{}) int {
+	order := len(gh.nodes)
+	gh.nodes = append(gh.nodes, &graphNode{
+		Order:   order,
+		Wrapped: wrapped,
 	})
+	return order
 }
 
-func updateGraph(dg *dot.Graph, err error) error {
-	var errors []errVisualizer
-	// Unwrap error to find the root cause.
-	for {
-		if ev, ok := err.(errVisualizer); ok {
-			errors = append(errors, ev)
-		}
-		e, ok := err.(causer)
-		if !ok {
-			break
-		}
-		err = e.cause()
-	}
-
-	// If there are no errVisualizers included, we do not modify the graph.
-	if len(errors) == 0 {
-		return nil
-	}
-
-	// We iterate in reverse because the last element is the root cause.
-	for i := len(errors) - 1; i >= 0; i-- {
-		errors[i].updateGraph(dg)
-	}
-
-	// Remove non-error entries from the graph for readability.
-	dg.PruneSuccess()
-
-	return nil
+// Lookup retrieves the value for the node with the given order.
+// Lookup panics if i is invalid.
+func (gh *graphHolder) Lookup(i int) interface{} {
+	return gh.nodes[i].Wrapped
 }
 
-var _graphTmpl = template.Must(
-	template.New("DotGraph").
-		Funcs(template.FuncMap{
-			"quote": strconv.Quote,
-		}).
-		Parse(`digraph {
-	rankdir=RL;
-	graph [compound=true];
-	{{range $g := .Groups}}
-		{{- quote .String}} [{{.Attributes}}];
-		{{range .Results}}
-			{{- quote $g.String}} -> {{quote .String}};
-		{{end}}
-	{{end -}}
-	{{range $index, $ctor := .Ctors}}
-		subgraph cluster_{{$index}} {
-			{{ with .Package }}label = {{ quote .}};
-			{{ end -}}
-
-			constructor_{{$index}} [shape=plaintext label={{quote .Name}}];
-			{{with .ErrorType}}color={{.Color}};{{end}}
-			{{range .Results}}
-				{{- quote .String}} [{{.Attributes}}];
-			{{end}}
-		}
-		{{range .Params}}
-			constructor_{{$index}} -> {{quote .String}} [ltail=cluster_{{$index}}{{if .Optional}} style=dashed{{end}}];
-		{{end}}
-		{{range .GroupParams}}
-			constructor_{{$index}} -> {{quote .String}} [ltail=cluster_{{$index}}];
-		{{end -}}
-	{{end}}
-	{{range .Failed.TransitiveFailures}}
-		{{- quote .String}} [color=orange];
-	{{end -}}
-	{{range .Failed.RootCauses}}
-		{{- quote .String}} [color=red];
-	{{end}}
-}`))
-
-// Visualize parses the graph in Container c into DOT format and writes it to
-// io.Writer w.
-func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
-	dg := c.createGraph()
-
-	var options visualizeOptions
-	for _, o := range opts {
-		o.applyVisualizeOption(&options)
-	}
-
-	if options.VisualizeError != nil {
-		if err := updateGraph(dg, options.VisualizeError); err != nil {
-			return err
-		}
-	}
-
-	return _graphTmpl.Execute(w, dg)
+// Snapshot takes a temporary snapshot of the current state of the graph.
+// Use with Rollback to undo changes to the graph.
+//
+// Only one snapshot is allowed at a time.
+// Multiple calls to snapshot will overwrite prior snapshots.
+func (gh *graphHolder) Snapshot() {
+	gh.snap = len(gh.nodes)
 }
 
-// CanVisualizeError returns true if the error is an errVisualizer.
-func CanVisualizeError(err error) bool {
-	for {
-		if _, ok := err.(errVisualizer); ok {
-			return true
-		}
-		e, ok := err.(causer)
-		if !ok {
-			break
-		}
-		err = e.cause()
+// Rollback rolls back a snapshot to a previously captured state.
+// This is a no-op if no snapshot was captured.
+func (gh *graphHolder) Rollback() {
+	if gh.snap < 0 {
+		return
 	}
 
-	return false
-}
-
-func (c *Container) createGraph() *dot.Graph {
-	dg := dot.NewGraph()
-
-	for _, n := range c.nodes {
-		dg.AddCtor(newDotCtor(n), n.paramList.DotParam(), n.resultList.DotResult())
-	}
-
-	return dg
-}
-
-func newDotCtor(n *node) *dot.Ctor {
-	return &dot.Ctor{
-		ID:      n.id,
-		Name:    n.location.Name,
-		Package: n.location.Package,
-		File:    n.location.File,
-		Line:    n.location.Line,
-	}
+	// nodes is an append-only list. To rollback, we just drop the
+	// extraneous entries from the slice.
+	gh.nodes = gh.nodes[:gh.snap]
+	gh.snap = -1
 }

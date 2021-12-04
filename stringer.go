@@ -51,7 +51,7 @@ func (c *Container) String() string {
 	return b.String()
 }
 
-func (n *node) String() string {
+func (n *constructorNode) String() string {
 	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)
 }
 

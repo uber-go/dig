@@ -1887,11 +1887,12 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			`cannot provide function "go.uber.org/dig".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`this function introduces a cycle:`,
-			`\*dig.C provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
-			`depends on \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
+			`depends on func\(\*dig.B\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
+		assert.Error(t, c.Invoke(func(c *C) {}), "expected invoking a function that uses a type that failed to provide to fail.")
 	})
 
 	t.Run("dig.In based cycle", func(t *testing.T) {
@@ -1934,11 +1935,12 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			`cannot provide function "go.uber.org/dig".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`this function introduces a cycle:`,
-			`dig.C provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
-			`depends on dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(dig.AParams\) dig.A provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
+			`depends on func\(dig.CParams\) dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(dig.BParams\) dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(dig.AParams\) dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
+		assert.Error(t, c.Invoke(func(c C) {}), "expected invoking a function that uses a type that failed to provide to fail.")
 	})
 
 	t.Run("group based cycle", func(t *testing.T) {
@@ -2005,10 +2007,10 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			`cannot provide function "go.uber.org/dig".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`this function introduces a cycle:`,
-			`\*dig.D provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
-			`depends on int\[group="bar"\] provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on string\[group="foo"\] provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.D provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig.D\) dig.outB provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
+			`depends on func\(dig.inD\) \*dig.D provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(dig.inC\) dig.outC provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.D\) dig.outB provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 
@@ -2036,10 +2038,36 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		assert.True(t, IsCycleDetected(err))
 		assertErrorMatches(t, err,
 			`cycle detected in dependency graph:`,
-			`\*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.B\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+		)
+	})
+
+	t.Run("DeferAcyclicVerification eventually catches cycle with self-cycle", func(t *testing.T) {
+		// A      <-- C <- D
+		// |      |__^    ^
+		// |______________|
+		type A struct{}
+		type C struct{}
+		type D struct{}
+		newA := func(*D) *A { return &A{} }
+		newC := func(*C) *C { return &C{} }
+		newD := func(*C) *D { return &D{} }
+
+		c := New(DeferAcyclicVerification())
+		assert.NoError(t, c.Provide(newA))
+		assert.NoError(t, c.Provide(newC))
+		assert.NoError(t, c.Provide(newD))
+
+		err := c.Invoke(func(*A) {})
+		require.Error(t, err, "expected error when introducing cycle")
+		assert.True(t, IsCycleDetected(err))
+		assertErrorMatches(t, err,
+			`cycle detected in dependency graph:`,
+			`func\(\*dig.C\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig.C\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 }
@@ -3065,7 +3093,7 @@ func TestNodeAlreadyCalled(t *testing.T) {
 	type type1 struct{}
 	f := func() type1 { return type1{} }
 
-	n, err := newNode(f, nodeOptions{})
+	n, err := newConstructorNode(f, New(), constructorOptions{})
 	require.NoError(t, err, "failed to build node")
 	require.False(t, n.called, "node must not have been called")
 

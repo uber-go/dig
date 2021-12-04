@@ -32,6 +32,7 @@ import (
 
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
+	"go.uber.org/dig/internal/graph"
 )
 
 const (
@@ -290,12 +291,11 @@ type InvokeOption interface {
 
 // Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
-	// Mapping from key to all the nodes that can provide a value for that
+	// Mapping from key to all the constructor node that can provide a value for that
 	// key.
-	providers map[key][]*node
+	providers map[key][]*constructorNode
 
-	// All nodes in the container.
-	nodes []*node
+	nodes []*constructorNode
 
 	// Values that have already been generated in the container.
 	values map[key]reflect.Value
@@ -314,6 +314,8 @@ type Container struct {
 
 	// invokerFn calls a function with arguments provided to Provide or Invoke.
 	invokerFn invokerFn
+
+	gh *graphHolder
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -332,6 +334,9 @@ type containerWriter interface {
 // containerStore provides access to the Container's underlying data store.
 type containerStore interface {
 	containerWriter
+
+	// Adds a new graph node to the Container and returns its order.
+	newGraphNode(w interface{}) int
 
 	// Returns a slice containing all known types.
 	knownTypes() []reflect.Type
@@ -363,6 +368,10 @@ type provider interface {
 	// ID is a unique numerical identifier for this provider.
 	ID() dot.CtorID
 
+	// Order reports the order of this provider in the graphHolder.
+	// This value is usually returned by the graphHolder.NewNode method.
+	Order() int
+
 	// Location returns where this constructor was defined.
 	Location() *digreflect.Func
 
@@ -380,17 +389,21 @@ type provider interface {
 	// The values produced by this provider should be submitted into the
 	// containerStore.
 	Call(containerStore) error
+
+	CType() reflect.Type
 }
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
 	c := &Container{
-		providers: make(map[key][]*node),
+		providers: make(map[key][]*constructorNode),
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
 		invokerFn: defaultInvoker,
 	}
+
+	c.gh = newGraphHolder(c)
 
 	for _, opt := range opts {
 		opt.applyOption(c)
@@ -566,7 +579,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return errf("can't invoke non-function %v (type %v)", function, ftype)
 	}
 
-	pl, err := newParamList(ftype)
+	pl, err := newParamList(ftype, c)
 	if err != nil {
 		return err
 	}
@@ -579,9 +592,10 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	}
 
 	if !c.isVerifiedAcyclic {
-		if err := c.verifyAcyclic(); err != nil {
-			return err
+		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
+			return errf("cycle detected in dependency graph", c.cycleDetectedError(cycle))
 		}
+		c.isVerifiedAcyclic = true
 	}
 
 	args, err := pl.BuildList(c)
@@ -604,22 +618,40 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
-func (c *Container) verifyAcyclic() error {
-	visited := make(map[key]struct{})
-	for _, n := range c.nodes {
-		if err := detectCycles(n, c, nil /* path */, visited); err != nil {
-			return errf("cycle detected in dependency graph", err)
-		}
-	}
-
-	c.isVerifiedAcyclic = true
-	return nil
+func (c *Container) newGraphNode(wrapped interface{}) int {
+	return c.gh.NewNode(wrapped)
 }
 
-func (c *Container) provide(ctor interface{}, opts provideOptions) error {
-	n, err := newNode(
+func (c *Container) cycleDetectedError(cycle []int) error {
+	var path []cycleErrPathEntry
+	for _, n := range cycle {
+		if n, ok := c.gh.Lookup(n).(*constructorNode); ok {
+			path = append(path, cycleErrPathEntry{
+				Key: key{
+					t: n.CType(),
+				},
+				Func: n.Location(),
+			})
+		}
+	}
+	return errCycleDetected{Path: path}
+}
+
+func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
+	// take a snapshot of the current graph state before
+	// we start making changes to it as we may need to
+	// undo them upon encountering errors.
+	c.gh.Snapshot()
+	defer func() {
+		if err != nil {
+			c.gh.Rollback()
+		}
+	}()
+
+	n, err := newConstructorNode(
 		ctor,
-		nodeOptions{
+		c,
+		constructorOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
 			ResultAs:    opts.As,
@@ -640,17 +672,24 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 		return errf("%v must provide at least one non-error type", ctype)
 	}
 
+	oldProviders := make(map[key][]*constructorNode)
 	for k := range keys {
-		c.isVerifiedAcyclic = false
-		oldProviders := c.providers[k]
+		// Cache old providers before running cycle detection.
+		oldProviders[k] = c.providers[k]
 		c.providers[k] = append(c.providers[k], n)
+	}
 
-		if c.deferAcyclicVerification {
-			continue
-		}
-		if err := verifyAcyclic(c, n, k); err != nil {
-			c.providers[k] = oldProviders
-			return err
+	c.isVerifiedAcyclic = false
+	if !c.deferAcyclicVerification {
+		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
+			// When a cycle is detected, recover the old providers to reset
+			// the providers map back to what it was before this node was
+			// introduced.
+			for k, ops := range oldProviders {
+				c.providers[k] = ops
+			}
+
+			return errf("this function introduces a cycle", c.cycleDetectedError(cycle))
 		}
 		c.isVerifiedAcyclic = true
 	}
@@ -685,8 +724,8 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) error {
 	return nil
 }
 
-// Builds a collection of all result types produced by this node.
-func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
+// Builds a collection of all result types produced by this constructor.
+func (c *Container) findAndValidateResults(n *constructorNode) (map[key]struct{}, error) {
 	var err error
 	keyPaths := make(map[key]string)
 	walkResult(n.ResultList(), connectionVisitor{
@@ -711,7 +750,7 @@ func (c *Container) findAndValidateResults(n *node) (map[key]struct{}, error) {
 // produced by that node.
 type connectionVisitor struct {
 	c *Container
-	n *node
+	n *constructorNode
 
 	// If this points to a non-nil value, we've already encountered an error
 	// and should stop traversing.
@@ -809,13 +848,13 @@ func (cv connectionVisitor) checkKey(k key, path string) error {
 	return nil
 }
 
-// node is a node in the dependency graph. Each node maps to a single
-// constructor provided by the user.
+// constructorNode is a node in the dependency graph that represents
+// a constructor provided by the user.
 //
-// Nodes can produce zero or more values that they store into the container.
-// For the Provide path, we verify that nodes produce at least one value,
+// constructorNodes can produce zero or more values that they store into the container.
+// For the Provide path, we verify that constructorNodes produce at least one value,
 // otherwise the function will never be called.
-type node struct {
+type constructorNode struct {
 	ctor  interface{}
 	ctype reflect.Type
 
@@ -833,10 +872,12 @@ type node struct {
 
 	// Type information about constructor results.
 	resultList resultList
+
+	order int // order of this node in graphHolder
 }
 
-type nodeOptions struct {
-	// If specified, all values produced by this node have the provided name
+type constructorOptions struct {
+	// If specified, all values produced by this constructor have the provided name
 	// belong to the specified value group or implement any of the interfaces.
 	ResultName  string
 	ResultGroup string
@@ -844,12 +885,12 @@ type nodeOptions struct {
 	Location    *digreflect.Func
 }
 
-func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
+func newConstructorNode(ctor interface{}, c containerStore, opts constructorOptions) (*constructorNode, error) {
 	cval := reflect.ValueOf(ctor)
 	ctype := cval.Type()
 	cptr := cval.Pointer()
 
-	params, err := newParamList(ctype)
+	params, err := newParamList(ctype, c)
 	if err != nil {
 		return nil, err
 	}
@@ -871,24 +912,28 @@ func newNode(ctor interface{}, opts nodeOptions) (*node, error) {
 		location = digreflect.InspectFunc(ctor)
 	}
 
-	return &node{
+	n := &constructorNode{
 		ctor:       ctor,
 		ctype:      ctype,
 		location:   location,
 		id:         dot.CtorID(cptr),
 		paramList:  params,
 		resultList: results,
-	}, err
+	}
+	n.order = c.newGraphNode(n)
+	return n, nil
 }
 
-func (n *node) Location() *digreflect.Func { return n.location }
-func (n *node) ParamList() paramList       { return n.paramList }
-func (n *node) ResultList() resultList     { return n.resultList }
-func (n *node) ID() dot.CtorID             { return n.id }
+func (n *constructorNode) Location() *digreflect.Func { return n.location }
+func (n *constructorNode) ParamList() paramList       { return n.paramList }
+func (n *constructorNode) ResultList() resultList     { return n.resultList }
+func (n *constructorNode) ID() dot.CtorID             { return n.id }
+func (n *constructorNode) CType() reflect.Type        { return n.ctype }
+func (n *constructorNode) Order() int                 { return n.order }
 
-// Call calls this node's constructor if it hasn't already been called and
+// Call calls this constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
-func (n *node) Call(c containerStore) error {
+func (n *constructorNode) Call(c containerStore) error {
 	if n.called {
 		return nil
 	}
@@ -954,29 +999,41 @@ func isIgnoreUnexportedSet(f reflect.StructField) (bool, error) {
 	return allowed, err
 }
 
-// Checks that all direct dependencies of the provided param are present in
+// Checks that all direct dependencies of the provided parameters are present in
 // the container. Returns an error if not.
-func shallowCheckDependencies(c containerStore, p param) error {
+func shallowCheckDependencies(c containerStore, pl paramList) error {
 	var err errMissingTypes
 	var addMissingNodes []*dot.Param
-	walkParam(p, paramVisitorFunc(func(p param) bool {
-		ps, ok := p.(paramSingle)
-		if !ok {
-			return true
-		}
 
-		if ns := c.getValueProviders(ps.Name, ps.Type); len(ns) == 0 && !ps.Optional {
-			err = append(err, newErrMissingTypes(c, key{name: ps.Name, t: ps.Type})...)
-			addMissingNodes = append(addMissingNodes, ps.DotParam()...)
-		}
-
-		return true
-	}))
+	missingDeps := findMissingDependencies(c, pl.Params...)
+	for _, dep := range missingDeps {
+		err = append(err, newErrMissingTypes(c, key{name: dep.Name, t: dep.Type})...)
+		addMissingNodes = append(addMissingNodes, dep.DotParam()...)
+	}
 
 	if len(err) > 0 {
 		return err
 	}
 	return nil
+}
+
+func findMissingDependencies(c containerStore, params ...param) []paramSingle {
+	var missingDeps []paramSingle
+
+	for _, param := range params {
+		switch p := param.(type) {
+		case paramSingle:
+			if ns := c.getValueProviders(p.Name, p.Type); len(ns) == 0 && !p.Optional {
+				missingDeps = append(missingDeps, p)
+			}
+		case paramObject:
+			for _, f := range p.Fields {
+				missingDeps = append(missingDeps, findMissingDependencies(c, f.Param)...)
+
+			}
+		}
+	}
+	return missingDeps
 }
 
 // stagingContainerWriter is a containerWriter that records the changes that
