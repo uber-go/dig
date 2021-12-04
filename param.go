@@ -230,14 +230,12 @@ func getParamOrder(gh *graphHolder, param param) []int {
 	case paramSingle:
 		providers := gh.c.getValueProviders(p.Name, p.Type)
 		for _, provider := range providers {
-			v := gh.orders[key{t: provider.CType()}]
-			orders = append(orders, v)
+			orders = append(orders, provider.Order())
 		}
 	case paramGroupedSlice:
 		// value group parameters have nodes of their own.
 		// We can directly return that here.
-		v := gh.orders[key{t: p.Type, group: p.Group}]
-		orders = append(orders, v)
+		orders = append(orders, p.order)
 	case paramObject:
 		for _, pf := range p.Fields {
 			orders = append(orders, getParamOrder(gh, pf.Param)...)
@@ -375,6 +373,8 @@ type paramGroupedSlice struct {
 
 	// Type of the slice.
 	Type reflect.Type
+
+	order int
 }
 
 func (pt paramGroupedSlice) DotParam() []*dot.Param {
@@ -416,11 +416,7 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	case optional:
 		return pg, errors.New("value groups cannot be optional")
 	}
-	c.newGraphNode(key{
-		t:     f.Type,
-		group: g.Name,
-	}, &pg)
-
+	pg.order = c.newGraphNode(&pg)
 	return pg, nil
 }
 

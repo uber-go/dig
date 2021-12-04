@@ -329,14 +329,14 @@ type containerWriter interface {
 	// submitGroupedValue submits a value to the value group with the provided
 	// name.
 	submitGroupedValue(name string, t reflect.Type, v reflect.Value)
-
-	// Adds a new graph node to the Container.
-	newGraphNode(k key, w interface{})
 }
 
 // containerStore provides access to the Container's underlying data store.
 type containerStore interface {
 	containerWriter
+
+	// Adds a new graph node to the Container and returns its order.
+	newGraphNode(w interface{}) int
 
 	// Returns a slice containing all known types.
 	knownTypes() []reflect.Type
@@ -367,6 +367,10 @@ type containerStore interface {
 type provider interface {
 	// ID is a unique numerical identifier for this provider.
 	ID() dot.CtorID
+
+	// Order reports the order of this provider in the graphHolder.
+	// This value is usually returned by the graphHolder.NewNode method.
+	Order() int
 
 	// Location returns where this constructor was defined.
 	Location() *digreflect.Func
@@ -614,8 +618,8 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return nil
 }
 
-func (c *Container) newGraphNode(k key, wrapped interface{}) {
-	c.gh.NewNode(k, wrapped)
+func (c *Container) newGraphNode(wrapped interface{}) int {
+	return c.gh.NewNode(wrapped)
 }
 
 func (c *Container) cycleDetectedError(cycle []int) error {
@@ -869,6 +873,8 @@ type constructorNode struct {
 
 	// Type information about constructor results.
 	resultList resultList
+
+	order int // order of this node in graphHolder
 }
 
 type constructorOptions struct {
@@ -915,9 +921,7 @@ func newConstructorNode(ctor interface{}, c containerStore, opts constructorOpti
 		paramList:  params,
 		resultList: results,
 	}
-	c.newGraphNode(key{
-		t: ctype,
-	}, n)
+	n.order = c.newGraphNode(n)
 	return n, nil
 }
 
@@ -926,6 +930,7 @@ func (n *constructorNode) ParamList() paramList       { return n.paramList }
 func (n *constructorNode) ResultList() resultList     { return n.resultList }
 func (n *constructorNode) ID() dot.CtorID             { return n.id }
 func (n *constructorNode) CType() reflect.Type        { return n.ctype }
+func (n *constructorNode) Order() int                 { return n.order }
 
 // Call calls this constructor if it hasn't already been called and
 // injects any values produced by it into the provided container.
@@ -1035,10 +1040,8 @@ func findMissingDependencies(c containerStore, params ...param) []paramSingle {
 // stagingContainerWriter is a containerWriter that records the changes that
 // would be made to a containerWriter and defers them until Commit is called.
 type stagingContainerWriter struct {
-	values          map[key]reflect.Value
-	groups          map[key][]reflect.Value
-	graphNodeKeys   []key
-	graphNodeValues []interface{}
+	values map[key]reflect.Value
+	groups map[key][]reflect.Value
 }
 
 var _ containerWriter = (*stagingContainerWriter)(nil)
@@ -1059,11 +1062,6 @@ func (sr *stagingContainerWriter) submitGroupedValue(group string, t reflect.Typ
 	sr.groups[k] = append(sr.groups[k], v)
 }
 
-func (sr *stagingContainerWriter) newGraphNode(k key, w interface{}) {
-	sr.graphNodeKeys = append(sr.graphNodeKeys, k)
-	sr.graphNodeValues = append(sr.graphNodeValues, w)
-}
-
 // Commit commits the received results to the provided containerWriter.
 func (sr *stagingContainerWriter) Commit(cw containerWriter) {
 	for k, v := range sr.values {
@@ -1074,10 +1072,6 @@ func (sr *stagingContainerWriter) Commit(cw containerWriter) {
 		for _, v := range vs {
 			cw.submitGroupedValue(k.group, k.t, v)
 		}
-	}
-
-	for i := 0; i < len(sr.graphNodeKeys); i++ {
-		cw.newGraphNode(sr.graphNodeKeys[i], sr.graphNodeValues[i])
 	}
 }
 

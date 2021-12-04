@@ -22,7 +22,7 @@ package dig
 
 // graphNode represents a single node in the dependency graph's graph representation.
 type graphNode struct {
-	// The index of this node in the graphHolder's allNodes.
+	// The index of this node in the graphHolder's nodes.
 	Order   int
 	Wrapped interface{}
 }
@@ -34,10 +34,7 @@ type graphNode struct {
 // it represents.
 type graphHolder struct {
 	// all the nodes defined in the graph.
-	allNodes []*graphNode
-
-	// Maps each graphNode to its index in allNodes slice.
-	orders map[key]int
+	nodes []*graphNode
 
 	// Container whose graph this holder contains.
 	c *Container
@@ -46,33 +43,13 @@ type graphHolder struct {
 	ss *graphSnapshot
 }
 
-// graphSnapshot records a snapshotted state of a graph.
-type graphSnapshot struct {
-	nodesLength int
-	orders      map[key]int
-}
-
 func newGraphHolder(c *Container) *graphHolder {
-	return &graphHolder{
-		orders: make(map[key]int),
-		c:      c,
-		allNodes: []*graphNode{
-			// This is a sentinel node to represent an error node.
-			// We use map[key]int to look up orders, so in case of
-			// a nonexistent key lookup, it will return an order of 0.
-			// To avoid any issues that may cause, we always add a
-			// sentinel node in index 0.
-			{
-				Order:   0,
-				Wrapped: nil,
-			},
-		},
-	}
+	return &graphHolder{c: c}
 
 }
 
 func (gh *graphHolder) Order() int {
-	return len(gh.allNodes)
+	return len(gh.nodes)
 }
 
 // EdgesFrom returns the indices of nodes that are dependencies of node u. To do that,
@@ -81,7 +58,7 @@ func (gh *graphHolder) Order() int {
 // dependencies' providers.
 // 2. For a value group node, look at the group providers and get their orders.
 func (gh *graphHolder) EdgesFrom(u int) []int {
-	n := gh.allNodes[u]
+	n := gh.nodes[u]
 
 	var orders []int
 
@@ -93,27 +70,31 @@ func (gh *graphHolder) EdgesFrom(u int) []int {
 	case *paramGroupedSlice:
 		providers := gh.c.getGroupProviders(w.Group, w.Type.Elem())
 		for _, provider := range providers {
-			orders = append(orders, gh.orders[key{t: provider.CType()}])
+			orders = append(orders, provider.Order())
 		}
 	}
 	return orders
 }
 
 // NewNode adds a new value to the graph and returns its order.
-func (gh *graphHolder) NewNode(k key, wrapped interface{}) int {
-	order := len(gh.allNodes)
-	gh.allNodes = append(gh.allNodes, &graphNode{
+func (gh *graphHolder) NewNode(wrapped interface{}) int {
+	order := len(gh.nodes)
+	gh.nodes = append(gh.nodes, &graphNode{
 		Order:   order,
 		Wrapped: wrapped,
 	})
-	gh.orders[k] = order
 	return order
 }
 
 // Lookup retrieves the value for the node with the given order.
 // Lookup panics if i is invalid.
 func (gh *graphHolder) Lookup(i int) interface{} {
-	return gh.allNodes[i].Wrapped
+	return gh.nodes[i].Wrapped
+}
+
+// graphSnapshot records a snapshotted state of a graph.
+type graphSnapshot struct {
+	nodesLength int
 }
 
 // Snapshot is a helper used for taking a temporary snapshot of the current state
@@ -122,11 +103,7 @@ func (gh *graphHolder) Lookup(i int) interface{} {
 // many times overwrites the previous snapshotted state.
 func (gh *graphHolder) Snapshot() {
 	gh.ss = &graphSnapshot{
-		nodesLength: len(gh.allNodes),
-		orders:      make(map[key]int, len(gh.orders)),
-	}
-	for key, order := range gh.orders {
-		gh.ss.orders[key] = order
+		nodesLength: len(gh.nodes),
 	}
 }
 
@@ -136,16 +113,8 @@ func (gh *graphHolder) Rollback() {
 	if gh.ss == nil {
 		return
 	}
-	// recover allNodes
-	rollbackNodes := make([]*graphNode, gh.ss.nodesLength)
-	for i := 0; i < gh.ss.nodesLength; i++ {
-		rollbackNodes[i] = gh.allNodes[i]
-	}
-	gh.allNodes = rollbackNodes
-	// recover orders
-	gh.orders = make(map[key]int, len(gh.ss.orders))
-	for key, order := range gh.ss.orders {
-		gh.orders[key] = order
-	}
+	// nodes is an append-only list To rollback, we just drop the
+	// extraneous entries from the slice.
+	gh.nodes = gh.nodes[:gh.ss.nodesLength]
 	gh.ss = nil
 }
