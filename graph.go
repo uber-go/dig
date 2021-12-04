@@ -41,14 +41,15 @@ type graphHolder struct {
 	// Container whose graph this holder contains.
 	c *Container
 
-	// Used for snapshots and rollbacks.
-	ss *graphSnapshot
+	// Number of nodes in the graph at last snapshot.
+	// -1 if no snapshot has been taken.
+	snap int
 }
 
 var _ graph.Graph = (*graphHolder)(nil)
 
 func newGraphHolder(c *Container) *graphHolder {
-	return &graphHolder{c: c}
+	return &graphHolder{c: c, snap: -1}
 
 }
 
@@ -95,30 +96,24 @@ func (gh *graphHolder) Lookup(i int) interface{} {
 	return gh.nodes[i].Wrapped
 }
 
-// graphSnapshot records a snapshotted state of a graph.
-type graphSnapshot struct {
-	nodesLength int
-}
-
 // Snapshot takes a temporary snapshot of the current state of the graph.
 // Use with Rollback to undo changes to the graph.
 //
 // Only one snapshot is allowed at a time.
 // Multiple calls to snapshot will overwrite prior snapshots.
 func (gh *graphHolder) Snapshot() {
-	gh.ss = &graphSnapshot{
-		nodesLength: len(gh.nodes),
-	}
+	gh.snap = len(gh.nodes)
 }
 
 // Rollback rolls back a snapshot to a previously captured state.
 // This is a no-op if no snapshot was captured.
 func (gh *graphHolder) Rollback() {
-	if gh.ss == nil {
+	if gh.snap < 0 {
 		return
 	}
+
 	// nodes is an append-only list To rollback, we just drop the
 	// extraneous entries from the slice.
-	gh.nodes = gh.nodes[:gh.ss.nodesLength]
-	gh.ss = nil
+	gh.nodes = gh.nodes[:gh.snap]
+	gh.snap = -1
 }
