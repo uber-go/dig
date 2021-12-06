@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Uber Technologies, Inc.
+// Copyright (c) 2021 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,6 +22,7 @@ package dig
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -642,4 +643,22 @@ func TestCanVisualizeError(t *testing.T) {
 			assert.Equal(t, tt.canVisualize, CanVisualizeError(tt.err))
 		})
 	}
+}
+
+func TestVisualizeErrorString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil", func(t *testing.T) {
+		t.Parallel()
+
+		opt := VisualizeError(nil)
+		assert.Equal(t, "VisualizeError(<nil>)", fmt.Sprint(opt))
+	})
+
+	t.Run("not nil", func(t *testing.T) {
+		t.Parallel()
+
+		opt := VisualizeError(errors.New("great sadness"))
+		assert.Equal(t, "VisualizeError(great sadness)", fmt.Sprint(opt))
+	})
 }
