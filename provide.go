@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -86,10 +87,6 @@ func (o *provideOptions) Validate() error {
 	return nil
 }
 
-type provideOptionFunc func(*provideOptions)
-
-func (f provideOptionFunc) applyProvideOption(opts *provideOptions) { f(opts) }
-
 // Name is a ProvideOption that specifies that all values produced by a
 // constructor should have the given name. See also the package documentation
 // about Named Values.
@@ -108,9 +105,17 @@ func (f provideOptionFunc) applyProvideOption(opts *provideOptions) { f(opts) }
 // This option cannot be provided for constructors which produce result
 // objects.
 func Name(name string) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.Name = name
-	})
+	return provideNameOption(name)
+}
+
+type provideNameOption string
+
+func (o provideNameOption) String() string {
+	return fmt.Sprintf("Name(%q)", string(o))
+}
+
+func (o provideNameOption) applyProvideOption(opt *provideOptions) {
+	opt.Name = string(o)
 }
 
 // Group is a ProvideOption that specifies that all values produced by a
@@ -120,9 +125,17 @@ func Name(name string) ProvideOption {
 // This option cannot be provided for constructors which produce result
 // objects.
 func Group(group string) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.Group = group
-	})
+	return provideGroupOption(group)
+}
+
+type provideGroupOption string
+
+func (o provideGroupOption) String() string {
+	return fmt.Sprintf("Group(%q)", string(o))
+}
+
+func (o provideGroupOption) applyProvideOption(opt *provideOptions) {
+	opt.Group = string(o)
 }
 
 // ID is a unique integer representing the constructor node in the dependency graph.
@@ -189,9 +202,17 @@ func (o *Output) String() string {
 // FillProvideInfo is a ProvideOption that writes info on what Dig was able to get out
 // out of the provided constructor into the provided ProvideInfo.
 func FillProvideInfo(info *ProvideInfo) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.Info = info
-	})
+	return fillProvideInfoOption{info: info}
+}
+
+type fillProvideInfoOption struct{ info *ProvideInfo }
+
+func (o fillProvideInfoOption) String() string {
+	return fmt.Sprintf("FillProvideInfo(%p)", o.info)
+}
+
+func (o fillProvideInfoOption) applyProvideOption(opts *provideOptions) {
+	opts.Info = o.info
 }
 
 // As is a ProvideOption that specifies that the value produced by the
@@ -237,9 +258,25 @@ func FillProvideInfo(info *ProvideInfo) ProvideOption {
 // This option cannot be provided for constructors which produce result
 // objects.
 func As(i ...interface{}) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.As = append(opts.As, i...)
-	})
+	return provideAsOption(i)
+}
+
+type provideAsOption []interface{}
+
+func (o provideAsOption) String() string {
+	buf := bytes.NewBufferString("As(")
+	for i, iface := range o {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(reflect.TypeOf(iface).Elem().String())
+	}
+	buf.WriteString(")")
+	return buf.String()
+}
+
+func (o provideAsOption) applyProvideOption(opts *provideOptions) {
+	opts.As = append(opts.As, o...)
 }
 
 // LocationForPC is a ProvideOption which specifies an alternate function program
@@ -249,9 +286,19 @@ func As(i ...interface{}) ProvideOption {
 // with the reflect.MakeFunc method whose error messages are otherwise hard to
 // understand
 func LocationForPC(pc uintptr) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.Location = digreflect.InspectFuncPC(pc)
-	})
+	return provideLocationOption{
+		loc: digreflect.InspectFuncPC(pc),
+	}
+}
+
+type provideLocationOption struct{ loc *digreflect.Func }
+
+func (o provideLocationOption) String() string {
+	return fmt.Sprintf("LocationForPC(%v)", o.loc)
+}
+
+func (o provideLocationOption) applyProvideOption(opts *provideOptions) {
+	opts.Location = o.loc
 }
 
 // provider encapsulates a user-provided constructor.
