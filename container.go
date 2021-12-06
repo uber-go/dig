@@ -67,32 +67,12 @@ type optionFunc func(*Container)
 func (f optionFunc) applyOption(c *Container) { f(c) }
 
 // Container is a directed acyclic graph of types and their dependencies.
+// A Container is the root Scope that represents the top-level scoped
+// directed acyclic graph of the dependencies.
 type Container struct {
-	// Mapping from key to all the constructor node that can provide a value for that
-	// key.
-	providers map[key][]*constructorNode
-
-	nodes []*constructorNode
-
-	// Values that have already been generated in the container.
-	values map[key]reflect.Value
-
-	// Values groups that have already been generated in the container.
-	groups map[key][]reflect.Value
-
-	// Source of randomness.
-	rand *rand.Rand
-
-	// Flag indicating whether the graph has been checked for cycles.
-	isVerifiedAcyclic bool
-
-	// Defer acyclic check on provide until Invoke.
-	deferAcyclicVerification bool
-
-	// invokerFn calls a function with arguments provided to Provide or Invoke.
-	invokerFn invokerFn
-
-	gh *graphHolder
+	// this is the "root" Scope that represents the
+	// root of the scope tree.
+	scope *Scope
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -142,6 +122,13 @@ type containerStore interface {
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
+	s := &Scope{
+		providers: make(map[key][]*constructorNode),
+		values:    make(map[key]reflect.Value),
+		groups:    make(map[key][]reflect.Value),
+		invokerFn: defaultInvoker,
+		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
 	c := &Container{
 		providers: make(map[key][]*constructorNode),
 		values:    make(map[key]reflect.Value),
