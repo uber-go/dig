@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"fmt"
 	"io"
 	"strconv"
 	"text/template"
@@ -37,10 +38,6 @@ type visualizeOptions struct {
 	VisualizeError error
 }
 
-type visualizeOptionFunc func(*visualizeOptions)
-
-func (f visualizeOptionFunc) applyVisualizeOption(opts *visualizeOptions) { f(opts) }
-
 // VisualizeError includes a visualization of the given error in the output of
 // Visualize if an error was returned by Invoke or Provide.
 //
@@ -51,9 +48,17 @@ func (f visualizeOptionFunc) applyVisualizeOption(opts *visualizeOptions) { f(op
 // This option has no effect if the error was nil or if it didn't contain any
 // information to visualize.
 func VisualizeError(err error) VisualizeOption {
-	return visualizeOptionFunc(func(opts *visualizeOptions) {
-		opts.VisualizeError = err
-	})
+	return visualizeErrorOption{err}
+}
+
+type visualizeErrorOption struct{ err error }
+
+func (o visualizeErrorOption) String() string {
+	return fmt.Sprintf("VisualizeError(%v)", o.err)
+}
+
+func (o visualizeErrorOption) applyVisualizeOption(opt *visualizeOptions) {
+	opt.VisualizeError = o.err
 }
 
 func updateGraph(dg *dot.Graph, err error) error {
