@@ -62,10 +62,6 @@ type Option interface {
 	applyOption(*Container)
 }
 
-type optionFunc func(*Container)
-
-func (f optionFunc) applyOption(c *Container) { f(c) }
-
 // Container is a directed acyclic graph of types and their dependencies.
 type Container struct {
 	// Mapping from key to all the constructor node that can provide a value for that
@@ -166,30 +162,54 @@ func New(opts ...Option) *Container {
 // Applications adding providers to a container in a tight loop may experience
 // performance improvements by initializing the container with this option.
 func DeferAcyclicVerification() Option {
-	return optionFunc(func(c *Container) {
-		c.deferAcyclicVerification = true
-	})
+	return deferAcyclicVerificationOption{}
+}
+
+type deferAcyclicVerificationOption struct{}
+
+func (deferAcyclicVerificationOption) String() string {
+	return "DeferAcyclicVerification()"
+}
+
+func (deferAcyclicVerificationOption) applyOption(c *Container) {
+	c.deferAcyclicVerification = true
 }
 
 // Changes the source of randomness for the container.
 //
 // This will help provide determinism during tests.
 func setRand(r *rand.Rand) Option {
-	return optionFunc(func(c *Container) {
-		c.rand = r
-	})
+	return setRandOption{r: r}
+}
+
+type setRandOption struct{ r *rand.Rand }
+
+func (o setRandOption) String() string {
+	return fmt.Sprintf("setRand(%p)", o.r)
+}
+
+func (o setRandOption) applyOption(c *Container) {
+	c.rand = o.r
 }
 
 // DryRun is an Option which, when set to true, disables invocation of functions supplied to
 // Provide and Invoke. Use this to build no-op containers.
 func DryRun(dry bool) Option {
-	return optionFunc(func(c *Container) {
-		if dry {
-			c.invokerFn = dryInvoker
-		} else {
-			c.invokerFn = defaultInvoker
-		}
-	})
+	return dryRunOption(dry)
+}
+
+type dryRunOption bool
+
+func (o dryRunOption) String() string {
+	return fmt.Sprintf("DryRun(%v)", bool(o))
+}
+
+func (o dryRunOption) applyOption(c *Container) {
+	if o {
+		c.invokerFn = dryInvoker
+	} else {
+		c.invokerFn = defaultInvoker
+	}
 }
 
 // invokerFn specifies how the container calls user-supplied functions.
