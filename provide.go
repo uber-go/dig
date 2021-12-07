@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -86,10 +87,6 @@ func (o *provideOptions) Validate() error {
 	return nil
 }
 
-type provideOptionFunc func(*provideOptions)
-
-func (f provideOptionFunc) applyProvideOption(opts *provideOptions) { f(opts) }
-
 // Name is a ProvideOption that specifies that all values produced by a
 // constructor should have the given name. See also the package documentation
 // about Named Values.
@@ -108,9 +105,17 @@ func (f provideOptionFunc) applyProvideOption(opts *provideOptions) { f(opts) }
 // This option cannot be provided for constructors which produce result
 // objects.
 func Name(name string) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.Name = name
-	})
+	return provideNameOption(name)
+}
+
+type provideNameOption string
+
+func (o provideNameOption) String() string {
+	return fmt.Sprintf("Name(%q)", string(o))
+}
+
+func (o provideNameOption) applyProvideOption(opt *provideOptions) {
+	opt.Name = string(o)
 }
 
 // Group is a ProvideOption that specifies that all values produced by a
@@ -120,9 +125,17 @@ func Name(name string) ProvideOption {
 // This option cannot be provided for constructors which produce result
 // objects.
 func Group(group string) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.Group = group
-	})
+	return provideGroupOption(group)
+}
+
+type provideGroupOption string
+
+func (o provideGroupOption) String() string {
+	return fmt.Sprintf("Group(%q)", string(o))
+}
+
+func (o provideGroupOption) applyProvideOption(opt *provideOptions) {
+	opt.Group = string(o)
 }
 
 // ID is a unique integer representing the constructor node in the dependency graph.
@@ -189,9 +202,17 @@ func (o *Output) String() string {
 // FillProvideInfo is a ProvideOption that writes info on what Dig was able to get out
 // out of the provided constructor into the provided ProvideInfo.
 func FillProvideInfo(info *ProvideInfo) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.Info = info
-	})
+	return fillProvideInfoOption{info: info}
+}
+
+type fillProvideInfoOption struct{ info *ProvideInfo }
+
+func (o fillProvideInfoOption) String() string {
+	return fmt.Sprintf("FillProvideInfo(%p)", o.info)
+}
+
+func (o fillProvideInfoOption) applyProvideOption(opts *provideOptions) {
+	opts.Info = o.info
 }
 
 // As is a ProvideOption that specifies that the value produced by the
@@ -237,9 +258,25 @@ func FillProvideInfo(info *ProvideInfo) ProvideOption {
 // This option cannot be provided for constructors which produce result
 // objects.
 func As(i ...interface{}) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.As = append(opts.As, i...)
-	})
+	return provideAsOption(i)
+}
+
+type provideAsOption []interface{}
+
+func (o provideAsOption) String() string {
+	buf := bytes.NewBufferString("As(")
+	for i, iface := range o {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(reflect.TypeOf(iface).Elem().String())
+	}
+	buf.WriteString(")")
+	return buf.String()
+}
+
+func (o provideAsOption) applyProvideOption(opts *provideOptions) {
+	opts.As = append(opts.As, o...)
 }
 
 // LocationForPC is a ProvideOption which specifies an alternate function program
@@ -249,9 +286,19 @@ func As(i ...interface{}) ProvideOption {
 // with the reflect.MakeFunc method whose error messages are otherwise hard to
 // understand
 func LocationForPC(pc uintptr) ProvideOption {
-	return provideOptionFunc(func(opts *provideOptions) {
-		opts.Location = digreflect.InspectFuncPC(pc)
-	})
+	return provideLocationOption{
+		loc: digreflect.InspectFuncPC(pc),
+	}
+}
+
+type provideLocationOption struct{ loc *digreflect.Func }
+
+func (o provideLocationOption) String() string {
+	return fmt.Sprintf("LocationForPC(%v)", o.loc)
+}
+
+func (o provideLocationOption) applyProvideOption(opts *provideOptions) {
+	opts.Location = o.loc
 }
 
 // provider encapsulates a user-provided constructor.
@@ -301,6 +348,10 @@ type provider interface {
 // accepts constructors that specify dependencies as dig.In structs and/or
 // specify results as dig.Out structs.
 func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) error {
+	return c.scope.Provide(constructor, opts...)
+}
+
+func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {
 		return errors.New("can't provide an untyped nil")
@@ -317,7 +368,7 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 		return err
 	}
 
-	if err := c.provide(constructor, options); err != nil {
+	if err := s.provide(constructor, options); err != nil {
 		return errProvide{
 			Func:   digreflect.InspectFunc(constructor),
 			Reason: err,
@@ -326,20 +377,20 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	return nil
 }
 
-func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
+func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	// take a snapshot of the current graph state before
 	// we start making changes to it as we may need to
 	// undo them upon encountering errors.
-	c.gh.Snapshot()
+	s.gh.Snapshot()
 	defer func() {
 		if err != nil {
-			c.gh.Rollback()
+			s.gh.Rollback()
 		}
 	}()
 
 	n, err := newConstructorNode(
 		ctor,
-		c,
+		s,
 		constructorOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
@@ -351,7 +402,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
 		return err
 	}
 
-	keys, err := c.findAndValidateResults(n)
+	keys, err := s.findAndValidateResults(n)
 	if err != nil {
 		return err
 	}
@@ -364,25 +415,25 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
 	oldProviders := make(map[key][]*constructorNode)
 	for k := range keys {
 		// Cache old providers before running cycle detection.
-		oldProviders[k] = c.providers[k]
-		c.providers[k] = append(c.providers[k], n)
+		oldProviders[k] = s.providers[k]
+		s.providers[k] = append(s.providers[k], n)
 	}
 
-	c.isVerifiedAcyclic = false
-	if !c.deferAcyclicVerification {
-		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
+	s.isVerifiedAcyclic = false
+	if !s.deferAcyclicVerification {
+		if ok, cycle := graph.IsAcyclic(s.gh); !ok {
 			// When a cycle is detected, recover the old providers to reset
 			// the providers map back to what it was before this node was
 			// introduced.
 			for k, ops := range oldProviders {
-				c.providers[k] = ops
+				s.providers[k] = ops
 			}
 
-			return errf("this function introduces a cycle", c.cycleDetectedError(cycle))
+			return errf("this function introduces a cycle", s.cycleDetectedError(cycle))
 		}
-		c.isVerifiedAcyclic = true
+		s.isVerifiedAcyclic = true
 	}
-	c.nodes = append(c.nodes, n)
+	s.nodes = append(s.nodes, n)
 
 	// Record introspection info for caller if Info option is specified
 	if info := opts.Info; info != nil {
@@ -414,11 +465,11 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
 }
 
 // Builds a collection of all result types produced by this constructor.
-func (c *Container) findAndValidateResults(n *constructorNode) (map[key]struct{}, error) {
+func (s *Scope) findAndValidateResults(n *constructorNode) (map[key]struct{}, error) {
 	var err error
 	keyPaths := make(map[key]string)
 	walkResult(n.ResultList(), connectionVisitor{
-		c:        c,
+		s:        s,
 		n:        n,
 		err:      &err,
 		keyPaths: keyPaths,
@@ -438,7 +489,7 @@ func (c *Container) findAndValidateResults(n *constructorNode) (map[key]struct{}
 // Visits the results of a node and compiles a collection of all the keys
 // produced by that node.
 type connectionVisitor struct {
-	c *Container
+	s *Scope
 	n *constructorNode
 
 	// If this points to a non-nil value, we've already encountered an error
@@ -523,7 +574,7 @@ func (cv connectionVisitor) checkKey(k key, path string) error {
 			"already provided by %v", conflict,
 		)
 	}
-	if ps := cv.c.providers[k]; len(ps) > 0 {
+	if ps := cv.s.providers[k]; len(ps) > 0 {
 		cons := make([]string, len(ps))
 		for i, p := range ps {
 			cons[i] = fmt.Sprint(p.Location())

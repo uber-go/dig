@@ -39,7 +39,7 @@ type graphHolder struct {
 	nodes []*graphNode
 
 	// Scope whose graph this holder contains.
-	c *Scope
+	s *Scope
 
 	// Number of nodes in the graph at last snapshot.
 	// -1 if no snapshot has been taken.
@@ -48,8 +48,8 @@ type graphHolder struct {
 
 var _ graph.Graph = (*graphHolder)(nil)
 
-func newGraphHolder(c *Container) *graphHolder {
-	return &graphHolder{c: c, snap: -1}
+func newGraphHolder(s *Scope) *graphHolder {
+	return &graphHolder{s: s, snap: -1}
 }
 
 func (gh *graphHolder) Order() int { return len(gh.nodes) }
@@ -71,7 +71,7 @@ func (gh *graphHolder) EdgesFrom(u int) []int {
 			orders = append(orders, getParamOrder(gh, param)...)
 		}
 	case *paramGroupedSlice:
-		providers := gh.c.getGroupProviders(w.Group, w.Type.Elem())
+		providers := gh.s.getGroupProviders(w.Group, w.Type.Elem())
 		for _, provider := range providers {
 			orders = append(orders, provider.Order())
 		}

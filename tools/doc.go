@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Uber Technologies, Inc.
+// Copyright (c) 2021 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,11 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:build tools
-// +build tools
-
-package dig
-
-import (
-	_ "golang.org/x/lint/golint"
-)
+// Package tools exists to make this directory a valid Go package.
+// The tools.go has a build tag that excludes it from being considered by Go
+// tooling except for dependency constraints.
+package tools

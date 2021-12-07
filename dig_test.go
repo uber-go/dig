@@ -1067,8 +1067,9 @@ func TestGroups(t *testing.T) {
 		}
 
 		func(i int) {
-			require.Error(t, c.Provide(func() {
+			require.Error(t, c.Provide(func() out {
 				t.Fatal("This should not be called")
+				return out{}
 			}, Group("val")), "This Provide should fail")
 		}(1)
 	})
@@ -1425,7 +1426,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 
 	t.Run("name option cannot be provided for result structs", func(t *testing.T) {
 		c := New()
-		type A struct{ idx int }
+		type A struct{}
 
 		type out struct {
 			Out
@@ -2660,6 +2661,9 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			A1 A // all is good
 			a2 A // oops, unexported type
 		}
+
+		_ = in{}.a2 // unused but needed for the test
+
 		require.NoError(t, c.Provide(func() A { return A{} }))
 
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
@@ -2678,6 +2682,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 			foo string
 		}
+
+		_ = in{}.foo // unused but needed for the test
 
 		err := c.Provide(func(in) int { return 0 })
 		require.Error(t, err, "Provide must fail")
@@ -2702,6 +2708,9 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		type in struct {
 			Embed
 		}
+
+		_ = in{}.a2 // unused but needed for the test
+
 		require.NoError(t, c.Provide(func() A { return A{} }))
 
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
@@ -2721,6 +2730,9 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 			string // embed an unexported std type
 		}
+
+		_ = param{}.string // unused but needed for the test
+
 		err := c.Invoke(func(p param) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
 		assertErrorMatches(t, err,
@@ -3093,14 +3105,14 @@ func TestNodeAlreadyCalled(t *testing.T) {
 	type type1 struct{}
 	f := func() type1 { return type1{} }
 
-	n, err := newConstructorNode(f, New(), constructorOptions{})
+	n, err := newConstructorNode(f, New().scope, constructorOptions{})
 	require.NoError(t, err, "failed to build node")
 	require.False(t, n.called, "node must not have been called")
 
 	c := New()
-	require.NoError(t, n.Call(c), "invoke failed")
+	require.NoError(t, n.Call(c.scope), "invoke failed")
 	require.True(t, n.called, "node must be called")
-	require.NoError(t, n.Call(c), "calling again should be okay")
+	require.NoError(t, n.Call(c.scope), "calling again should be okay")
 }
 
 func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {
@@ -3229,6 +3241,7 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 		type type1 struct{}
 		type type2 struct{}
 		type type3 struct{}
+
 		constructor := func() (*type1, *type2) {
 			return &type1{}, &type2{}
 		}
@@ -3241,10 +3254,12 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 			T2 *type2 `optional:"true"` // optional type present in the graph
 			t3 *type3
 		}
+
 		require.NoError(t, c.Provide(constructor))
 		err := c.Invoke(func(p param) {
 			require.NotNil(t, p.T1, "whole param struct should not be nil")
 			assert.NotNil(t, p.T2, "optional type in the graph should not return nil")
+			_ = p.t3 // unused
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
@@ -3267,10 +3282,12 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 			T2 *type2 `optional:"true"` // optional type present in the graph
 			t3 *type3
 		}
+
 		require.NoError(t, c.Provide(constructor))
 		err := c.Invoke(func(p param) {
 			require.NotNil(t, p.T1, "whole param struct should not be nil")
 			assert.NotNil(t, p.T2, "optional type in the graph should not return nil")
+			_ = p.t3
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),

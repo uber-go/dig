@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Uber Technologies, Inc.
+// Copyright (c) 2021 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,6 +22,7 @@ package dig
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -376,7 +377,7 @@ func TestNewDotCtor(t *testing.T) {
 	type t1 struct{}
 	type t2 struct{}
 
-	n, err := newConstructorNode(func(A t1) t2 { return t2{} }, New(), constructorOptions{})
+	n, err := newConstructorNode(func(A t1) t2 { return t2{} }, New().scope, constructorOptions{})
 	require.NoError(t, err)
 
 	n.location = &digreflect.Func{
@@ -535,7 +536,7 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(in2) t4 { return t4{} })
 		c.Provide(func() out2 { return out2{} })
 		c.Provide(func() (out3, error) { return out3{}, errf("great sadness") })
-		err := c.Invoke(func(t4 t4) { return })
+		err := c.Invoke(func(t4 t4) {})
 
 		VerifyVisualization(t, "error", c, VisualizeError(err))
 
@@ -547,7 +548,7 @@ func TestVisualize(t *testing.T) {
 				c.Provide(func(in2) t4 { return t4{} })
 				c.Provide(func() (out2, error) { return out2{}, errf("great sadness") })
 				c.Provide(func() out3 { return out3{} })
-				err := c.Invoke(func(t4 t4) { return })
+				err := c.Invoke(func(t4 t4) {})
 
 				VerifyVisualization(t, "prune_constructor_result", c, VisualizeError(err))
 			})
@@ -558,7 +559,7 @@ func TestVisualize(t *testing.T) {
 				c.Provide(func(in2) (t4, error) { return t4{}, errf("great sadness") })
 				c.Provide(func() out2 { return out2{} })
 				c.Provide(func() out3 { return out3{} })
-				err := c.Invoke(func(t4 t4) { return })
+				err := c.Invoke(func(t4 t4) {})
 
 				VerifyVisualization(t, "prune_non_root_nodes", c, VisualizeError(err))
 			})
@@ -569,14 +570,14 @@ func TestVisualize(t *testing.T) {
 		c := New()
 
 		c.Provide(func(A t1, B t2, C t3) t4 { return t4{} })
-		err := c.Invoke(func(t4 t4) { return })
+		err := c.Invoke(func(t4 t4) {})
 
 		VerifyVisualization(t, "missing", c, VisualizeError(err))
 	})
 
 	t.Run("missing dependency", func(t *testing.T) {
 		c := New()
-		err := c.Invoke(func(t1 t1) { return })
+		err := c.Invoke(func(t1 t1) {})
 
 		VerifyVisualization(t, "missingDep", c, VisualizeError(err))
 	})
@@ -642,4 +643,22 @@ func TestCanVisualizeError(t *testing.T) {
 			assert.Equal(t, tt.canVisualize, CanVisualizeError(tt.err))
 		})
 	}
+}
+
+func TestVisualizeErrorString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil", func(t *testing.T) {
+		t.Parallel()
+
+		opt := VisualizeError(nil)
+		assert.Equal(t, "VisualizeError(<nil>)", fmt.Sprint(opt))
+	})
+
+	t.Run("not nil", func(t *testing.T) {
+		t.Parallel()
+
+		opt := VisualizeError(errors.New("great sadness"))
+		assert.Equal(t, "VisualizeError(great sadness)", fmt.Sprint(opt))
+	})
 }
