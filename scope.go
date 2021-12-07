@@ -105,6 +105,14 @@ func (s *Scope) getScopesUntilRoot() []*Scope {
 	return []*Scope{s}
 }
 
+func (s *Scope) getStoresUntilRoot() []containerStore {
+	if s.parentScope != nil {
+		return append(s.parentScope.getStoresUntilRoot(), s)
+	}
+	return []containerStore{s}
+
+}
+
 func (s *Scope) knownTypes() []reflect.Type {
 	typeSet := make(map[reflect.Type]struct{}, len(s.providers))
 	for k := range s.providers {

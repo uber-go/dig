@@ -108,6 +108,16 @@ type containerStore interface {
 	// type.
 	getGroupProviders(name string, t reflect.Type) []provider
 
+	// Returns the providers that can produce a value with the given name and
+	// type across all the Scopes that are in effect of this containerStore.
+	getAllValueProviders(name string, t reflect.Type) []provider
+
+	// Returns the providers that can produce values for the given group and
+	// type across all the Scopes that are in effect of this containerStore.
+	getAllGroupProviders(name string, t reflect.Type) []provider
+
+	getStoresUntilRoot() []containerStore
+
 	createGraph() *dot.Graph
 
 	// Returns invokerFn function to use when calling arguments.
@@ -218,6 +228,11 @@ func (c *Container) invoker() invokerFn {
 // String representation of the entire Container
 func (c *Container) String() string {
 	return c.scope.String()
+}
+
+// Scope creates a child scope of the Container with the given name.
+func (c *Container) Scope(name string, opts ...ScopeOption) *Scope {
+	return c.scope.Scope(name, opts...)
 }
 
 type byTypeName []reflect.Type

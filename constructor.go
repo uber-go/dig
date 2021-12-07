@@ -54,6 +54,8 @@ type constructorNode struct {
 	resultList resultList
 
 	order int // order of this node in graphHolder
+
+	s *Scope // scope this node was originally provided to.
 }
 
 type constructorOptions struct {
@@ -65,12 +67,12 @@ type constructorOptions struct {
 	Location    *digreflect.Func
 }
 
-func newConstructorNode(ctor interface{}, c containerStore, opts constructorOptions) (*constructorNode, error) {
+func newConstructorNode(ctor interface{}, s *Scope, opts constructorOptions) (*constructorNode, error) {
 	cval := reflect.ValueOf(ctor)
 	ctype := cval.Type()
 	cptr := cval.Pointer()
 
-	params, err := newParamList(ctype, c)
+	params, err := newParamList(ctype, s)
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +101,9 @@ func newConstructorNode(ctor interface{}, c containerStore, opts constructorOpti
 		id:         dot.CtorID(cptr),
 		paramList:  params,
 		resultList: results,
+		s:          s,
 	}
-	n.order = c.newGraphNode(n)
+	n.order = s.newGraphNode(n)
 	return n, nil
 }
 
