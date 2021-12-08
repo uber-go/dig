@@ -351,6 +351,27 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	return c.scope.Provide(constructor, opts...)
 }
 
+// Provide teaches the Scope how to build values of one or more types and
+// expresses their dependencies.
+//
+// The first argument of Provide is a function that accepts zero or more
+// parameters and returns one or more results. The function may optionally
+// return an error to indicate that it failed to build the value. This
+// function will be treated as the constructor for all the types it returns.
+// This function will be called AT MOST ONCE when a type produced by it, or a
+// type that consumes this function's output, is requested via Invoke. If the
+// same types are requested multiple times, the previously produced value will
+// be reused.
+//
+// In addition to accepting constructors that accept dependencies as separate
+// arguments and produce results as separate return values, Provide also
+// accepts constructors that specify dependencies as dig.In structs and/or
+// specify results as dig.Out structs.
+//
+// When a constructor is Provided to a Scope, it will propagate this to any
+// Scopes that are descendents, but not ancestors of this Scope.
+// To provide a constructor to all the Scopes available, provide it to
+// Container, which is the root Scope.
 func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {

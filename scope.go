@@ -28,18 +28,17 @@ import (
 	"sort"
 )
 
-// ScopeOption configures a Scope. It's included for future functionality;
-// currently, there are no concrete implementations.
+// A ScopeOption modifies the default behavior of Scope; currently,
+// there are no implementations.
 type ScopeOption interface {
-	applyOption(*Scope)
+	applyScopeOption(*scopeOptions)
 }
 
-type scopeOptionFunc func(*Scope)
-
-func (f scopeOptionFunc) applyOption(s *Scope) { f(s) }
+type scopeOptions struct {
+}
 
 // Scope is a scoped DAG of types and their dependencies.
-// A Scope may also have one or more child Scopes that "inherit"
+// A Scope may also have one or more child Scopes that inherit
 // from it.
 type Scope struct {
 	name string
@@ -77,6 +76,10 @@ type Scope struct {
 }
 
 // Scope creates a new Scope with the given name and options from current Scope.
+// Any constructors that the current Scope knows about, as well as any modifications
+// made to it in the future will be propagated to the child scope.
+// However, no modifications made to the child scope being created will be propagated
+// to the parent Scope.
 func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	child := &Scope{
 		name:        name,
@@ -189,10 +192,6 @@ func (s *Scope) getProviders(k key) []provider {
 
 func (s *Scope) getAllValueProviders(name string, t reflect.Type) []provider {
 	return s.getAllProviders(key{name: name, t: t})
-}
-
-func (s *Scope) getAllGroupProviders(name string, t reflect.Type) []provider {
-	return s.getAllProviders(key{group: name, t: t})
 }
 
 func (s *Scope) getAllProviders(k key) []provider {

@@ -215,12 +215,6 @@ func dryInvoker(fn reflect.Value, _ []reflect.Value) []reflect.Value {
 	return results
 }
 
-// invokerFn return a function to run when calling function provided to Provide or Invoke. Used for
-// running container in dry mode.
-func (c *Container) invoker() invokerFn {
-	return c.scope.invokerFn
-}
-
 // String representation of the entire Container
 func (c *Container) String() string {
 	return c.scope.String()
