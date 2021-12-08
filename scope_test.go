@@ -70,24 +70,57 @@ func TestScopedOperations(t *testing.T) {
 		assert.Error(t, c.Invoke(useB))
 	})
 
-	t.Run("private provides do not propagate upstream", func(t *testing.T) {
+	t.Run("provides to top-level Container propogates to all scopes", func(t *testing.T) {
 		type A struct{}
 
-		c := New()
-		s := c.Scope("child")
-		s.Provide(func() *A { return &A{} })
+		// Scope tree:
+		//     root  <-- Provide(func() *A)
+		//    /    \
+		//   c1	    c2
+		//   |     /  \
+		//   gc1  gc2  gc3
+		var allScopes []*Scope
+		root := New()
 
-		assert.Error(t, c.Invoke(func(a *A) {}), "invoking on child's private-provided type should fail")
+		allScopes = append(allScopes, root.Scope("child 1"), root.Scope("child 2"))
+		allScopes = append(allScopes, allScopes[0].Scope("grandchild 1"), allScopes[1].Scope("grandchild 2"), allScopes[1].Scope("grandchild 3"))
+
+		root.Provide(func() *A {
+			return &A{}
+		})
+
+		// top-level provide should be available in all the scopes.
+		for _, scope := range allScopes {
+			assert.NoError(t, scope.Invoke(func(a *A) {}))
+		}
 	})
 
-	t.Run("export provides propogate upstream", func(t *testing.T) {
+	t.Run("private provides to child should be available to grandchildren, but not root", func(t *testing.T) {
+		type A struct{}
+		// Scope tree:
+		//     root
+		//      |
+		//     child  <-- Provide(func() *A)
+		//     /  \
+		//   gc1   gc2
+		root := New()
+		c := root.Scope("child")
+		gc := c.Scope("grandchild")
+
+		c.Provide(func() *A { return &A{} })
+
+		err := root.Invoke(func(a *A) {})
+		assert.Error(t, err, "expected Invoke in root container on child's private-provided type to fail")
+		assert.Contains(t, err.Error(), "missing type: *dig.A")
+
+		assert.NoError(t, gc.Invoke(func(a *A) {}), "expected Invoke in grandchild container on child's private-provided type to fail")
 	})
 }
 
 func TestScopeFailures(t *testing.T) {
 	t.Parallel()
 
-	t.Run("cycle with child", func(t *testing.T) {
+	t.Run("introduce a cycle with child", func(t *testing.T) {
 		// what root sees:
 		// A <- B    C
 		// |         ^
@@ -117,4 +150,17 @@ func TestScopeFailures(t *testing.T) {
 		assert.NoError(t, s.Provide(newB))
 		assert.Error(t, c.Provide(newC), "expected a cycle to be introduced in the child")
 	})
+
+	t.Run("private provides do not propagate upstream", func(t *testing.T) {
+		type A struct{}
+
+		root := New()
+		c := root.Scope("child")
+		gc := c.Scope("grandchild")
+		gc.Provide(func() *A { return &A{} })
+
+		assert.Error(t, root.Invoke(func(a *A) {}), "invoking on grandchild's private-provided type should fail")
+		assert.Error(t, c.Invoke(func(a *A) {}), "invoking on child's private-provided type should fail")
+	})
+
 }
