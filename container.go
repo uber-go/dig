@@ -112,10 +112,6 @@ type containerStore interface {
 	// type across all the Scopes that are in effect of this containerStore.
 	getAllValueProviders(name string, t reflect.Type) []provider
 
-	// Returns the providers that can produce values for the given group and
-	// type across all the Scopes that are in effect of this containerStore.
-	getAllGroupProviders(name string, t reflect.Type) []provider
-
 	getStoresUntilRoot() []containerStore
 
 	createGraph() *dot.Graph

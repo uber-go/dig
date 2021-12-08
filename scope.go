@@ -81,15 +81,38 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	child := &Scope{
 		name:        name,
 		parentScope: s,
-		providers:   make(map[key][]*constructorNode),
-		values:      make(map[key]reflect.Value),
-		groups:      make(map[key][]reflect.Value),
+		providers:   make(map[key][]*constructorNode, len(s.providers)),
+		values:      make(map[key]reflect.Value, len(s.values)),
+		groups:      make(map[key][]reflect.Value, len(s.groups)),
 		invokerFn:   s.invokerFn,
+	}
+
+	// Copy over providers, values, and groups.
+	for key, nodes := range s.providers {
+		child.providers[key] = make([]*constructorNode, len(nodes))
+		for i, node := range nodes {
+			child.providers[key][i] = node
+		}
+	}
+	for key, value := range s.values {
+		child.values[key] = value
+	}
+
+	for key, groups := range s.groups {
+		child.groups[key] = make([]reflect.Value, len(groups))
+		for i, group := range groups {
+			child.groups[key][i] = group
+		}
 	}
 
 	// child should hold a separate graph holder
 	child.gh = &graphHolder{
-		s: child,
+		s:     child,
+		snap:  -1,
+		nodes: make([]*graphNode, len(s.gh.nodes)),
+	}
+	for i, graphNode := range s.gh.nodes {
+		child.gh.nodes[i] = graphNode
 	}
 
 	s.childScopes = append(s.childScopes, child)

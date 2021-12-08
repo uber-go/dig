@@ -27,31 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScopeTree(t *testing.T) {
-	t.Parallel()
-	c := New()
-	s1 := c.Scope("child 1")
-	s2 := c.Scope("child 2")
-	s3 := s1.Scope("grandchild")
-
-	t.Run("verify Container tree", func(t *testing.T) {
-		t.Parallel()
-
-		assert.Equal(t, s1.parentScope, c.scope)
-		assert.Equal(t, s2.parentScope, c.scope)
-
-		assert.Equal(t, s3.parentScope, s1)
-		assert.NotEqual(t, s3.parentScope, s2)
-	})
-
-	t.Run("getScopesUntilRoot returns scopes in tree path in order of distance from root", func(t *testing.T) {
-		t.Parallel()
-
-		assert.Equal(t, []*Scope{c.scope, s1, s3}, s3.getScopesUntilRoot())
-		assert.Equal(t, []*Scope{c.scope, s1, s3}, s3.getScopesUntilRoot())
-	})
-}
-
 func TestScopedOperations(t *testing.T) {
 	t.Parallel()
 
@@ -93,5 +68,53 @@ func TestScopedOperations(t *testing.T) {
 		assert.NoError(t, grandchild.Invoke(useA))
 		assert.NoError(t, grandchild.Invoke(useB))
 		assert.Error(t, c.Invoke(useB))
+	})
+
+	t.Run("private provides do not propagate upstream", func(t *testing.T) {
+		type A struct{}
+
+		c := New()
+		s := c.Scope("child")
+		s.Provide(func() *A { return &A{} })
+
+		assert.Error(t, c.Invoke(func(a *A) {}), "invoking on child's private-provided type should fail")
+	})
+
+	t.Run("export provides propogate upstream", func(t *testing.T) {
+	})
+}
+
+func TestScopeFailures(t *testing.T) {
+	t.Parallel()
+
+	t.Run("cycle with child", func(t *testing.T) {
+		// what root sees:
+		// A <- B    C
+		// |         ^
+		// |_________|
+		//
+		// what child sees:
+		// A <- B <- C
+		// |         ^
+		// |_________|
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		newA := func(*C) *A { return &A{} }
+		newB := func(*A) *B { return &B{} }
+		newC := func(*B) *C { return &C{} }
+
+		c := New()
+		s := c.Scope("child")
+		assert.NoError(t, c.Provide(newA))
+		assert.NoError(t, s.Provide(newB))
+		assert.Error(t, c.Provide(newC), "expected a cycle to be introduced in the child")
+
+		// Try again, this time with child inheriting parent-provided constructors.
+		c = New()
+		assert.NoError(t, c.Provide(newA))
+		s = c.Scope("child")
+		assert.NoError(t, s.Provide(newB))
+		assert.Error(t, c.Provide(newC), "expected a cycle to be introduced in the child")
 	})
 }

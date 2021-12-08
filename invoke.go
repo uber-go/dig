@@ -116,7 +116,7 @@ func findMissingDependencies(c containerStore, params ...param) []paramSingle {
 	for _, param := range params {
 		switch p := param.(type) {
 		case paramSingle:
-			if ns := c.getAllValueProviders(p.Name, p.Type); len(ns) == 0 && !p.Optional {
+			if ns := c.getValueProviders(p.Name, p.Type); len(ns) == 0 && !p.Optional {
 				missingDeps = append(missingDeps, p)
 			}
 		case paramObject:
