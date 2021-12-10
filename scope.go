@@ -46,12 +46,14 @@ type Scope struct {
 	// key.
 	providers map[key][]*constructorNode
 
+	// constructorNodes provided directly to this Scope. i.e. it does not include
+	// any nodes that were provided to the parent Scope this inherited from.
 	nodes []*constructorNode
 
-	// Values that have already been generated in the container.
+	// Values that have already been generated directly in the Scope.
 	values map[key]reflect.Value
 
-	// Values groups that have already been generated in the container.
+	// Values groups that have already been generated directly in the Scope.
 	groups map[key][]reflect.Value
 
 	// Source of randomness.
@@ -66,6 +68,8 @@ type Scope struct {
 	// invokerFn calls a function with arguments provided to Provide or Invoke.
 	invokerFn invokerFn
 
+	// graph of this Scope. Note that this holds the dependency graph of all the
+	// nodes that affect this Scope, not just the ones provided directly to this Scope.
 	gh *graphHolder
 
 	// Parent of this Scope.
