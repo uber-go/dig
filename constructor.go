@@ -53,9 +53,11 @@ type constructorNode struct {
 	// Type information about constructor results.
 	resultList resultList
 
-	orders map[*Scope]int // order of this node in each Scopes' graphHolders.
+	// order of this node in each Scopes' graphHolders.
+	orders map[*Scope]int
 
-	s *Scope // scope this node was originally provided to.
+	// scope this node was originally provided to.
+	s *Scope
 }
 
 type constructorOptions struct {

@@ -114,12 +114,21 @@ func (s *Scope) getScopesUntilRoot() []*Scope {
 	return []*Scope{s}
 }
 
+func (s *Scope) getAllLeafScopes() []*Scope {
+	allScopes := []*Scope{s}
+	if len(s.childScopes) > 0 {
+		for _, cs := range s.childScopes {
+			allScopes = append(allScopes, cs.getAllLeafScopes()...)
+		}
+	}
+	return allScopes
+}
+
 func (s *Scope) getStoresUntilRoot() []containerStore {
 	if s.parentScope != nil {
 		return append(s.parentScope.getStoresUntilRoot(), s)
 	}
 	return []containerStore{s}
-
 }
 
 func (s *Scope) knownTypes() []reflect.Type {
@@ -173,6 +182,10 @@ func (s *Scope) getProviders(k key) []provider {
 	return providers
 }
 
+func (s *Scope) getAllGroupProviders(name string, t reflect.Type) []provider {
+	return s.getAllProviders(key{group: name, t: t})
+}
+
 func (s *Scope) getAllValueProviders(name string, t reflect.Type) []provider {
 	return s.getAllProviders(key{name: name, t: t})
 }
@@ -214,7 +227,7 @@ func (s *Scope) cycleDetectedError(cycle []int) error {
 			})
 		}
 	}
-	return errCycleDetected{Path: path}
+	return errCycleDetected{Path: path, scope: s}
 }
 
 // String representation of the entire Scope

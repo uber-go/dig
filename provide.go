@@ -440,31 +440,27 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 		s.providers[k] = append(s.providers[k], n)
 	}
 
-	s.isVerifiedAcyclic = false
-	if !s.deferAcyclicVerification {
-		if ok, cycle := graph.IsAcyclic(s.gh); !ok {
-			// When a cycle is detected, recover the old providers to reset
-			// the providers map back to what it was before this node was
-			// introduced.
-			for k, ops := range oldProviders {
-				s.providers[k] = ops
-			}
+	allScopes := s.getAllLeafScopes()
+	for _, s := range allScopes {
+		s.isVerifiedAcyclic = false
+		if !s.deferAcyclicVerification {
+			if ok, cycle := graph.IsAcyclic(s.gh); !ok {
+				// When a cycle is detected, recover the old providers to reset
+				// the providers map back to what it was before this node was
+				// introduced.
+				for k, ops := range oldProviders {
+					s.providers[k] = ops
+				}
 
-			return errf("this function introduces a cycle", s.cycleDetectedError(cycle))
+				return errf("this function introduces a cycle", s.cycleDetectedError(cycle))
+			}
+			s.isVerifiedAcyclic = true
 		}
-		s.isVerifiedAcyclic = true
 	}
 
 	// Before appending to the nodes, check if there are
 	// any child Scopes. If there are any, recurse down
 	// the descendents to provide the constructor to them.
-	if len(s.childScopes) != 0 {
-		for _, childScope := range s.childScopes {
-			if err := childScope.provide(ctor, opts); err != nil {
-				return err
-			}
-		}
-	}
 	s.nodes = append(s.nodes, n)
 
 	// Record introspection info for caller if Info option is specified

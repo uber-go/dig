@@ -71,7 +71,7 @@ func (gh *graphHolder) EdgesFrom(u int) []int {
 			orders = append(orders, getParamOrder(gh, param)...)
 		}
 	case *paramGroupedSlice:
-		providers := gh.s.getGroupProviders(w.Group, w.Type.Elem())
+		providers := gh.s.getAllGroupProviders(w.Group, w.Type.Elem())
 		for _, provider := range providers {
 			orders = append(orders, provider.Order(gh.s))
 		}

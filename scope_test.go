@@ -141,14 +141,18 @@ func TestScopeFailures(t *testing.T) {
 		s := c.Scope("child")
 		assert.NoError(t, c.Provide(newA))
 		assert.NoError(t, s.Provide(newB))
-		assert.Error(t, c.Provide(newC), "expected a cycle to be introduced in the child")
+		err := c.Provide(newC)
+		assert.Error(t, err, "expected a cycle to be introduced in the child")
+		assert.Contains(t, err.Error(), "In Scope child")
 
 		// Try again, this time with child inheriting parent-provided constructors.
 		c = New()
 		assert.NoError(t, c.Provide(newA))
 		s = c.Scope("child")
 		assert.NoError(t, s.Provide(newB))
-		assert.Error(t, c.Provide(newC), "expected a cycle to be introduced in the child")
+		err = c.Provide(newC)
+		assert.Error(t, err, "expected a cycle to be introduced in the child")
+		assert.Contains(t, err.Error(), "In Scope child")
 	})
 
 	t.Run("private provides do not propagate upstream", func(t *testing.T) {
