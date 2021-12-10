@@ -90,30 +90,13 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 		invokerFn:   s.invokerFn,
 	}
 
-	// Copy over providers, values, and groups.
-	for key, nodes := range s.providers {
-		child.providers[key] = make([]*constructorNode, len(nodes))
-		for i, node := range nodes {
-			child.providers[key][i] = node
-		}
-	}
-	for key, value := range s.values {
-		child.values[key] = value
-	}
-
-	for key, groups := range s.groups {
-		child.groups[key] = make([]reflect.Value, len(groups))
-		for i, group := range groups {
-			child.groups[key][i] = group
-		}
-	}
-
 	// child should hold a separate graph holder
 	child.gh = &graphHolder{
 		s:     child,
 		snap:  -1,
 		nodes: make([]*graphNode, len(s.gh.nodes)),
 	}
+
 	for i, graphNode := range s.gh.nodes {
 		child.gh.nodes[i] = graphNode
 	}
@@ -207,8 +190,16 @@ func (s *Scope) invoker() invokerFn {
 	return s.invokerFn
 }
 
-func (s *Scope) newGraphNode(wrapped interface{}) int {
-	return s.gh.NewNode(wrapped)
+// adds a new graphNode to this Scope and all of its descendent
+// scope.
+func (s *Scope) newGraphNode(wrapped interface{}, orders map[*Scope]int) {
+	orders[s] = s.gh.NewNode(wrapped)
+
+	if len(s.childScopes) > 0 {
+		for _, cs := range s.childScopes {
+			cs.newGraphNode(wrapped, orders)
+		}
+	}
 }
 
 func (s *Scope) cycleDetectedError(cycle []int) error {

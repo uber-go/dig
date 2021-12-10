@@ -308,7 +308,7 @@ type provider interface {
 
 	// Order reports the order of this provider in the graphHolder.
 	// This value is usually returned by the graphHolder.NewNode method.
-	Order() int
+	Order(*Scope) int
 
 	// Location returns where this constructor was defined.
 	Location() *digreflect.Func

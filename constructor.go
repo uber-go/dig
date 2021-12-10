@@ -53,7 +53,7 @@ type constructorNode struct {
 	// Type information about constructor results.
 	resultList resultList
 
-	order int // order of this node in graphHolder
+	orders map[*Scope]int // order of this node in each Scopes' graphHolders.
 
 	s *Scope // scope this node was originally provided to.
 }
@@ -101,9 +101,10 @@ func newConstructorNode(ctor interface{}, s *Scope, opts constructorOptions) (*c
 		id:         dot.CtorID(cptr),
 		paramList:  params,
 		resultList: results,
+		orders:     make(map[*Scope]int),
 		s:          s,
 	}
-	n.order = s.newGraphNode(n)
+	s.newGraphNode(n, n.orders)
 	return n, nil
 }
 
@@ -112,7 +113,7 @@ func (n *constructorNode) ParamList() paramList       { return n.paramList }
 func (n *constructorNode) ResultList() resultList     { return n.resultList }
 func (n *constructorNode) ID() dot.CtorID             { return n.id }
 func (n *constructorNode) CType() reflect.Type        { return n.ctype }
-func (n *constructorNode) Order() int                 { return n.order }
+func (n *constructorNode) Order(s *Scope) int         { return n.orders[s] }
 
 func (n *constructorNode) String() string {
 	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)

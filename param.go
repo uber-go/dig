@@ -270,14 +270,14 @@ func getParamOrder(gh *graphHolder, param param) []int {
 	var orders []int
 	switch p := param.(type) {
 	case paramSingle:
-		providers := gh.s.getValueProviders(p.Name, p.Type)
+		providers := gh.s.getAllValueProviders(p.Name, p.Type)
 		for _, provider := range providers {
-			orders = append(orders, provider.Order())
+			orders = append(orders, provider.Order(gh.s))
 		}
 	case paramGroupedSlice:
 		// value group parameters have nodes of their own.
 		// We can directly return that here.
-		orders = append(orders, p.order)
+		orders = append(orders, p.orders[gh.s])
 	case paramObject:
 		for _, pf := range p.Fields {
 			orders = append(orders, getParamOrder(gh, pf.Param)...)
@@ -416,7 +416,7 @@ type paramGroupedSlice struct {
 	// Type of the slice.
 	Type reflect.Type
 
-	order int
+	orders map[*Scope]int
 }
 
 func (pt paramGroupedSlice) String() string {
@@ -444,7 +444,7 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	if err != nil {
 		return paramGroupedSlice{}, err
 	}
-	pg := paramGroupedSlice{Group: g.Name, Type: f.Type}
+	pg := paramGroupedSlice{Group: g.Name, Type: f.Type, orders: make(map[*Scope]int)}
 
 	name := f.Tag.Get(_nameTag)
 	optional, _ := isFieldOptional(f)
@@ -463,7 +463,7 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	case optional:
 		return pg, errors.New("value groups cannot be optional")
 	}
-	pg.order = c.newGraphNode(&pg)
+	c.newGraphNode(&pg, pg.orders)
 	return pg, nil
 }
 
