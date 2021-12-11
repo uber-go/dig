@@ -405,6 +405,7 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	// undo them upon encountering errors.
 	allScopes := s.getAllLeafScopes()
 	for _, s := range allScopes {
+		s := s
 		s.gh.Snapshot()
 		defer func() {
 			if err != nil {
