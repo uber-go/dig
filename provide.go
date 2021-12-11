@@ -399,15 +399,19 @@ func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 }
 
 func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
+	// For all scopes affected by this change,
 	// take a snapshot of the current graph state before
 	// we start making changes to it as we may need to
 	// undo them upon encountering errors.
-	s.gh.Snapshot()
-	defer func() {
-		if err != nil {
-			s.gh.Rollback()
-		}
-	}()
+	allScopes := s.getAllLeafScopes()
+	for _, s := range allScopes {
+		s.gh.Snapshot()
+		defer func() {
+			if err != nil {
+				s.gh.Rollback()
+			}
+		}()
+	}
 
 	n, err := newConstructorNode(
 		ctor,
@@ -440,7 +444,6 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 		s.providers[k] = append(s.providers[k], n)
 	}
 
-	allScopes := s.getAllLeafScopes()
 	for _, s := range allScopes {
 		s.isVerifiedAcyclic = false
 		if !s.deferAcyclicVerification {
