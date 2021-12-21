@@ -169,7 +169,7 @@ func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 		// for these errors to occur in child scopes that don't
 		// contain the given parameter type. We can safely ignore
 		// these.
-		// kf it's an error other than missing types/dependencies,
+		// If it's an error other than missing types/dependencies,
 		// this means some constructor returned an error that must
 		// be reported.
 		_, isErrMissingTypes := err.(errMissingTypes)
