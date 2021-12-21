@@ -85,7 +85,7 @@ type containerWriter interface {
 type containerStore interface {
 	containerWriter
 
-	// Adds a new graph node to the Container and returns its order.
+	// Adds a new graph node to the Container
 	newGraphNode(w interface{}, orders map[*Scope]int)
 
 	// Returns a slice containing all known types.

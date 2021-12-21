@@ -108,8 +108,8 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	return child
 }
 
-// getScopesFromRoot creates a list of Scopes
-// have to traverse through from root until the current node.
+// getScopesFromRoot returns a list of Scopes from the root Container
+// until the current Scope.
 func (s *Scope) getScopesFromRoot() []*Scope {
 	var scopes []*Scope
 	for s := s; s != nil; s = s.parentScope {
