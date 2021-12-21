@@ -30,10 +30,10 @@ import (
 )
 
 func TestParamListBuild(t *testing.T) {
-	p, err := newParamList(reflect.TypeOf(func() io.Writer { return nil }), New().scope)
+	p, err := newParamList(reflect.TypeOf(func() io.Writer { return nil }), newScope())
 	require.NoError(t, err)
 	assert.Panics(t, func() {
-		p.Build(New().scope)
+		p.Build(newScope())
 	})
 }
 
@@ -57,7 +57,7 @@ func TestParamObjectSuccess(t *testing.T) {
 		} `name:"bar"`
 	}
 
-	po, err := newParamObject(reflect.TypeOf(in{}), New().scope)
+	po, err := newParamObject(reflect.TypeOf(in{}), newScope())
 	require.NoError(t, err)
 
 	require.Len(t, po.Fields, 4)
@@ -114,7 +114,7 @@ func TestParamObjectWithUnexportedFieldsSuccess(t *testing.T) {
 
 	_ = in{}.t2 // unused
 
-	po, err := newParamObject(reflect.TypeOf(in{}), New().scope)
+	po, err := newParamObject(reflect.TypeOf(in{}), newScope())
 	require.NoError(t, err)
 
 	require.Len(t, po.Fields, 1)
@@ -138,7 +138,7 @@ func TestParamObjectFailure(t *testing.T) {
 
 		_ = in{}.a2 // unused but needed
 
-		_, err := newParamObject(reflect.TypeOf(in{}), New().scope)
+		_, err := newParamObject(reflect.TypeOf(in{}), newScope())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
 			`bad field "a2" of dig.in: unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A)`)
@@ -155,7 +155,7 @@ func TestParamObjectFailure(t *testing.T) {
 
 		_ = in{}.a2 // unused but needed
 
-		_, err := newParamObject(reflect.TypeOf(in{}), New().scope)
+		_, err := newParamObject(reflect.TypeOf(in{}), newScope())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
 			`bad field "a2" of dig.in: unexported fields not allowed in dig.In, did you mean to export "a2" (dig.A)`)
@@ -172,7 +172,7 @@ func TestParamObjectFailure(t *testing.T) {
 
 		_ = in{}.a2 // unused but needed
 
-		_, err := newParamObject(reflect.TypeOf(in{}), New().scope)
+		_, err := newParamObject(reflect.TypeOf(in{}), newScope())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
 			`invalid value "foo" for "ignore-unexported" tag on field In: strconv.ParseBool: parsing "foo": invalid syntax`)
@@ -227,7 +227,7 @@ func TestParamGroupSliceErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			_, err := newParamObject(reflect.TypeOf(tt.shape), New().scope)
+			_, err := newParamObject(reflect.TypeOf(tt.shape), newScope())
 			require.Error(t, err, "expected failure")
 			assert.Contains(t, err.Error(), tt.wantErr)
 		})

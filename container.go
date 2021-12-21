@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
-	"time"
 
 	"go.uber.org/dig/internal/dot"
 )
@@ -112,7 +111,7 @@ type containerStore interface {
 	// type across all the Scopes that are in effect of this containerStore.
 	getAllValueProviders(name string, t reflect.Type) []provider
 
-	getStoresUntilRoot() []containerStore
+	getStoresFromRoot() []containerStore
 
 	createGraph() *dot.Graph
 
@@ -122,15 +121,7 @@ type containerStore interface {
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
-	s := &Scope{
-		providers: make(map[key][]*constructorNode),
-		values:    make(map[key]reflect.Value),
-		groups:    make(map[key][]reflect.Value),
-		invokerFn: defaultInvoker,
-		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
-
-	s.gh = newGraphHolder(s)
+	s := newScope()
 	c := &Container{scope: s}
 
 	for _, opt := range opts {

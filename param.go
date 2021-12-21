@@ -146,16 +146,35 @@ func (pl paramList) Build(containerStore) (reflect.Value, error) {
 // to the underlying constructor.
 func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
-	allContainers := c.getStoresUntilRoot()
+	argsBuilt := make([]bool, len(pl.Params))
+	allContainers := c.getStoresFromRoot()
 	for i, p := range pl.Params {
 		var err error
+		var arg reflect.Value
 		// iterate through the tree path of scopes.
-		for _, ac := range allContainers {
-			if args[i], err = p.Build(ac); err == nil {
-				break
+		for _, c := range allContainers {
+			if arg, err = p.Build(c); err == nil {
+				args[i] = arg
+				argsBuilt[i] = true
 			}
 		}
-		if err != nil {
+
+		// If an argument failed to build, that means none of the
+		// scopes had the type. This should be reported.
+		if !argsBuilt[i] {
+			return nil, err
+		}
+
+		// If argument has successfully been built, it's possible
+		// for these errors to occur in child scopes that don't
+		// contain the given parameter type. We can safely ignore
+		// these.
+		// kf it's an error other than missing types/dependencies,
+		// this means some constructor returned an error that must
+		// be reported.
+		_, isErrMissingTypes := err.(errMissingTypes)
+		_, isErrMissingDeps := err.(errMissingDependencies)
+		if err != nil && !isErrMissingTypes && !isErrMissingDeps {
 			return nil, err
 		}
 	}

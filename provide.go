@@ -343,10 +343,8 @@ type provider interface {
 // same types are requested multiple times, the previously produced value will
 // be reused.
 //
-// In addition to accepting constructors that accept dependencies as separate
-// arguments and produce results as separate return values, Provide also
-// accepts constructors that specify dependencies as dig.In structs and/or
-// specify results as dig.Out structs.
+// Provide accepts argument types or dig.In structs as dependencies, and
+// separate return values or dig.Out structs for results.
 func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) error {
 	return c.scope.Provide(constructor, opts...)
 }
@@ -363,10 +361,8 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 // same types are requested multiple times, the previously produced value will
 // be reused.
 //
-// In addition to accepting constructors that accept dependencies as separate
-// arguments and produce results as separate return values, Provide also
-// accepts constructors that specify dependencies as dig.In structs and/or
-// specify results as dig.Out structs.
+// Provide accepts argument types or dig.In structs as dependencies, and
+// separate return values or dig.Out structs for results.
 //
 // When a constructor is Provided to a Scope, it will propagate this to any
 // Scopes that are descendents, but not ancestors of this Scope.
@@ -403,7 +399,7 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	// take a snapshot of the current graph state before
 	// we start making changes to it as we may need to
 	// undo them upon encountering errors.
-	allScopes := s.getAllLeafScopes()
+	allScopes := s.appendLeafScopes(nil)
 	for _, s := range allScopes {
 		s := s
 		s.gh.Snapshot()
@@ -447,24 +443,22 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 
 	for _, s := range allScopes {
 		s.isVerifiedAcyclic = false
-		if !s.deferAcyclicVerification {
-			if ok, cycle := graph.IsAcyclic(s.gh); !ok {
-				// When a cycle is detected, recover the old providers to reset
-				// the providers map back to what it was before this node was
-				// introduced.
-				for k, ops := range oldProviders {
-					s.providers[k] = ops
-				}
-
-				return errf("this function introduces a cycle", s.cycleDetectedError(cycle))
-			}
-			s.isVerifiedAcyclic = true
+		if s.deferAcyclicVerification {
+			continue
 		}
+		if ok, cycle := graph.IsAcyclic(s.gh); !ok {
+			// When a cycle is detected, recover the old providers to reset
+			// the providers map back to what it was before this node was
+			// introduced.
+			for k, ops := range oldProviders {
+				s.providers[k] = ops
+			}
+
+			return errf("this function introduces a cycle", s.cycleDetectedError(cycle))
+		}
+		s.isVerifiedAcyclic = true
 	}
 
-	// Before appending to the nodes, check if there are
-	// any child Scopes. If there are any, recurse down
-	// the descendents to provide the constructor to them.
 	s.nodes = append(s.nodes, n)
 
 	// Record introspection info for caller if Info option is specified

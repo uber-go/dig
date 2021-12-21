@@ -3105,7 +3105,7 @@ func TestNodeAlreadyCalled(t *testing.T) {
 	type type1 struct{}
 	f := func() type1 { return type1{} }
 
-	n, err := newConstructorNode(f, New().scope, constructorOptions{})
+	n, err := newConstructorNode(f, newScope(), constructorOptions{})
 	require.NoError(t, err, "failed to build node")
 	require.False(t, n.called, "node must not have been called")
 

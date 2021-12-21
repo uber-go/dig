@@ -26,15 +26,13 @@ import (
 	"math/rand"
 	"reflect"
 	"sort"
+	"time"
 )
 
 // A ScopeOption modifies the default behavior of Scope; currently,
 // there are no implementations.
 type ScopeOption interface {
-	applyScopeOption(*scopeOptions)
-}
-
-type scopeOptions struct {
+	noScopeOption() //yet
 }
 
 // Scope is a scoped DAG of types and their dependencies.
@@ -50,10 +48,10 @@ type Scope struct {
 	// any nodes that were provided to the parent Scope this inherited from.
 	nodes []*constructorNode
 
-	// Values that have already been generated directly in the Scope.
+	// Values that generated directly in the Scope.
 	values map[key]reflect.Value
 
-	// Values groups that have already been generated directly in the Scope.
+	// Values groups that generated directly in the Scope.
 	groups map[key][]reflect.Value
 
 	// Source of randomness.
@@ -79,60 +77,67 @@ type Scope struct {
 	childScopes []*Scope
 }
 
+func newScope() *Scope {
+	s := &Scope{
+		name:      "container",
+		providers: make(map[key][]*constructorNode),
+		values:    make(map[key]reflect.Value),
+		groups:    make(map[key][]reflect.Value),
+		invokerFn: defaultInvoker,
+		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+	s.gh = newGraphHolder(s)
+	return s
+}
+
 // Scope creates a new Scope with the given name and options from current Scope.
 // Any constructors that the current Scope knows about, as well as any modifications
 // made to it in the future will be propagated to the child scope.
 // However, no modifications made to the child scope being created will be propagated
 // to the parent Scope.
 func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
-	child := &Scope{
-		name:        name,
-		parentScope: s,
-		providers:   make(map[key][]*constructorNode, len(s.providers)),
-		values:      make(map[key]reflect.Value, len(s.values)),
-		groups:      make(map[key][]reflect.Value, len(s.groups)),
-		invokerFn:   s.invokerFn,
-	}
+	child := newScope()
+	child.name = name
+	child.parentScope = s
+	child.invokerFn = s.invokerFn
 
-	// child should hold a separate graph holder
-	child.gh = &graphHolder{
-		s:     child,
-		snap:  -1,
-		nodes: make([]*graphNode, len(s.gh.nodes)),
-	}
-
-	for i, graphNode := range s.gh.nodes {
-		child.gh.nodes[i] = graphNode
-	}
+	// child copies the parent's graph nodes.
+	child.gh.nodes = append(child.gh.nodes, s.gh.nodes...)
 
 	s.childScopes = append(s.childScopes, child)
 	return child
 }
 
-// getScopesUntilRoot creates a list of Scopes
-// have to traverse through until the current node.
-func (s *Scope) getScopesUntilRoot() []*Scope {
-	if s.parentScope != nil {
-		return append(s.parentScope.getScopesUntilRoot(), s)
+// getScopesFromRoot creates a list of Scopes
+// have to traverse through from root until the current node.
+func (s *Scope) getScopesFromRoot() []*Scope {
+	var scopes []*Scope
+	for s := s; s != nil; s = s.parentScope {
+		scopes = append(scopes, s)
 	}
-	return []*Scope{s}
+	for i, j := 0, len(scopes)-1; i < j; i, j = i+1, j-1 {
+		scopes[i], scopes[j] = scopes[j], scopes[i]
+	}
+	return scopes
 }
 
-func (s *Scope) getAllLeafScopes() []*Scope {
-	allScopes := []*Scope{s}
-	if len(s.childScopes) > 0 {
-		for _, cs := range s.childScopes {
-			allScopes = append(allScopes, cs.getAllLeafScopes()...)
-		}
+func (s *Scope) appendLeafScopes(dest []*Scope) []*Scope {
+	dest = append(dest, s)
+	for _, cs := range s.childScopes {
+		dest = cs.appendLeafScopes(dest)
 	}
-	return allScopes
+	return dest
 }
 
-func (s *Scope) getStoresUntilRoot() []containerStore {
-	if s.parentScope != nil {
-		return append(s.parentScope.getStoresUntilRoot(), s)
+func (s *Scope) getStoresFromRoot() []containerStore {
+	var stores []containerStore
+	for s := s; s != nil; s = s.parentScope {
+		stores = append(stores, s)
 	}
-	return []containerStore{s}
+	for i, j := 0, len(stores)-1; i < j; i, j = i+1, j-1 {
+		stores[i], stores[j] = stores[j], stores[i]
+	}
+	return stores
 }
 
 func (s *Scope) knownTypes() []reflect.Type {
@@ -195,7 +200,7 @@ func (s *Scope) getAllValueProviders(name string, t reflect.Type) []provider {
 }
 
 func (s *Scope) getAllProviders(k key) []provider {
-	allScopes := s.getScopesUntilRoot()
+	allScopes := s.getScopesFromRoot()
 	var providers []provider
 	for _, scope := range allScopes {
 		providers = append(providers, scope.getProviders(k)...)
@@ -211,11 +216,8 @@ func (s *Scope) invoker() invokerFn {
 // scope.
 func (s *Scope) newGraphNode(wrapped interface{}, orders map[*Scope]int) {
 	orders[s] = s.gh.NewNode(wrapped)
-
-	if len(s.childScopes) > 0 {
-		for _, cs := range s.childScopes {
-			cs.newGraphNode(wrapped, orders)
-		}
+	for _, cs := range s.childScopes {
+		cs.newGraphNode(wrapped, orders)
 	}
 }
 

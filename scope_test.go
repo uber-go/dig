@@ -30,7 +30,17 @@ import (
 func TestScopedOperations(t *testing.T) {
 	t.Parallel()
 
-	t.Run("verify private provides", func(t *testing.T) {
+	t.Run("getStores/ScopesFromRoot returns scopes from root in order of distance from root", func(t *testing.T) {
+		c := New()
+		s1 := c.Scope("child1")
+		s2 := s1.Scope("child2")
+		s3 := s2.Scope("child2")
+
+		assert.Equal(t, []containerStore{c.scope, s1, s2, s3}, s3.getStoresFromRoot())
+		assert.Equal(t, []*Scope{c.scope, s1, s2, s3}, s3.getScopesFromRoot())
+	})
+
+	t.Run("private provides", func(t *testing.T) {
 		c := New()
 		s := c.Scope("child")
 		type A struct{}
@@ -44,7 +54,7 @@ func TestScopedOperations(t *testing.T) {
 		assert.Error(t, c.Invoke(f))
 	})
 
-	t.Run("verify private provides inherits", func(t *testing.T) {
+	t.Run("private provides inherits", func(t *testing.T) {
 		type A struct{}
 		type B struct{}
 
