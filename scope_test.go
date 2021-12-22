@@ -209,6 +209,40 @@ func TestScopeFailures(t *testing.T) {
 		}
 	})
 
+	t.Run("introduce a cycle with Export option", func(t *testing.T) {
+		// what root and child1 sees:
+		// A <- B    C
+		// |         ^
+		// |_________|
+		//
+		// what child2 sees:
+		// A <- B <- C
+		// |         ^
+		// |_________|
+
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		newA := func(*C) *A { return &A{} }
+		newB := func(*A) *B { return &B{} }
+		newC := func(*B) *C { return &C{} }
+
+		root := New()
+		child1 := root.Scope("child 1")
+		child2 := root.Scope("child 2")
+
+		// A <- B made available to all Scopes with root provision.
+		require.NoError(t, root.Provide(newA))
+
+		// B <- C made available to only child 2 with private provide.
+		require.NoError(t, child2.Provide(newB))
+
+		// C <- A made available to all Scopes with Export provide.
+		err := child1.Provide(newC, Export(true))
+		assert.Error(t, err, "expected a cycle to be introduced in child 2")
+		assert.Contains(t, err.Error(), "In Scope child 2")
+	})
+
 	t.Run("private provides do not propagate upstream", func(t *testing.T) {
 		type A struct{}
 
