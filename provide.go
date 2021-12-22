@@ -43,6 +43,7 @@ type provideOptions struct {
 	Info     *ProvideInfo
 	As       []interface{}
 	Location *digreflect.Func
+	Exported bool
 }
 
 func (o *provideOptions) Validate() error {
@@ -301,6 +302,23 @@ func (o provideLocationOption) applyProvideOption(opts *provideOptions) {
 	opts.Location = o.loc
 }
 
+// Export is a ProvideOption which specifies that the provided function should
+// be made available to all Scopes available in the application, regardless
+// of from which Scope it was provided.
+func Export(export bool) ProvideOption {
+	return provideExportOption{exported: export}
+}
+
+type provideExportOption struct{ exported bool }
+
+func (o provideExportOption) String() string {
+	return fmt.Sprintf("Export(%v)", o.exported)
+}
+
+func (o provideExportOption) applyProvideOption(opts *provideOptions) {
+	opts.Exported = o.exported
+}
+
 // provider encapsulates a user-provided constructor.
 type provider interface {
 	// ID is a unique numerical identifier for this provider.
@@ -395,6 +413,12 @@ func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 }
 
 func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
+	// If Export option is provided to the constructor, this should be injected to the
+	// root-level Scope (Container) to allow it to propagate to all other Scopes.
+	if opts.Exported {
+		s = s.rootScope()
+	}
+
 	// For all scopes affected by this change,
 	// take a snapshot of the current graph state before
 	// we start making changes to it as we may need to

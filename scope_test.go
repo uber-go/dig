@@ -104,6 +104,32 @@ func TestScopedOperations(t *testing.T) {
 			assert.NoError(t, scope.Invoke(func(a *A) {}))
 		}
 	})
+
+	t.Run("provide with Export", func(t *testing.T) {
+		// Scope tree:
+		//     root
+		//    /    \
+		//   c1	    c2
+		//   |     /  \
+		//   gc1  gc2  gc3 <-- Provide(func() *A)
+
+		root := New()
+		var allScopes []*Scope
+
+		allScopes = append(allScopes, root.Scope("child 1"), root.Scope("child 2"))
+		allScopes = append(allScopes, allScopes[0].Scope("grandchild 1"), allScopes[1].Scope("grandchild 2"), allScopes[1].Scope("grandchild 3"))
+
+		type A struct{}
+		// provide to the leaf Scope with Export option set.
+		require.NoError(t, allScopes[len(allScopes)-1].Provide(func() *A {
+			return &A{}
+		}, Export(true)))
+
+		// since constructor was provided with Export option, this should let all the Scopes below should see it.
+		for _, scope := range allScopes {
+			assert.NoError(t, scope.Invoke(func(a *A) {}))
+		}
+	})
 }
 
 func TestScopeFailures(t *testing.T) {
