@@ -104,6 +104,32 @@ func TestScopedOperations(t *testing.T) {
 			assert.NoError(t, scope.Invoke(func(a *A) {}))
 		}
 	})
+
+	t.Run("provide with Export", func(t *testing.T) {
+		// Scope tree:
+		//     root
+		//    /    \
+		//   c1	    c2
+		//   |     /  \
+		//   gc1  gc2  gc3 <-- Provide(func() *A)
+
+		root := New()
+		var allScopes []*Scope
+
+		allScopes = append(allScopes, root.Scope("child 1"), root.Scope("child 2"))
+		allScopes = append(allScopes, allScopes[0].Scope("grandchild 1"), allScopes[1].Scope("grandchild 2"), allScopes[1].Scope("grandchild 3"))
+
+		type A struct{}
+		// provide to the leaf Scope with Export option set.
+		require.NoError(t, allScopes[len(allScopes)-1].Provide(func() *A {
+			return &A{}
+		}, Export(true)))
+
+		// since constructor was provided with Export option, this should let all the Scopes below should see it.
+		for _, scope := range allScopes {
+			assert.NoError(t, scope.Invoke(func(a *A) {}))
+		}
+	})
 }
 
 func TestScopeFailures(t *testing.T) {
@@ -181,6 +207,40 @@ func TestScopeFailures(t *testing.T) {
 			check(c(), false)
 			checkWithInheritance(c(), false)
 		}
+	})
+
+	t.Run("introduce a cycle with Export option", func(t *testing.T) {
+		// what root and child1 sees:
+		// A <- B    C
+		// |         ^
+		// |_________|
+		//
+		// what child2 sees:
+		// A <- B <- C
+		// |         ^
+		// |_________|
+
+		type A struct{}
+		type B struct{}
+		type C struct{}
+		newA := func(*C) *A { return &A{} }
+		newB := func(*A) *B { return &B{} }
+		newC := func(*B) *C { return &C{} }
+
+		root := New()
+		child1 := root.Scope("child 1")
+		child2 := root.Scope("child 2")
+
+		// A <- B made available to all Scopes with root provision.
+		require.NoError(t, root.Provide(newA))
+
+		// B <- C made available to only child 2 with private provide.
+		require.NoError(t, child2.Provide(newB))
+
+		// C <- A made available to all Scopes with Export provide.
+		err := child1.Provide(newC, Export(true))
+		assert.Error(t, err, "expected a cycle to be introduced in child 2")
+		assert.Contains(t, err.Error(), "In Scope child 2")
 	})
 
 	t.Run("private provides do not propagate upstream", func(t *testing.T) {
