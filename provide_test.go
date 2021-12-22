@@ -88,9 +88,6 @@ func TestLocationForPCString(t *testing.T) {
 }
 
 func TestExportString(t *testing.T) {
-	opt1 := Export(true)
-	opt2 := Export(false)
-
-	assert.Equal(t, fmt.Sprint(opt1), "Export(true)")
-	assert.Equal(t, fmt.Sprint(opt2), "Export(false)")
+	assert.Equal(t, fmt.Sprint(Export(true)), "Export(true)")
+	assert.Equal(t, fmt.Sprint(Export(false)), "Export(false)")
 }

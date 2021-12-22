@@ -304,7 +304,7 @@ func (o provideLocationOption) applyProvideOption(opts *provideOptions) {
 
 // Export is a ProvideOption which specifies that the provided function should
 // be made available to all Scopes available in the application, regardless
-// of from which Scope it was provided. By default, it is false.
+// of which Scope it was provided from. By default, it is false.
 //
 // For example,
 //  c := New()
