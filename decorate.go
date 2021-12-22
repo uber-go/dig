@@ -20,13 +20,31 @@
 
 package dig
 
-type DecorateOption interface {
-	applyDecorateOption(*decorateOptions)
-}
+import (
+	"reflect"
 
-type decorateOptions struct {
-}
+	"go.uber.org/dig/internal/digreflect"
+)
 
-func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
+type decoratorNode struct {
+	dcor  interface{}
+	ctype reflect.Type
 
+	// Location where this function was defined.
+	location *digreflect.Func
+
+	// Whether the decorator owned by this node was already called.
+	called bool
+
+	// Type information about constructor parameters.
+	paramList paramList
+
+	// Type information about constructor results.
+	resultList resultList
+
+	// order of this node in each Scopes' graphHolders.
+	orders map[*Scope]int
+
+	// scope this node was originally provided to.
+	s *Scope
 }

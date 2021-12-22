@@ -51,6 +51,9 @@ type Scope struct {
 	// any nodes that were provided to the parent Scope this inherited from.
 	nodes []*constructorNode
 
+	// decoratorNodes provided directly to this Scope.
+	dcorNodes []*decoratorNode
+
 	// Values that generated directly in the Scope.
 	values map[key]reflect.Value
 
