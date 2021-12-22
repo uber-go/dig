@@ -43,6 +43,18 @@ type InvokeOption interface {
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
 func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
+	return c.scope.Invoke(function, opts...)
+}
+
+// Invoke runs the given function after instantiating its dependencies.
+//
+// Any arguments that the function has are treated as its dependencies. The
+// dependencies are instantiated in an unspecified order along with any
+// dependencies that they might have.
+//
+// The function may return an error to indicate failure. The error will be
+// returned to the caller as-is.
+func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
 		return errors.New("can't invoke an untyped nil")
@@ -51,33 +63,33 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 		return errf("can't invoke non-function %v (type %v)", function, ftype)
 	}
 
-	pl, err := newParamList(ftype, c)
+	pl, err := newParamList(ftype, s)
 	if err != nil {
 		return err
 	}
 
-	if err := shallowCheckDependencies(c, pl); err != nil {
+	if err := shallowCheckDependencies(s, pl); err != nil {
 		return errMissingDependencies{
 			Func:   digreflect.InspectFunc(function),
 			Reason: err,
 		}
 	}
 
-	if !c.isVerifiedAcyclic {
-		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
-			return errf("cycle detected in dependency graph", c.cycleDetectedError(cycle))
+	if !s.isVerifiedAcyclic {
+		if ok, cycle := graph.IsAcyclic(s.gh); !ok {
+			return errf("cycle detected in dependency graph", s.cycleDetectedError(cycle))
 		}
-		c.isVerifiedAcyclic = true
+		s.isVerifiedAcyclic = true
 	}
 
-	args, err := pl.BuildList(c)
+	args, err := pl.BuildList(s)
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   digreflect.InspectFunc(function),
 			Reason: err,
 		}
 	}
-	returned := c.invokerFn(reflect.ValueOf(function), args)
+	returned := s.invokerFn(reflect.ValueOf(function), args)
 	if len(returned) == 0 {
 		return nil
 	}
@@ -112,7 +124,7 @@ func findMissingDependencies(c containerStore, params ...param) []paramSingle {
 	for _, param := range params {
 		switch p := param.(type) {
 		case paramSingle:
-			if ns := c.getValueProviders(p.Name, p.Type); len(ns) == 0 && !p.Optional {
+			if ns := c.getAllValueProviders(p.Name, p.Type); len(ns) == 0 && !p.Optional {
 				missingDeps = append(missingDeps, p)
 			}
 		case paramObject:

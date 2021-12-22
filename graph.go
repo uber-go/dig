@@ -33,13 +33,13 @@ type graphNode struct {
 // It saves constructorNodes and paramGroupedSlice (value groups)
 // as nodes in the graph.
 // It implements the graph interface defined by internal/graph.
-// It has 1-1 correspondence with the Container whose graph it represents.
+// It has 1-1 correspondence with the Scope whose graph it represents.
 type graphHolder struct {
 	// all the nodes defined in the graph.
 	nodes []*graphNode
 
-	// Container whose graph this holder contains.
-	c *Container
+	// Scope whose graph this holder contains.
+	s *Scope
 
 	// Number of nodes in the graph at last snapshot.
 	// -1 if no snapshot has been taken.
@@ -48,9 +48,8 @@ type graphHolder struct {
 
 var _ graph.Graph = (*graphHolder)(nil)
 
-func newGraphHolder(c *Container) *graphHolder {
-	return &graphHolder{c: c, snap: -1}
-
+func newGraphHolder(s *Scope) *graphHolder {
+	return &graphHolder{s: s, snap: -1}
 }
 
 func (gh *graphHolder) Order() int { return len(gh.nodes) }
@@ -72,9 +71,9 @@ func (gh *graphHolder) EdgesFrom(u int) []int {
 			orders = append(orders, getParamOrder(gh, param)...)
 		}
 	case *paramGroupedSlice:
-		providers := gh.c.getGroupProviders(w.Group, w.Type.Elem())
+		providers := gh.s.getAllGroupProviders(w.Group, w.Type.Elem())
 		for _, provider := range providers {
-			orders = append(orders, provider.Order())
+			orders = append(orders, provider.Order(gh.s))
 		}
 	}
 	return orders

@@ -146,10 +146,35 @@ func (pl paramList) Build(containerStore) (reflect.Value, error) {
 // to the underlying constructor.
 func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
+	argsBuilt := make([]bool, len(pl.Params))
+	allContainers := c.getStoresFromRoot()
 	for i, p := range pl.Params {
 		var err error
-		args[i], err = p.Build(c)
-		if err != nil {
+		var arg reflect.Value
+		// iterate through the tree path of scopes.
+		for _, c := range allContainers {
+			if arg, err = p.Build(c); err == nil {
+				args[i] = arg
+				argsBuilt[i] = true
+			}
+		}
+
+		// If an argument failed to build, that means none of the
+		// scopes had the type. This should be reported.
+		if !argsBuilt[i] {
+			return nil, err
+		}
+
+		// If argument has successfully been built, it's possible
+		// for these errors to occur in child scopes that don't
+		// contain the given parameter type. We can safely ignore
+		// these.
+		// If it's an error other than missing types/dependencies,
+		// this means some constructor returned an error that must
+		// be reported.
+		_, isErrMissingTypes := err.(errMissingTypes)
+		_, isErrMissingDeps := err.(errMissingDependencies)
+		if err != nil && !isErrMissingTypes && !isErrMissingDeps {
 			return nil, err
 		}
 	}
@@ -264,14 +289,14 @@ func getParamOrder(gh *graphHolder, param param) []int {
 	var orders []int
 	switch p := param.(type) {
 	case paramSingle:
-		providers := gh.c.getValueProviders(p.Name, p.Type)
+		providers := gh.s.getAllValueProviders(p.Name, p.Type)
 		for _, provider := range providers {
-			orders = append(orders, provider.Order())
+			orders = append(orders, provider.Order(gh.s))
 		}
 	case paramGroupedSlice:
 		// value group parameters have nodes of their own.
 		// We can directly return that here.
-		orders = append(orders, p.order)
+		orders = append(orders, p.orders[gh.s])
 	case paramObject:
 		for _, pf := range p.Fields {
 			orders = append(orders, getParamOrder(gh, pf.Param)...)
@@ -410,7 +435,7 @@ type paramGroupedSlice struct {
 	// Type of the slice.
 	Type reflect.Type
 
-	order int
+	orders map[*Scope]int
 }
 
 func (pt paramGroupedSlice) String() string {
@@ -438,7 +463,7 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	if err != nil {
 		return paramGroupedSlice{}, err
 	}
-	pg := paramGroupedSlice{Group: g.Name, Type: f.Type}
+	pg := paramGroupedSlice{Group: g.Name, Type: f.Type, orders: make(map[*Scope]int)}
 
 	name := f.Tag.Get(_nameTag)
 	optional, _ := isFieldOptional(f)
@@ -457,7 +482,7 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	case optional:
 		return pg, errors.New("value groups cannot be optional")
 	}
-	pg.order = c.newGraphNode(&pg)
+	c.newGraphNode(&pg, pg.orders)
 	return pg, nil
 }
 

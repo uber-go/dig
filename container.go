@@ -21,12 +21,9 @@
 package dig
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
 	"reflect"
-	"sort"
-	"time"
 
 	"go.uber.org/dig/internal/dot"
 )
@@ -63,32 +60,12 @@ type Option interface {
 }
 
 // Container is a directed acyclic graph of types and their dependencies.
+// A Container is the root Scope that represents the top-level scoped
+// directed acyclic graph of the dependencies.
 type Container struct {
-	// Mapping from key to all the constructor node that can provide a value for that
-	// key.
-	providers map[key][]*constructorNode
-
-	nodes []*constructorNode
-
-	// Values that have already been generated in the container.
-	values map[key]reflect.Value
-
-	// Values groups that have already been generated in the container.
-	groups map[key][]reflect.Value
-
-	// Source of randomness.
-	rand *rand.Rand
-
-	// Flag indicating whether the graph has been checked for cycles.
-	isVerifiedAcyclic bool
-
-	// Defer acyclic check on provide until Invoke.
-	deferAcyclicVerification bool
-
-	// invokerFn calls a function with arguments provided to Provide or Invoke.
-	invokerFn invokerFn
-
-	gh *graphHolder
+	// this is the "root" Scope that represents the
+	// root of the scope tree.
+	scope *Scope
 }
 
 // containerWriter provides write access to the Container's underlying data
@@ -108,8 +85,8 @@ type containerWriter interface {
 type containerStore interface {
 	containerWriter
 
-	// Adds a new graph node to the Container and returns its order.
-	newGraphNode(w interface{}) int
+	// Adds a new graph node to the Container
+	newGraphNode(w interface{}, orders map[*Scope]int)
 
 	// Returns a slice containing all known types.
 	knownTypes() []reflect.Type
@@ -130,6 +107,12 @@ type containerStore interface {
 	// type.
 	getGroupProviders(name string, t reflect.Type) []provider
 
+	// Returns the providers that can produce a value with the given name and
+	// type across all the Scopes that are in effect of this containerStore.
+	getAllValueProviders(name string, t reflect.Type) []provider
+
+	getStoresFromRoot() []containerStore
+
 	createGraph() *dot.Graph
 
 	// Returns invokerFn function to use when calling arguments.
@@ -138,15 +121,8 @@ type containerStore interface {
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
-	c := &Container{
-		providers: make(map[key][]*constructorNode),
-		values:    make(map[key]reflect.Value),
-		groups:    make(map[key][]reflect.Value),
-		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		invokerFn: defaultInvoker,
-	}
-
-	c.gh = newGraphHolder(c)
+	s := newScope()
+	c := &Container{scope: s}
 
 	for _, opt := range opts {
 		opt.applyOption(c)
@@ -172,7 +148,7 @@ func (deferAcyclicVerificationOption) String() string {
 }
 
 func (deferAcyclicVerificationOption) applyOption(c *Container) {
-	c.deferAcyclicVerification = true
+	c.scope.deferAcyclicVerification = true
 }
 
 // Changes the source of randomness for the container.
@@ -189,7 +165,7 @@ func (o setRandOption) String() string {
 }
 
 func (o setRandOption) applyOption(c *Container) {
-	c.rand = o.r
+	c.scope.rand = o.r
 }
 
 // DryRun is an Option which, when set to true, disables invocation of functions supplied to
@@ -206,9 +182,9 @@ func (o dryRunOption) String() string {
 
 func (o dryRunOption) applyOption(c *Container) {
 	if o {
-		c.invokerFn = dryInvoker
+		c.scope.invokerFn = dryInvoker
 	} else {
-		c.invokerFn = defaultInvoker
+		c.scope.invokerFn = defaultInvoker
 	}
 }
 
@@ -230,105 +206,14 @@ func dryInvoker(fn reflect.Value, _ []reflect.Value) []reflect.Value {
 	return results
 }
 
-func (c *Container) knownTypes() []reflect.Type {
-	typeSet := make(map[reflect.Type]struct{}, len(c.providers))
-	for k := range c.providers {
-		typeSet[k.t] = struct{}{}
-	}
-
-	types := make([]reflect.Type, 0, len(typeSet))
-	for t := range typeSet {
-		types = append(types, t)
-	}
-	sort.Sort(byTypeName(types))
-	return types
-}
-
-func (c *Container) getValue(name string, t reflect.Type) (v reflect.Value, ok bool) {
-	v, ok = c.values[key{name: name, t: t}]
-	return
-}
-
-func (c *Container) setValue(name string, t reflect.Type, v reflect.Value) {
-	c.values[key{name: name, t: t}] = v
-}
-
-func (c *Container) getValueGroup(name string, t reflect.Type) []reflect.Value {
-	items := c.groups[key{group: name, t: t}]
-	// shuffle the list so users don't rely on the ordering of grouped values
-	return shuffledCopy(c.rand, items)
-}
-
-func (c *Container) submitGroupedValue(name string, t reflect.Type, v reflect.Value) {
-	k := key{group: name, t: t}
-	c.groups[k] = append(c.groups[k], v)
-}
-
-func (c *Container) getValueProviders(name string, t reflect.Type) []provider {
-	return c.getProviders(key{name: name, t: t})
-}
-
-func (c *Container) getGroupProviders(name string, t reflect.Type) []provider {
-	return c.getProviders(key{group: name, t: t})
-}
-
-func (c *Container) getProviders(k key) []provider {
-	nodes := c.providers[k]
-	providers := make([]provider, len(nodes))
-	for i, n := range nodes {
-		providers[i] = n
-	}
-	return providers
-}
-
-// invokerFn return a function to run when calling function provided to Provide or Invoke. Used for
-// running container in dry mode.
-func (c *Container) invoker() invokerFn {
-	return c.invokerFn
-}
-
-func (c *Container) newGraphNode(wrapped interface{}) int {
-	return c.gh.NewNode(wrapped)
-}
-
-func (c *Container) cycleDetectedError(cycle []int) error {
-	var path []cycleErrPathEntry
-	for _, n := range cycle {
-		if n, ok := c.gh.Lookup(n).(*constructorNode); ok {
-			path = append(path, cycleErrPathEntry{
-				Key: key{
-					t: n.CType(),
-				},
-				Func: n.Location(),
-			})
-		}
-	}
-	return errCycleDetected{Path: path}
-}
-
 // String representation of the entire Container
 func (c *Container) String() string {
-	b := &bytes.Buffer{}
-	fmt.Fprintln(b, "nodes: {")
-	for k, vs := range c.providers {
-		for _, v := range vs {
-			fmt.Fprintln(b, "\t", k, "->", v)
-		}
-	}
-	fmt.Fprintln(b, "}")
+	return c.scope.String()
+}
 
-	fmt.Fprintln(b, "values: {")
-	for k, v := range c.values {
-		fmt.Fprintln(b, "\t", k, "=>", v)
-	}
-	for k, vs := range c.groups {
-		for _, v := range vs {
-			fmt.Fprintln(b, "\t", k, "=>", v)
-		}
-	}
-	fmt.Fprintln(b, "}")
-
-	return b.String()
+// Scope creates a child scope of the Container with the given name.
+func (c *Container) Scope(name string, opts ...ScopeOption) *Scope {
+	return c.scope.Scope(name, opts...)
 }
 
 type byTypeName []reflect.Type

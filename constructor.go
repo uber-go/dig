@@ -53,7 +53,11 @@ type constructorNode struct {
 	// Type information about constructor results.
 	resultList resultList
 
-	order int // order of this node in graphHolder
+	// order of this node in each Scopes' graphHolders.
+	orders map[*Scope]int
+
+	// scope this node was originally provided to.
+	s *Scope
 }
 
 type constructorOptions struct {
@@ -65,12 +69,12 @@ type constructorOptions struct {
 	Location    *digreflect.Func
 }
 
-func newConstructorNode(ctor interface{}, c containerStore, opts constructorOptions) (*constructorNode, error) {
+func newConstructorNode(ctor interface{}, s *Scope, opts constructorOptions) (*constructorNode, error) {
 	cval := reflect.ValueOf(ctor)
 	ctype := cval.Type()
 	cptr := cval.Pointer()
 
-	params, err := newParamList(ctype, c)
+	params, err := newParamList(ctype, s)
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +103,10 @@ func newConstructorNode(ctor interface{}, c containerStore, opts constructorOpti
 		id:         dot.CtorID(cptr),
 		paramList:  params,
 		resultList: results,
+		orders:     make(map[*Scope]int),
+		s:          s,
 	}
-	n.order = c.newGraphNode(n)
+	s.newGraphNode(n, n.orders)
 	return n, nil
 }
 
@@ -109,7 +115,7 @@ func (n *constructorNode) ParamList() paramList       { return n.paramList }
 func (n *constructorNode) ResultList() resultList     { return n.resultList }
 func (n *constructorNode) ID() dot.CtorID             { return n.id }
 func (n *constructorNode) CType() reflect.Type        { return n.ctype }
-func (n *constructorNode) Order() int                 { return n.order }
+func (n *constructorNode) Order(s *Scope) int         { return n.orders[s] }
 
 func (n *constructorNode) String() string {
 	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)

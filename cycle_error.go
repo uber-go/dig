@@ -33,7 +33,8 @@ type cycleErrPathEntry struct {
 }
 
 type errCycleDetected struct {
-	Path []cycleErrPathEntry
+	Path  []cycleErrPathEntry
+	scope *Scope
 }
 
 func (e errCycleDetected) Error() string {
@@ -46,6 +47,7 @@ func (e errCycleDetected) Error() string {
 	//
 	b := new(bytes.Buffer)
 
+	fmt.Fprintf(b, "In Scope %s: \n", e.scope.name)
 	for i, entry := range e.Path {
 		if i > 0 {
 			b.WriteString("\n\tdepends on ")

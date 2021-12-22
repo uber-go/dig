@@ -3105,14 +3105,14 @@ func TestNodeAlreadyCalled(t *testing.T) {
 	type type1 struct{}
 	f := func() type1 { return type1{} }
 
-	n, err := newConstructorNode(f, New(), constructorOptions{})
+	n, err := newConstructorNode(f, newScope(), constructorOptions{})
 	require.NoError(t, err, "failed to build node")
 	require.False(t, n.called, "node must not have been called")
 
 	c := New()
-	require.NoError(t, n.Call(c), "invoke failed")
+	require.NoError(t, n.Call(c.scope), "invoke failed")
 	require.True(t, n.called, "node must be called")
-	require.NoError(t, n.Call(c), "calling again should be okay")
+	require.NoError(t, n.Call(c.scope), "calling again should be okay")
 }
 
 func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {

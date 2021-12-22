@@ -308,7 +308,7 @@ type provider interface {
 
 	// Order reports the order of this provider in the graphHolder.
 	// This value is usually returned by the graphHolder.NewNode method.
-	Order() int
+	Order(*Scope) int
 
 	// Location returns where this constructor was defined.
 	Location() *digreflect.Func
@@ -343,11 +343,32 @@ type provider interface {
 // same types are requested multiple times, the previously produced value will
 // be reused.
 //
-// In addition to accepting constructors that accept dependencies as separate
-// arguments and produce results as separate return values, Provide also
-// accepts constructors that specify dependencies as dig.In structs and/or
-// specify results as dig.Out structs.
+// Provide accepts argument types or dig.In structs as dependencies, and
+// separate return values or dig.Out structs for results.
 func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) error {
+	return c.scope.Provide(constructor, opts...)
+}
+
+// Provide teaches the Scope how to build values of one or more types and
+// expresses their dependencies.
+//
+// The first argument of Provide is a function that accepts zero or more
+// parameters and returns one or more results. The function may optionally
+// return an error to indicate that it failed to build the value. This
+// function will be treated as the constructor for all the types it returns.
+// This function will be called AT MOST ONCE when a type produced by it, or a
+// type that consumes this function's output, is requested via Invoke. If the
+// same types are requested multiple times, the previously produced value will
+// be reused.
+//
+// Provide accepts argument types or dig.In structs as dependencies, and
+// separate return values or dig.Out structs for results.
+//
+// When a constructor is Provided to a Scope, it will propagate this to any
+// Scopes that are descendents, but not ancestors of this Scope.
+// To provide a constructor to all the Scopes available, provide it to
+// Container, which is the root Scope.
+func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {
 		return errors.New("can't provide an untyped nil")
@@ -364,7 +385,7 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 		return err
 	}
 
-	if err := c.provide(constructor, options); err != nil {
+	if err := s.provide(constructor, options); err != nil {
 		return errProvide{
 			Func:   digreflect.InspectFunc(constructor),
 			Reason: err,
@@ -373,20 +394,25 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 	return nil
 }
 
-func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
+func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
+	// For all scopes affected by this change,
 	// take a snapshot of the current graph state before
 	// we start making changes to it as we may need to
 	// undo them upon encountering errors.
-	c.gh.Snapshot()
-	defer func() {
-		if err != nil {
-			c.gh.Rollback()
-		}
-	}()
+	allScopes := s.appendLeafScopes(nil)
+	for _, s := range allScopes {
+		s := s
+		s.gh.Snapshot()
+		defer func() {
+			if err != nil {
+				s.gh.Rollback()
+			}
+		}()
+	}
 
 	n, err := newConstructorNode(
 		ctor,
-		c,
+		s,
 		constructorOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,
@@ -398,7 +424,7 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
 		return err
 	}
 
-	keys, err := c.findAndValidateResults(n)
+	keys, err := s.findAndValidateResults(n)
 	if err != nil {
 		return err
 	}
@@ -411,25 +437,29 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
 	oldProviders := make(map[key][]*constructorNode)
 	for k := range keys {
 		// Cache old providers before running cycle detection.
-		oldProviders[k] = c.providers[k]
-		c.providers[k] = append(c.providers[k], n)
+		oldProviders[k] = s.providers[k]
+		s.providers[k] = append(s.providers[k], n)
 	}
 
-	c.isVerifiedAcyclic = false
-	if !c.deferAcyclicVerification {
-		if ok, cycle := graph.IsAcyclic(c.gh); !ok {
+	for _, s := range allScopes {
+		s.isVerifiedAcyclic = false
+		if s.deferAcyclicVerification {
+			continue
+		}
+		if ok, cycle := graph.IsAcyclic(s.gh); !ok {
 			// When a cycle is detected, recover the old providers to reset
 			// the providers map back to what it was before this node was
 			// introduced.
 			for k, ops := range oldProviders {
-				c.providers[k] = ops
+				s.providers[k] = ops
 			}
 
-			return errf("this function introduces a cycle", c.cycleDetectedError(cycle))
+			return errf("this function introduces a cycle", s.cycleDetectedError(cycle))
 		}
-		c.isVerifiedAcyclic = true
+		s.isVerifiedAcyclic = true
 	}
-	c.nodes = append(c.nodes, n)
+
+	s.nodes = append(s.nodes, n)
 
 	// Record introspection info for caller if Info option is specified
 	if info := opts.Info; info != nil {
@@ -461,11 +491,11 @@ func (c *Container) provide(ctor interface{}, opts provideOptions) (err error) {
 }
 
 // Builds a collection of all result types produced by this constructor.
-func (c *Container) findAndValidateResults(n *constructorNode) (map[key]struct{}, error) {
+func (s *Scope) findAndValidateResults(n *constructorNode) (map[key]struct{}, error) {
 	var err error
 	keyPaths := make(map[key]string)
 	walkResult(n.ResultList(), connectionVisitor{
-		c:        c,
+		s:        s,
 		n:        n,
 		err:      &err,
 		keyPaths: keyPaths,
@@ -485,7 +515,7 @@ func (c *Container) findAndValidateResults(n *constructorNode) (map[key]struct{}
 // Visits the results of a node and compiles a collection of all the keys
 // produced by that node.
 type connectionVisitor struct {
-	c *Container
+	s *Scope
 	n *constructorNode
 
 	// If this points to a non-nil value, we've already encountered an error
@@ -570,7 +600,7 @@ func (cv connectionVisitor) checkKey(k key, path string) error {
 			"already provided by %v", conflict,
 		)
 	}
-	if ps := cv.c.providers[k]; len(ps) > 0 {
+	if ps := cv.s.providers[k]; len(ps) > 0 {
 		cons := make([]string, len(ps))
 		for i, p := range ps {
 			cons[i] = fmt.Sprint(p.Location())
