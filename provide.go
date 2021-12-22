@@ -304,7 +304,18 @@ func (o provideLocationOption) applyProvideOption(opts *provideOptions) {
 
 // Export is a ProvideOption which specifies that the provided function should
 // be made available to all Scopes available in the application, regardless
-// of from which Scope it was provided.
+// of from which Scope it was provided. By default, it is false.
+//
+// For example,
+//  c := New()
+//  s1 := c.Scope("child 1")
+//  s2:= c.Scope("child 2")
+//  s1.Provide(func() *bytes.Buffer { ... })
+// does not allow the constructor returning *bytes.Buffer to be made available to
+// the root Container c or its sibling Scope s2.
+//
+// With Export, you can make this constructor available to all the Scopes:
+//  s1.Provide(func() *bytes.Buffer { ... }, Export(true))
 func Export(export bool) ProvideOption {
 	return provideExportOption{exported: export}
 }
