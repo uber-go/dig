@@ -39,6 +39,9 @@ type ScopeOption interface {
 // A Scope may also have one or more child Scopes that inherit
 // from it.
 type Scope struct {
+	// This implements containerStore interface.
+
+	// Name of the Scope
 	name string
 	// Mapping from key to all the constructor node that can provide a value for that
 	// key.
@@ -103,6 +106,10 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 
 	// child copies the parent's graph nodes.
 	child.gh.nodes = append(child.gh.nodes, s.gh.nodes...)
+
+	for _, opt := range opts {
+		opt.noScopeOption()
+	}
 
 	s.childScopes = append(s.childScopes, child)
 	return child

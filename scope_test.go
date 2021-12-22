@@ -66,7 +66,7 @@ func TestScopedOperations(t *testing.T) {
 		}
 
 		c := New()
-		c.Provide(func() *A { return &A{} })
+		require.NoError(t, c.Provide(func() *A { return &A{} }))
 
 		child := c.Scope("child")
 		child.Provide(func() *B { return &B{} })
