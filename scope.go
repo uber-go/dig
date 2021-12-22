@@ -103,6 +103,7 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	child.name = name
 	child.parentScope = s
 	child.invokerFn = s.invokerFn
+	child.deferAcyclicVerification = s.deferAcyclicVerification
 
 	// child copies the parent's graph nodes.
 	child.gh.nodes = append(child.gh.nodes, s.gh.nodes...)

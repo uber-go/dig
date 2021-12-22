@@ -69,7 +69,7 @@ func TestScopedOperations(t *testing.T) {
 		require.NoError(t, c.Provide(func() *A { return &A{} }))
 
 		child := c.Scope("child")
-		child.Provide(func() *B { return &B{} })
+		require.NoError(t, child.Provide(func() *B { return &B{} }))
 		assert.NoError(t, child.Invoke(useA))
 		assert.NoError(t, child.Invoke(useB))
 
@@ -95,35 +95,14 @@ func TestScopedOperations(t *testing.T) {
 		allScopes = append(allScopes, root.Scope("child 1"), root.Scope("child 2"))
 		allScopes = append(allScopes, allScopes[0].Scope("grandchild 1"), allScopes[1].Scope("grandchild 2"), allScopes[1].Scope("grandchild 3"))
 
-		root.Provide(func() *A {
+		require.NoError(t, root.Provide(func() *A {
 			return &A{}
-		})
+		}))
 
 		// top-level provide should be available in all the scopes.
 		for _, scope := range allScopes {
 			assert.NoError(t, scope.Invoke(func(a *A) {}))
 		}
-	})
-
-	t.Run("private provides to child should be available to grandchildren, but not root", func(t *testing.T) {
-		type A struct{}
-		// Scope tree:
-		//     root
-		//      |
-		//     child  <-- Provide(func() *A)
-		//     /  \
-		//   gc1   gc2
-		root := New()
-		c := root.Scope("child")
-		gc := c.Scope("grandchild")
-
-		c.Provide(func() *A { return &A{} })
-
-		err := root.Invoke(func(a *A) {})
-		assert.Error(t, err, "expected Invoke in root container on child's private-provided type to fail")
-		assert.Contains(t, err.Error(), "missing type: *dig.A")
-
-		assert.NoError(t, gc.Invoke(func(a *A) {}), "expected Invoke in grandchild container on child's private-provided type to fail")
 	})
 }
 
@@ -147,22 +126,61 @@ func TestScopeFailures(t *testing.T) {
 		newB := func(*A) *B { return &B{} }
 		newC := func(*B) *C { return &C{} }
 
-		c := New()
-		s := c.Scope("child")
-		assert.NoError(t, c.Provide(newA))
-		assert.NoError(t, s.Provide(newB))
-		err := c.Provide(newC)
-		assert.Error(t, err, "expected a cycle to be introduced in the child")
-		assert.Contains(t, err.Error(), "In Scope child")
+		// Create a child Scope, and introduce a cycle
+		// in the child only.
+		check := func(c *Container, fails bool) {
+			s := c.Scope("child")
+			assert.NoError(t, c.Provide(newA))
+			assert.NoError(t, s.Provide(newB))
+			err := c.Provide(newC)
 
-		// Try again, this time with child inheriting parent-provided constructors.
-		c = New()
-		assert.NoError(t, c.Provide(newA))
-		s = c.Scope("child")
-		assert.NoError(t, s.Provide(newB))
-		err = c.Provide(newC)
-		assert.Error(t, err, "expected a cycle to be introduced in the child")
-		assert.Contains(t, err.Error(), "In Scope child")
+			if fails {
+				assert.Error(t, err, "expected a cycle to be introduced in the child")
+				assert.Contains(t, err.Error(), "In Scope child")
+			} else {
+				assert.NoError(t, err)
+			}
+		}
+
+		// Same as check, but this time child should inherit
+		// parent-provided constructors upon construction.
+		checkWithInheritance := func(c *Container, fails bool) {
+			assert.NoError(t, c.Provide(newA))
+			s := c.Scope("child")
+			assert.NoError(t, s.Provide(newB))
+			err := c.Provide(newC)
+			if fails {
+				assert.Error(t, err, "expected a cycle to be introduced in the child")
+				assert.Contains(t, err.Error(), "In Scope child")
+			} else {
+				assert.NoError(t, err)
+			}
+		}
+
+		// Test using different permutations
+		nodeferContainers := []func() *Container{
+			func() *Container { return New() },
+			func() *Container { return New(DryRun(true)) },
+			func() *Container { return New(DryRun(false)) },
+		}
+		// Container permutations with DeferAcyclicVerification.
+		deferredContainers := []func() *Container{
+			func() *Container { return New(DeferAcyclicVerification()) },
+			func() *Container { return New(DeferAcyclicVerification(), DryRun(true)) },
+			func() *Container { return New(DeferAcyclicVerification(), DryRun(false)) },
+		}
+
+		for _, c := range nodeferContainers {
+			check(c(), true)
+			checkWithInheritance(c(), true)
+		}
+
+		// with deferAcyclicVerification, these should not
+		// error on Provides.
+		for _, c := range deferredContainers {
+			check(c(), false)
+			checkWithInheritance(c(), false)
+		}
 	})
 
 	t.Run("private provides do not propagate upstream", func(t *testing.T) {
@@ -171,10 +189,30 @@ func TestScopeFailures(t *testing.T) {
 		root := New()
 		c := root.Scope("child")
 		gc := c.Scope("grandchild")
-		gc.Provide(func() *A { return &A{} })
+		require.NoError(t, gc.Provide(func() *A { return &A{} }))
 
 		assert.Error(t, root.Invoke(func(a *A) {}), "invoking on grandchild's private-provided type should fail")
 		assert.Error(t, c.Invoke(func(a *A) {}), "invoking on child's private-provided type should fail")
 	})
 
+	t.Run("private provides to child should be available to grandchildren, but not root", func(t *testing.T) {
+		type A struct{}
+		// Scope tree:
+		//     root
+		//      |
+		//     child  <-- Provide(func() *A)
+		//     /  \
+		//   gc1   gc2
+		root := New()
+		c := root.Scope("child")
+		gc := c.Scope("grandchild")
+
+		require.NoError(t, c.Provide(func() *A { return &A{} }))
+
+		err := root.Invoke(func(a *A) {})
+		assert.Error(t, err, "expected Invoke in root container on child's private-provided type to fail")
+		assert.Contains(t, err.Error(), "missing type: *dig.A")
+
+		assert.NoError(t, gc.Invoke(func(a *A) {}), "expected Invoke in grandchild container on child's private-provided type to fail")
+	})
 }
