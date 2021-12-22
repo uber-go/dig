@@ -244,6 +244,15 @@ func (s *Scope) cycleDetectedError(cycle []int) error {
 	return errCycleDetected{Path: path, scope: s}
 }
 
+// Returns the root Scope that can be reached from this Scope.
+func (s *Scope) rootScope() *Scope {
+	curr := s
+	for curr.parentScope != nil {
+		curr = curr.parentScope
+	}
+	return curr
+}
+
 // String representation of the entire Scope
 func (s *Scope) String() string {
 	b := &bytes.Buffer{}

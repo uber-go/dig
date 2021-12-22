@@ -86,3 +86,8 @@ func TestLocationForPCString(t *testing.T) {
 	opt := LocationForPC(reflect.ValueOf(func() {}).Pointer())
 	assert.Contains(t, fmt.Sprint(opt), `LocationForPC("go.uber.org/dig".TestLocationForPCString.func1 `)
 }
+
+func TestExportString(t *testing.T) {
+	assert.Equal(t, fmt.Sprint(Export(true)), "Export(true)")
+	assert.Equal(t, fmt.Sprint(Export(false)), "Export(false)")
+}
