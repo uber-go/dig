@@ -21,14 +21,16 @@
 package dig
 
 import (
+	"fmt"
 	"reflect"
 
 	"go.uber.org/dig/internal/digreflect"
+	"go.uber.org/dig/internal/graph"
 )
 
 type decoratorNode struct {
 	dcor  interface{}
-	ctype reflect.Type
+	dtype reflect.Type
 
 	// Location where this function was defined.
 	location *digreflect.Func
@@ -36,15 +38,109 @@ type decoratorNode struct {
 	// Whether the decorator owned by this node was already called.
 	called bool
 
-	// Type information about constructor parameters.
-	paramList paramList
-
-	// Type information about constructor results.
-	resultList resultList
+	// parameters being decorated
+	params []key
 
 	// order of this node in each Scopes' graphHolders.
 	orders map[*Scope]int
 
 	// scope this node was originally provided to.
 	s *Scope
+}
+
+func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
+	dtype := reflect.ValueOf(dcor).Type()
+
+	dcorParams := make([]key, dtype.NumIn())
+
+	// Iterate through the parameters and make sure there is at least
+	// one provider for this decorator.
+	// Otherwise, that's an error.
+	for i := 0; i < dtype.NumIn(); i++ {
+		k := key{t: dtype.In(i)}
+		if _, ok := s.providers[k]; !ok {
+			return nil, fmt.Errorf("cannot decorate using decorator %v: %T was never provided Scope %s",
+				dtype,
+				dtype.In(i),
+				s.name,
+			)
+		}
+		dcorParams[i] = k
+	}
+
+	n := &decoratorNode{
+		dcor:     dcor,
+		dtype:    dtype,
+		location: digreflect.InspectFunc(dcor),
+		orders:   make(map[*Scope]int),
+		params:   dcorParams,
+		s:        s,
+	}
+	return n, nil
+}
+
+type DecorateOption interface {
+	applyDecorateOption(*decorateOptions)
+}
+
+type decorateOptions struct {
+}
+
+// Decorate ...
+func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) error {
+	return c.scope.Decorate(decorator, opts...)
+}
+
+// Decorate ...
+func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
+	options := decorateOptions{}
+	for _, opt := range opts {
+		opt.applyDecorateOption(&options)
+	}
+
+	dn, err := newDecoratorNode(decorator, s)
+	if err != nil {
+		return err
+	}
+
+	dn.orders[s] = s.gh.NewNode(dn)
+	if !s.deferAcyclicVerification {
+		if ok, cycle := graph.IsAcyclic(s.gh); !ok {
+			return errf("cycle detected in dependency graph", s.cycleDetectedError(cycle))
+		}
+		s.isVerifiedAcyclic = true
+	}
+
+	pl, err := newParamList(dn.dtype, s)
+	if err != nil {
+		return err
+	}
+
+	if err := shallowCheckDependencies(s, pl); err != nil {
+		return errMissingDependencies{
+			Func:   dn.location,
+			Reason: err,
+		}
+	}
+
+	args, err := pl.BuildList(s)
+	if err != nil {
+		return errArgumentsFailed{
+			Func:   dn.location,
+			Reason: err,
+		}
+	}
+	results := reflect.ValueOf(decorator).Call(args)
+	/*
+		should we check for error here?
+		for _, result := range results {
+			if err, _ := result.Interface().(error); err != nil {
+				return errf("failed to decorate", err)
+			}
+		}
+	*/
+	for _, result := range results {
+		s.decoratedValues[key{t: result.Type()}] = result
+	}
+	return nil
 }

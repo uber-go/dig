@@ -94,6 +94,8 @@ type containerStore interface {
 	// Retrieves the value with the provided name and type, if any.
 	getValue(name string, t reflect.Type) (v reflect.Value, ok bool)
 
+	getDecoratedValue(name string, t reflect.Type) (v reflect.Value, ok bool)
+
 	// Retrieves all values for the provided group and type.
 	//
 	// The order in which the values are returned is undefined.

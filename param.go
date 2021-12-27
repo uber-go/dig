@@ -221,7 +221,13 @@ func (ps paramSingle) String() string {
 
 	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
 }
+
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
+	// Check whetr the value is a decorated value first.
+	if v, ok := c.getDecoratedValue(ps.Name, ps.Type); ok {
+		return v, nil
+	}
+
 	if v, ok := c.getValue(ps.Name, ps.Type); ok {
 		return v, nil
 	}

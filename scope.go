@@ -51,8 +51,8 @@ type Scope struct {
 	// any nodes that were provided to the parent Scope this inherited from.
 	nodes []*constructorNode
 
-	// decoratorNodes provided directly to this Scope.
-	dcorNodes []*decoratorNode
+	// Values that generated via decorators in the Scope.
+	decoratedValues map[key]reflect.Value
 
 	// Values that generated directly in the Scope.
 	values map[key]reflect.Value
@@ -85,12 +85,13 @@ type Scope struct {
 
 func newScope() *Scope {
 	s := &Scope{
-		name:      "container",
-		providers: make(map[key][]*constructorNode),
-		values:    make(map[key]reflect.Value),
-		groups:    make(map[key][]reflect.Value),
-		invokerFn: defaultInvoker,
-		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		name:            "container",
+		providers:       make(map[key][]*constructorNode),
+		values:          make(map[key]reflect.Value),
+		decoratedValues: make(map[key]reflect.Value),
+		groups:          make(map[key][]reflect.Value),
+		invokerFn:       defaultInvoker,
+		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	s.gh = newGraphHolder(s)
 	return s
@@ -167,6 +168,11 @@ func (s *Scope) knownTypes() []reflect.Type {
 
 func (s *Scope) getValue(name string, t reflect.Type) (v reflect.Value, ok bool) {
 	v, ok = s.values[key{name: name, t: t}]
+	return
+}
+
+func (s *Scope) getDecoratedValue(name string, t reflect.Type) (v reflect.Value, ok bool) {
+	v, ok = s.decoratedValues[key{name: name, t: t}]
 	return
 }
 
