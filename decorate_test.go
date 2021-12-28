@@ -27,24 +27,73 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDecorate(t *testing.T) {
-	c := New()
+func TestDecorateSuccess(t *testing.T) {
+	t.Run("simple decorate without names or groups", func(t *testing.T) {
+		c := New()
 
-	type A struct{}
-	type B struct {
-		name string
-	}
+		type A struct {
+			name string
+		}
 
-	require.NoError(t, c.Provide(func() *A { return &A{} }))
-	require.NoError(t, c.Provide(func() *B { return &B{name: "B"} }))
+		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
 
-	assert.NoError(t, c.Invoke(func(b *B) {
-		assert.Equal(t, b.name, "B")
-	}))
+		assert.NoError(t, c.Invoke(func(a *A) {
+			assert.Equal(t, a.name, "A", "expected name to not be decorated yet.")
+		}))
 
-	require.NoError(t, c.Decorate(func(b *B) *B { return &B{name: b.name + "'"} }))
+		require.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }))
 
-	assert.NoError(t, c.Invoke(func(b *B) {
-		assert.Equal(t, b.name, "B'")
-	}))
+		assert.NoError(t, c.Invoke(func(a *A) {
+			assert.Equal(t, a.name, "A'", "expected name to equal decorated name.")
+		}))
+	})
+
+	t.Run("simple decorate a provider from child scope", func(t *testing.T) {
+		c := New()
+		type A struct {
+			name string
+		}
+
+		child := c.Scope("child")
+		require.NoError(t, child.Provide(func() *A { return &A{name: "A"} }, Export(true)))
+
+		c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} })
+
+		assert.NoError(t, c.Invoke(func(a *A) {
+			assert.Equal(t, a.name, "A'", "expected name to equal decorated name in parent scope")
+		}))
+
+		assert.NoError(t, child.Invoke(func(a *A) {
+			assert.Equal(t, a.name, "A'", "expected name to equal original name in child scope")
+		}))
+	})
+}
+
+func TestDecorateFailure(t *testing.T) {
+	t.Run("decorate a type that wasn't provided", func(t *testing.T) {
+		c := New()
+
+		type A struct {
+			name string
+		}
+
+		err := c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} })
+
+		assert.Error(t, err)
+
+		assert.Contains(t, err.Error(), "*dig.A was never Provided to Scope [container]")
+	})
+
+	t.Run("decorate the same type twice", func(t *testing.T) {
+		c := New()
+		type A struct {
+			name string
+		}
+		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
+
+		assert.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }), "first decorate should not fail.")
+		err := c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} })
+		assert.Error(t, err, "expected second call to decorate to fail.")
+		assert.Contains(t, err.Error(), "*dig.A was already Decorated in Scope [container]")
+	})
 }

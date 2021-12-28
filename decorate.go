@@ -59,13 +59,27 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	for i := 0; i < dtype.NumIn(); i++ {
 		k := key{t: dtype.In(i)}
 		if _, ok := s.providers[k]; !ok {
-			return nil, fmt.Errorf("cannot decorate using decorator %v: %T was never provided Scope %s",
+			return nil, fmt.Errorf("cannot decorate using function %v: %s was never Provided to Scope [%s]",
 				dtype,
 				dtype.In(i),
 				s.name,
 			)
 		}
 		dcorParams[i] = k
+	}
+
+	// Iterate through the Out types and make sure they are not already
+	// decorated.
+	for i := 0; i < dtype.NumOut(); i++ {
+		k := key{t: dtype.Out(i)}
+		if _, ok := s.decoratedValues[k]; ok {
+			return nil, fmt.Errorf("cannot decorate using function %v: %s was already Decorated in Scope [%s]",
+				dtype,
+				dtype.Out(i),
+				s.name,
+			)
+		}
+
 	}
 
 	n := &decoratorNode{

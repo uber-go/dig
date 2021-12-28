@@ -223,7 +223,7 @@ func (ps paramSingle) String() string {
 }
 
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
-	// Check whetr the value is a decorated value first.
+	// Check whether the value is a decorated value first.
 	if v, ok := c.getDecoratedValue(ps.Name, ps.Type); ok {
 		return v, nil
 	}
