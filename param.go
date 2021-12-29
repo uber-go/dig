@@ -350,6 +350,10 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 }
 
 func (po paramObject) Build(c containerStore) (reflect.Value, error) {
+	if v, ok := c.getDecoratedValue("", po.Type); ok {
+		return v, nil
+	}
+
 	dest := reflect.New(po.Type).Elem()
 	for _, f := range po.Fields {
 		v, err := f.Build(c)

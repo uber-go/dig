@@ -29,12 +29,12 @@ import (
 
 func TestDecorateSuccess(t *testing.T) {
 	t.Run("simple decorate without names or groups", func(t *testing.T) {
-		c := New()
-
+		t.Parallel()
 		type A struct {
 			name string
 		}
 
+		c := New()
 		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
 
 		assert.NoError(t, c.Invoke(func(a *A) {
@@ -49,22 +49,93 @@ func TestDecorateSuccess(t *testing.T) {
 	})
 
 	t.Run("simple decorate a provider from child scope", func(t *testing.T) {
-		c := New()
+		t.Parallel()
 		type A struct {
 			name string
 		}
 
+		c := New()
 		child := c.Scope("child")
 		require.NoError(t, child.Provide(func() *A { return &A{name: "A"} }, Export(true)))
 
-		c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} })
+		assert.NoError(t, child.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }))
+		assert.NoError(t, c.Invoke(func(a *A) {
+			assert.Equal(t, "A", a.name, "expected name to equal original name in parent scope")
+		}))
+		assert.NoError(t, child.Invoke(func(a *A) {
+			assert.Equal(t, "A'", a.name, "expected name to equal decorated name in child scope")
+		}))
+	})
+
+	t.Run("simple decorate a provider to a scope and its descendants", func(t *testing.T) {
+		t.Parallel()
+		type A struct {
+			name string
+		}
+
+		c := New()
+		child := c.Scope("child")
+		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
+
+		assert.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }))
+		assertDecoratedName := func(a *A) {
+			assert.Equal(t, a.name, "A'", "expected name to equal decorated name")
+		}
+		assert.NoError(t, c.Invoke(assertDecoratedName))
+		assert.NoError(t, child.Invoke(assertDecoratedName))
+	})
+
+	t.Run("modifications compose with descendants", func(t *testing.T) {
+		t.Parallel()
+		type A struct {
+			name string
+		}
+
+		c := New()
+		child := c.Scope("child")
+		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
+
+		require.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }))
+		require.NoError(t, child.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }))
 
 		assert.NoError(t, c.Invoke(func(a *A) {
-			assert.Equal(t, a.name, "A'", "expected name to equal decorated name in parent scope")
+			assert.Equal(t, "A'", a.name, "expected decorated name in parent")
 		}))
 
 		assert.NoError(t, child.Invoke(func(a *A) {
-			assert.Equal(t, a.name, "A'", "expected name to equal original name in child scope")
+			assert.Equal(t, "A''", a.name, "expected double-decorated name in child")
+		}))
+	})
+
+	t.Run("decorate with In struct", func(t *testing.T) {
+		t.Parallel()
+
+		type A struct {
+			Name string
+		}
+		type B struct {
+			In
+
+			A *A
+			B string `name:"b"`
+		}
+
+		c := New()
+		require.NoError(t, c.Provide(func() *A { return &A{Name: "A"} }))
+		require.NoError(t, c.Provide(func() string { return "b" }, Name("b")))
+
+		require.NoError(t, c.Decorate(func(b B) B {
+			return B{
+				A: &A{
+					Name: b.A.Name + "'",
+				},
+				B: b.B + "'",
+			}
+		}))
+
+		assert.NoError(t, c.Invoke(func(b B) {
+			assert.Equal(t, "A'", b.A.Name)
+			assert.Equal(t, "b'", b.B)
 		}))
 	})
 }
@@ -81,7 +152,7 @@ func TestDecorateFailure(t *testing.T) {
 
 		assert.Error(t, err)
 
-		assert.Contains(t, err.Error(), "*dig.A was never Provided to Scope [container]")
+		assert.Contains(t, err.Error(), "missing type: *dig.A")
 	})
 
 	t.Run("decorate the same type twice", func(t *testing.T) {

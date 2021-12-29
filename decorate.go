@@ -56,17 +56,22 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	// Iterate through the parameters and make sure there is at least
 	// one provider for this decorator.
 	// Otherwise, that's an error.
-	for i := 0; i < dtype.NumIn(); i++ {
-		k := key{t: dtype.In(i)}
-		if _, ok := s.providers[k]; !ok {
-			return nil, fmt.Errorf("cannot decorate using function %v: %s was never Provided to Scope [%s]",
-				dtype,
-				dtype.In(i),
-				s.name,
-			)
+
+	/*
+		for i := 0; i < dtype.NumIn(); i++ {
+			k := key{t: dtype.In(i)}
+
+			var providers []provider
+			if providers = s.getAllProviders(k); len(providers) == 0 {
+				return nil, fmt.Errorf("cannot decorate using function %v: %s was never Provided to Scope [%s]",
+					dtype,
+					dtype.In(i),
+					s.name,
+				)
+			}
+			dcorParams[i] = k
 		}
-		dcorParams[i] = k
-	}
+	*/
 
 	// Iterate through the Out types and make sure they are not already
 	// decorated.
