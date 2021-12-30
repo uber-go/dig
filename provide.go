@@ -531,7 +531,6 @@ func (s *Scope) findAndValidateResults(n *constructorNode) (map[key]struct{}, er
 	keyPaths := make(map[key]string)
 	walkResult(n.ResultList(), connectionVisitor{
 		s:        s,
-		n:        n,
 		err:      &err,
 		keyPaths: keyPaths,
 	})
@@ -551,7 +550,6 @@ func (s *Scope) findAndValidateResults(n *constructorNode) (map[key]struct{}, er
 // produced by that node.
 type connectionVisitor struct {
 	s *Scope
-	n *constructorNode
 
 	// If this points to a non-nil value, we've already encountered an error
 	// and should stop traversing.
