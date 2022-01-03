@@ -1893,6 +1893,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
 		)
+		assert.NotContains(t, err.Error(), "[scope")
 		assert.Error(t, c.Invoke(func(c *C) {}), "expected invoking a function that uses a type that failed to provide to fail.")
 	})
 
