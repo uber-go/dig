@@ -162,7 +162,7 @@ func TestScopeFailures(t *testing.T) {
 
 			if fails {
 				assert.Error(t, err, "expected a cycle to be introduced in the child")
-				assert.Contains(t, err.Error(), "In Scope child")
+				assert.Contains(t, err.Error(), `[scope "child"]`)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -177,7 +177,7 @@ func TestScopeFailures(t *testing.T) {
 			err := c.Provide(newC)
 			if fails {
 				assert.Error(t, err, "expected a cycle to be introduced in the child")
-				assert.Contains(t, err.Error(), "In Scope child")
+				assert.Contains(t, err.Error(), `[scope "child"]`)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -240,7 +240,7 @@ func TestScopeFailures(t *testing.T) {
 		// C <- A made available to all Scopes with Export provide.
 		err := child1.Provide(newC, Export(true))
 		assert.Error(t, err, "expected a cycle to be introduced in child 2")
-		assert.Contains(t, err.Error(), "In Scope child 2")
+		assert.Contains(t, err.Error(), `[scope "child 2"]`)
 	})
 
 	t.Run("private provides do not propagate upstream", func(t *testing.T) {
