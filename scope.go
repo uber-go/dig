@@ -82,7 +82,6 @@ type Scope struct {
 
 func newScope() *Scope {
 	s := &Scope{
-		name:      "container",
 		providers: make(map[key][]*constructorNode),
 		values:    make(map[key]reflect.Value),
 		groups:    make(map[key][]reflect.Value),
