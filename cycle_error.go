@@ -40,6 +40,7 @@ type errCycleDetected struct {
 func (e errCycleDetected) Error() string {
 	// We get something like,
 	//
+	//   [scope "foo"]
 	//   func(*bar) *foo provided by "path/to/package".NewFoo (path/to/file.go:42)
 	//   	depends on func(*baz) *bar provided by "another/package".NewBar (somefile.go:1)
 	//   	depends on func(*foo) baz provided by "somepackage".NewBar (anotherfile.go:2)
@@ -47,7 +48,9 @@ func (e errCycleDetected) Error() string {
 	//
 	b := new(bytes.Buffer)
 
-	fmt.Fprintf(b, "In Scope %s: \n", e.scope.name)
+	if name := e.scope.name; len(name) > 0 {
+		fmt.Fprintf(b, "[scope %q]\n", name)
+	}
 	for i, entry := range e.Path {
 		if i > 0 {
 			b.WriteString("\n\tdepends on ")

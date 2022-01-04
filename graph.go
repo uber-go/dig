@@ -24,8 +24,6 @@ import "go.uber.org/dig/internal/graph"
 
 // graphNode is a single node in the dependency graph.
 type graphNode struct {
-	// The index of this node in the graphHolder's nodes.
-	Order   int
 	Wrapped interface{}
 }
 
@@ -83,7 +81,6 @@ func (gh *graphHolder) EdgesFrom(u int) []int {
 func (gh *graphHolder) NewNode(wrapped interface{}) int {
 	order := len(gh.nodes)
 	gh.nodes = append(gh.nodes, &graphNode{
-		Order:   order,
 		Wrapped: wrapped,
 	})
 	return order
