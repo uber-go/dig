@@ -82,7 +82,7 @@ func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 		s.isVerifiedAcyclic = true
 	}
 
-	args, err := pl.BuildList(s)
+	args, err := pl.BuildList(s, false)
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   digreflect.InspectFunc(function),
@@ -124,13 +124,14 @@ func findMissingDependencies(c containerStore, params ...param) []paramSingle {
 	for _, param := range params {
 		switch p := param.(type) {
 		case paramSingle:
-			if ns := c.getAllValueProviders(p.Name, p.Type); len(ns) == 0 && !p.Optional {
+			allProviders := c.getAllValueProviders(p.Name, p.Type)
+			_, hasDecoratedValue := c.getDecoratedValue(p.Name, p.Type)
+			if len(allProviders) == 0 && !hasDecoratedValue && !p.Optional {
 				missingDeps = append(missingDeps, p)
 			}
 		case paramObject:
 			for _, f := range p.Fields {
 				missingDeps = append(missingDeps, findMissingDependencies(c, f.Param)...)
-
 			}
 		}
 	}

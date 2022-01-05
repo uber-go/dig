@@ -76,9 +76,15 @@ type containerWriter interface {
 	// overwritten.
 	setValue(name string, t reflect.Type, v reflect.Value)
 
+	setDecoratedValue(name string, t reflect.Type, v reflect.Value)
+
 	// submitGroupedValue submits a value to the value group with the provided
 	// name.
 	submitGroupedValue(name string, t reflect.Type, v reflect.Value)
+
+	// submitDecoratedGroupedValue submits a decorated value to the value group
+	// with the provided name.
+	submitDecoratedGroupedValue(name string, t reflect.Type, v reflect.Value)
 }
 
 // containerStore provides access to the Container's underlying data store.
@@ -101,6 +107,11 @@ type containerStore interface {
 	// The order in which the values are returned is undefined.
 	getValueGroup(name string, t reflect.Type) []reflect.Value
 
+	// Retrieves all decorated values for the provided group and type.
+	//
+	// The order in which the values are returned is undefined.
+	getDecoratedValueGroup(name string, t reflect.Type) []reflect.Value
+
 	// Returns the providers that can produce a value with the given name and
 	// type.
 	getValueProviders(name string, t reflect.Type) []provider
@@ -112,6 +123,14 @@ type containerStore interface {
 	// Returns the providers that can produce a value with the given name and
 	// type across all the Scopes that are in effect of this containerStore.
 	getAllValueProviders(name string, t reflect.Type) []provider
+
+	// Returns the decorators that can produce values for the given name and
+	// type.
+	getValueDecorators(name string, t reflect.Type) []decorator
+
+	// Reutrns the decorators that can produce values for the given group and
+	// type.
+	getGroupDecorators(name string, t reflect.Type) []decorator
 
 	getStoresFromRoot() []containerStore
 

@@ -25,8 +25,11 @@ import (
 	"reflect"
 
 	"go.uber.org/dig/internal/digreflect"
-	"go.uber.org/dig/internal/graph"
 )
+
+type decorator interface {
+	Call(c containerStore) error
+}
 
 type decoratorNode struct {
 	dcor  interface{}
@@ -38,8 +41,11 @@ type decoratorNode struct {
 	// Whether the decorator owned by this node was already called.
 	called bool
 
-	// parameters being decorated
-	params []key
+	// Parameters of the decorator
+	params paramList
+
+	// Results of the decorator
+	results resultList
 
 	// order of this node in each Scopes' graphHolders.
 	orders map[*Scope]int
@@ -50,28 +56,6 @@ type decoratorNode struct {
 
 func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	dtype := reflect.ValueOf(dcor).Type()
-
-	dcorParams := make([]key, dtype.NumIn())
-
-	// Iterate through the parameters and make sure there is at least
-	// one provider for this decorator.
-	// Otherwise, that's an error.
-
-	/*
-		for i := 0; i < dtype.NumIn(); i++ {
-			k := key{t: dtype.In(i)}
-
-			var providers []provider
-			if providers = s.getAllProviders(k); len(providers) == 0 {
-				return nil, fmt.Errorf("cannot decorate using function %v: %s was never Provided to Scope [%s]",
-					dtype,
-					dtype.In(i),
-					s.name,
-				)
-			}
-			dcorParams[i] = k
-		}
-	*/
 
 	// Iterate through the Out types and make sure they are not already
 	// decorated.
@@ -84,7 +68,17 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 				s.name,
 			)
 		}
+	}
 
+	// Create parameter / result list.
+	pl, err := newParamList(dtype, s)
+	if err != nil {
+		return nil, err
+	}
+
+	rl, err := newResultList(dtype, resultOptions{})
+	if err != nil {
+		return nil, err
 	}
 
 	n := &decoratorNode{
@@ -92,12 +86,46 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 		dtype:    dtype,
 		location: digreflect.InspectFunc(dcor),
 		orders:   make(map[*Scope]int),
-		params:   dcorParams,
+		params:   pl,
+		results:  rl,
 		s:        s,
 	}
 	return n, nil
 }
 
+func (n *decoratorNode) Call(s containerStore) error {
+	if n.called {
+		return nil
+	}
+
+	if err := shallowCheckDependencies(s, n.params); err != nil {
+		return errMissingDependencies{
+			Func:   n.location,
+			Reason: err,
+		}
+	}
+
+	args, err := n.params.BuildList(n.s, true)
+	if err != nil {
+		return errArgumentsFailed{
+			Func:   n.location,
+			Reason: err,
+		}
+	}
+
+	results := reflect.ValueOf(n.dcor).Call(args)
+	if err != nil {
+		return nil
+	}
+
+	if err := n.results.ExtractList(n.s, true, results); err != nil {
+		return err
+	}
+	n.called = true
+	return nil
+}
+
+// DecorateOption ...
 type DecorateOption interface {
 	applyDecorateOption(*decorateOptions)
 }
@@ -122,44 +150,37 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 		return err
 	}
 
-	dn.orders[s] = s.gh.NewNode(dn)
-	if !s.deferAcyclicVerification {
-		if ok, cycle := graph.IsAcyclic(s.gh); !ok {
-			return errf("cycle detected in dependency graph", s.cycleDetectedError(cycle))
-		}
-		s.isVerifiedAcyclic = true
-	}
-
-	pl, err := newParamList(dn.dtype, s)
+	keys, err := s.findAndValidateResults(dn.results)
 	if err != nil {
 		return err
 	}
 
-	if err := shallowCheckDependencies(s, pl); err != nil {
-		return errMissingDependencies{
-			Func:   dn.location,
-			Reason: err,
+	for k := range keys {
+		s.decorators[k] = append(s.decorators[k], dn)
+	}
+	return nil
+}
+
+func findResultKeys(r resultList) []key {
+	// use BFS to search for all keys included in a resultList
+	var q []result
+	var keys []key
+	q = append(q, r)
+
+	for len(q) > 0 {
+		res := q[0]
+		q = q[1:]
+
+		switch innerResult := res.(type) {
+		case resultSingle:
+			keys = append(keys, key{t: innerResult.Type, name: innerResult.Name})
+		case resultGrouped:
+			keys = append(keys, key{t: innerResult.Type.Elem(), group: innerResult.Group})
+		case resultObject:
+			for _, f := range innerResult.Fields {
+				q = append(q, f.Result)
+			}
 		}
 	}
 
-	args, err := pl.BuildList(s)
-	if err != nil {
-		return errArgumentsFailed{
-			Func:   dn.location,
-			Reason: err,
-		}
-	}
-	results := reflect.ValueOf(decorator).Call(args)
-	/*
-		should we check for error here?
-		for _, result := range results {
-			if err, _ := result.Interface().(error); err != nil {
-				return errf("failed to decorate", err)
-			}
-		}
-	*/
-	for _, result := range results {
-		s.decoratedValues[key{t: result.Type()}] = result
-	}
-	return nil
 }

@@ -38,13 +38,13 @@ func TestDecorateSuccess(t *testing.T) {
 		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
 
 		assert.NoError(t, c.Invoke(func(a *A) {
-			assert.Equal(t, a.name, "A", "expected name to not be decorated yet.")
+			assert.Equal(t, "A", a.name, "expected name to not be decorated yet.")
 		}))
 
 		require.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }))
 
 		assert.NoError(t, c.Invoke(func(a *A) {
-			assert.Equal(t, a.name, "A'", "expected name to equal decorated name.")
+			assert.Equal(t, "A'", a.name, "expected name to equal decorated name.")
 		}))
 	})
 
@@ -120,12 +120,19 @@ func TestDecorateSuccess(t *testing.T) {
 			B string `name:"b"`
 		}
 
+		type C struct {
+			Out
+
+			A *A
+			B string `name:"b"`
+		}
+
 		c := New()
 		require.NoError(t, c.Provide(func() *A { return &A{Name: "A"} }))
 		require.NoError(t, c.Provide(func() string { return "b" }, Name("b")))
 
-		require.NoError(t, c.Decorate(func(b B) B {
-			return B{
+		require.NoError(t, c.Decorate(func(b B) C {
+			return C{
 				A: &A{
 					Name: b.A.Name + "'",
 				},
@@ -136,6 +143,41 @@ func TestDecorateSuccess(t *testing.T) {
 		assert.NoError(t, c.Invoke(func(b B) {
 			assert.Equal(t, "A'", b.A.Name)
 			assert.Equal(t, "b'", b.B)
+		}))
+	})
+
+	t.Run("decorate with value groups", func(t *testing.T) {
+		t.Parallel()
+
+		type Params struct {
+			In
+
+			Animals []string `group:"animals"`
+		}
+
+		type Result struct {
+			Out
+
+			Animals []string `group:"animals"`
+		}
+
+		c := New()
+		require.NoError(t, c.Provide(func() string { return "dog" }, Group("animals")))
+		require.NoError(t, c.Provide(func() string { return "cat" }, Group("animals")))
+		require.NoError(t, c.Provide(func() string { return "alpaca" }, Group("animals")))
+
+		assert.NoError(t, c.Decorate(func(p Params) Result {
+			animals := p.Animals
+			for i := 0; i < len(animals); i++ {
+				animals[i] = "good " + animals[i]
+			}
+			return Result{
+				Animals: animals,
+			}
+		}))
+
+		assert.NoError(t, c.Invoke(func(p Params) {
+			assert.Contains(t, p.Animals, "good dog")
 		}))
 	})
 }
@@ -164,7 +206,7 @@ func TestDecorateFailure(t *testing.T) {
 
 		assert.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }), "first decorate should not fail.")
 		err := c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} })
-		assert.Error(t, err, "expected second call to decorate to fail.")
+		require.Error(t, err, "expected second call to decorate to fail.")
 		assert.Contains(t, err.Error(), "*dig.A was already Decorated in Scope [container]")
 	})
 }

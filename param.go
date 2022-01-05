@@ -49,7 +49,7 @@ type param interface {
 	// Container.
 	//
 	// This MAY panic if the param does not produce a single value.
-	Build(containerStore) (reflect.Value, error)
+	Build(containerStore, bool) (reflect.Value, error)
 
 	// DotParam returns a slice of dot.Param(s).
 	DotParam() []*dot.Param
@@ -137,14 +137,14 @@ func newParamList(ctype reflect.Type, c containerStore) (paramList, error) {
 	return pl, nil
 }
 
-func (pl paramList) Build(containerStore) (reflect.Value, error) {
+func (pl paramList) Build(containerStore, bool) (reflect.Value, error) {
 	digerror.BugPanicf("paramList.Build() must never be called")
 	panic("") // Unreachable, as BugPanicf above will panic.
 }
 
 // BuildList returns an ordered list of values which may be passed directly
 // to the underlying constructor.
-func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
+func (pl paramList) BuildList(c containerStore, decorate bool) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
 	argsBuilt := make([]bool, len(pl.Params))
 	allContainers := c.getStoresFromRoot()
@@ -153,7 +153,7 @@ func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 		var arg reflect.Value
 		// iterate through the tree path of scopes.
 		for _, c := range allContainers {
-			if arg, err = p.Build(c); err == nil {
+			if arg, err = p.Build(c, decorate); err == nil {
 				args[i] = arg
 				argsBuilt[i] = true
 			}
@@ -222,10 +222,31 @@ func (ps paramSingle) String() string {
 	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
 }
 
-func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
+func (ps paramSingle) Build(c containerStore, decorate bool) (reflect.Value, error) {
 	// Check whether the value is a decorated value first.
 	if v, ok := c.getDecoratedValue(ps.Name, ps.Type); ok {
 		return v, nil
+	}
+	if !decorate {
+		decorators := c.getValueDecorators(ps.Name, ps.Type)
+		if len(decorators) != 0 {
+			for _, d := range decorators {
+				err := d.Call(c)
+				if err == nil {
+					continue
+				}
+				if _, ok := err.(errMissingDependencies); ok && ps.Optional {
+					return reflect.Zero(ps.Type), nil
+				}
+				return _noValue, errParamSingleFailed{
+					CtorID: 1,
+					Key:    key{t: ps.Type, name: ps.Name},
+					Reason: err,
+				}
+			}
+			v, _ := c.getDecoratedValue(ps.Name, ps.Type)
+			return v, nil
+		}
 	}
 
 	if v, ok := c.getValue(ps.Name, ps.Type); ok {
@@ -349,14 +370,14 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 	return po, nil
 }
 
-func (po paramObject) Build(c containerStore) (reflect.Value, error) {
+func (po paramObject) Build(c containerStore, decorate bool) (reflect.Value, error) {
 	if v, ok := c.getDecoratedValue("", po.Type); ok {
 		return v, nil
 	}
 
 	dest := reflect.New(po.Type).Elem()
 	for _, f := range po.Fields {
-		v, err := f.Build(c)
+		v, err := f.Build(c, decorate)
 		if err != nil {
 			return dest, err
 		}
@@ -428,8 +449,8 @@ func newParamObjectField(idx int, f reflect.StructField, c containerStore) (para
 	return pof, nil
 }
 
-func (pof paramObjectField) Build(c containerStore) (reflect.Value, error) {
-	v, err := pof.Param.Build(c)
+func (pof paramObjectField) Build(c containerStore, decorate bool) (reflect.Value, error) {
+	v, err := pof.Param.Build(c, decorate)
 	if err != nil {
 		return v, err
 	}
@@ -496,7 +517,17 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	return pg, nil
 }
 
-func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
+func (pt paramGroupedSlice) Build(c containerStore, decorate bool) (reflect.Value, error) {
+	for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
+		if err := d.Call(c); err != nil {
+			return _noValue, errParamGroupFailed{
+				CtorID: 0, // sungyoon: FIXME
+				Key:    key{group: pt.Group, t: pt.Type.Elem()},
+				Reason: err,
+			}
+		}
+	}
+
 	for _, n := range c.getGroupProviders(pt.Group, pt.Type.Elem()) {
 		if err := n.Call(c); err != nil {
 			return _noValue, errParamGroupFailed{
@@ -507,7 +538,10 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 		}
 	}
 
-	items := c.getValueGroup(pt.Group, pt.Type.Elem())
+	items := c.getDecoratedValueGroup(pt.Group, pt.Type.Elem())
+	if len(items) == 0 {
+		items = c.getValueGroup(pt.Group, pt.Type.Elem())
+	}
 
 	result := reflect.MakeSlice(pt.Type, len(items), len(items))
 	for i, v := range items {

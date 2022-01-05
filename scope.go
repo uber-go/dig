@@ -47,6 +47,9 @@ type Scope struct {
 	// key.
 	providers map[key][]*constructorNode
 
+	// Mapping from key to all decorator nodes that decorates a value for that key.
+	decorators map[key][]*decoratorNode
+
 	// constructorNodes provided directly to this Scope. i.e. it does not include
 	// any nodes that were provided to the parent Scope this inherited from.
 	nodes []*constructorNode
@@ -59,6 +62,9 @@ type Scope struct {
 
 	// Values groups that generated directly in the Scope.
 	groups map[key][]reflect.Value
+
+	// Values groups that generated via decoraters in the Scope.
+	decoratedGroups map[key][]reflect.Value
 
 	// Source of randomness.
 	rand *rand.Rand
@@ -86,9 +92,11 @@ type Scope struct {
 func newScope() *Scope {
 	s := &Scope{
 		providers:       make(map[key][]*constructorNode),
+		decorators:      make(map[key][]*decoratorNode),
 		values:          make(map[key]reflect.Value),
 		decoratedValues: make(map[key]reflect.Value),
 		groups:          make(map[key][]reflect.Value),
+		decoratedGroups: make(map[key][]reflect.Value),
 		invokerFn:       defaultInvoker,
 		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
@@ -179,8 +187,18 @@ func (s *Scope) setValue(name string, t reflect.Type, v reflect.Value) {
 	s.values[key{name: name, t: t}] = v
 }
 
+func (s *Scope) setDecoratedValue(name string, t reflect.Type, v reflect.Value) {
+	s.decoratedValues[key{name: name, t: t}] = v
+}
+
 func (s *Scope) getValueGroup(name string, t reflect.Type) []reflect.Value {
 	items := s.groups[key{group: name, t: t}]
+	// shuffle the list so users don't rely on the ordering of grouped values
+	return shuffledCopy(s.rand, items)
+}
+
+func (s *Scope) getDecoratedValueGroup(name string, t reflect.Type) []reflect.Value {
+	items := s.decoratedGroups[key{group: name, t: t}]
 	// shuffle the list so users don't rely on the ordering of grouped values
 	return shuffledCopy(s.rand, items)
 }
@@ -190,12 +208,34 @@ func (s *Scope) submitGroupedValue(name string, t reflect.Type, v reflect.Value)
 	s.groups[k] = append(s.groups[k], v)
 }
 
+func (s *Scope) submitDecoratedGroupedValue(name string, t reflect.Type, v reflect.Value) {
+	k := key{group: name, t: t}
+	s.decoratedGroups[k] = append(s.decoratedGroups[k], v)
+}
+
 func (s *Scope) getValueProviders(name string, t reflect.Type) []provider {
 	return s.getProviders(key{name: name, t: t})
 }
 
 func (s *Scope) getGroupProviders(name string, t reflect.Type) []provider {
 	return s.getProviders(key{group: name, t: t})
+}
+
+func (s *Scope) getValueDecorators(name string, t reflect.Type) []decorator {
+	return s.getDecorators(key{name: name, t: t})
+}
+
+func (s *Scope) getGroupDecorators(name string, t reflect.Type) []decorator {
+	return s.getDecorators(key{group: name, t: t})
+}
+
+func (s *Scope) getDecorators(k key) []decorator {
+	nodes := s.decorators[k]
+	decorators := make([]decorator, len(nodes))
+	for i, n := range nodes {
+		decorators[i] = n
+	}
+	return decorators
 }
 
 func (s *Scope) getProviders(k key) []provider {
