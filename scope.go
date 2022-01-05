@@ -115,15 +115,12 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	return child
 }
 
-// getScopesFromRoot returns a list of Scopes from the root Container
-// until the current Scope.
-func (s *Scope) getScopesFromRoot() []*Scope {
+// ancestors returns a list of scopes of ancestors of this scope up to the
+// root. The scope at at index 0 is this scope itself.
+func (s *Scope) ancestors() []*Scope {
 	var scopes []*Scope
 	for s := s; s != nil; s = s.parentScope {
 		scopes = append(scopes, s)
-	}
-	for i, j := 0, len(scopes)-1; i < j; i, j = i+1, j-1 {
-		scopes[i], scopes[j] = scopes[j], scopes[i]
 	}
 	return scopes
 }
@@ -136,8 +133,8 @@ func (s *Scope) appendSubscopes(dest []*Scope) []*Scope {
 	return dest
 }
 
-func (s *Scope) getStoresFromRoot() []containerStore {
-	scopes := s.getScopesFromRoot()
+func (s *Scope) storesToRoot() []containerStore {
+	scopes := s.ancestors()
 	stores := make([]containerStore, len(scopes))
 	for i, s := range scopes {
 		stores[i] = s
@@ -205,7 +202,7 @@ func (s *Scope) getAllValueProviders(name string, t reflect.Type) []provider {
 }
 
 func (s *Scope) getAllProviders(k key) []provider {
-	allScopes := s.getScopesFromRoot()
+	allScopes := s.ancestors()
 	var providers []provider
 	for _, scope := range allScopes {
 		providers = append(providers, scope.getProviders(k)...)

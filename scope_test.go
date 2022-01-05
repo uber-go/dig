@@ -36,8 +36,8 @@ func TestScopedOperations(t *testing.T) {
 		s2 := s1.Scope("child2")
 		s3 := s2.Scope("child2")
 
-		assert.Equal(t, []containerStore{c.scope, s1, s2, s3}, s3.getStoresFromRoot())
-		assert.Equal(t, []*Scope{c.scope, s1, s2, s3}, s3.getScopesFromRoot())
+		assert.Equal(t, []containerStore{s3, s2, s1, c.scope}, s3.storesToRoot())
+		assert.Equal(t, []*Scope{s3, s2, s1, c.scope}, s3.ancestors())
 	})
 
 	t.Run("private provides", func(t *testing.T) {

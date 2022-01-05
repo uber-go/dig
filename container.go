@@ -111,7 +111,9 @@ type containerStore interface {
 	// type across all the Scopes that are in effect of this containerStore.
 	getAllValueProviders(name string, t reflect.Type) []provider
 
-	getStoresFromRoot() []containerStore
+	// Reports a list of stores (starting at this store) up to the root
+	// store.
+	storesToRoot() []containerStore
 
 	createGraph() *dot.Graph
 

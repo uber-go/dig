@@ -146,13 +146,15 @@ func (pl paramList) Build(containerStore) (reflect.Value, error) {
 // to the underlying constructor.
 func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
-	allContainers := c.getStoresFromRoot()
+	allContainers := c.storesToRoot()
 	for i, p := range pl.Params {
 		// iterate through the tree path of scopes.
+	containerLoop:
 		for _, c := range allContainers {
 			arg, err := p.Build(c)
 			if err == nil {
 				args[i] = arg
+				break containerLoop
 			}
 			// If argument has successfully been built, it's possible
 			// for these errors to occur in child scopes that don't
