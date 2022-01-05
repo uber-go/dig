@@ -172,9 +172,7 @@ func findResultKeys(r resultList) []key {
 				q = append(q, f.Result)
 			}
 		case resultList:
-			for _, r := range innerResult.Results {
-				q = append(q, r)
-			}
+			q = append(q, innerResult.Results...)
 		}
 	}
 	return keys
