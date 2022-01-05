@@ -434,7 +434,7 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	// take a snapshot of the current graph state before
 	// we start making changes to it as we may need to
 	// undo them upon encountering errors.
-	allScopes := s.appendLeafScopes(nil)
+	allScopes := s.appendSubscopes(nil)
 	for _, s := range allScopes {
 		s := s
 		s.gh.Snapshot()
