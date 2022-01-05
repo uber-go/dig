@@ -148,11 +148,10 @@ func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
 	allContainers := c.getStoresFromRoot()
 	for i, p := range pl.Params {
-		var err error
-		var arg reflect.Value
 		// iterate through the tree path of scopes.
 		for _, c := range allContainers {
-			if arg, err = p.Build(c); err == nil {
+			arg, err := p.Build(c)
+			if err == nil {
 				args[i] = arg
 			}
 			// If argument has successfully been built, it's possible
