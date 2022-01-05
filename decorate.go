@@ -25,15 +25,19 @@ import (
 	"reflect"
 
 	"go.uber.org/dig/internal/digreflect"
+	"go.uber.org/dig/internal/dot"
 )
 
 type decorator interface {
 	Call(c containerStore) error
+	ID() dot.CtorID
 }
 
 type decoratorNode struct {
 	dcor  interface{}
 	dtype reflect.Type
+
+	id dot.CtorID
 
 	// Location where this function was defined.
 	location *digreflect.Func
@@ -55,7 +59,9 @@ type decoratorNode struct {
 }
 
 func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
-	dtype := reflect.ValueOf(dcor).Type()
+	dval := reflect.ValueOf(dcor)
+	dtype := dval.Type()
+	dptr := dval.Pointer()
 
 	// Create parameter / result list.
 	pl, err := newParamList(dtype, s)
@@ -71,6 +77,7 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	n := &decoratorNode{
 		dcor:     dcor,
 		dtype:    dtype,
+		id:       dot.CtorID(dptr),
 		location: digreflect.InspectFunc(dcor),
 		orders:   make(map[*Scope]int),
 		params:   pl,
@@ -111,6 +118,8 @@ func (n *decoratorNode) Call(s containerStore) error {
 	n.called = true
 	return nil
 }
+
+func (n *decoratorNode) ID() dot.CtorID { return n.id }
 
 // DecorateOption ...
 type DecorateOption interface {
