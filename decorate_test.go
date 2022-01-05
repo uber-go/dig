@@ -147,8 +147,6 @@ func TestDecorateSuccess(t *testing.T) {
 	})
 
 	t.Run("decorate with value groups", func(t *testing.T) {
-		t.Parallel()
-
 		type Params struct {
 			In
 
@@ -190,7 +188,8 @@ func TestDecorateFailure(t *testing.T) {
 			name string
 		}
 
-		err := c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} })
+		require.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }))
+		err := c.Invoke(func(a *A) string { return a.name })
 
 		assert.Error(t, err)
 
@@ -203,10 +202,10 @@ func TestDecorateFailure(t *testing.T) {
 			name string
 		}
 		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
+		require.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }), "first decorate should not fail.")
 
-		assert.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }), "first decorate should not fail.")
 		err := c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} })
 		require.Error(t, err, "expected second call to decorate to fail.")
-		assert.Contains(t, err.Error(), "*dig.A was already Decorated in Scope [container]")
+		assert.Contains(t, err.Error(), "*dig.A was already Decorated")
 	})
 }

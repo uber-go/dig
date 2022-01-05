@@ -57,19 +57,6 @@ type decoratorNode struct {
 func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	dtype := reflect.ValueOf(dcor).Type()
 
-	// Iterate through the Out types and make sure they are not already
-	// decorated.
-	for i := 0; i < dtype.NumOut(); i++ {
-		k := key{t: dtype.Out(i)}
-		if _, ok := s.decoratedValues[k]; ok {
-			return nil, fmt.Errorf("cannot decorate using function %v: %s was already Decorated in Scope [%s]",
-				dtype,
-				dtype.Out(i),
-				s.name,
-			)
-		}
-	}
-
 	// Create parameter / result list.
 	pl, err := newParamList(dtype, s)
 	if err != nil {
@@ -150,12 +137,15 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 		return err
 	}
 
-	keys, err := s.findAndValidateResults(dn.results)
-	if err != nil {
-		return err
-	}
-
-	for k := range keys {
+	keys := findResultKeys(dn.results)
+	for _, k := range keys {
+		if len(s.decorators[k]) > 0 {
+			return fmt.Errorf("cannot decorate using function %v: %s was already Decorated in Scope [%s]",
+				dn.dtype,
+				k,
+				s.name,
+			)
+		}
 		s.decorators[k] = append(s.decorators[k], dn)
 	}
 	return nil
@@ -175,12 +165,17 @@ func findResultKeys(r resultList) []key {
 		case resultSingle:
 			keys = append(keys, key{t: innerResult.Type, name: innerResult.Name})
 		case resultGrouped:
+			// Flatten the result.
 			keys = append(keys, key{t: innerResult.Type.Elem(), group: innerResult.Group})
 		case resultObject:
 			for _, f := range innerResult.Fields {
 				q = append(q, f.Result)
 			}
+		case resultList:
+			for _, r := range innerResult.Results {
+				q = append(q, r)
+			}
 		}
 	}
-
+	return keys
 }

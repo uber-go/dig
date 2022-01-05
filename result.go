@@ -493,7 +493,7 @@ func (rt resultGrouped) Extract(cw containerWriter, decorated bool, v reflect.Va
 		if !decorated {
 			cw.submitGroupedValue(rt.Group, rt.Type, v.Index(i))
 		} else {
-			cw.submitDecoratedGroupedValue(rt.Group, rt.Type, v.Index(i))
+			cw.submitDecoratedGroupedValue(rt.Group, rt.Type.Elem(), v.Index(i))
 		}
 	}
 }

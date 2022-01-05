@@ -518,12 +518,14 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 }
 
 func (pt paramGroupedSlice) Build(c containerStore, decorate bool) (reflect.Value, error) {
-	for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
-		if err := d.Call(c); err != nil {
-			return _noValue, errParamGroupFailed{
-				CtorID: 0, // sungyoon: FIXME
-				Key:    key{group: pt.Group, t: pt.Type.Elem()},
-				Reason: err,
+	if !decorate {
+		for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
+			if err := d.Call(c); err != nil {
+				return _noValue, errParamGroupFailed{
+					CtorID: 0, // sungyoon: FIXME
+					Key:    key{group: pt.Group, t: pt.Type.Elem()},
+					Reason: err,
+				}
 			}
 		}
 	}
