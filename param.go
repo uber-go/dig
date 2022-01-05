@@ -146,28 +146,11 @@ func (pl paramList) Build(containerStore) (reflect.Value, error) {
 // to the underlying constructor.
 func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
-	allContainers := c.storesToRoot()
 	for i, p := range pl.Params {
-		// iterate through the tree path of scopes.
-	containerLoop:
-		for _, c := range allContainers {
-			arg, err := p.Build(c)
-			if err == nil {
-				args[i] = arg
-				break containerLoop
-			}
-			// If argument has successfully been built, it's possible
-			// for these errors to occur in child scopes that don't
-			// contain the given parameter type. We can safely ignore
-			// these.
-			// If it's an error other than missing types/dependencies,
-			// this means some constructor returned an error that must
-			// be reported.
-			_, isErrMissingTypes := err.(errMissingTypes)
-			_, isErrMissingDeps := err.(errMissingDependencies)
-			if err != nil && !isErrMissingTypes && !isErrMissingDeps {
-				return nil, err
-			}
+		var err error
+		args[i], err = p.Build(c)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return args, nil
@@ -218,7 +201,21 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 		return v, nil
 	}
 
-	providers := c.getValueProviders(ps.Name, ps.Type)
+	// Starting at the given container and working our way up its parents,
+	// find one that provides this dependency.
+	//
+	// Once found, we'll use that container for the rest of the invocation.
+	// Dependencies of this type will begin searching at that container,
+	// rather than starting at base.
+	var providers []provider
+	for _, candidate := range c.storesToRoot() {
+		providers = candidate.getValueProviders(ps.Name, ps.Type)
+		if len(providers) > 0 {
+			c = candidate
+			break
+		}
+	}
+
 	if len(providers) == 0 {
 		if ps.Optional {
 			return reflect.Zero(ps.Type), nil
