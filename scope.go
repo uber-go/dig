@@ -128,21 +128,19 @@ func (s *Scope) getScopesFromRoot() []*Scope {
 	return scopes
 }
 
-func (s *Scope) appendLeafScopes(dest []*Scope) []*Scope {
+func (s *Scope) appendSubscopes(dest []*Scope) []*Scope {
 	dest = append(dest, s)
 	for _, cs := range s.childScopes {
-		dest = cs.appendLeafScopes(dest)
+		dest = cs.appendSubscopes(dest)
 	}
 	return dest
 }
 
 func (s *Scope) getStoresFromRoot() []containerStore {
-	var stores []containerStore
-	for s := s; s != nil; s = s.parentScope {
-		stores = append(stores, s)
-	}
-	for i, j := 0, len(stores)-1; i < j; i, j = i+1, j-1 {
-		stores[i], stores[j] = stores[j], stores[i]
+	scopes := s.getScopesFromRoot()
+	stores := make([]containerStore, len(scopes))
+	for i, s := range scopes {
+		stores[i] = s
 	}
 	return stores
 }
