@@ -309,3 +309,48 @@ func TestScopeFailures(t *testing.T) {
 		assert.NoError(t, gc.Invoke(func(a *A) {}), "expected Invoke in grandchild container on child's private-provided type to fail")
 	})
 }
+
+func TestScopeValueGroups(t *testing.T) {
+	t.Run("provide in parent and child", func(t *testing.T) {
+		type result struct {
+			Out
+
+			Value string `group:"foo"`
+		}
+
+		root := New()
+		require.NoError(t, root.Provide(func() result {
+			return result{Value: "a"}
+		}))
+		require.NoError(t, root.Provide(func() result {
+			return result{Value: "b"}
+		}))
+		require.NoError(t, root.Provide(func() result {
+			return result{Value: "c"}
+		}))
+
+		child := root.Scope("child")
+		require.NoError(t,
+			child.Provide(func() result {
+				return result{Value: "d"}
+			}))
+
+		type param struct {
+			In
+
+			Values []string `group:"foo"`
+		}
+
+		t.Run("invoke parent", func(t *testing.T) {
+			require.NoError(t, root.Invoke(func(i param) {
+				assert.ElementsMatch(t, []string{"a", "b", "c"}, i.Values)
+			}), "only values added to parent should be visible")
+		})
+
+		t.Run("invoke child", func(t *testing.T) {
+			require.NoError(t, child.Invoke(func(i param) {
+				assert.ElementsMatch(t, []string{"a", "b", "c", "d"}, i.Values)
+			}), "values added to both, parent and child should be visible")
+		})
+	})
+}
