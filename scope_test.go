@@ -353,4 +353,37 @@ func TestScopeValueGroups(t *testing.T) {
 			}), "values added to both, parent and child should be visible")
 		})
 	})
+
+	t.Run("value group as a parent dependency", func(t *testing.T) {
+		// Tree:
+		//
+		//   root      defines a function that consumes the value group
+		//    |
+		//    |
+		//   child     produces values to the value group
+
+		type T1 struct{}
+		type param struct {
+			In
+
+			Values []string `group:"foo"`
+		}
+
+		root := New()
+
+		require.NoError(t, root.Provide(func(p param) T1 {
+			assert.ElementsMatch(t, []string{"a", "b", "c"}, p.Values)
+			return T1{}
+		}))
+
+		child := root.Scope("child")
+		require.NoError(t, child.Provide(func() string { return "a" }, Group("foo")))
+		require.NoError(t, child.Provide(func() string { return "b" }, Group("foo")))
+		require.NoError(t, child.Provide(func() string { return "c" }, Group("foo")))
+
+		// Invocation in child should see values provided to the child,
+		// even though the constructor we're invoking is provided in
+		// the parent.
+		require.NoError(t, child.Invoke(func(T1) {}))
+	})
 }
