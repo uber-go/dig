@@ -146,28 +146,11 @@ func (pl paramList) Build(containerStore) (reflect.Value, error) {
 // to the underlying constructor.
 func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
-	allContainers := c.storesToRoot()
 	for i, p := range pl.Params {
-		// iterate through the tree path of scopes.
-	containerLoop:
-		for _, c := range allContainers {
-			arg, err := p.Build(c)
-			if err == nil {
-				args[i] = arg
-				break containerLoop
-			}
-			// If argument has successfully been built, it's possible
-			// for these errors to occur in child scopes that don't
-			// contain the given parameter type. We can safely ignore
-			// these.
-			// If it's an error other than missing types/dependencies,
-			// this means some constructor returned an error that must
-			// be reported.
-			_, isErrMissingTypes := err.(errMissingTypes)
-			_, isErrMissingDeps := err.(errMissingDependencies)
-			if err != nil && !isErrMissingTypes && !isErrMissingDeps {
-				return nil, err
-			}
+		var err error
+		args[i], err = p.Build(c)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return args, nil
@@ -213,12 +196,36 @@ func (ps paramSingle) String() string {
 
 	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
 }
+
+// searches the given container and its parent for a matching value.
+func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
+	for _, c := range c.storesToRoot() {
+		if v, ok := c.getValue(ps.Name, ps.Type); ok {
+			return v, ok
+		}
+	}
+	return _noValue, false
+}
+
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
-	if v, ok := c.getValue(ps.Name, ps.Type); ok {
+	if v, ok := ps.getValue(c); ok {
 		return v, nil
 	}
 
-	providers := c.getValueProviders(ps.Name, ps.Type)
+	// Starting at the given container and working our way up its parents,
+	// find one that provides this dependency.
+	//
+	// Once found, we'll use that container for the rest of the invocation.
+	// Dependencies of this type will begin searching at that container,
+	// rather than starting at base.
+	var providers []provider
+	for _, container := range c.storesToRoot() {
+		providers = container.getValueProviders(ps.Name, ps.Type)
+		if len(providers) > 0 {
+			break
+		}
+	}
+
 	if len(providers) == 0 {
 		if ps.Optional {
 			return reflect.Zero(ps.Type), nil
@@ -247,7 +254,7 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 
 	// If we get here, it's impossible for the value to be absent from the
 	// container.
-	v, _ := c.getValue(ps.Name, ps.Type)
+	v, _ := ps.getValue(c)
 	return v, nil
 }
 
@@ -479,21 +486,25 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 }
 
 func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
-	for _, n := range c.getGroupProviders(pt.Group, pt.Type.Elem()) {
-		if err := n.Call(c); err != nil {
-			return _noValue, errParamGroupFailed{
-				CtorID: n.ID(),
-				Key:    key{group: pt.Group, t: pt.Type.Elem()},
-				Reason: err,
+	var itemCount int
+	stores := c.storesToRoot()
+	for _, c := range stores {
+		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
+		itemCount += len(providers)
+		for _, n := range providers {
+			if err := n.Call(c); err != nil {
+				return _noValue, errParamGroupFailed{
+					CtorID: n.ID(),
+					Key:    key{group: pt.Group, t: pt.Type.Elem()},
+					Reason: err,
+				}
 			}
 		}
 	}
 
-	items := c.getValueGroup(pt.Group, pt.Type.Elem())
-
-	result := reflect.MakeSlice(pt.Type, len(items), len(items))
-	for i, v := range items {
-		result.Index(i).Set(v)
+	result := reflect.MakeSlice(pt.Type, 0, itemCount)
+	for _, c := range stores {
+		result = reflect.Append(result, c.getValueGroup(pt.Group, pt.Type.Elem())...)
 	}
 	return result, nil
 }
