@@ -151,7 +151,7 @@ func (n *constructorNode) Call(c containerStore) error {
 
 	// Commit the result to the original container that this constructor
 	// was supplied to. The provided constructor is only used for a view of
-	// the rest of the graph to instantiate the dependnecies of this
+	// the rest of the graph to instantiate the dependencies of this
 	// container.
 	receiver.Commit(n.s)
 	n.called = true
