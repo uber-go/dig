@@ -132,7 +132,9 @@ type containerStore interface {
 	// type.
 	getGroupDecorators(name string, t reflect.Type) []decorator
 
-	getStoresFromRoot() []containerStore
+	// Reports a list of stores (starting at this store) up to the root
+	// store.
+	storesToRoot() []containerStore
 
 	createGraph() *dot.Graph
 

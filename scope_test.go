@@ -36,8 +36,8 @@ func TestScopedOperations(t *testing.T) {
 		s2 := s1.Scope("child2")
 		s3 := s2.Scope("child2")
 
-		assert.Equal(t, []containerStore{c.scope, s1, s2, s3}, s3.getStoresFromRoot())
-		assert.Equal(t, []*Scope{c.scope, s1, s2, s3}, s3.getScopesFromRoot())
+		assert.Equal(t, []containerStore{s3, s2, s1, c.scope}, s3.storesToRoot())
+		assert.Equal(t, []*Scope{s3, s2, s1, c.scope}, s3.ancestors())
 	})
 
 	t.Run("private provides", func(t *testing.T) {
@@ -129,6 +129,39 @@ func TestScopedOperations(t *testing.T) {
 		for _, scope := range allScopes {
 			assert.NoError(t, scope.Invoke(func(a *A) {}))
 		}
+	})
+
+	t.Run("parent shares values with children", func(t *testing.T) {
+		type (
+			T1 struct{ s string }
+			T2 struct{}
+		)
+
+		parent := New()
+
+		require.NoError(t, parent.Provide(func() T1 {
+			assert.Fail(t, "parent should not be called")
+			return T1{"parent"}
+		}))
+
+		child := parent.Scope("child")
+
+		var childCalled bool
+		defer func() {
+			assert.True(t, childCalled, "child constructor must be called")
+		}()
+		require.NoError(t, child.Provide(func() T1 {
+			childCalled = true
+			return T1{"child"}
+		}))
+
+		require.NoError(t, child.Provide(func(v T1) T2 {
+			assert.Equal(t, "child", v.s,
+				"value should be built by child")
+			return T2{}
+		}))
+
+		require.NoError(t, child.Invoke(func(T2) {}))
 	})
 }
 
