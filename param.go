@@ -476,21 +476,25 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 }
 
 func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
-	for _, n := range c.getGroupProviders(pt.Group, pt.Type.Elem()) {
-		if err := n.Call(c); err != nil {
-			return _noValue, errParamGroupFailed{
-				CtorID: n.ID(),
-				Key:    key{group: pt.Group, t: pt.Type.Elem()},
-				Reason: err,
+	var itemCount int
+	stores := c.storesToRoot()
+	for _, c := range stores {
+		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
+		itemCount += len(providers)
+		for _, n := range providers {
+			if err := n.Call(c); err != nil {
+				return _noValue, errParamGroupFailed{
+					CtorID: n.ID(),
+					Key:    key{group: pt.Group, t: pt.Type.Elem()},
+					Reason: err,
+				}
 			}
 		}
 	}
 
-	items := c.getValueGroup(pt.Group, pt.Type.Elem())
-
-	result := reflect.MakeSlice(pt.Type, len(items), len(items))
-	for i, v := range items {
-		result.Index(i).Set(v)
+	result := reflect.MakeSlice(pt.Type, 0, itemCount)
+	for _, c := range stores {
+		result = reflect.Append(result, c.getValueGroup(pt.Group, pt.Type.Elem())...)
 	}
 	return result, nil
 }
