@@ -196,8 +196,19 @@ func (ps paramSingle) String() string {
 
 	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
 }
+
+// searches the given container and its parent for a matching value.
+func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
+	for _, c := range c.storesToRoot() {
+		if v, ok := c.getValue(ps.Name, ps.Type); ok {
+			return v, ok
+		}
+	}
+	return _noValue, false
+}
+
 func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
-	if v, ok := c.getValue(ps.Name, ps.Type); ok {
+	if v, ok := ps.getValue(c); ok {
 		return v, nil
 	}
 
@@ -208,10 +219,9 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	// Dependencies of this type will begin searching at that container,
 	// rather than starting at base.
 	var providers []provider
-	for _, candidate := range c.storesToRoot() {
-		providers = candidate.getValueProviders(ps.Name, ps.Type)
+	for _, container := range c.storesToRoot() {
+		providers = container.getValueProviders(ps.Name, ps.Type)
 		if len(providers) > 0 {
-			c = candidate
 			break
 		}
 	}
@@ -244,7 +254,7 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 
 	// If we get here, it's impossible for the value to be absent from the
 	// container.
-	v, _ := c.getValue(ps.Name, ps.Type)
+	v, _ := ps.getValue(c)
 	return v, nil
 }
 
