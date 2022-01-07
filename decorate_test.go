@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -213,30 +214,95 @@ func TestDecorateSuccess(t *testing.T) {
 
 func TestDecorateFailure(t *testing.T) {
 	t.Run("decorate a type that wasn't provided", func(t *testing.T) {
-		c := New()
+		t.Parallel()
 
+		c := New()
 		type A struct {
-			name string
+			Name string
 		}
 
-		require.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }))
-		err := c.Invoke(func(a *A) string { return a.name })
-
+		require.NoError(t, c.Decorate(func(a *A) *A { return &A{Name: a.Name + "'"} }))
+		err := c.Invoke(func(a *A) string { return a.Name })
 		assert.Error(t, err)
-
 		assert.Contains(t, err.Error(), "missing type: *dig.A")
 	})
 
 	t.Run("decorate the same type twice", func(t *testing.T) {
+		t.Parallel()
+
 		c := New()
 		type A struct {
-			name string
+			Name string
 		}
-		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
-		require.NoError(t, c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }), "first decorate should not fail.")
+		require.NoError(t, c.Provide(func() *A { return &A{Name: "A"} }))
+		require.NoError(t, c.Decorate(func(a *A) *A { return &A{Name: a.Name + "'"} }), "first decorate should not fail.")
 
-		err := c.Decorate(func(a *A) *A { return &A{name: a.name + "'"} })
+		err := c.Decorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
 		require.Error(t, err, "expected second call to decorate to fail.")
 		assert.Contains(t, err.Error(), "*dig.A was already Decorated")
+	})
+
+	t.Run("decorator returns an error", func(t *testing.T) {
+		t.Parallel()
+
+		c := New()
+
+		type A struct {
+			Name string
+		}
+
+		require.NoError(t, c.Provide(func() *A { return &A{Name: "A"} }))
+		require.NoError(t, c.Decorate(func(a *A) (*A, error) { return a, errors.New("great sadness") }))
+
+		err := c.Invoke(func(a *A) {})
+		require.Error(t, err, "expected the decorator to error out")
+		assert.Contains(t, err.Error(), "failed to build *dig.A: great sadness")
+	})
+
+	t.Run("use dig.Out parameter for decorator", func(t *testing.T) {
+		t.Parallel()
+
+		type Param struct {
+			Out
+
+			Value string `name:"val"`
+		}
+
+		c := New()
+		require.NoError(t, c.Provide(func() string { return "hello" }, Name("val")))
+		err := c.Decorate(func(p Param) string { return "fail" })
+		require.Error(t, err, "expected dig.Out struct used as param to fail")
+		assert.Contains(t, err.Error(), "cannot depend on result objects")
+	})
+
+	t.Run("use dig.In as out parameter for decorator", func(t *testing.T) {
+		t.Parallel()
+
+		type Result struct {
+			In
+
+			Value string `name:"val"`
+		}
+
+		c := New()
+		err := c.Decorate(func() Result { return Result{Value: "hi"} })
+		require.Error(t, err, "expected dig.In struct used as result to fail")
+		assert.Contains(t, err.Error(), "cannot provide parameter object")
+	})
+
+	t.Run("missing dependency for a decorator", func(t *testing.T) {
+		t.Parallel()
+
+		type Param struct {
+			In
+
+			Value string `name:"val"`
+		}
+
+		c := New()
+		require.NoError(t, c.Decorate(func(p Param) string { return p.Value }))
+		err := c.Invoke(func(s string) {})
+		require.Error(t, err, "expected missing dep check to fail the decorator")
+		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig".TestDecorateFailure.func6.2`)
 	})
 }
