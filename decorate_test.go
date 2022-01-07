@@ -178,6 +178,37 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.Contains(t, p.Animals, "good dog")
 		}))
 	})
+
+	t.Run("decorate with optional parameter", func(t *testing.T) {
+		c := New()
+
+		type A struct{}
+		type Param struct {
+			In
+
+			Values []string `group:"values"`
+			A      *A       `optional:"true"`
+		}
+
+		type Result struct {
+			Out
+
+			Values []string `group:"values"`
+		}
+
+		require.NoError(t, c.Provide(func() string { return "a" }, Group("values")))
+		require.NoError(t, c.Provide(func() string { return "b" }, Group("values")))
+
+		require.NoError(t, c.Decorate(func(p Param) Result {
+			return Result{
+				Values: append(p.Values, "c"),
+			}
+		}))
+
+		assert.NoError(t, c.Invoke(func(p Param) {
+			assert.Equal(t, 3, len(p.Values))
+		}))
+	})
 }
 
 func TestDecorateFailure(t *testing.T) {

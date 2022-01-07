@@ -218,7 +218,6 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 }
 
 func (ps paramSingle) Build(c containerStore, decorate bool) (reflect.Value, error) {
-
 	if !decorate {
 		decorators := c.getValueDecorators(ps.Name, ps.Type)
 		if len(decorators) != 0 {
