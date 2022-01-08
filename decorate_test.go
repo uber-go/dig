@@ -239,7 +239,7 @@ func TestDecorateFailure(t *testing.T) {
 
 		err := c.Decorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
 		require.Error(t, err, "expected second call to decorate to fail.")
-		assert.Contains(t, err.Error(), "*dig.A was already Decorated")
+		assert.Contains(t, err.Error(), "decorating *dig.A multiple times")
 	})
 
 	t.Run("decorator returns an error", func(t *testing.T) {
@@ -257,6 +257,42 @@ func TestDecorateFailure(t *testing.T) {
 		err := c.Invoke(func(a *A) {})
 		require.Error(t, err, "expected the decorator to error out")
 		assert.Contains(t, err.Error(), "failed to build *dig.A: great sadness")
+	})
+
+	t.Run("one of the decorators dependencies returns an error", func(t *testing.T) {
+		t.Parallel()
+		type DecorateIn struct {
+			In
+			Values []string `group:"value"`
+		}
+		type DecorateOut struct {
+			Out
+			Values []string `group:"decoratedVal"`
+		}
+		type InvokeIn struct {
+			In
+			Values []string `group:"decoratedVal"`
+		}
+
+		c := New()
+		require.NoError(t, c.Provide(func() (string, error) {
+			return "value 1", nil
+		}, Group("value")))
+		require.NoError(t, c.Provide(func() (string, error) {
+			return "value 2", nil
+		}, Group("value")))
+		require.NoError(t, c.Provide(func() (string, error) {
+			return "value 3", errors.New("sadness")
+		}, Group("value")))
+
+		require.NoError(t, c.Decorate(func(i DecorateIn) DecorateOut {
+			return DecorateOut{Values: i.Values}
+		}))
+
+		err := c.Invoke(func(c InvokeIn) {})
+		require.Error(t, err, "expected one of the group providers for a decorator to fail")
+		assert.Contains(t, err.Error(), `could not build value group string[group="decoratedVal"]`)
+		assert.Contains(t, err.Error(), `received non-nil error from function "go.uber.org/dig".TestDecorateFailure.func4.3`)
 	})
 
 	t.Run("use dig.Out parameter for decorator", func(t *testing.T) {
@@ -303,6 +339,42 @@ func TestDecorateFailure(t *testing.T) {
 		require.NoError(t, c.Decorate(func(p Param) string { return p.Value }))
 		err := c.Invoke(func(s string) {})
 		require.Error(t, err, "expected missing dep check to fail the decorator")
-		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig".TestDecorateFailure.func6.2`)
+		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig".TestDecorateFailure.func7.2`)
+	})
+
+	t.Run("duplicate decoration through value groups", func(t *testing.T) {
+		t.Parallel()
+
+		type Param struct {
+			In
+
+			Value string `name:"val"`
+		}
+		type A struct {
+			Name string
+		}
+		type Result struct {
+			Out
+
+			Value *A
+		}
+
+		c := New()
+		require.NoError(t, c.Provide(func() string { return "value" }, Name("val")))
+		require.NoError(t, c.Decorate(func(p Param) *A {
+			return &A{
+				Name: p.Value,
+			}
+		}))
+		err := c.Decorate(func(p Param) Result {
+			return Result{
+				Value: &A{
+					Name: p.Value,
+				},
+			}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot decorate using function func(dig.Param) dig.Result")
+		assert.Contains(t, err.Error(), "decorating *dig.A multiple times")
 	})
 }

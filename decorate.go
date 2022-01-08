@@ -149,10 +149,9 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 	keys := findResultKeys(dn.results)
 	for _, k := range keys {
 		if len(s.decorators[k]) > 0 {
-			return fmt.Errorf("cannot decorate using function %v: %s was already Decorated in Scope [%s]",
+			return fmt.Errorf("cannot decorate using function %v: decorating %s multiple times",
 				dn.dtype,
 				k,
-				s.name,
 			)
 		}
 		s.decorators[k] = append(s.decorators[k], dn)
