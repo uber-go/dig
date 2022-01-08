@@ -106,6 +106,15 @@ func TestDecorateSuccess(t *testing.T) {
 		assert.NoError(t, child.Invoke(func(a *A) {
 			assert.Equal(t, "A''", a.name, "expected double-decorated name in child")
 		}))
+
+		sibling := c.Scope("sibling")
+		grandchild := child.Scope("grandchild")
+		sibling.Invoke(func(a *A) {
+			assert.Equal(t, "A'", a.name, "expected single-decorated name in sibling")
+		})
+		grandchild.Invoke(func(a *A) {
+			assert.Equal(t, "A''", a.name, "expected double-decorated name in grandchild")
+		})
 	})
 
 	t.Run("decorate with In struct", func(t *testing.T) {
@@ -209,6 +218,79 @@ func TestDecorateSuccess(t *testing.T) {
 		assert.NoError(t, c.Invoke(func(p Param) {
 			assert.Equal(t, 3, len(p.Values))
 		}))
+	})
+
+	t.Run("replace a type completely", func(t *testing.T) {
+		t.Parallel()
+
+		c := New()
+		type A struct {
+			From string
+		}
+
+		require.NoError(t, c.Provide(func() A {
+			assert.Fail(t, "provider shouldn't be called")
+			return A{From: "provider"}
+		}))
+		require.NoError(t, c.Decorate(func() A {
+			return A{From: "decorator"}
+		}))
+		require.NoError(t, c.Invoke(func(a A) {
+			assert.Equal(t, a.From, "decorator", "value should be from decorator")
+		}))
+	})
+
+	t.Run("group value decorator from parent and child", func(t *testing.T) {
+		t.Parallel()
+
+		type DecorateIn struct {
+			In
+
+			Values []string `group:"values"`
+		}
+
+		type DecorateOut struct {
+			Out
+
+			Values []string `group:"decoratedVals"`
+		}
+
+		type InvokeIn struct {
+			In
+
+			Values []string `group:"decoratedVals"`
+		}
+
+		parent := New()
+
+		require.NoError(t, parent.Provide(func() string { return "dog" }, Group("values")))
+		require.NoError(t, parent.Provide(func() string { return "cat" }, Group("values")))
+
+		child := parent.Scope("child")
+
+		parent.Decorate(func(i DecorateIn) DecorateOut {
+			var result []string
+			for _, val := range i.Values {
+				result = append(result, "happy "+val)
+			}
+			return DecorateOut{
+				Values: result,
+			}
+		})
+
+		child.Decorate(func(i DecorateIn) DecorateOut {
+			var result []string
+			for _, val := range i.Values {
+				result = append(result, "good "+val)
+			}
+			return DecorateOut{
+				Values: result,
+			}
+		})
+
+		child.Invoke(func(i InvokeIn) {
+			assert.ElementsMatch(t, []string{"happy dog", "happy cat", "good dog", "good cat"}, i.Values)
+		})
 	})
 }
 

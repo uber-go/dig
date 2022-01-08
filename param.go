@@ -535,16 +535,50 @@ func (pt paramGroupedSlice) getDecoratedValues(c containerStore) []reflect.Value
 	return items
 }
 
-func (pt paramGroupedSlice) Build(c containerStore, decorate bool) (reflect.Value, error) {
-	if !decorate {
+// searches the given container and its parent for matching group decorators
+// and call them to commit values.
+func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
+	stores := c.storesToRoot()
+	for _, c := range stores {
 		for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
 			if err := d.Call(c); err != nil {
-				return _noValue, errParamGroupFailed{
+				return errParamGroupFailed{
 					CtorID: d.ID(),
 					Key:    key{group: pt.Group, t: pt.Type.Elem()},
 					Reason: err,
 				}
 			}
+		}
+	}
+	return nil
+}
+
+func (pt paramGroupedSlice) callGroupProviders(c containerStore) (int, error) {
+	itemCount := 0
+	stores := c.storesToRoot()
+	for _, c := range stores {
+		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
+		itemCount += len(providers)
+		for _, n := range providers {
+			if err := n.Call(c); err != nil {
+				return 0, errParamGroupFailed{
+					CtorID: n.ID(),
+					Key:    key{group: pt.Group, t: pt.Type.Elem()},
+					Reason: err,
+				}
+			}
+		}
+	}
+	return itemCount, nil
+}
+
+func (pt paramGroupedSlice) Build(c containerStore, decorate bool) (reflect.Value, error) {
+	// do not call this if we are already inside a decorator since
+	// it will result in an infinite recursion. (i.e. decorate -> params.BuildList() -> Decorate -> params.BuildList...)
+	// this is safe since a value can be decorated at most once in a given scope.
+	if !decorate {
+		if err := pt.callGroupDecorators(c); err != nil {
+			return _noValue, err
 		}
 	}
 
@@ -558,21 +592,14 @@ func (pt paramGroupedSlice) Build(c containerStore, decorate bool) (reflect.Valu
 		return result, nil
 	}
 
-	var itemCount int
-	stores := c.storesToRoot()
-	for _, c := range stores {
-		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
-		itemCount += len(providers)
-		for _, n := range providers {
-			if err := n.Call(c); err != nil {
-				return _noValue, errParamGroupFailed{
-					CtorID: n.ID(),
-					Key:    key{group: pt.Group, t: pt.Type.Elem()},
-					Reason: err,
-				}
-			}
-		}
+	// If we do not have any decorated values, find the
+	// providers and call them.
+	itemCount, err := pt.callGroupProviders(c)
+	if err != nil {
+		return _noValue, err
 	}
+
+	stores := c.storesToRoot()
 	result := reflect.MakeSlice(pt.Type, 0, itemCount)
 	for _, c := range stores {
 		result = reflect.Append(result, c.getValueGroup(pt.Group, pt.Type.Elem())...)
