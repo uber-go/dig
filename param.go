@@ -532,7 +532,8 @@ func (pt paramGroupedSlice) getDecoratedValues(c containerStore) []reflect.Value
 }
 
 // searches the given container and its parent for matching group decorators
-// and call them to commit values.
+// and calls them to commit values. If any of the decorators returns an error,
+// it returns that error immediately. If all decorators succeeds, it returns nil.
 func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
 	stores := c.storesToRoot()
 	for _, c := range stores {
@@ -549,6 +550,10 @@ func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
 	return nil
 }
 
+// searches the given container and its parent for matching group providers and
+// calls them to commit values. Returns the total number of providers it ended up
+// calling as well as an error which indicates whether any of the providers encountered
+// an error when getting called.
 func (pt paramGroupedSlice) callGroupProviders(c containerStore) (int, error) {
 	itemCount := 0
 	stores := c.storesToRoot()
