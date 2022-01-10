@@ -121,7 +121,8 @@ func (n *decoratorNode) Call(s containerStore) error {
 
 func (n *decoratorNode) ID() dot.CtorID { return n.id }
 
-// DecorateOption ...
+// DecorateOption modifies the default behavior of Provide.
+// Currently there is no implementation of it yet.
 type DecorateOption interface {
 	applyDecorateOption(*decorateOptions)
 }
@@ -129,12 +130,78 @@ type DecorateOption interface {
 type decorateOptions struct {
 }
 
-// Decorate ...
+// Decorate provides a decorator for a type that has already been provided in the Container.
+//
+// Similar to Provide, Decorate takes in a function with zero or more dependencies and one
+// or more results. Decorate can be used to modify a type that was already introduced to the
+// container, or completely replace it with a new object.
+//
+// For example,
+//  dig.Decorate(func(log *zap.Logger) *zap.Logger {
+//    return log.Named("myapp")
+//  }
+//
+// takes in a value, augments it with a name, and returns a replacement for it. Functions
+// in the container's dependency graph that use *zap.Logger will now use the *zap.Logger
+// returned by this decorator.
+//
+// A decorator can also take in multiple parameters and replace one of them:
+//  dig.Decorate(func(log *zap.Logger, cfg *Config) *zap.Logger {
+//    return log.Named(cfg.Name)
+//  }
+//
+// Or replace a subset of them:
+//  dig.Decorate(func(
+//    log *zap.Logger,
+//    cfg *Config,
+//    scope metrics.Scope
+//  ) (*zap.Logger, metrics.Scope) {
+//    log = log.Named(cfg.Name)
+//    scope = scope.With(metrics.Tag("service", cfg.Name))
+//    return log, scope
+//  })
+//
+// Decorating a Container affects all the child scopes of this Container.
+//
+// Similar to a provider, the decorator function gets called *at most once*.
 func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) error {
 	return c.scope.Decorate(decorator, opts...)
 }
 
-// Decorate ...
+// Decorate provides a decorator for a type that has already been provided in the Container.
+//
+// Similar to Provide, Decorate takes in a function with zero or more dependencies and one
+// or more results. Decorate can be used to modify a type that was already introduced to the
+// container, or completely replace it with a new object.
+//
+// For example,
+//  dig.Decorate(func(log *zap.Logger) *zap.Logger {
+//    return log.Named("myapp")
+//  }
+//
+// takes in a value, augments it with a name, and returns a replacement for it. Functions
+// in the container's dependency graph that use *zap.Logger will now use the *zap.Logger
+// returned by this decorator.
+//
+// A decorator can also take in multiple parameters and replace one of them:
+//  dig.Decorate(func(log *zap.Logger, cfg *Config) *zap.Logger {
+//    return log.Named(cfg.Name)
+//  }
+//
+// Or replace a subset of them:
+//  dig.Decorate(func(
+//    log *zap.Logger,
+//    cfg *Config,
+//    scope metrics.Scope
+//  ) (*zap.Logger, metrics.Scope) {
+//    log = log.Named(cfg.Name)
+//    scope = scope.With(metrics.Tag("service", cfg.Name))
+//    return log, scope
+//  })
+//
+// Decorating a Scope affects all the child scopes of this Scope.
+//
+// Similar to a provider, the decorator function gets called *at most once*.
 func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 	options := decorateOptions{}
 	for _, opt := range opts {
