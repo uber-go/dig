@@ -18,30 +18,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package dig
+package dig_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/dig"
 )
 
 func TestScopedOperations(t *testing.T) {
 	t.Parallel()
 
-	t.Run("getStores/ScopesFromRoot returns scopes from root in order of distance from root", func(t *testing.T) {
-		c := New()
-		s1 := c.Scope("child1")
-		s2 := s1.Scope("child2")
-		s3 := s2.Scope("child2")
-
-		assert.Equal(t, []containerStore{s3, s2, s1, c.scope}, s3.storesToRoot())
-		assert.Equal(t, []*Scope{s3, s2, s1, c.scope}, s3.ancestors())
-	})
-
 	t.Run("private provides", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		s := c.Scope("child")
 		type A struct{}
 
@@ -65,7 +56,7 @@ func TestScopedOperations(t *testing.T) {
 			assert.NotEqual(t, nil, b)
 		}
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() *A { return &A{} }))
 
 		child := c.Scope("child")
@@ -89,8 +80,8 @@ func TestScopedOperations(t *testing.T) {
 		//   c1	    c2
 		//   |     /  \
 		//   gc1  gc2  gc3
-		var allScopes []*Scope
-		root := New()
+		var allScopes []*dig.Scope
+		root := dig.New()
 
 		allScopes = append(allScopes, root.Scope("child 1"), root.Scope("child 2"))
 		allScopes = append(allScopes, allScopes[0].Scope("grandchild 1"), allScopes[1].Scope("grandchild 2"), allScopes[1].Scope("grandchild 3"))
@@ -113,8 +104,8 @@ func TestScopedOperations(t *testing.T) {
 		//   |     /  \
 		//   gc1  gc2  gc3 <-- Provide(func() *A)
 
-		root := New()
-		var allScopes []*Scope
+		root := dig.New()
+		var allScopes []*dig.Scope
 
 		allScopes = append(allScopes, root.Scope("child 1"), root.Scope("child 2"))
 		allScopes = append(allScopes, allScopes[0].Scope("grandchild 1"), allScopes[1].Scope("grandchild 2"), allScopes[1].Scope("grandchild 3"))
@@ -123,7 +114,7 @@ func TestScopedOperations(t *testing.T) {
 		// provide to the leaf Scope with Export option set.
 		require.NoError(t, allScopes[len(allScopes)-1].Provide(func() *A {
 			return &A{}
-		}, Export(true)))
+		}, dig.Export(true)))
 
 		// since constructor was provided with Export option, this should let all the Scopes below should see it.
 		for _, scope := range allScopes {
@@ -137,7 +128,7 @@ func TestScopedOperations(t *testing.T) {
 			T2 struct{}
 		)
 
-		parent := New()
+		parent := dig.New()
 
 		require.NoError(t, parent.Provide(func() T1 {
 			assert.Fail(t, "parent should not be called")
@@ -187,7 +178,7 @@ func TestScopeFailures(t *testing.T) {
 
 		// Create a child Scope, and introduce a cycle
 		// in the child only.
-		check := func(c *Container, fails bool) {
+		check := func(c *dig.Container, fails bool) {
 			s := c.Scope("child")
 			assert.NoError(t, c.Provide(newA))
 			assert.NoError(t, s.Provide(newB))
@@ -203,7 +194,7 @@ func TestScopeFailures(t *testing.T) {
 
 		// Same as check, but this time child should inherit
 		// parent-provided constructors upon construction.
-		checkWithInheritance := func(c *Container, fails bool) {
+		checkWithInheritance := func(c *dig.Container, fails bool) {
 			assert.NoError(t, c.Provide(newA))
 			s := c.Scope("child")
 			assert.NoError(t, s.Provide(newB))
@@ -217,16 +208,16 @@ func TestScopeFailures(t *testing.T) {
 		}
 
 		// Test using different permutations
-		nodeferContainers := []func() *Container{
-			func() *Container { return New() },
-			func() *Container { return New(DryRun(true)) },
-			func() *Container { return New(DryRun(false)) },
+		nodeferContainers := []func() *dig.Container{
+			func() *dig.Container { return dig.New() },
+			func() *dig.Container { return dig.New(dig.DryRun(true)) },
+			func() *dig.Container { return dig.New(dig.DryRun(false)) },
 		}
 		// Container permutations with DeferAcyclicVerification.
-		deferredContainers := []func() *Container{
-			func() *Container { return New(DeferAcyclicVerification()) },
-			func() *Container { return New(DeferAcyclicVerification(), DryRun(true)) },
-			func() *Container { return New(DeferAcyclicVerification(), DryRun(false)) },
+		deferredContainers := []func() *dig.Container{
+			func() *dig.Container { return dig.New(dig.DeferAcyclicVerification()) },
+			func() *dig.Container { return dig.New(dig.DeferAcyclicVerification(), dig.DryRun(true)) },
+			func() *dig.Container { return dig.New(dig.DeferAcyclicVerification(), dig.DryRun(false)) },
 		}
 
 		for _, c := range nodeferContainers {
@@ -260,7 +251,7 @@ func TestScopeFailures(t *testing.T) {
 		newB := func(*A) *B { return &B{} }
 		newC := func(*B) *C { return &C{} }
 
-		root := New()
+		root := dig.New()
 		child1 := root.Scope("child 1")
 		child2 := root.Scope("child 2")
 
@@ -271,7 +262,7 @@ func TestScopeFailures(t *testing.T) {
 		require.NoError(t, child2.Provide(newB))
 
 		// C <- A made available to all Scopes with Export provide.
-		err := child1.Provide(newC, Export(true))
+		err := child1.Provide(newC, dig.Export(true))
 		assert.Error(t, err, "expected a cycle to be introduced in child 2")
 		assert.Contains(t, err.Error(), `[scope "child 2"]`)
 	})
@@ -279,7 +270,7 @@ func TestScopeFailures(t *testing.T) {
 	t.Run("private provides do not propagate upstream", func(t *testing.T) {
 		type A struct{}
 
-		root := New()
+		root := dig.New()
 		c := root.Scope("child")
 		gc := c.Scope("grandchild")
 		require.NoError(t, gc.Provide(func() *A { return &A{} }))
@@ -296,7 +287,7 @@ func TestScopeFailures(t *testing.T) {
 		//     child  <-- Provide(func() *A)
 		//     /  \
 		//   gc1   gc2
-		root := New()
+		root := dig.New()
 		c := root.Scope("child")
 		gc := c.Scope("grandchild")
 
@@ -304,7 +295,7 @@ func TestScopeFailures(t *testing.T) {
 
 		err := root.Invoke(func(a *A) {})
 		assert.Error(t, err, "expected Invoke in root container on child's private-provided type to fail")
-		assert.Contains(t, err.Error(), "missing type: *dig.A")
+		assert.Contains(t, err.Error(), "missing type: *dig_test.A")
 
 		assert.NoError(t, gc.Invoke(func(a *A) {}), "expected Invoke in grandchild container on child's private-provided type to fail")
 	})
@@ -313,12 +304,12 @@ func TestScopeFailures(t *testing.T) {
 func TestScopeValueGroups(t *testing.T) {
 	t.Run("provide in parent and child", func(t *testing.T) {
 		type result struct {
-			Out
+			dig.Out
 
 			Value string `group:"foo"`
 		}
 
-		root := New()
+		root := dig.New()
 		require.NoError(t, root.Provide(func() result {
 			return result{Value: "a"}
 		}))
@@ -336,7 +327,7 @@ func TestScopeValueGroups(t *testing.T) {
 			}))
 
 		type param struct {
-			In
+			dig.In
 
 			Values []string `group:"foo"`
 		}
@@ -364,12 +355,12 @@ func TestScopeValueGroups(t *testing.T) {
 
 		type T1 struct{}
 		type param struct {
-			In
+			dig.In
 
 			Values []string `group:"foo"`
 		}
 
-		root := New()
+		root := dig.New()
 
 		require.NoError(t, root.Provide(func(p param) T1 {
 			assert.ElementsMatch(t, []string{"a", "b", "c"}, p.Values)
@@ -377,9 +368,9 @@ func TestScopeValueGroups(t *testing.T) {
 		}))
 
 		child := root.Scope("child")
-		require.NoError(t, child.Provide(func() string { return "a" }, Group("foo")))
-		require.NoError(t, child.Provide(func() string { return "b" }, Group("foo")))
-		require.NoError(t, child.Provide(func() string { return "c" }, Group("foo")))
+		require.NoError(t, child.Provide(func() string { return "a" }, dig.Group("foo")))
+		require.NoError(t, child.Provide(func() string { return "b" }, dig.Group("foo")))
+		require.NoError(t, child.Provide(func() string { return "c" }, dig.Group("foo")))
 
 		// Invocation in child should see values provided to the child,
 		// even though the constructor we're invoking is provided in
