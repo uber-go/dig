@@ -87,7 +87,7 @@ func (c *Container) RequireInvoke(f interface{}, opts ...dig.InvokeOption) {
 	require.NoError(c.t, c.Invoke(f, opts...), "failed to invoke")
 }
 
-// RequireInvoke invokes the given function to the container,
+// RequireInvoke invokes the given function to the scope,
 // halting the test if it fails.
 func (s *Scope) RequireInvoke(f interface{}, opts ...dig.InvokeOption) {
 	s.t.Helper()
@@ -104,7 +104,7 @@ func (c *Container) Scope(name string, opts ...dig.ScopeOption) *Scope {
 	}
 }
 
-// Scope builds a subscope of this container with the given name.
+// Scope builds a subscope of this scope with the given name.
 // The returned Scope is similarly augmented to ease testing.
 func (s *Scope) Scope(name string, opts ...dig.ScopeOption) *Scope {
 	return &Scope{
