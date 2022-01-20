@@ -3,27 +3,27 @@ digraph {
 	graph [compound=true];
 	
 		subgraph cluster_0 {
-			label = "go.uber.org/dig";
+			label = "go.uber.org/dig_test";
 			constructor_0 [shape=plaintext label="TestVisualize.func2.1"];
 			
-			"dig.t1" [label=<dig.t1>];
-			"dig.t2" [label=<dig.t2>];
+			"dig_test.t1" [label=<dig_test.t1>];
+			"dig_test.t2" [label=<dig_test.t2>];
 			
 		}
 		
 		
 		subgraph cluster_1 {
-			label = "go.uber.org/dig";
+			label = "go.uber.org/dig_test";
 			constructor_1 [shape=plaintext label="TestVisualize.func2.2"];
 			
-			"dig.t3" [label=<dig.t3>];
-			"dig.t4" [label=<dig.t4>];
+			"dig_test.t3" [label=<dig_test.t3>];
+			"dig_test.t4" [label=<dig_test.t4>];
 			
 		}
 		
-			constructor_1 -> "dig.t1" [ltail=cluster_1];
+			constructor_1 -> "dig_test.t1" [ltail=cluster_1];
 		
-			constructor_1 -> "dig.t2" [ltail=cluster_1];
+			constructor_1 -> "dig_test.t2" [ltail=cluster_1];
 		
 		
 	

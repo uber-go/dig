@@ -49,7 +49,7 @@ import (
 // Because "bar" is not after "baz" in the error message.
 //
 // Messages will be treated as regular expressions.
-func assertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
+func AssertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
 	t.Helper()
 
 	// We have one positional argument in addition to the variadic argument to
@@ -86,6 +86,10 @@ func assertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
 		original := fmt.Sprintf("%+v", err)
 		assert.NoError(t, runFinders(original, plusFinders))
 	})
+}
+
+func Errf(msg string, args ...interface{}) error {
+	return errf(msg, args...)
 }
 
 // consumingFinder matches a string and returns the rest of the string *after*
