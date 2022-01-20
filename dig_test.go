@@ -808,7 +808,11 @@ func TestEndToEndSuccess(t *testing.T) {
 		// tags to implement this behavior differently in the two Go versions.
 
 		inType := reflect.StructOf([]reflect.StructField{
-			anonymousField(reflect.TypeOf(In{})),
+			{
+				Name:      "In",
+				Anonymous: true,
+				Type:      reflect.TypeOf(In{}),
+			},
 			{
 				Name: "Foo",
 				Type: reflect.TypeOf(&type1{}),
@@ -851,7 +855,11 @@ func TestEndToEndSuccess(t *testing.T) {
 		type A struct{ Value int }
 
 		outType := reflect.StructOf([]reflect.StructField{
-			anonymousField(reflect.TypeOf(Out{})),
+			{
+				Name:      "Out",
+				Anonymous: true,
+				Type:      reflect.TypeOf(Out{}),
+			},
 			{
 				Name: "Foo",
 				Type: reflect.TypeOf(&A{}),
@@ -3416,4 +3424,92 @@ func TestProvideInfoOption(t *testing.T) {
 		assert.Equal(t, "*dig.type3", info2.Inputs[0].String())
 		assert.Equal(t, "*dig.type4", info2.Outputs[0].String())
 	})
+}
+
+func TestEndToEndSuccessWithAliases(t *testing.T) {
+	t.Run("pointer constructor", func(t *testing.T) {
+		type Buffer = *bytes.Buffer
+
+		c := New()
+
+		var b Buffer
+		require.NoError(t, c.Provide(func() *bytes.Buffer {
+			b = &bytes.Buffer{}
+			return b
+		}), "provide failed")
+
+		require.NoError(t, c.Invoke(func(got Buffer) {
+			require.NotNil(t, got, "invoke got nil buffer")
+			require.True(t, got == b, "invoke got wrong buffer")
+		}), "invoke failed")
+	})
+
+	t.Run("duplicate provide", func(t *testing.T) {
+		type A struct{}
+		type B = A
+
+		c := New()
+		require.NoError(t, c.Provide(func() A {
+			return A{}
+		}), "A should not fail to provide")
+
+		err := c.Provide(func() B { return B{} })
+		require.Error(t, err, "B should fail to provide")
+		assertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig".TestEndToEndSuccessWithAliases\S+`,
+			`dig_test.go:\d+`, // file:line
+			`cannot provide dig.A from \[0\]:`,
+			`already provided by "go.uber.org/dig".TestEndToEndSuccessWithAliases\S+`,
+		)
+	})
+
+	t.Run("named instances", func(t *testing.T) {
+		c := New()
+		type A1 struct{ s string }
+		type A2 = A1
+		type A3 = A2
+
+		type ret struct {
+			Out
+
+			A A1 `name:"a"`
+			B A2 `name:"b"`
+			C A3 `name:"c"`
+		}
+
+		type param struct {
+			In
+
+			A1 A1 `name:"a"`
+			B1 A2 `name:"b"`
+			C1 A3 `name:"c"`
+
+			A2 A3 `name:"a"`
+			B2 A1 `name:"b"`
+			C2 A2 `name:"c"`
+
+			A3 A2 `name:"a"`
+			B3 A3 `name:"b"`
+			C3 A1 `name:"c"`
+		}
+		require.NoError(t, c.Provide(func() ret {
+			return ret{A: A2{"a"}, B: A3{"b"}, C: A1{"c"}}
+		}), "provide for three named instances should succeed")
+
+		require.NoError(t, c.Invoke(func(p param) {
+			assert.Equal(t, "a", p.A1.s, "A1 should match")
+			assert.Equal(t, "b", p.B1.s, "B1 should match")
+			assert.Equal(t, "c", p.C1.s, "C1 should match")
+
+			assert.Equal(t, "a", p.A2.s, "A2 should match")
+			assert.Equal(t, "b", p.B2.s, "B2 should match")
+			assert.Equal(t, "c", p.C2.s, "C2 should match")
+
+			assert.Equal(t, "a", p.A3.s, "A3 should match")
+			assert.Equal(t, "b", p.B3.s, "B3 should match")
+			assert.Equal(t, "c", p.C3.s, "C3 should match")
+
+		}), "invoke should succeed, pulling out two named instances")
+	})
+
 }
