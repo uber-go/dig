@@ -1,39 +1,39 @@
 digraph {
 	rankdir=RL;
 	graph [compound=true];
-	"[type=dig.t3 group=foo]" [shape=diamond label=<dig.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>];
-		"[type=dig.t3 group=foo]" -> "dig.t3[group=foo]0";
-		"[type=dig.t3 group=foo]" -> "dig.t3[group=foo]1";
+	"[type=dig_test.t3 group=foo]" [shape=diamond label=<dig_test.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>];
+		"[type=dig_test.t3 group=foo]" -> "dig_test.t3[group=foo]0";
+		"[type=dig_test.t3 group=foo]" -> "dig_test.t3[group=foo]1";
 		
 	
 		subgraph cluster_0 {
-			label = "go.uber.org/dig";
+			label = "go.uber.org/dig_test";
 			constructor_0 [shape=plaintext label="TestVisualize.func6.1"];
 			
-			"dig.t3[group=foo]0" [label=<dig.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>];
+			"dig_test.t3[group=foo]0" [label=<dig_test.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>];
 			
 		}
 		
 		
 		subgraph cluster_1 {
-			label = "go.uber.org/dig";
+			label = "go.uber.org/dig_test";
 			constructor_1 [shape=plaintext label="TestVisualize.func6.2"];
 			
-			"dig.t3[group=foo]1" [label=<dig.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>];
+			"dig_test.t3[group=foo]1" [label=<dig_test.t3<BR /><FONT POINT-SIZE="10">Group: foo</FONT>>];
 			
 		}
 		
 		
 		subgraph cluster_2 {
-			label = "go.uber.org/dig";
+			label = "go.uber.org/dig_test";
 			constructor_2 [shape=plaintext label="TestVisualize.func6.3"];
 			
-			"dig.t2" [label=<dig.t2>];
+			"dig_test.t2" [label=<dig_test.t2>];
 			
 		}
 		
 		
-			constructor_2 -> "[type=dig.t3 group=foo]" [ltail=cluster_2];
+			constructor_2 -> "[type=dig_test.t3 group=foo]" [ltail=cluster_2];
 		
 	
 }

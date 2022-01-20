@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package dig
+package dig_test
 
 import (
 	"bytes"
@@ -31,7 +31,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/dig/internal/digreflect"
+	"go.uber.org/dig"
 	"go.uber.org/dig/internal/dot"
 )
 
@@ -93,10 +93,10 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
+		c := dig.New()
 		c.Provide(func(A t1) t2 { return t2{} })
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
@@ -108,10 +108,10 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
-		c.Provide(func(A t1) t5 { return t5{} }, As(new(io.Reader)))
+		c := dig.New()
+		c.Provide(func(A t1) t5 { return t5{} }, dig.As(new(io.Reader)))
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
@@ -131,12 +131,12 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
+		c := dig.New()
 		c.Provide(func(A t1) t2 { return t2{} })
 		c.Provide(func(A t1) t3 { return t3{} })
 		c.Provide(func(A t2) t4 { return t4{} })
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
@@ -148,23 +148,23 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
+		c := dig.New()
 		c.Provide(func(A t3, B t4) (t1, t2) { return t1{}, t2{} })
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("param objects and result objects", func(t *testing.T) {
 		type in struct {
-			In
+			dig.In
 
 			A t1
 			B t2
 		}
 
 		type out struct {
-			Out
+			dig.Out
 
 			C t3
 			D t4
@@ -177,24 +177,24 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
+		c := dig.New()
 		c.Provide(func(i in) out { return out{} })
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("nested param object", func(t *testing.T) {
 		type in struct {
-			In
+			dig.In
 
 			A    t1
 			Nest struct {
-				In
+				dig.In
 
 				B    t2
 				Nest struct {
-					In
+					dig.In
 
 					C t3
 				}
@@ -208,29 +208,29 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
+		c := dig.New()
 		c.Provide(func(p in) t4 { return t4{} })
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("nested result object", func(t *testing.T) {
 		type nested1 struct {
-			Out
+			dig.Out
 
 			D t4
 		}
 
 		type nested2 struct {
-			Out
+			dig.Out
 
 			C    t3
 			Nest nested1
 		}
 
 		type out struct {
-			Out
+			dig.Out
 
 			B    t2
 			Nest nested2
@@ -243,28 +243,28 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
+		c := dig.New()
 		c.Provide(func(A t1) out { return out{} })
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("value groups", func(t *testing.T) {
 		type in struct {
-			In
+			dig.In
 
 			D []t1 `group:"foo"`
 		}
 
 		type out1 struct {
-			Out
+			dig.Out
 
 			A t1 `group:"foo"`
 		}
 
 		type out2 struct {
-			Out
+			dig.Out
 
 			A t1 `group:"foo"`
 		}
@@ -293,24 +293,24 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
+		c := dig.New()
 		c.Provide(func(B t2) out1 { return out1{} })
 		c.Provide(func(B t4) out2 { return out2{} })
 		c.Provide(func(i in) t3 { return t3{} })
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("named values", func(t *testing.T) {
 		type in struct {
-			In
+			dig.In
 
 			A t1 `name:"A"`
 		}
 
 		type out struct {
-			Out
+			dig.Out
 
 			B t2 `name:"B"`
 		}
@@ -326,16 +326,16 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
+		c := dig.New()
 		c.Provide(func(i in) out { return out{B: t2{}} })
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
 	t.Run("optional dependencies", func(t *testing.T) {
 		type in struct {
-			In
+			dig.In
 
 			A t1 `name:"A" optional:"true"`
 			B t2 `name:"B"`
@@ -353,10 +353,10 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := New()
+		c := dig.New()
 		c.Provide(func(i in) t4 { return t4{} })
 
-		dg := c.createGraph()
+		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 }
@@ -373,28 +373,6 @@ func assertCtorsEqual(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
 	}
 }
 
-func TestNewDotCtor(t *testing.T) {
-	type t1 struct{}
-	type t2 struct{}
-
-	n, err := newConstructorNode(func(A t1) t2 { return t2{} }, newScope(), constructorOptions{})
-	require.NoError(t, err)
-
-	n.location = &digreflect.Func{
-		Name:    "function1",
-		Package: "pkg1",
-		File:    "file1",
-		Line:    24534,
-	}
-
-	ctor := newDotCtor(n)
-	assert.Equal(t, n.id, ctor.ID)
-	assert.Equal(t, "function1", ctor.Name)
-	assert.Equal(t, "pkg1", ctor.Package)
-	assert.Equal(t, "file1", ctor.File)
-	assert.Equal(t, 24534, ctor.Line)
-}
-
 func TestVisualize(t *testing.T) {
 	type t1 struct{}
 	type t2 struct{}
@@ -404,87 +382,87 @@ func TestVisualize(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty graph in container", func(t *testing.T) {
-		c := New()
-		VerifyVisualization(t, "empty", c)
+		c := dig.New()
+		dig.VerifyVisualization(t, "empty", c)
 	})
 
 	t.Run("simple graph", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		c.Provide(func() (t1, t2) { return t1{}, t2{} })
 		c.Provide(func(A t1, B t2) (t3, t4) { return t3{}, t4{} })
-		VerifyVisualization(t, "simple", c)
+		dig.VerifyVisualization(t, "simple", c)
 	})
 
 	t.Run("named types", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type in struct {
-			In
+			dig.In
 
 			A t3 `name:"foo"`
 		}
 		type out1 struct {
-			Out
+			dig.Out
 
 			A t1 `name:"bar"`
 			B t2 `name:"baz"`
 		}
 		type out2 struct {
-			Out
+			dig.Out
 
 			A t3 `name:"foo"`
 		}
 
 		c.Provide(func(in) out1 { return out1{} })
 		c.Provide(func() out2 { return out2{} })
-		VerifyVisualization(t, "named", c)
+		dig.VerifyVisualization(t, "named", c)
 	})
 
 	t.Run("dig.As two types", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		require.NoError(t, c.Provide(
 			func() *bytes.Buffer {
 				panic("this function should not be called")
 			},
-			As(new(io.Reader), new(io.Writer)),
+			dig.As(new(io.Reader), new(io.Writer)),
 		))
 
-		VerifyVisualization(t, "dig_as_two", c)
+		dig.VerifyVisualization(t, "dig_as_two", c)
 	})
 
 	t.Run("optional params", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type in struct {
-			In
+			dig.In
 
 			A t1 `optional:"true"`
 		}
 
 		c.Provide(func() t1 { return t1{} })
 		c.Provide(func(in) t2 { return t2{} })
-		VerifyVisualization(t, "optional", c)
+		dig.VerifyVisualization(t, "optional", c)
 	})
 
 	t.Run("grouped types", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type in struct {
-			In
+			dig.In
 
 			A []t3 `group:"foo"`
 		}
 
 		type out1 struct {
-			Out
+			dig.Out
 
 			A t3 `group:"foo"`
 		}
 
 		type out2 struct {
-			Out
+			dig.Out
 
 			A t3 `group:"foo"`
 		}
@@ -493,40 +471,40 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func() out2 { return out2{} })
 		c.Provide(func(in) t2 { return t2{} })
 
-		VerifyVisualization(t, "grouped", c)
+		dig.VerifyVisualization(t, "grouped", c)
 	})
 
 	t.Run("constructor fails with an error", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type in1 struct {
-			In
+			dig.In
 
 			C []t1 `group:"g1"`
 		}
 
 		type in2 struct {
-			In
+			dig.In
 
 			A []t2 `group:"g2"`
 			B t3   `name:"n3"`
 		}
 
 		type out1 struct {
-			Out
+			dig.Out
 
 			B t3 `name:"n3"`
 			C t2 `group:"g2"`
 		}
 
 		type out2 struct {
-			Out
+			dig.Out
 
 			D t2 `group:"g2"`
 		}
 
 		type out3 struct {
-			Out
+			dig.Out
 
 			A t1 `group:"g1"`
 			B t2 `group:"g2"`
@@ -535,114 +513,52 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(in1) out1 { return out1{} })
 		c.Provide(func(in2) t4 { return t4{} })
 		c.Provide(func() out2 { return out2{} })
-		c.Provide(func() (out3, error) { return out3{}, errf("great sadness") })
+		c.Provide(func() (out3, error) { return out3{}, dig.Errf("great sadness") })
 		err := c.Invoke(func(t4 t4) {})
 
-		VerifyVisualization(t, "error", c, VisualizeError(err))
+		dig.VerifyVisualization(t, "error", c, dig.VisualizeError(err))
 
 		t.Run("non-failing graph nodes are pruned", func(t *testing.T) {
 
 			t.Run("prune non-failing constructor result", func(t *testing.T) {
-				c := New()
+				c := dig.New()
 				c.Provide(func(in1) out1 { return out1{} })
 				c.Provide(func(in2) t4 { return t4{} })
-				c.Provide(func() (out2, error) { return out2{}, errf("great sadness") })
+				c.Provide(func() (out2, error) { return out2{}, dig.Errf("great sadness") })
 				c.Provide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) {})
 
-				VerifyVisualization(t, "prune_constructor_result", c, VisualizeError(err))
+				dig.VerifyVisualization(t, "prune_constructor_result", c, dig.VisualizeError(err))
 			})
 
 			t.Run("if only the root node fails all node except for the root should be pruned", func(t *testing.T) {
-				c := New()
+				c := dig.New()
 				c.Provide(func(in1) out1 { return out1{} })
-				c.Provide(func(in2) (t4, error) { return t4{}, errf("great sadness") })
+				c.Provide(func(in2) (t4, error) { return t4{}, dig.Errf("great sadness") })
 				c.Provide(func() out2 { return out2{} })
 				c.Provide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) {})
 
-				VerifyVisualization(t, "prune_non_root_nodes", c, VisualizeError(err))
+				dig.VerifyVisualization(t, "prune_non_root_nodes", c, dig.VisualizeError(err))
 			})
 		})
 	})
 
 	t.Run("missing types", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		c.Provide(func(A t1, B t2, C t3) t4 { return t4{} })
 		err := c.Invoke(func(t4 t4) {})
 
-		VerifyVisualization(t, "missing", c, VisualizeError(err))
+		dig.VerifyVisualization(t, "missing", c, dig.VisualizeError(err))
 	})
 
 	t.Run("missing dependency", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		err := c.Invoke(func(t1 t1) {})
 
-		VerifyVisualization(t, "missingDep", c, VisualizeError(err))
+		dig.VerifyVisualization(t, "missingDep", c, dig.VisualizeError(err))
 	})
-}
-
-type visualizableErr struct{}
-
-func (err visualizableErr) Error() string             { return "great sadness" }
-func (err visualizableErr) updateGraph(dg *dot.Graph) {}
-
-type nestedErr struct {
-	err error
-}
-
-var _ causer = nestedErr{}
-
-func (e nestedErr) Error() string {
-	return fmt.Sprint(e)
-}
-
-func (e nestedErr) Format(w fmt.State, c rune) {
-	formatCauser(e, w, c)
-}
-
-func (e nestedErr) cause() error {
-	return e.err
-}
-
-func (e nestedErr) writeMessage(w io.Writer, _ string) {
-	io.WriteString(w, "oh no")
-}
-
-func TestCanVisualizeError(t *testing.T) {
-	tests := []struct {
-		desc         string
-		err          error
-		canVisualize bool
-	}{
-		{
-			desc:         "unvisualizable error",
-			err:          errf("great sadness"),
-			canVisualize: false,
-		},
-		{
-			desc:         "nested unvisualizable error",
-			err:          nestedErr{err: errf("great sadness")},
-			canVisualize: false,
-		},
-		{
-			desc:         "visualizable error",
-			err:          visualizableErr{},
-			canVisualize: true,
-		},
-		{
-			desc:         "nested visualizable error",
-			err:          nestedErr{err: visualizableErr{}},
-			canVisualize: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			assert.Equal(t, tt.canVisualize, CanVisualizeError(tt.err))
-		})
-	}
 }
 
 func TestVisualizeErrorString(t *testing.T) {
@@ -651,14 +567,14 @@ func TestVisualizeErrorString(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
 		t.Parallel()
 
-		opt := VisualizeError(nil)
+		opt := dig.VisualizeError(nil)
 		assert.Equal(t, "VisualizeError(<nil>)", fmt.Sprint(opt))
 	})
 
 	t.Run("not nil", func(t *testing.T) {
 		t.Parallel()
 
-		opt := VisualizeError(errors.New("great sadness"))
+		opt := dig.VisualizeError(errors.New("great sadness"))
 		assert.Equal(t, "VisualizeError(great sadness)", fmt.Sprint(opt))
 	})
 }

@@ -88,6 +88,10 @@ func assertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
 	})
 }
 
+func Errf(msg string, args ...interface{}) error {
+	return errf(msg, args...)
+}
+
 // consumingFinder matches a string and returns the rest of the string *after*
 // the match.
 type consumingFinder interface {
