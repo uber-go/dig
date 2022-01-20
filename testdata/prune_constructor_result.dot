@@ -1,31 +1,31 @@
 digraph {
 	rankdir=RL;
 	graph [compound=true];
-	"[type=dig.t2 group=g2]" [shape=diamond label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>> color=red];
-		"[type=dig.t2 group=g2]" -> "dig.t2[group=g2]1";
+	"[type=dig_test.t2 group=g2]" [shape=diamond label=<dig_test.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>> color=red];
+		"[type=dig_test.t2 group=g2]" -> "dig_test.t2[group=g2]1";
 		
 	
 		subgraph cluster_0 {
-			label = "go.uber.org/dig";
+			label = "go.uber.org/dig_test";
 			constructor_0 [shape=plaintext label="TestVisualize.func7.6.1.2"];
 			color=orange;
-			"dig.t4" [label=<dig.t4>];
+			"dig_test.t4" [label=<dig_test.t4>];
 			
 		}
 		
 		
-			constructor_0 -> "[type=dig.t2 group=g2]" [ltail=cluster_0];
+			constructor_0 -> "[type=dig_test.t2 group=g2]" [ltail=cluster_0];
 		
 		subgraph cluster_1 {
-			label = "go.uber.org/dig";
+			label = "go.uber.org/dig_test";
 			constructor_1 [shape=plaintext label="TestVisualize.func7.6.1.3"];
 			color=red;
-			"dig.t2[group=g2]1" [label=<dig.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>>];
+			"dig_test.t2[group=g2]1" [label=<dig_test.t2<BR /><FONT POINT-SIZE="10">Group: g2</FONT>>];
 			
 		}
 		
 		
-	"dig.t4" [color=orange];
-	"dig.t2[group=g2]1" [color=red];
+	"dig_test.t4" [color=orange];
+	"dig_test.t2[group=g2]1" [color=red];
 	
 }

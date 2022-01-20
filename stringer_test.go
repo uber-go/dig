@@ -18,14 +18,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package dig
+package dig_test
 
 import (
 	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"go.uber.org/dig"
+	"go.uber.org/dig/internal/digtest"
 )
 
 func TestStringer(t *testing.T) {
@@ -35,7 +36,7 @@ func TestStringer(t *testing.T) {
 	type D struct{}
 
 	type in struct {
-		In
+		dig.In
 
 		A A `name:"foo"`
 		B B `optional:"true"`
@@ -45,63 +46,63 @@ func TestStringer(t *testing.T) {
 	}
 
 	type out struct {
-		Out
+		dig.Out
 
 		A A `name:"foo"`
 		C C `name:"bar"`
 	}
 
 	type stringOut struct {
-		Out
+		dig.Out
 
 		S string `group:"baz"`
 	}
 
-	c := New(setRand(rand.New(rand.NewSource(0))))
+	c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
 
-	require.NoError(t, c.Provide(func(i in) D {
+	c.RequireProvide(func(i in) D {
 		assert.Equal(t, []string{"bar", "baz", "foo"}, i.Strings)
 		return D{}
-	}))
+	})
 
-	require.NoError(t, c.Provide(func() out {
+	c.RequireProvide(func() out {
 		return out{
 			A: A{},
 			C: C{},
 		}
-	}))
+	})
 
-	require.NoError(t, c.Provide(func() A { return A{} }))
-	require.NoError(t, c.Provide(func() B { return B{} }))
-	require.NoError(t, c.Provide(func() C { return C{} }))
+	c.RequireProvide(func() A { return A{} })
+	c.RequireProvide(func() B { return B{} })
+	c.RequireProvide(func() C { return C{} })
 
-	require.NoError(t, c.Provide(func(A) stringOut { return stringOut{S: "foo"} }))
-	require.NoError(t, c.Provide(func(B) stringOut { return stringOut{S: "bar"} }))
-	require.NoError(t, c.Provide(func(C) stringOut { return stringOut{S: "baz"} }))
+	c.RequireProvide(func(A) stringOut { return stringOut{S: "foo"} })
+	c.RequireProvide(func(B) stringOut { return stringOut{S: "bar"} })
+	c.RequireProvide(func(C) stringOut { return stringOut{S: "baz"} })
 
-	require.NoError(t, c.Invoke(func(D) {
-	}))
+	c.RequireInvoke(func(D) {
+	})
 
 	s := c.String()
 
 	// All nodes
-	assert.Contains(t, s, `dig.A[name="foo"] -> deps: []`)
-	assert.Contains(t, s, "dig.A -> deps: []")
-	assert.Contains(t, s, "dig.B -> deps: []")
-	assert.Contains(t, s, "dig.C -> deps: []")
-	assert.Contains(t, s, `dig.C[name="bar"] -> deps: []`)
-	assert.Contains(t, s, `dig.D -> deps: [dig.A[name="foo"] dig.B[optional] dig.C[optional, name="bar"] string[group="baz"]]`)
-	assert.Contains(t, s, `string[group="baz"] -> deps: [dig.A]`)
-	assert.Contains(t, s, `string[group="baz"] -> deps: [dig.B]`)
-	assert.Contains(t, s, `string[group="baz"] -> deps: [dig.C]`)
+	assert.Contains(t, s, `dig_test.A[name="foo"] -> deps: []`)
+	assert.Contains(t, s, "dig_test.A -> deps: []")
+	assert.Contains(t, s, "dig_test.B -> deps: []")
+	assert.Contains(t, s, "dig_test.C -> deps: []")
+	assert.Contains(t, s, `dig_test.C[name="bar"] -> deps: []`)
+	assert.Contains(t, s, `dig_test.D -> deps: [dig_test.A[name="foo"] dig_test.B[optional] dig_test.C[optional, name="bar"] string[group="baz"]]`)
+	assert.Contains(t, s, `string[group="baz"] -> deps: [dig_test.A]`)
+	assert.Contains(t, s, `string[group="baz"] -> deps: [dig_test.B]`)
+	assert.Contains(t, s, `string[group="baz"] -> deps: [dig_test.C]`)
 
 	// Values
-	assert.Contains(t, s, "dig.A => {}")
-	assert.Contains(t, s, "dig.B => {}")
-	assert.Contains(t, s, "dig.C => {}")
-	assert.Contains(t, s, "dig.D => {}")
-	assert.Contains(t, s, `dig.A[name="foo"] => {}`)
-	assert.Contains(t, s, `dig.C[name="bar"] => {}`)
+	assert.Contains(t, s, "dig_test.A => {}")
+	assert.Contains(t, s, "dig_test.B => {}")
+	assert.Contains(t, s, "dig_test.C => {}")
+	assert.Contains(t, s, "dig_test.D => {}")
+	assert.Contains(t, s, `dig_test.A[name="foo"] => {}`)
+	assert.Contains(t, s, `dig_test.C[name="bar"] => {}`)
 	assert.Contains(t, s, `string[group="baz"] => foo`)
 	assert.Contains(t, s, `string[group="baz"] => bar`)
 	assert.Contains(t, s, `string[group="baz"] => baz`)

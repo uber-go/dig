@@ -18,13 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:build go1.9
-// +build go1.9
-
 package dig
 
-import "reflect"
+import "math/rand"
 
-func anonymousField(t reflect.Type) reflect.StructField {
-	return reflect.StructField{Name: t.Name(), Anonymous: true, Type: t}
+func SetRand(r *rand.Rand) Option {
+	return setRand(r)
 }
