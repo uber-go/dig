@@ -24,15 +24,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/dig"
+	"go.uber.org/dig/internal/digtest"
 )
 
 func TestScopedOperations(t *testing.T) {
 	t.Parallel()
 
 	t.Run("private provides", func(t *testing.T) {
-		c := dig.New()
+		c := digtest.New(t)
 		s := c.Scope("child")
 		type A struct{}
 
@@ -40,8 +40,8 @@ func TestScopedOperations(t *testing.T) {
 			assert.NotEqual(t, nil, a)
 		}
 
-		require.NoError(t, s.Provide(func() *A { return &A{} }))
-		assert.NoError(t, s.Invoke(f))
+		s.RequireProvide(func() *A { return &A{} })
+		s.RequireInvoke(f)
 		assert.Error(t, c.Invoke(f))
 	})
 
@@ -56,18 +56,18 @@ func TestScopedOperations(t *testing.T) {
 			assert.NotEqual(t, nil, b)
 		}
 
-		c := dig.New()
-		require.NoError(t, c.Provide(func() *A { return &A{} }))
+		c := digtest.New(t)
+		c.RequireProvide(func() *A { return &A{} })
 
 		child := c.Scope("child")
-		require.NoError(t, child.Provide(func() *B { return &B{} }))
-		assert.NoError(t, child.Invoke(useA))
-		assert.NoError(t, child.Invoke(useB))
+		child.RequireProvide(func() *B { return &B{} })
+		child.RequireInvoke(useA)
+		child.RequireInvoke(useB)
 
 		grandchild := child.Scope("grandchild")
 
-		assert.NoError(t, grandchild.Invoke(useA))
-		assert.NoError(t, grandchild.Invoke(useB))
+		grandchild.RequireInvoke(useA)
+		grandchild.RequireInvoke(useB)
 		assert.Error(t, c.Invoke(useB))
 	})
 
@@ -80,19 +80,19 @@ func TestScopedOperations(t *testing.T) {
 		//   c1	    c2
 		//   |     /  \
 		//   gc1  gc2  gc3
-		var allScopes []*dig.Scope
-		root := dig.New()
+		var allScopes []*digtest.Scope
+		root := digtest.New(t)
 
 		allScopes = append(allScopes, root.Scope("child 1"), root.Scope("child 2"))
 		allScopes = append(allScopes, allScopes[0].Scope("grandchild 1"), allScopes[1].Scope("grandchild 2"), allScopes[1].Scope("grandchild 3"))
 
-		require.NoError(t, root.Provide(func() *A {
+		root.RequireProvide(func() *A {
 			return &A{}
-		}))
+		})
 
 		// top-level provide should be available in all the scopes.
 		for _, scope := range allScopes {
-			assert.NoError(t, scope.Invoke(func(a *A) {}))
+			scope.RequireInvoke(func(a *A) {})
 		}
 	})
 
@@ -104,21 +104,21 @@ func TestScopedOperations(t *testing.T) {
 		//   |     /  \
 		//   gc1  gc2  gc3 <-- Provide(func() *A)
 
-		root := dig.New()
-		var allScopes []*dig.Scope
+		root := digtest.New(t)
+		var allScopes []*digtest.Scope
 
 		allScopes = append(allScopes, root.Scope("child 1"), root.Scope("child 2"))
 		allScopes = append(allScopes, allScopes[0].Scope("grandchild 1"), allScopes[1].Scope("grandchild 2"), allScopes[1].Scope("grandchild 3"))
 
 		type A struct{}
 		// provide to the leaf Scope with Export option set.
-		require.NoError(t, allScopes[len(allScopes)-1].Provide(func() *A {
+		allScopes[len(allScopes)-1].RequireProvide(func() *A {
 			return &A{}
-		}, dig.Export(true)))
+		}, dig.Export(true))
 
 		// since constructor was provided with Export option, this should let all the Scopes below should see it.
 		for _, scope := range allScopes {
-			assert.NoError(t, scope.Invoke(func(a *A) {}))
+			scope.RequireInvoke(func(a *A) {})
 		}
 	})
 
@@ -128,12 +128,12 @@ func TestScopedOperations(t *testing.T) {
 			T2 struct{}
 		)
 
-		parent := dig.New()
+		parent := digtest.New(t)
 
-		require.NoError(t, parent.Provide(func() T1 {
+		parent.RequireProvide(func() T1 {
 			assert.Fail(t, "parent should not be called")
 			return T1{"parent"}
-		}))
+		})
 
 		child := parent.Scope("child")
 
@@ -141,18 +141,18 @@ func TestScopedOperations(t *testing.T) {
 		defer func() {
 			assert.True(t, childCalled, "child constructor must be called")
 		}()
-		require.NoError(t, child.Provide(func() T1 {
+		child.RequireProvide(func() T1 {
 			childCalled = true
 			return T1{"child"}
-		}))
+		})
 
-		require.NoError(t, child.Provide(func(v T1) T2 {
+		child.RequireProvide(func(v T1) T2 {
 			assert.Equal(t, "child", v.s,
 				"value should be built by child")
 			return T2{}
-		}))
+		})
 
-		require.NoError(t, child.Invoke(func(T2) {}))
+		child.RequireInvoke(func(T2) {})
 	})
 }
 
@@ -178,10 +178,10 @@ func TestScopeFailures(t *testing.T) {
 
 		// Create a child Scope, and introduce a cycle
 		// in the child only.
-		check := func(c *dig.Container, fails bool) {
+		check := func(c *digtest.Container, fails bool) {
 			s := c.Scope("child")
-			assert.NoError(t, c.Provide(newA))
-			assert.NoError(t, s.Provide(newB))
+			c.RequireProvide(newA)
+			s.RequireProvide(newB)
 			err := c.Provide(newC)
 
 			if fails {
@@ -194,10 +194,10 @@ func TestScopeFailures(t *testing.T) {
 
 		// Same as check, but this time child should inherit
 		// parent-provided constructors upon construction.
-		checkWithInheritance := func(c *dig.Container, fails bool) {
-			assert.NoError(t, c.Provide(newA))
+		checkWithInheritance := func(c *digtest.Container, fails bool) {
+			c.RequireProvide(newA)
 			s := c.Scope("child")
-			assert.NoError(t, s.Provide(newB))
+			s.RequireProvide(newB)
 			err := c.Provide(newC)
 			if fails {
 				assert.Error(t, err, "expected a cycle to be introduced in the child")
@@ -208,16 +208,16 @@ func TestScopeFailures(t *testing.T) {
 		}
 
 		// Test using different permutations
-		nodeferContainers := []func() *dig.Container{
-			func() *dig.Container { return dig.New() },
-			func() *dig.Container { return dig.New(dig.DryRun(true)) },
-			func() *dig.Container { return dig.New(dig.DryRun(false)) },
+		nodeferContainers := []func() *digtest.Container{
+			func() *digtest.Container { return digtest.New(t) },
+			func() *digtest.Container { return digtest.New(t, dig.DryRun(true)) },
+			func() *digtest.Container { return digtest.New(t, dig.DryRun(false)) },
 		}
 		// Container permutations with DeferAcyclicVerification.
-		deferredContainers := []func() *dig.Container{
-			func() *dig.Container { return dig.New(dig.DeferAcyclicVerification()) },
-			func() *dig.Container { return dig.New(dig.DeferAcyclicVerification(), dig.DryRun(true)) },
-			func() *dig.Container { return dig.New(dig.DeferAcyclicVerification(), dig.DryRun(false)) },
+		deferredContainers := []func() *digtest.Container{
+			func() *digtest.Container { return digtest.New(t, dig.DeferAcyclicVerification()) },
+			func() *digtest.Container { return digtest.New(t, dig.DeferAcyclicVerification(), dig.DryRun(true)) },
+			func() *digtest.Container { return digtest.New(t, dig.DeferAcyclicVerification(), dig.DryRun(false)) },
 		}
 
 		for _, c := range nodeferContainers {
@@ -251,15 +251,15 @@ func TestScopeFailures(t *testing.T) {
 		newB := func(*A) *B { return &B{} }
 		newC := func(*B) *C { return &C{} }
 
-		root := dig.New()
+		root := digtest.New(t)
 		child1 := root.Scope("child 1")
 		child2 := root.Scope("child 2")
 
 		// A <- B made available to all Scopes with root provision.
-		require.NoError(t, root.Provide(newA))
+		root.RequireProvide(newA)
 
 		// B <- C made available to only child 2 with private provide.
-		require.NoError(t, child2.Provide(newB))
+		child2.RequireProvide(newB)
 
 		// C <- A made available to all Scopes with Export provide.
 		err := child1.Provide(newC, dig.Export(true))
@@ -270,10 +270,10 @@ func TestScopeFailures(t *testing.T) {
 	t.Run("private provides do not propagate upstream", func(t *testing.T) {
 		type A struct{}
 
-		root := dig.New()
+		root := digtest.New(t)
 		c := root.Scope("child")
 		gc := c.Scope("grandchild")
-		require.NoError(t, gc.Provide(func() *A { return &A{} }))
+		gc.RequireProvide(func() *A { return &A{} })
 
 		assert.Error(t, root.Invoke(func(a *A) {}), "invoking on grandchild's private-provided type should fail")
 		assert.Error(t, c.Invoke(func(a *A) {}), "invoking on child's private-provided type should fail")
@@ -287,17 +287,17 @@ func TestScopeFailures(t *testing.T) {
 		//     child  <-- Provide(func() *A)
 		//     /  \
 		//   gc1   gc2
-		root := dig.New()
+		root := digtest.New(t)
 		c := root.Scope("child")
 		gc := c.Scope("grandchild")
 
-		require.NoError(t, c.Provide(func() *A { return &A{} }))
+		c.RequireProvide(func() *A { return &A{} })
 
 		err := root.Invoke(func(a *A) {})
 		assert.Error(t, err, "expected Invoke in root container on child's private-provided type to fail")
 		assert.Contains(t, err.Error(), "missing type: *dig_test.A")
 
-		assert.NoError(t, gc.Invoke(func(a *A) {}), "expected Invoke in grandchild container on child's private-provided type to fail")
+		gc.RequireInvoke(func(a *A) {})
 	})
 }
 
@@ -309,22 +309,23 @@ func TestScopeValueGroups(t *testing.T) {
 			Value string `group:"foo"`
 		}
 
-		root := dig.New()
-		require.NoError(t, root.Provide(func() result {
+		root := digtest.New(t)
+		root.RequireProvide(func() result {
 			return result{Value: "a"}
-		}))
-		require.NoError(t, root.Provide(func() result {
+		})
+
+		root.RequireProvide(func() result {
 			return result{Value: "b"}
-		}))
-		require.NoError(t, root.Provide(func() result {
+		})
+
+		root.RequireProvide(func() result {
 			return result{Value: "c"}
-		}))
+		})
 
 		child := root.Scope("child")
-		require.NoError(t,
-			child.Provide(func() result {
-				return result{Value: "d"}
-			}))
+		child.RequireProvide(func() result {
+			return result{Value: "d"}
+		})
 
 		type param struct {
 			dig.In
@@ -333,15 +334,17 @@ func TestScopeValueGroups(t *testing.T) {
 		}
 
 		t.Run("invoke parent", func(t *testing.T) {
-			require.NoError(t, root.Invoke(func(i param) {
+			root.RequireInvoke(func(i param) {
 				assert.ElementsMatch(t, []string{"a", "b", "c"}, i.Values)
-			}), "only values added to parent should be visible")
+			})
+
 		})
 
 		t.Run("invoke child", func(t *testing.T) {
-			require.NoError(t, child.Invoke(func(i param) {
+			child.RequireInvoke(func(i param) {
 				assert.ElementsMatch(t, []string{"a", "b", "c", "d"}, i.Values)
-			}), "values added to both, parent and child should be visible")
+			})
+
 		})
 	})
 
@@ -360,21 +363,21 @@ func TestScopeValueGroups(t *testing.T) {
 			Values []string `group:"foo"`
 		}
 
-		root := dig.New()
+		root := digtest.New(t)
 
-		require.NoError(t, root.Provide(func(p param) T1 {
+		root.RequireProvide(func(p param) T1 {
 			assert.ElementsMatch(t, []string{"a", "b", "c"}, p.Values)
 			return T1{}
-		}))
+		})
 
 		child := root.Scope("child")
-		require.NoError(t, child.Provide(func() string { return "a" }, dig.Group("foo")))
-		require.NoError(t, child.Provide(func() string { return "b" }, dig.Group("foo")))
-		require.NoError(t, child.Provide(func() string { return "c" }, dig.Group("foo")))
+		child.RequireProvide(func() string { return "a" }, dig.Group("foo"))
+		child.RequireProvide(func() string { return "b" }, dig.Group("foo"))
+		child.RequireProvide(func() string { return "c" }, dig.Group("foo"))
 
 		// Invocation in child should see values provided to the child,
 		// even though the constructor we're invoking is provided in
 		// the parent.
-		require.NoError(t, child.Invoke(func(T1) {}))
+		child.RequireInvoke(func(T1) {})
 	})
 }

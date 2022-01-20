@@ -25,8 +25,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/dig"
+	"go.uber.org/dig/internal/digtest"
 )
 
 func TestStringer(t *testing.T) {
@@ -58,30 +58,30 @@ func TestStringer(t *testing.T) {
 		S string `group:"baz"`
 	}
 
-	c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
+	c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
 
-	require.NoError(t, c.Provide(func(i in) D {
+	c.RequireProvide(func(i in) D {
 		assert.Equal(t, []string{"bar", "baz", "foo"}, i.Strings)
 		return D{}
-	}))
+	})
 
-	require.NoError(t, c.Provide(func() out {
+	c.RequireProvide(func() out {
 		return out{
 			A: A{},
 			C: C{},
 		}
-	}))
+	})
 
-	require.NoError(t, c.Provide(func() A { return A{} }))
-	require.NoError(t, c.Provide(func() B { return B{} }))
-	require.NoError(t, c.Provide(func() C { return C{} }))
+	c.RequireProvide(func() A { return A{} })
+	c.RequireProvide(func() B { return B{} })
+	c.RequireProvide(func() C { return C{} })
 
-	require.NoError(t, c.Provide(func(A) stringOut { return stringOut{S: "foo"} }))
-	require.NoError(t, c.Provide(func(B) stringOut { return stringOut{S: "bar"} }))
-	require.NoError(t, c.Provide(func(C) stringOut { return stringOut{S: "baz"} }))
+	c.RequireProvide(func(A) stringOut { return stringOut{S: "foo"} })
+	c.RequireProvide(func(B) stringOut { return stringOut{S: "bar"} })
+	c.RequireProvide(func(C) stringOut { return stringOut{S: "baz"} })
 
-	require.NoError(t, c.Invoke(func(D) {
-	}))
+	c.RequireInvoke(func(D) {
+	})
 
 	s := c.String()
 

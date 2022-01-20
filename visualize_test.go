@@ -30,8 +30,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/dig"
+	"go.uber.org/dig/internal/digtest"
 	"go.uber.org/dig/internal/dot"
 )
 
@@ -93,7 +93,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(A t1) t2 { return t2{} })
 
 		dg := c.CreateGraph()
@@ -108,7 +108,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(A t1) t5 { return t5{} }, dig.As(new(io.Reader)))
 
 		dg := c.CreateGraph()
@@ -131,7 +131,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(A t1) t2 { return t2{} })
 		c.Provide(func(A t1) t3 { return t3{} })
 		c.Provide(func(A t2) t4 { return t4{} })
@@ -148,7 +148,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(A t3, B t4) (t1, t2) { return t1{}, t2{} })
 
 		dg := c.CreateGraph()
@@ -177,7 +177,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(i in) out { return out{} })
 
 		dg := c.CreateGraph()
@@ -208,7 +208,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(p in) t4 { return t4{} })
 
 		dg := c.CreateGraph()
@@ -243,7 +243,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(A t1) out { return out{} })
 
 		dg := c.CreateGraph()
@@ -293,7 +293,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(B t2) out1 { return out1{} })
 		c.Provide(func(B t4) out2 { return out2{} })
 		c.Provide(func(i in) t3 { return t3{} })
@@ -326,7 +326,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(i in) out { return out{B: t2{}} })
 
 		dg := c.CreateGraph()
@@ -353,7 +353,7 @@ func TestDotGraph(t *testing.T) {
 			},
 		}
 
-		c := dig.New()
+		c := digtest.New(t)
 		c.Provide(func(i in) t4 { return t4{} })
 
 		dg := c.CreateGraph()
@@ -382,20 +382,20 @@ func TestVisualize(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty graph in container", func(t *testing.T) {
-		c := dig.New()
-		dig.VerifyVisualization(t, "empty", c)
+		c := digtest.New(t)
+		dig.VerifyVisualization(t, "empty", c.Container)
 	})
 
 	t.Run("simple graph", func(t *testing.T) {
-		c := dig.New()
+		c := digtest.New(t)
 
 		c.Provide(func() (t1, t2) { return t1{}, t2{} })
 		c.Provide(func(A t1, B t2) (t3, t4) { return t3{}, t4{} })
-		dig.VerifyVisualization(t, "simple", c)
+		dig.VerifyVisualization(t, "simple", c.Container)
 	})
 
 	t.Run("named types", func(t *testing.T) {
-		c := dig.New()
+		c := digtest.New(t)
 
 		type in struct {
 			dig.In
@@ -416,24 +416,23 @@ func TestVisualize(t *testing.T) {
 
 		c.Provide(func(in) out1 { return out1{} })
 		c.Provide(func() out2 { return out2{} })
-		dig.VerifyVisualization(t, "named", c)
+		dig.VerifyVisualization(t, "named", c.Container)
 	})
 
 	t.Run("dig.As two types", func(t *testing.T) {
-		c := dig.New()
+		c := digtest.New(t)
 
-		require.NoError(t, c.Provide(
+		c.RequireProvide(
 			func() *bytes.Buffer {
 				panic("this function should not be called")
 			},
-			dig.As(new(io.Reader), new(io.Writer)),
-		))
+			dig.As(new(io.Reader), new(io.Writer)))
 
-		dig.VerifyVisualization(t, "dig_as_two", c)
+		dig.VerifyVisualization(t, "dig_as_two", c.Container)
 	})
 
 	t.Run("optional params", func(t *testing.T) {
-		c := dig.New()
+		c := digtest.New(t)
 
 		type in struct {
 			dig.In
@@ -443,11 +442,11 @@ func TestVisualize(t *testing.T) {
 
 		c.Provide(func() t1 { return t1{} })
 		c.Provide(func(in) t2 { return t2{} })
-		dig.VerifyVisualization(t, "optional", c)
+		dig.VerifyVisualization(t, "optional", c.Container)
 	})
 
 	t.Run("grouped types", func(t *testing.T) {
-		c := dig.New()
+		c := digtest.New(t)
 
 		type in struct {
 			dig.In
@@ -471,11 +470,11 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func() out2 { return out2{} })
 		c.Provide(func(in) t2 { return t2{} })
 
-		dig.VerifyVisualization(t, "grouped", c)
+		dig.VerifyVisualization(t, "grouped", c.Container)
 	})
 
 	t.Run("constructor fails with an error", func(t *testing.T) {
-		c := dig.New()
+		c := digtest.New(t)
 
 		type in1 struct {
 			dig.In
@@ -516,48 +515,48 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func() (out3, error) { return out3{}, dig.Errf("great sadness") })
 		err := c.Invoke(func(t4 t4) {})
 
-		dig.VerifyVisualization(t, "error", c, dig.VisualizeError(err))
+		dig.VerifyVisualization(t, "error", c.Container, dig.VisualizeError(err))
 
 		t.Run("non-failing graph nodes are pruned", func(t *testing.T) {
 
 			t.Run("prune non-failing constructor result", func(t *testing.T) {
-				c := dig.New()
+				c := digtest.New(t)
 				c.Provide(func(in1) out1 { return out1{} })
 				c.Provide(func(in2) t4 { return t4{} })
 				c.Provide(func() (out2, error) { return out2{}, dig.Errf("great sadness") })
 				c.Provide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) {})
 
-				dig.VerifyVisualization(t, "prune_constructor_result", c, dig.VisualizeError(err))
+				dig.VerifyVisualization(t, "prune_constructor_result", c.Container, dig.VisualizeError(err))
 			})
 
 			t.Run("if only the root node fails all node except for the root should be pruned", func(t *testing.T) {
-				c := dig.New()
+				c := digtest.New(t)
 				c.Provide(func(in1) out1 { return out1{} })
 				c.Provide(func(in2) (t4, error) { return t4{}, dig.Errf("great sadness") })
 				c.Provide(func() out2 { return out2{} })
 				c.Provide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) {})
 
-				dig.VerifyVisualization(t, "prune_non_root_nodes", c, dig.VisualizeError(err))
+				dig.VerifyVisualization(t, "prune_non_root_nodes", c.Container, dig.VisualizeError(err))
 			})
 		})
 	})
 
 	t.Run("missing types", func(t *testing.T) {
-		c := dig.New()
+		c := digtest.New(t)
 
 		c.Provide(func(A t1, B t2, C t3) t4 { return t4{} })
 		err := c.Invoke(func(t4 t4) {})
 
-		dig.VerifyVisualization(t, "missing", c, dig.VisualizeError(err))
+		dig.VerifyVisualization(t, "missing", c.Container, dig.VisualizeError(err))
 	})
 
 	t.Run("missing dependency", func(t *testing.T) {
-		c := dig.New()
+		c := digtest.New(t)
 		err := c.Invoke(func(t1 t1) {})
 
-		dig.VerifyVisualization(t, "missingDep", c, dig.VisualizeError(err))
+		dig.VerifyVisualization(t, "missingDep", c.Container, dig.VisualizeError(err))
 	})
 }
 
