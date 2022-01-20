@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package dig
+package dig_test
 
 import (
 	"errors"
@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/dig"
 )
 
 func TestDecorateSuccess(t *testing.T) {
@@ -35,7 +36,7 @@ func TestDecorateSuccess(t *testing.T) {
 			name string
 		}
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
 
 		assert.NoError(t, c.Invoke(func(a *A) {
@@ -55,9 +56,9 @@ func TestDecorateSuccess(t *testing.T) {
 			name string
 		}
 
-		c := New()
+		c := dig.New()
 		child := c.Scope("child")
-		require.NoError(t, child.Provide(func() *A { return &A{name: "A"} }, Export(true)))
+		require.NoError(t, child.Provide(func() *A { return &A{name: "A"} }, dig.Export(true)))
 
 		assert.NoError(t, child.Decorate(func(a *A) *A { return &A{name: a.name + "'"} }))
 		assert.NoError(t, c.Invoke(func(a *A) {
@@ -74,7 +75,7 @@ func TestDecorateSuccess(t *testing.T) {
 			name string
 		}
 
-		c := New()
+		c := dig.New()
 		child := c.Scope("child")
 		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
 
@@ -92,7 +93,7 @@ func TestDecorateSuccess(t *testing.T) {
 			name string
 		}
 
-		c := New()
+		c := dig.New()
 		child := c.Scope("child")
 		require.NoError(t, c.Provide(func() *A { return &A{name: "A"} }))
 
@@ -124,22 +125,22 @@ func TestDecorateSuccess(t *testing.T) {
 			Name string
 		}
 		type B struct {
-			In
+			dig.In
 
 			A *A
 			B string `name:"b"`
 		}
 
 		type C struct {
-			Out
+			dig.Out
 
 			A *A
 			B string `name:"b"`
 		}
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() *A { return &A{Name: "A"} }))
-		require.NoError(t, c.Provide(func() string { return "b" }, Name("b")))
+		require.NoError(t, c.Provide(func() string { return "b" }, dig.Name("b")))
 
 		require.NoError(t, c.Decorate(func(b B) C {
 			return C{
@@ -158,21 +159,21 @@ func TestDecorateSuccess(t *testing.T) {
 
 	t.Run("decorate with value groups", func(t *testing.T) {
 		type Params struct {
-			In
+			dig.In
 
 			Animals []string `group:"animals"`
 		}
 
 		type Result struct {
-			Out
+			dig.Out
 
 			Animals []string `group:"animals"`
 		}
 
-		c := New()
-		require.NoError(t, c.Provide(func() string { return "dog" }, Group("animals")))
-		require.NoError(t, c.Provide(func() string { return "cat" }, Group("animals")))
-		require.NoError(t, c.Provide(func() string { return "alpaca" }, Group("animals")))
+		c := dig.New()
+		require.NoError(t, c.Provide(func() string { return "dog" }, dig.Group("animals")))
+		require.NoError(t, c.Provide(func() string { return "cat" }, dig.Group("animals")))
+		require.NoError(t, c.Provide(func() string { return "alpaca" }, dig.Group("animals")))
 
 		assert.NoError(t, c.Decorate(func(p Params) Result {
 			animals := p.Animals
@@ -190,24 +191,24 @@ func TestDecorateSuccess(t *testing.T) {
 	})
 
 	t.Run("decorate with optional parameter", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type A struct{}
 		type Param struct {
-			In
+			dig.In
 
 			Values []string `group:"values"`
 			A      *A       `optional:"true"`
 		}
 
 		type Result struct {
-			Out
+			dig.Out
 
 			Values []string `group:"values"`
 		}
 
-		require.NoError(t, c.Provide(func() string { return "a" }, Group("values")))
-		require.NoError(t, c.Provide(func() string { return "b" }, Group("values")))
+		require.NoError(t, c.Provide(func() string { return "a" }, dig.Group("values")))
+		require.NoError(t, c.Provide(func() string { return "b" }, dig.Group("values")))
 
 		require.NoError(t, c.Decorate(func(p Param) Result {
 			return Result{
@@ -223,7 +224,7 @@ func TestDecorateSuccess(t *testing.T) {
 	t.Run("replace a type completely", func(t *testing.T) {
 		t.Parallel()
 
-		c := New()
+		c := dig.New()
 		type A struct {
 			From string
 		}
@@ -244,27 +245,27 @@ func TestDecorateSuccess(t *testing.T) {
 		t.Parallel()
 
 		type DecorateIn struct {
-			In
+			dig.In
 
 			Values []string `group:"values"`
 		}
 
 		type DecorateOut struct {
-			Out
+			dig.Out
 
 			Values []string `group:"decoratedVals"`
 		}
 
 		type InvokeIn struct {
-			In
+			dig.In
 
 			Values []string `group:"decoratedVals"`
 		}
 
-		parent := New()
+		parent := dig.New()
 
-		require.NoError(t, parent.Provide(func() string { return "dog" }, Group("values")))
-		require.NoError(t, parent.Provide(func() string { return "cat" }, Group("values")))
+		require.NoError(t, parent.Provide(func() string { return "dog" }, dig.Group("values")))
+		require.NoError(t, parent.Provide(func() string { return "cat" }, dig.Group("values")))
 
 		child := parent.Scope("child")
 
@@ -298,7 +299,7 @@ func TestDecorateFailure(t *testing.T) {
 	t.Run("decorate a type that wasn't provided", func(t *testing.T) {
 		t.Parallel()
 
-		c := New()
+		c := dig.New()
 		type A struct {
 			Name string
 		}
@@ -306,13 +307,13 @@ func TestDecorateFailure(t *testing.T) {
 		require.NoError(t, c.Decorate(func(a *A) *A { return &A{Name: a.Name + "'"} }))
 		err := c.Invoke(func(a *A) string { return a.Name })
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "missing type: *dig.A")
+		assert.Contains(t, err.Error(), "missing type: *dig_test.A")
 	})
 
 	t.Run("decorate the same type twice", func(t *testing.T) {
 		t.Parallel()
 
-		c := New()
+		c := dig.New()
 		type A struct {
 			Name string
 		}
@@ -321,13 +322,13 @@ func TestDecorateFailure(t *testing.T) {
 
 		err := c.Decorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
 		require.Error(t, err, "expected second call to decorate to fail.")
-		assert.Contains(t, err.Error(), "decorating *dig.A multiple times")
+		assert.Contains(t, err.Error(), "decorating *dig_test.A multiple times")
 	})
 
 	t.Run("decorator returns an error", func(t *testing.T) {
 		t.Parallel()
 
-		c := New()
+		c := dig.New()
 
 		type A struct {
 			Name string
@@ -338,34 +339,34 @@ func TestDecorateFailure(t *testing.T) {
 
 		err := c.Invoke(func(a *A) {})
 		require.Error(t, err, "expected the decorator to error out")
-		assert.Contains(t, err.Error(), "failed to build *dig.A: great sadness")
+		assert.Contains(t, err.Error(), "failed to build *dig_test.A: great sadness")
 	})
 
 	t.Run("one of the decorators dependencies returns an error", func(t *testing.T) {
 		t.Parallel()
 		type DecorateIn struct {
-			In
+			dig.In
 			Values []string `group:"value"`
 		}
 		type DecorateOut struct {
-			Out
+			dig.Out
 			Values []string `group:"decoratedVal"`
 		}
 		type InvokeIn struct {
-			In
+			dig.In
 			Values []string `group:"decoratedVal"`
 		}
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() (string, error) {
 			return "value 1", nil
-		}, Group("value")))
+		}, dig.Group("value")))
 		require.NoError(t, c.Provide(func() (string, error) {
 			return "value 2", nil
-		}, Group("value")))
+		}, dig.Group("value")))
 		require.NoError(t, c.Provide(func() (string, error) {
 			return "value 3", errors.New("sadness")
-		}, Group("value")))
+		}, dig.Group("value")))
 
 		require.NoError(t, c.Decorate(func(i DecorateIn) DecorateOut {
 			return DecorateOut{Values: i.Values}
@@ -374,20 +375,20 @@ func TestDecorateFailure(t *testing.T) {
 		err := c.Invoke(func(c InvokeIn) {})
 		require.Error(t, err, "expected one of the group providers for a decorator to fail")
 		assert.Contains(t, err.Error(), `could not build value group string[group="decoratedVal"]`)
-		assert.Contains(t, err.Error(), `received non-nil error from function "go.uber.org/dig".TestDecorateFailure.func4.3`)
+		assert.Contains(t, err.Error(), `received non-nil error from function "go.uber.org/dig_test".TestDecorateFailure.func4.3`)
 	})
 
 	t.Run("use dig.Out parameter for decorator", func(t *testing.T) {
 		t.Parallel()
 
 		type Param struct {
-			Out
+			dig.Out
 
 			Value string `name:"val"`
 		}
 
-		c := New()
-		require.NoError(t, c.Provide(func() string { return "hello" }, Name("val")))
+		c := dig.New()
+		require.NoError(t, c.Provide(func() string { return "hello" }, dig.Name("val")))
 		err := c.Decorate(func(p Param) string { return "fail" })
 		require.Error(t, err, "expected dig.Out struct used as param to fail")
 		assert.Contains(t, err.Error(), "cannot depend on result objects")
@@ -397,12 +398,12 @@ func TestDecorateFailure(t *testing.T) {
 		t.Parallel()
 
 		type Result struct {
-			In
+			dig.In
 
 			Value string `name:"val"`
 		}
 
-		c := New()
+		c := dig.New()
 		err := c.Decorate(func() Result { return Result{Value: "hi"} })
 		require.Error(t, err, "expected dig.In struct used as result to fail")
 		assert.Contains(t, err.Error(), "cannot provide parameter object")
@@ -412,23 +413,23 @@ func TestDecorateFailure(t *testing.T) {
 		t.Parallel()
 
 		type Param struct {
-			In
+			dig.In
 
 			Value string `name:"val"`
 		}
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Decorate(func(p Param) string { return p.Value }))
 		err := c.Invoke(func(s string) {})
 		require.Error(t, err, "expected missing dep check to fail the decorator")
-		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig".TestDecorateFailure.func7.2`)
+		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig_test".TestDecorateFailure.func7.2`)
 	})
 
 	t.Run("duplicate decoration through value groups", func(t *testing.T) {
 		t.Parallel()
 
 		type Param struct {
-			In
+			dig.In
 
 			Value string `name:"val"`
 		}
@@ -436,13 +437,13 @@ func TestDecorateFailure(t *testing.T) {
 			Name string
 		}
 		type Result struct {
-			Out
+			dig.Out
 
 			Value *A
 		}
 
-		c := New()
-		require.NoError(t, c.Provide(func() string { return "value" }, Name("val")))
+		c := dig.New()
+		require.NoError(t, c.Provide(func() string { return "value" }, dig.Name("val")))
 		require.NoError(t, c.Decorate(func(p Param) *A {
 			return &A{
 				Name: p.Value,
@@ -456,7 +457,7 @@ func TestDecorateFailure(t *testing.T) {
 			}
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot decorate using function func(dig.Param) dig.Result")
-		assert.Contains(t, err.Error(), "decorating *dig.A multiple times")
+		assert.Contains(t, err.Error(), "cannot decorate using function func(dig_test.Param) dig_test.Result")
+		assert.Contains(t, err.Error(), "decorating *dig_test.A multiple times")
 	})
 }
