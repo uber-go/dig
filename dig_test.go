@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package dig
+package dig_test
 
 import (
 	"bytes"
@@ -34,13 +34,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/dig"
 )
 
 func TestEndToEndSuccess(t *testing.T) {
 	t.Parallel()
 
 	t.Run("pointer constructor", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		var b *bytes.Buffer
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
 			b = &bytes.Buffer{}
@@ -56,7 +57,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		// Dig shouldn't forbid this - it's perfectly reasonable to explicitly
 		// provide a typed nil, since that's often a convenient way to supply a
 		// default no-op implementation.
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() *bytes.Buffer { return nil }), "provide failed")
 		require.NoError(t, c.Invoke(func(b *bytes.Buffer) {
 			require.Nil(t, b, "expected to get nil buffer")
@@ -64,7 +65,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("struct constructor", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() bytes.Buffer {
 			var buf bytes.Buffer
 			buf.WriteString("foo")
@@ -77,7 +78,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("slice constructor", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		b1 := &bytes.Buffer{}
 		b2 := &bytes.Buffer{}
 		require.NoError(t, c.Provide(func() []*bytes.Buffer {
@@ -91,7 +92,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("array constructor", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		bufs := [1]*bytes.Buffer{{}}
 		require.NoError(t, c.Provide(func() [1]*bytes.Buffer { return bufs }), "provide failed")
 		require.NoError(t, c.Invoke(func(bs [1]*bytes.Buffer) {
@@ -100,7 +101,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("map constructor", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() map[string]string {
 			return map[string]string{}
 		}), "provide failed")
@@ -110,7 +111,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("channel constructor", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() chan int {
 			return make(chan int)
 		}), "provide failed")
@@ -120,7 +121,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("func constructor", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() func(int) {
 			return func(int) {}
 		}), "provide failed")
@@ -130,7 +131,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("interface constructor", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() io.Writer {
 			return &bytes.Buffer{}
 		}), "provide failed")
@@ -140,10 +141,10 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("param", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type contents string
 		type Args struct {
-			In
+			dig.In
 
 			Contents contents
 		}
@@ -166,13 +167,13 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("invoke param", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
 			return new(bytes.Buffer)
 		}), "provide failed")
 
 		type Args struct {
-			In
+			dig.In
 
 			*bytes.Buffer
 		}
@@ -188,7 +189,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			called bool
 		)
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
 			require.False(t, called, "constructor must be called exactly once")
 			called = true
@@ -196,7 +197,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			return buff
 		}), "provide failed")
 
-		type MyParam struct{ In }
+		type MyParam struct{ dig.In }
 
 		type Args struct {
 			MyParam
@@ -213,13 +214,13 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("param recurse", func(t *testing.T) {
 		type anotherParam struct {
-			In
+			dig.In
 
 			Buffer *bytes.Buffer
 		}
 
 		type someParam struct {
-			In
+			dig.In
 
 			Buffer  *bytes.Buffer
 			Another anotherParam
@@ -230,7 +231,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			called bool
 		)
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
 			require.False(t, called, "constructor must be called exactly once")
 			called = true
@@ -250,7 +251,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("multiple-type constructor", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		constructor := func() (*bytes.Buffer, []int, error) {
 			return &bytes.Buffer{}, []int{42}, nil
 		}
@@ -263,7 +264,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("multiple-type constructor is called once", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{}
 		type B struct{}
 		count := 0
@@ -285,7 +286,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("method invocation inside Invoke", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{}
 		type B struct{}
 		cA := func() (*A, error) {
@@ -307,7 +308,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("collections and instances of same type", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() []*bytes.Buffer {
 			return []*bytes.Buffer{{}}
 		}), "providing collection failed")
@@ -326,9 +327,9 @@ func TestEndToEndSuccess(t *testing.T) {
 			return &type1{}, &type3{}, &type4{}
 		}
 
-		c := New()
+		c := dig.New()
 		type param struct {
-			In
+			dig.In
 
 			T1 *type1 // regular 'ol type
 			T2 *type2 `optional:"true" useless_tag:"false"` // optional type NOT in the graph
@@ -354,9 +355,9 @@ func TestEndToEndSuccess(t *testing.T) {
 			return &type1{}, &type2{}, &type3{}
 		}
 
-		c := New()
+		c := dig.New()
 		type param struct {
-			In `ignore-unexported:"true"`
+			dig.In `ignore-unexported:"true"`
 
 			T1 *type1 // regular 'ol type
 			T2 *type2 `optional:"true"` // optional type present in the graph
@@ -374,14 +375,14 @@ func TestEndToEndSuccess(t *testing.T) {
 		type A struct{ name string }
 		type B struct{ name string }
 		type Ret struct {
-			Out
+			dig.Out
 			A  // value type A
 			*B // pointer type *B
 		}
 		myA := A{"string A"}
 		myB := &B{"string B"}
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() Ret {
 			return Ret{A: myA, B: myB}
 		}), "provide for the Ret struct should succeed")
@@ -398,12 +399,12 @@ func TestEndToEndSuccess(t *testing.T) {
 		type type2 struct{}
 
 		type param struct {
-			In
+			dig.In
 
 			T1 *type1 `optional:"true"`
 		}
 
-		c := New()
+		c := dig.New()
 
 		var gave *type2
 		require.NoError(t, c.Provide(func(p param) *type2 {
@@ -418,7 +419,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("nested dependencies", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type A struct{ name string }
 		type B struct{ name string }
@@ -435,7 +436,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("primitives", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() string { return "piper" }), "string provide failed")
 		require.NoError(t, c.Provide(func() int { return 42 }), "int provide failed")
 		require.NoError(t, c.Provide(func() int64 { return 24 }), "int provide failed")
@@ -456,7 +457,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		type C struct{}
 		// Contains A
 		type Ret1 struct {
-			Out
+			dig.Out
 			*A
 		}
 		// Contains *A (through Ret1), *B and C
@@ -465,7 +466,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			*B
 			C
 		}
-		c := New()
+		c := dig.New()
 
 		require.NoError(t, c.Provide(func() Ret2 {
 			return Ret2{
@@ -482,12 +483,12 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("named instances can be created with tags", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{ idx int }
 
 		// returns three named instances of A
 		type ret struct {
-			Out
+			dig.Out
 
 			A1 A `name:"first"`
 			A2 A `name:"second"`
@@ -496,7 +497,7 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		// requires two specific named instances
 		type param struct {
-			In
+			dig.In
 
 			A1 A `name:"first"`
 			A3 A `name:"third"`
@@ -511,7 +512,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("named instances can be created with Name option", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type A struct{ idx int }
 
@@ -519,12 +520,12 @@ func TestEndToEndSuccess(t *testing.T) {
 			return func() A { return A{idx: idx} }
 		}
 
-		require.NoError(t, c.Provide(buildConstructor(1), Name("first")))
-		require.NoError(t, c.Provide(buildConstructor(2), Name("second")))
-		require.NoError(t, c.Provide(buildConstructor(3), Name("third")))
+		require.NoError(t, c.Provide(buildConstructor(1), dig.Name("first")))
+		require.NoError(t, c.Provide(buildConstructor(2), dig.Name("second")))
+		require.NoError(t, c.Provide(buildConstructor(3), dig.Name("third")))
 
 		type param struct {
-			In
+			dig.In
 
 			A1 A `name:"first"`
 			A3 A `name:"third"`
@@ -537,11 +538,11 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("named and unnamed instances coexist", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{ idx int }
 
 		type out struct {
-			Out
+			dig.Out
 
 			A `name:"foo"`
 		}
@@ -550,7 +551,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Provide(func() A { return A{2} }))
 
 		type in struct {
-			In
+			dig.In
 
 			A1 A `name:"foo"`
 			A2 A
@@ -562,11 +563,11 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("named instances recurse", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{ idx int }
 
 		type Ret1 struct {
-			Out
+			dig.Out
 
 			A1 A `name:"first"`
 		}
@@ -576,7 +577,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			A2 A `name:"second"`
 		}
 		type param struct {
-			In
+			dig.In
 
 			A1 A `name:"first"`  // should come from ret1 through ret2
 			A2 A `name:"second"` // should come from ret2
@@ -596,24 +597,24 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("named instances do not cause cycles", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{ idx int }
 		type param struct {
-			In
+			dig.In
 			A `name:"uno"`
 		}
 		type paramBoth struct {
-			In
+			dig.In
 
 			A1 A `name:"uno"`
 			A2 A `name:"dos"`
 		}
 		type retUno struct {
-			Out
+			dig.Out
 			A `name:"uno"`
 		}
 		type retDos struct {
-			Out
+			dig.Out
 			A `name:"dos"`
 		}
 
@@ -630,13 +631,13 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("struct constructor with as interface option", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		err := c.Provide(
 			func() *bytes.Buffer {
 				return bytes.NewBufferString("foo")
 			},
-			As(new(fmt.Stringer), new(io.Reader)),
+			dig.As(new(fmt.Stringer), new(io.Reader)),
 		)
 
 		require.NoError(t, err, "provide failed")
@@ -657,18 +658,18 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("As with Name", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		require.NoError(t, c.Provide(
 			func() *bytes.Buffer {
 				return bytes.NewBufferString("foo")
 			},
-			As(new(io.Reader)),
-			Name("buff"),
+			dig.As(new(io.Reader)),
+			dig.Name("buff"),
 		), "failed to provide")
 
 		type in struct {
-			In
+			dig.In
 
 			Buffer *bytes.Buffer `name:"buff"`
 			Reader io.Reader     `name:"buff"`
@@ -680,32 +681,32 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("As same interface", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() io.Reader {
 			panic("this function should not be called")
-		}, As(new(io.Reader))), "failed to provide")
+		}, dig.As(new(io.Reader))), "failed to provide")
 	})
 
 	t.Run("As different interface", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() io.ReadCloser {
 			panic("this function should not be called")
-		}, As(new(io.Reader), new(io.Closer))), "failed to provide")
+		}, dig.As(new(io.Reader), new(io.Closer))), "failed to provide")
 	})
 
 	t.Run("invoke on a type that depends on named parameters", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{ idx int }
 		type B struct{ sum int }
 		type param struct {
-			In
+			dig.In
 
 			A1 *A `name:"foo"`
 			A2 *A `name:"bar"`
 			A3 *A `name:"baz" optional:"true"`
 		}
 		type ret struct {
-			Out
+			dig.Out
 
 			A1 *A `name:"foo"`
 			A2 *A `name:"bar"`
@@ -726,19 +727,19 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("optional and named ordering doesn't matter", func(t *testing.T) {
 		type param1 struct {
-			In
+			dig.In
 
 			Foo *struct{} `name:"foo" optional:"true"`
 		}
 
 		type param2 struct {
-			In
+			dig.In
 
 			Foo *struct{} `optional:"true" name:"foo"`
 		}
 
 		t.Run("optional", func(t *testing.T) {
-			c := New()
+			c := dig.New()
 
 			called1 := false
 			require.NoError(t, c.Invoke(func(p param1) {
@@ -757,11 +758,11 @@ func TestEndToEndSuccess(t *testing.T) {
 		})
 
 		t.Run("named", func(t *testing.T) {
-			c := New()
+			c := dig.New()
 
 			require.NoError(t, c.Provide(func() *struct{} {
 				return &struct{}{}
-			}, Name("foo")))
+			}, dig.Name("foo")))
 
 			called1 := false
 			require.NoError(t, c.Invoke(func(p param1) {
@@ -784,7 +785,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	t.Run("dynamically generated dig.In", func(t *testing.T) {
 		// This test verifies that a dig.In generated using reflect.StructOf
 		// works with our dig.In detection logic.
-		c := New()
+		c := dig.New()
 
 		type type1 struct{}
 		type type2 struct{}
@@ -811,7 +812,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			{
 				Name:      "In",
 				Anonymous: true,
-				Type:      reflect.TypeOf(In{}),
+				Type:      reflect.TypeOf(dig.In{}),
 			},
 			{
 				Name: "Foo",
@@ -850,7 +851,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		// This test verifies that a dig.Out generated using reflect.StructOf
 		// works with our dig.Out detection logic.
 
-		c := New()
+		c := dig.New()
 
 		type A struct{ Value int }
 
@@ -858,7 +859,7 @@ func TestEndToEndSuccess(t *testing.T) {
 			{
 				Name:      "Out",
 				Anonymous: true,
-				Type:      reflect.TypeOf(Out{}),
+				Type:      reflect.TypeOf(dig.Out{}),
 			},
 			{
 				Name: "Foo",
@@ -884,7 +885,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.NoError(t, c.Provide(fn.Interface()), "provide failed")
 
 		type params struct {
-			In
+			dig.In
 
 			Foo *A `name:"foo"`
 			Bar *A `name:"bar"`
@@ -899,7 +900,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("variadic arguments invoke", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type A struct{}
 
@@ -921,7 +922,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("variadic arguments dependency", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type A struct{}
 		type B struct{}
@@ -952,7 +953,7 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("non-error return arguments from invoke are ignored", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{}
 		type B struct{}
 
@@ -961,21 +962,21 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		err := c.Invoke(func(B) {})
 		require.Error(t, err, "invoking with B param should error out")
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".TestEndToEndSuccess.func\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".TestEndToEndSuccess.func\S+`,
 			`dig_test.go:\d+`, // file:line
 			"missing type:",
-			"dig.B",
+			"dig_test.B",
 		)
 	})
 }
 
 func TestGroups(t *testing.T) {
 	t.Run("empty slice received without provides", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type in struct {
-			In
+			dig.In
 
 			Values []int `group:"foo"`
 		}
@@ -986,10 +987,10 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("values are provided", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
-			Out
+			dig.Out
 
 			Value int `group:"val"`
 		}
@@ -1005,7 +1006,7 @@ func TestGroups(t *testing.T) {
 		provide(3)
 
 		type in struct {
-			In
+			dig.In
 
 			Values []int `group:"val"`
 		}
@@ -1016,12 +1017,12 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("groups are provided via option", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		provide := func(i int) {
 			require.NoError(t, c.Provide(func() int {
 				return i
-			}, Group("val")), "failed to provide ")
+			}, dig.Group("val")), "failed to provide ")
 		}
 
 		provide(1)
@@ -1029,7 +1030,7 @@ func TestGroups(t *testing.T) {
 		provide(3)
 
 		type in struct {
-			In
+			dig.In
 
 			Values []int `group:"val"`
 		}
@@ -1040,12 +1041,12 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("different types may be grouped", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		provide := func(i int, s string) {
 			require.NoError(t, c.Provide(func() (int, string) {
 				return i, s
-			}, Group("val")), "failed to provide ")
+			}, dig.Group("val")), "failed to provide ")
 		}
 
 		provide(1, "a")
@@ -1053,7 +1054,7 @@ func TestGroups(t *testing.T) {
 		provide(3, "c")
 
 		type in struct {
-			In
+			dig.In
 
 			Ivalues []int    `group:"val"`
 			Svalues []string `group:"val"`
@@ -1066,10 +1067,10 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("group options may not be provided for result structs", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
-			Out
+			dig.Out
 
 			Value int `group:"val"`
 		}
@@ -1078,15 +1079,15 @@ func TestGroups(t *testing.T) {
 			require.Error(t, c.Provide(func() out {
 				t.Fatal("This should not be called")
 				return out{}
-			}, Group("val")), "This Provide should fail")
+			}, dig.Group("val")), "This Provide should fail")
 		}(1)
 	})
 
 	t.Run("constructor is called at most once", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
-			Out
+			dig.Out
 
 			Result string `group:"s"`
 		}
@@ -1105,7 +1106,7 @@ func TestGroups(t *testing.T) {
 		provide("baz")
 
 		type in struct {
-			In
+			dig.In
 
 			Results []string `group:"s"`
 		}
@@ -1130,10 +1131,10 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("consume groups in constructor", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
-			Out
+			dig.Out
 
 			Result []string `group:"hi"`
 		}
@@ -1150,7 +1151,7 @@ func TestGroups(t *testing.T) {
 		provideStrings("7", "8", "9", "10")
 
 		type setParams struct {
-			In
+			dig.In
 
 			Strings [][]string `group:"hi"`
 		}
@@ -1173,10 +1174,10 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("provide multiple values", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		type outInt struct {
-			Out
+			dig.Out
 			Int int `group:"foo"`
 		}
 
@@ -1187,7 +1188,7 @@ func TestGroups(t *testing.T) {
 		}
 
 		type outString struct {
-			Out
+			dig.Out
 			String string `group:"foo"`
 		}
 
@@ -1198,7 +1199,7 @@ func TestGroups(t *testing.T) {
 		}
 
 		type outBoth struct {
-			Out
+			dig.Out
 
 			Int    int    `group:"foo"`
 			String string `group:"foo"`
@@ -1221,7 +1222,7 @@ func TestGroups(t *testing.T) {
 		provideInt(7)
 
 		type in struct {
-			In
+			dig.In
 
 			Ints    []int    `group:"foo"`
 			Strings []string `group:"foo"`
@@ -1236,10 +1237,10 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("duplicate values are supported", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
-			Out
+			dig.Out
 
 			Result string `group:"s"`
 		}
@@ -1262,7 +1263,7 @@ func TestGroups(t *testing.T) {
 		type stringSlice []string
 
 		type in struct {
-			In
+			dig.In
 
 			Strings stringSlice `group:"s"`
 		}
@@ -1275,10 +1276,10 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("failure to build a grouped value fails everything", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
-			Out
+			dig.Out
 
 			Result string `group:"x"`
 		}
@@ -1298,7 +1299,7 @@ func TestGroups(t *testing.T) {
 		}), "failed to provide")
 
 		type in struct {
-			In
+			dig.In
 
 			Strings []string `group:"x"`
 		}
@@ -1307,21 +1308,21 @@ func TestGroups(t *testing.T) {
 			require.FailNow(t, "this function must not be called")
 		})
 		require.Error(t, err, "expected failure")
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestGroups`,
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".TestGroups`,
 			`could not build value group string\[group="x"\]:`,
-			`received non-nil error from function "go.uber.org/dig".TestGroups\S+`,
+			`received non-nil error from function "go.uber.org/dig_test".TestGroups\S+`,
 			`dig_test.go:\d+`, // file:line
 			"great sadness",
 		)
-		assert.Equal(t, gaveErr, RootCause(err))
+		assert.Equal(t, gaveErr, dig.RootCause(err))
 	})
 
 	t.Run("flatten collects slices", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 
 		type out struct {
-			Out
+			dig.Out
 
 			Value []int `group:"val,flatten"`
 		}
@@ -1336,7 +1337,7 @@ func TestGroups(t *testing.T) {
 		provide([]int{3, 4})
 
 		type in struct {
-			In
+			dig.In
 
 			Values []int `group:"val"`
 		}
@@ -1347,12 +1348,12 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("flatten via option", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
 		require.NoError(t, c.Provide(func() []int {
 			return []int{1, 2, 3}
-		}, Group("val,flatten")), "failed to provide ")
+		}, dig.Group("val,flatten")), "failed to provide ")
 		type in struct {
-			In
+			dig.In
 
 			Values []int `group:"val"`
 		}
@@ -1363,8 +1364,8 @@ func TestGroups(t *testing.T) {
 	})
 
 	t.Run("flatten via option error if not a slice", func(t *testing.T) {
-		c := New(setRand(rand.New(rand.NewSource(0))))
-		err := c.Provide(func() int { return 1 }, Group("val,flatten"))
+		c := dig.New(dig.SetRand(rand.New(rand.NewSource(0))))
+		err := c.Provide(func() int { return 1 }, dig.Group("val,flatten"))
 		require.Error(t, err, "failed to provide")
 		assert.Contains(t, err.Error(), "flatten can be applied to slices only")
 	})
@@ -1374,7 +1375,7 @@ func TestGroups(t *testing.T) {
 
 func TestProvideConstructorErrors(t *testing.T) {
 	t.Run("multiple-type constructor returns multiple objects of same type", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{}
 		constructor := func() (*A, *A, error) {
 			return &A{}, &A{}, nil
@@ -1383,15 +1384,15 @@ func TestProvideConstructorErrors(t *testing.T) {
 	})
 
 	t.Run("constructor consumes a dig.Out", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type out struct {
-			Out
+			dig.Out
 
 			Reader io.Reader
 		}
 
 		type outPtr struct {
-			*Out
+			*dig.Out
 
 			Reader io.Reader
 		}
@@ -1404,17 +1405,17 @@ func TestProvideConstructorErrors(t *testing.T) {
 			{
 				desc:        "dig.Out",
 				constructor: func(out) io.Writer { return nil },
-				msg:         "dig.out embeds a dig.Out",
+				msg:         "dig_test.out embeds a dig.Out",
 			},
 			{
 				desc:        "*dig.Out",
 				constructor: func(*out) io.Writer { return nil },
-				msg:         `\*dig.out embeds a dig.Out`,
+				msg:         `\*dig_test.out embeds a dig.Out`,
 			},
 			{
 				desc:        "embeds *dig.Out",
 				constructor: func(outPtr) io.Writer { return nil },
-				msg:         `dig.outPtr embeds a dig.Out`,
+				msg:         `dig_test.outPtr embeds a dig.Out`,
 			},
 		}
 
@@ -1422,8 +1423,8 @@ func TestProvideConstructorErrors(t *testing.T) {
 			t.Run(tt.desc, func(t *testing.T) {
 				err := c.Provide(tt.constructor)
 				require.Error(t, err, "provide should fail")
-				assertErrorMatches(t, err,
-					`cannot provide function "go.uber.org/dig".TestProvideConstructorErrors\S+`,
+				dig.AssertErrorMatches(t, err,
+					`cannot provide function "go.uber.org/dig_test".TestProvideConstructorErrors\S+`,
 					`dig_test.go:\d+`, // file:line
 					`bad argument 1:`,
 					`cannot depend on result objects:`,
@@ -1433,40 +1434,40 @@ func TestProvideConstructorErrors(t *testing.T) {
 	})
 
 	t.Run("name option cannot be provided for result structs", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{}
 
 		type out struct {
-			Out
+			dig.Out
 
 			A A
 		}
 
 		err := c.Provide(func() out {
 			panic("this function must never be called")
-		}, Name("second"))
+		}, dig.Name("second"))
 		require.Error(t, err)
 
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".TestProvideConstructorErrors\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".TestProvideConstructorErrors\S+`,
 			`dig_test.go:\d+`, // file:line
 			`bad result 1:`,
 			"cannot specify a name for result objects:",
-			"dig.out embeds dig.Out",
+			"dig_test.out embeds dig.Out",
 		)
 	})
 
 	t.Run("name tags on result structs are not allowed", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		type Result1 struct {
-			Out
+			dig.Out
 
 			A string `name:"foo"`
 		}
 
 		type Result2 struct {
-			Out
+			dig.Out
 
 			Result1 Result1 `name:"bar"`
 		}
@@ -1476,19 +1477,19 @@ func TestProvideConstructorErrors(t *testing.T) {
 		})
 		require.Error(t, err)
 
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".TestProvideConstructorErrors\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".TestProvideConstructorErrors\S+`,
 			`dig_test.go:\d+`, // file:line
-			`bad field "Result1" of dig.Result2:`,
+			`bad field "Result1" of dig_test.Result2:`,
 			"cannot specify a name for result objects:",
-			"dig.Result1 embeds dig.Out",
+			"dig_test.Result1 embeds dig.Out",
 		)
 	})
 }
 
 func TestProvideRespectsConstructorErrors(t *testing.T) {
 	t.Run("constructor succeeds", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() (*bytes.Buffer, error) {
 			return &bytes.Buffer{}, nil
 		}), "provide failed")
@@ -1497,18 +1498,18 @@ func TestProvideRespectsConstructorErrors(t *testing.T) {
 		}), "invoke failed")
 	})
 	t.Run("constructor fails", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() (*bytes.Buffer, error) {
 			return nil, errors.New("oh no")
 		}), "provide failed")
 
 		var called bool
 		err := c.Invoke(func(b *bytes.Buffer) { called = true })
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".TestProvideRespectsConstructorErrors\S+`,
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".TestProvideRespectsConstructorErrors\S+`,
 			`dig_test.go:\d+`, // file:line
 			`failed to build \*bytes.Buffer:`,
-			`received non-nil error from function "go.uber.org/dig".TestProvideRespectsConstructorErrors\S+`,
+			`received non-nil error from function "go.uber.org/dig_test".TestProvideRespectsConstructorErrors\S+`,
 			`dig_test.go:\d+`, // file:line
 			`oh no`)
 		assert.False(t, called, "shouldn't call invoked function when deps aren't available")
@@ -1534,7 +1535,7 @@ func TestCantProvideObjects(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.typeDesc, func(t *testing.T) {
-			c := New()
+			c := dig.New()
 			assert.Error(t, c.Provide(tt.object))
 		})
 	}
@@ -1546,14 +1547,14 @@ func TestProvideWithWeirdNames(t *testing.T) {
 	t.Run("name with quotes", func(t *testing.T) {
 		type type1 struct{ value int }
 
-		c := New()
+		c := dig.New()
 
 		require.NoError(t, c.Provide(func() *type1 {
 			return &type1{42}
-		}, Name(`foo"""bar`)))
+		}, dig.Name(`foo"""bar`)))
 
 		type params struct {
-			In
+			dig.In
 
 			T *type1 `name:"foo\"\"\"bar"`
 		}
@@ -1566,14 +1567,14 @@ func TestProvideWithWeirdNames(t *testing.T) {
 	t.Run("name with newline", func(t *testing.T) {
 		type type1 struct{ value int }
 
-		c := New()
+		c := dig.New()
 
 		require.NoError(t, c.Provide(func() *type1 {
 			return &type1{42}
-		}, Name("foo\nbar")))
+		}, dig.Name("foo\nbar")))
 
 		type params struct {
-			In
+			dig.In
 
 			T *type1 `name:"foo\nbar"`
 		}
@@ -1587,10 +1588,10 @@ func TestProvideWithWeirdNames(t *testing.T) {
 func TestProvideInvalidName(t *testing.T) {
 	t.Parallel()
 
-	c := New()
+	c := dig.New()
 	err := c.Provide(func() io.Reader {
 		panic("this function must not be called")
-	}, Name("foo`bar"))
+	}, dig.Name("foo`bar"))
 	require.Error(t, err, "Provide must fail")
 	assert.Contains(t, err.Error(), "invalid dig.Name(\"foo`bar\"): names cannot contain backquotes")
 }
@@ -1598,16 +1599,16 @@ func TestProvideInvalidName(t *testing.T) {
 func TestProvideInvalidGroup(t *testing.T) {
 	t.Parallel()
 
-	c := New()
+	c := dig.New()
 	err := c.Provide(func() io.Reader {
 		panic("this function must not be called")
-	}, Group("foo`bar"))
+	}, dig.Group("foo`bar"))
 	require.Error(t, err, "Provide must fail")
 	assert.Contains(t, err.Error(), "invalid dig.Group(\"foo`bar\"): group names cannot contain backquotes")
 
 	err = c.Provide(func() io.Reader {
 		panic("this function must not be called")
-	}, Group("foo,bar"))
+	}, dig.Group("foo,bar"))
 	require.Error(t, err, "Provide must fail")
 	assert.Contains(t, err.Error(), `cannot parse group "foo,bar": invalid option "bar"`)
 }
@@ -1619,7 +1620,7 @@ func TestProvideInvalidAs(t *testing.T) {
 		name: "example",
 	}
 	type out struct {
-		Out
+		dig.Out
 
 		name string
 	}
@@ -1656,9 +1657,9 @@ func TestProvideInvalidAs(t *testing.T) {
 			expectedErr: "invalid dig.As(func()): argument must be a pointer to an interface",
 		},
 		{
-			name:        "as param is a func returning dig.out",
+			name:        "as param is a func returning dig_test.out",
 			param:       func() *out { return &out{name: "example"} },
-			expectedErr: "invalid dig.As(func() *dig.out): argument must be a pointer to an interface",
+			expectedErr: "invalid dig.As(func() *dig_test.out): argument must be a pointer to an interface",
 		},
 	}
 	for _, tt := range tests {
@@ -1666,13 +1667,13 @@ func TestProvideInvalidAs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			c := New()
+			c := dig.New()
 			err := c.Provide(
 				func() *bytes.Buffer {
 					var buf bytes.Buffer
 					return &buf
 				},
-				As(tt.param),
+				dig.As(tt.param),
 			)
 
 			require.Error(t, err, "provide must fail")
@@ -1685,18 +1686,18 @@ func TestAsExpectingOriginalType(t *testing.T) {
 	t.Parallel()
 
 	t.Run("fail on expecting original type", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 
 		require.NoError(t, c.Provide(
 			func() *bytes.Buffer {
 				return bytes.NewBufferString("foo")
 			},
-			As(new(io.Reader)),
-			Name("buff"),
+			dig.As(new(io.Reader)),
+			dig.Name("buff"),
 		), "failed to provide")
 
 		type in struct {
-			In
+			dig.In
 
 			Buffer *bytes.Buffer `name:"buff"`
 			Reader io.Reader     `name:"buff"`
@@ -1712,20 +1713,20 @@ func TestProvideIncompatibleOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("group and name", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		err := c.Provide(func() io.Reader {
 			panic("this function must not be called")
-		}, Group("foo"), Name("bar"))
+		}, dig.Group("foo"), dig.Name("bar"))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
 			`name:"bar" provided with group:"foo"`)
 	})
 
 	t.Run("group and As", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		err := c.Provide(func() *bytes.Buffer {
 			panic("this function must not be called")
-		}, Group("foo"), As(new(io.Reader)))
+		}, dig.Group("foo"), dig.As(new(io.Reader)))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use dig.As with value groups: "+
 			`dig.As provided with group:"foo"`)
@@ -1739,20 +1740,20 @@ func (testStruct) TestMethod(x int) float64 { return float64(x) }
 func TestProvideLocation(t *testing.T) {
 	t.Parallel()
 
-	c := New()
+	c := dig.New()
 	err := c.Provide(func(x int) float64 {
 		return testStruct{}.TestMethod(x)
-	}, LocationForPC(reflect.TypeOf(testStruct{}).Method(0).Func.Pointer()))
+	}, dig.LocationForPC(reflect.TypeOf(testStruct{}).Method(0).Func.Pointer()))
 	require.NoError(t, err)
 	err = c.Invoke(func(y float64) {})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), `"go.uber.org/dig".testStruct.TestMethod`)
+	require.Contains(t, err.Error(), `"go.uber.org/dig_test".testStruct.TestMethod`)
 	require.Contains(t, err.Error(), `dig/dig_test.go`)
 }
 
 func TestCantProvideUntypedNil(t *testing.T) {
 	t.Parallel()
-	c := New()
+	c := dig.New()
 	assert.Error(t, c.Provide(nil))
 }
 
@@ -1767,7 +1768,7 @@ func TestCantProvideErrorLikeType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%T", tt), func(t *testing.T) {
-			c := New()
+			c := dig.New()
 			assert.Error(t, c.Provide(tt), "providing errors should fail")
 		})
 	}
@@ -1777,36 +1778,36 @@ func TestCantProvideParameterObjects(t *testing.T) {
 	t.Parallel()
 
 	t.Run("constructor", func(t *testing.T) {
-		type Args struct{ In }
+		type Args struct{ dig.In }
 
-		c := New()
+		c := dig.New()
 		err := c.Provide(func() (Args, error) {
 			panic("great sadness")
 		})
 		require.Error(t, err, "provide should fail")
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".TestCantProvideParameterObjects\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".TestCantProvideParameterObjects\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad result 1:",
 			`cannot provide parameter objects:`,
-			`dig.Args embeds a dig.In`,
+			`dig_test.Args embeds a dig.In`,
 		)
 	})
 
 	t.Run("pointer from constructor", func(t *testing.T) {
-		c := New()
-		type Args struct{ In }
+		c := dig.New()
+		type Args struct{ dig.In }
 
 		args := &Args{}
 
 		err := c.Provide(func() (*Args, error) { return args, nil })
 		require.Error(t, err)
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".TestCantProvideParameterObjects\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".TestCantProvideParameterObjects\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad result 1:",
 			`cannot provide parameter objects:`,
-			`\*dig.Args embeds a dig.In`,
+			`\*dig_test.Args embeds a dig.In`,
 		)
 	})
 }
@@ -1821,7 +1822,7 @@ func TestProvideKnownTypesFails(t *testing.T) {
 
 	for _, first := range provideArgs {
 		t.Run(fmt.Sprintf("%T", first), func(t *testing.T) {
-			c := New()
+			c := dig.New()
 			require.NoError(t, c.Provide(first), "first provide must not fail")
 
 			for _, second := range provideArgs {
@@ -1830,7 +1831,7 @@ func TestProvideKnownTypesFails(t *testing.T) {
 		})
 	}
 	t.Run("provide constructor twice", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		assert.NoError(t, c.Provide(func() *bytes.Buffer { return nil }))
 		assert.Error(t, c.Provide(func() *bytes.Buffer { return nil }))
 	})
@@ -1844,7 +1845,7 @@ func TestDryModeSuccess(t *testing.T) {
 			return &type1{}
 		}
 		invokes := func(*type1) {}
-		c := New(DryRun(true))
+		c := dig.New(dig.DryRun(true))
 		assert.NoError(t, c.Provide(provides))
 		assert.NoError(t, c.Invoke(invokes))
 	})
@@ -1857,7 +1858,7 @@ func TestDryModeSuccess(t *testing.T) {
 		invokes := func(*type1) {
 			t.Fatal("must not be called")
 		}
-		c := New(DryRun(true))
+		c := dig.New(dig.DryRun(true))
 		assert.NoError(t, c.Provide(provides))
 		assert.NoError(t, c.Invoke(invokes))
 	})
@@ -1886,20 +1887,20 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		newB := func(*A) *B { return &B{} }
 		newC := func(*B) *C { return &C{} }
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		assert.NoError(t, c.Provide(newA))
 		assert.NoError(t, c.Provide(newB))
 		err := c.Provide(newC)
 		require.Error(t, err, "expected error when introducing cycle")
-		require.True(t, IsCycleDetected(err))
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testProvideCycleFails.\S+`,
+		require.True(t, dig.IsCycleDetected(err))
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`this function introduces a cycle:`,
-			`func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
-			`depends on func\(\*dig.B\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig_test.C\) \*dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails\S+ \(\S+\)`,
+			`depends on func\(\*dig_test.B\) \*dig_test.C provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig_test.A\) \*dig_test.B provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig_test.C\) \*dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 		assert.NotContains(t, err.Error(), "[scope")
 		assert.Error(t, c.Invoke(func(c *C) {}), "expected invoking a function that uses a type that failed to provide to fail.")
@@ -1913,42 +1914,42 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		type C struct{}
 
 		type AParams struct {
-			In
+			dig.In
 
 			C C
 		}
 		newA := func(AParams) A { return A{} }
 
 		type BParams struct {
-			In
+			dig.In
 
 			A A
 		}
 		newB := func(BParams) B { return B{} }
 
 		type CParams struct {
-			In
+			dig.In
 
 			B B
 			W io.Writer
 		}
 		newC := func(CParams) C { return C{} }
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		require.NoError(t, c.Provide(newA))
 		require.NoError(t, c.Provide(newB))
 
 		err := c.Provide(newC)
 		require.Error(t, err, "expected error when introducing cycle")
-		require.True(t, IsCycleDetected(err))
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testProvideCycleFails.\S+`,
+		require.True(t, dig.IsCycleDetected(err))
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`this function introduces a cycle:`,
-			`func\(dig.AParams\) dig.A provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
-			`depends on func\(dig.CParams\) dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(dig.BParams\) dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(dig.AParams\) dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(dig_test.AParams\) dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails\S+ \(\S+\)`,
+			`depends on func\(dig_test.CParams\) dig_test.C provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(dig_test.BParams\) dig_test.B provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(dig_test.AParams\) dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 		assert.Error(t, c.Invoke(func(c C) {}), "expected invoking a function that uses a type that failed to provide to fail.")
 	})
@@ -1957,7 +1958,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		type D struct{}
 
 		type outA struct {
-			Out
+			dig.Out
 
 			Foo string `group:"foo"`
 			Bar int    `group:"bar"`
@@ -1968,7 +1969,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		}
 
 		type outB struct {
-			Out
+			dig.Out
 
 			Foo string `group:"foo"`
 		}
@@ -1978,13 +1979,13 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		}
 
 		type inC struct {
-			In
+			dig.In
 
 			Foos []string `group:"foo"`
 		}
 
 		type outC struct {
-			Out
+			dig.Out
 
 			Bar int `group:"bar"`
 		}
@@ -1995,7 +1996,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		}
 
 		type inD struct {
-			In
+			dig.In
 
 			Bars []int `group:"bar"`
 		}
@@ -2005,22 +2006,22 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 			return nil
 		}
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(newA))
 		require.NoError(t, c.Provide(newB))
 		require.NoError(t, c.Provide(newC))
 
 		err := c.Provide(newD)
 		require.Error(t, err)
-		require.True(t, IsCycleDetected(err))
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testProvideCycleFails.\S+`,
+		require.True(t, dig.IsCycleDetected(err))
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`this function introduces a cycle:`,
-			`func\(\*dig.D\) dig.outB provided by "go.uber.org/dig".testProvideCycleFails\S+ \(\S+\)`,
-			`depends on func\(dig.inD\) \*dig.D provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(dig.inC\) dig.outC provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.D\) dig.outB provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig_test.D\) dig_test.outB provided by "go.uber.org/dig_test".testProvideCycleFails\S+ \(\S+\)`,
+			`depends on func\(dig_test.inD\) \*dig_test.D provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(dig_test.inC\) dig_test.outC provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig_test.D\) dig_test.outB provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 
@@ -2037,7 +2038,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		newC := func(*B) *C { return &C{} }
 		newD := func(*C) *D { return &D{} }
 
-		c := New(DeferAcyclicVerification())
+		c := dig.New(dig.DeferAcyclicVerification())
 		assert.NoError(t, c.Provide(newA))
 		assert.NoError(t, c.Provide(newB))
 		assert.NoError(t, c.Provide(newC))
@@ -2045,13 +2046,13 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 
 		err := c.Invoke(func(*A) {})
 		require.Error(t, err, "expected error when introducing cycle")
-		assert.True(t, IsCycleDetected(err))
-		assertErrorMatches(t, err,
+		assert.True(t, dig.IsCycleDetected(err))
+		dig.AssertErrorMatches(t, err,
 			`cycle detected in dependency graph:`,
-			`func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.B\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.A\) \*dig.B provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.C\) \*dig.A provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig_test.C\) \*dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig_test.B\) \*dig_test.C provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig_test.A\) \*dig_test.B provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig_test.C\) \*dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 
@@ -2066,18 +2067,18 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		newC := func(*C) *C { return &C{} }
 		newD := func(*C) *D { return &D{} }
 
-		c := New(DeferAcyclicVerification())
+		c := dig.New(dig.DeferAcyclicVerification())
 		assert.NoError(t, c.Provide(newA))
 		assert.NoError(t, c.Provide(newC))
 		assert.NoError(t, c.Provide(newD))
 
 		err := c.Invoke(func(*A) {})
 		require.Error(t, err, "expected error when introducing cycle")
-		assert.True(t, IsCycleDetected(err))
-		assertErrorMatches(t, err,
+		assert.True(t, dig.IsCycleDetected(err))
+		dig.AssertErrorMatches(t, err,
 			`cycle detected in dependency graph:`,
-			`func\(\*dig.C\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
-			`depends on func\(\*dig.C\) \*dig.C provided by "go.uber.org/dig".testProvideCycleFails.\S+ \(\S+\)`,
+			`func\(\*dig_test.C\) \*dig_test.C provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
+			`depends on func\(\*dig_test.C\) \*dig_test.C provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 		)
 	})
 }
@@ -2093,7 +2094,7 @@ func TestIncompleteGraphIsOkay(t *testing.T) {
 	newA := func() *A { return &A{} }
 	newC := func(*B) *C { return &C{} }
 
-	c := New()
+	c := dig.New()
 	assert.NoError(t, c.Provide(newA), "provide failed")
 	assert.NoError(t, c.Provide(newC), "provide failed")
 	assert.NoError(t, c.Invoke(func(*A) {}), "invoke failed")
@@ -2102,18 +2103,18 @@ func TestIncompleteGraphIsOkay(t *testing.T) {
 func TestProvideFuncsWithoutReturnsFails(t *testing.T) {
 	t.Parallel()
 
-	c := New()
+	c := dig.New()
 	assert.Error(t, c.Provide(func(*bytes.Buffer) {}))
 }
 
 func TestTypeCheckingEquality(t *testing.T) {
 	type A struct{}
 	type B struct {
-		Out
+		dig.Out
 		A
 	}
 	type in struct {
-		In
+		dig.In
 		A
 	}
 	type out struct {
@@ -2131,15 +2132,15 @@ func TestTypeCheckingEquality(t *testing.T) {
 		{nil, false, false},
 	}
 	for _, tt := range tests {
-		require.Equal(t, tt.isIn, IsIn(tt.item))
-		require.Equal(t, tt.isOut, IsOut(tt.item))
+		require.Equal(t, tt.isIn, dig.IsIn(tt.item))
+		require.Equal(t, tt.isOut, dig.IsOut(tt.item))
 	}
 }
 
 func TestInvokesUseCachedObjects(t *testing.T) {
 	t.Parallel()
 
-	c := New()
+	c := dig.New()
 
 	constructorCalls := 0
 	buf := &bytes.Buffer{}
@@ -2171,10 +2172,10 @@ func TestProvideFailures(t *testing.T) {
 
 func testProvideFailures(t *testing.T, dryRun bool) {
 	t.Run("out returning multiple instances of the same type", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type A struct{ idx int }
 		type ret struct {
-			Out
+			dig.Out
 
 			A1 A // sampe type A provided three times
 			A2 A
@@ -2189,19 +2190,19 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 			}
 		})
 		require.Error(t, err, "provide must return error")
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testProvideFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cannot provide dig.A from \[0\].A2:`,
+			`cannot provide dig_test.A from \[0\].A2:`,
 			`already provided by \[0\].A1`,
 		)
 	})
 
 	t.Run("out returning multiple instances of the same type and As option", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A struct{ idx int }
 		type ret struct {
-			Out
+			dig.Out
 
 			A1 A // same type A provided three times
 			A2 A
@@ -2214,10 +2215,10 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 				A2: A{idx: 2},
 				A3: A{idx: 3},
 			}
-		}, As(new(interface{})))
+		}, dig.As(new(interface{})))
 		require.Error(t, err, "provide must return error")
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testProvideFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			`cannot provide interface {} from \[0\].A2:`,
 			`already provided by \[0\].A1`,
@@ -2225,14 +2226,14 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 	})
 
 	t.Run("provide multiple instances with the same name", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type A struct{}
 		type ret1 struct {
-			Out
+			dig.Out
 			*A `name:"foo"`
 		}
 		type ret2 struct {
-			Out
+			dig.Out
 			*A `name:"foo"`
 		}
 		require.NoError(t, c.Provide(func() ret1 {
@@ -2242,82 +2243,82 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 			return ret2{A: &A{}}
 		})
 		require.Error(t, err, "expected error on the second provide")
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testProvideFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cannot provide \*dig.A\[name="foo"\] from \[0\].A:`,
-			`already provided by "go.uber.org/dig".testProvideFailures\S+`,
+			`cannot provide \*dig_test.A\[name="foo"\] from \[0\].A:`,
+			`already provided by "go.uber.org/dig_test".testProvideFailures\S+`,
 		)
 	})
 
 	t.Run("out with unexported field should error", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		type A struct{ idx int }
 		type out1 struct {
-			Out
+			dig.Out
 
 			A1 A // should be ok
 			a2 A // oops, unexported field. should generate an error
 		}
 		err := c.Provide(func() out1 { return out1{a2: A{77}} })
 		require.Error(t, err)
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testProvideFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad result 1:",
-			`bad field "a2" of dig.out1:`,
-			`unexported fields not allowed in dig.Out, did you mean to export "a2" \(dig.A\)\?`,
+			`bad field "a2" of dig_test.out1:`,
+			`unexported fields not allowed in dig.Out, did you mean to export "a2" \(dig_test.A\)\?`,
 		)
 	})
 
 	t.Run("providing pointer to out should fail", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type out struct {
-			Out
+			dig.Out
 
 			String string
 		}
 		err := c.Provide(func() *out { return &out{String: "foo"} })
 		require.Error(t, err)
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testProvideFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad result 1:",
 			`cannot return a pointer to a result object, use a value instead:`,
-			`\*dig.out is a pointer to a struct that embeds dig.Out`,
+			`\*dig_test.out is a pointer to a struct that embeds dig.Out`,
 		)
 	})
 
 	t.Run("embedding pointer to out should fail", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		type out struct {
-			*Out
+			*dig.Out
 
 			String string
 		}
 
 		err := c.Provide(func() out { return out{String: "foo"} })
 		require.Error(t, err)
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testProvideFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad result 1:",
 			`cannot build a result object by embedding \*dig.Out, embed dig.Out instead:`,
-			`dig.out embeds \*dig.Out`,
+			`dig_test.out embeds \*dig.Out`,
 		)
 	})
 
 	t.Run("provide the same implemented interface", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		err := c.Provide(
 			func() *bytes.Buffer {
 				var buf bytes.Buffer
 				return &buf
 			},
-			As(new(io.Reader)),
-			As(new(io.Reader)),
+			dig.As(new(io.Reader)),
+			dig.As(new(io.Reader)),
 		)
 
 		require.Error(t, err, "provide must fail")
@@ -2326,13 +2327,13 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 	})
 
 	t.Run("provide the same implementation with as interface", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		err := c.Provide(
 			func() *bytes.Buffer {
 				var buf bytes.Buffer
 				return &buf
 			},
-			As(new(io.Reader)),
+			dig.As(new(io.Reader)),
 		)
 		require.NoError(t, err, "provide must not fail here")
 
@@ -2341,7 +2342,7 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 				var buf bytes.Buffer
 				return &buf
 			},
-			As(new(io.Reader)),
+			dig.As(new(io.Reader)),
 		)
 
 		require.Error(t, err, "provide must fail")
@@ -2363,26 +2364,26 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 	t.Parallel()
 
 	t.Run("invoke a non-function", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		err := c.Invoke("foo")
 		require.Error(t, err)
-		assertErrorMatches(t, err, `can't invoke non-function foo \(type string\)`)
+		dig.AssertErrorMatches(t, err, `can't invoke non-function foo \(type string\)`)
 	})
 
 	t.Run("untyped nil", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		err := c.Invoke(nil)
 		require.Error(t, err)
-		assertErrorMatches(t, err, `can't invoke an untyped nil`)
+		dig.AssertErrorMatches(t, err, `can't invoke an untyped nil`)
 	})
 
 	t.Run("unmet dependency", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		err := c.Invoke(func(*bytes.Buffer) {})
 		require.Error(t, err, "expected failure")
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures\S+`,
 			`dig_test.go:\d+`,
 			`missing type:`,
 			`\*bytes.Buffer`,
@@ -2394,30 +2395,30 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		type type2 struct{}
 
 		type args struct {
-			In
+			dig.In
 
 			T1 *type1 `optional:"true"`
 			T2 *type2 `optional:"0"`
 		}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		err := c.Invoke(func(a args) {
 			t.Fatal("function must not be called")
 		})
 
 		require.Error(t, err, "expected invoke error")
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing type:`,
-			`\*dig.type2`,
+			`\*dig_test.type2`,
 		)
 	})
 
 	t.Run("unmet named dependency", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type param struct {
-			In
+			dig.In
 
 			*bytes.Buffer `name:"foo"`
 		}
@@ -2425,8 +2426,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			t.Fatal("function should not be called")
 		})
 		require.Error(t, err, "invoke should fail")
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing type:`,
 			`\*bytes.Buffer\[name="foo"\]`,
@@ -2439,13 +2440,13 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		type type3 struct{}
 
 		type param struct {
-			In
+			dig.In
 
 			T1 *type1
 			T2 *type2 `optional:"true"`
 		}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(func(p param) *type3 {
 			panic("function must not be called")
@@ -2455,14 +2456,14 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			t.Fatal("function must not be called")
 		})
 		require.Error(t, err, "invoke must fail")
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures\S+`,
 			`dig_test.go:\d+`, // file:line
-			`failed to build \*dig.type3:`,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+			`failed to build \*dig_test.type3:`,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing type:`,
-			`\*dig.type1`,
+			`\*dig_test.type1`,
 		)
 		// We don't expect type2 to be mentioned in the list because it's
 		// optional
@@ -2473,7 +2474,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		type type2 struct{}
 		type type3 struct{}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(func() type2 {
 			panic("function must not be called")
@@ -2488,33 +2489,33 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		})
 
 		require.Error(t, err, "invoke must fail")
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures\S+`,
 			`dig_test.go:\d+`, // file:line
-			`failed to build dig.type3:`,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+			`failed to build dig_test.type3:`,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing types:`,
-			"dig.type1",
-			`\*dig.type2 \(did you mean (to use )?dig.type2\?\)`,
+			"dig_test.type1",
+			`\*dig_test.type2 \(did you mean (to use )?dig_test.type2\?\)`,
 		)
 	})
 
 	t.Run("invalid optional tag", func(t *testing.T) {
 		type args struct {
-			In
+			dig.In
 
 			Buffer *bytes.Buffer `optional:"no"`
 		}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		err := c.Invoke(func(a args) {
 			t.Fatal("function must not be called")
 		})
 
 		require.Error(t, err, "expected invoke error")
-		assertErrorMatches(t, err,
-			`bad field "Buffer" of dig.args:`,
+		dig.AssertErrorMatches(t, err,
+			`bad field "Buffer" of dig_test.args:`,
 			`invalid value "no" for "optional" tag on field Buffer:`,
 		)
 	})
@@ -2523,29 +2524,29 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		type type1 struct{}
 
 		type nestedArgs struct {
-			In
+			dig.In
 
 			Buffer *bytes.Buffer `optional:"no"`
 		}
 
 		type args struct {
-			In
+			dig.In
 
 			Args nestedArgs
 		}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		err := c.Provide(func(a args) *type1 {
 			panic("function must not be called")
 		})
 
 		require.Error(t, err, "expected provide error")
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testInvokeFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testInvokeFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad argument 1:",
-			`bad field "Args" of dig.args:`,
-			`bad field "Buffer" of dig.nestedArgs:`,
+			`bad field "Args" of dig_test.args:`,
+			`bad field "Buffer" of dig_test.nestedArgs:`,
 			`invalid value "no" for "optional" tag on field Buffer:`,
 		)
 	})
@@ -2555,12 +2556,12 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		type dep struct{}
 
 		type params struct {
-			In
+			dig.In
 
 			Dep *dep `optional:"true"`
 		}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		// Container has a constructor for *dep, but that constructor has unmet
 		// dependencies.
@@ -2585,12 +2586,12 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		type dep struct{}
 
 		type params struct {
-			In
+			dig.In
 
 			Dep *dep `optional:"true"`
 		}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		errFailed := errors.New("failed")
 		err := c.Provide(func() (*failed, error) {
@@ -2609,63 +2610,63 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			panic("shouldn't execute invoked function")
 		})
 		require.Error(t, err, "expected invoke error")
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures\S+`,
 			`dig_test.go:\d+`, // file:line
-			`failed to build \*dig.dep:`,
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures.\S+`,
+			`failed to build \*dig_test.dep:`,
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
-			`failed to build \*dig.failed:`,
-			`received non-nil error from function "go.uber.org/dig".testInvokeFailures.\S+`,
+			`failed to build \*dig_test.failed:`,
+			`received non-nil error from function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`failed`,
 		)
-		assert.Equal(t, errFailed, RootCause(err), "root cause must match")
+		assert.Equal(t, errFailed, dig.RootCause(err), "root cause must match")
 	})
 
 	t.Run("returned error", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		err := c.Invoke(func() error { return errors.New("oh no") })
 		require.Equal(t, errors.New("oh no"), err, "error must match")
 	})
 
 	t.Run("many returns", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		err := c.Invoke(func() (int, error) { return 42, errors.New("oh no") })
 		require.Equal(t, errors.New("oh no"), err, "error must match")
 	})
 
 	t.Run("named instances are case sensitive", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type A struct{}
 		type ret struct {
-			Out
+			dig.Out
 			A `name:"CamelCase"`
 		}
 		type param1 struct {
-			In
+			dig.In
 			A `name:"CamelCase"`
 		}
 		type param2 struct {
-			In
+			dig.In
 			A `name:"camelcase"`
 		}
 		require.NoError(t, c.Provide(func() ret { return ret{A: A{}} }))
 		require.NoError(t, c.Invoke(func(param1) {}))
 		err := c.Invoke(func(param2) {})
 		require.Error(t, err, "provide should return error since cases don't match")
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing type:`,
-			`dig.A\[name="camelcase"\]`)
+			`dig_test.A\[name="camelcase"\]`)
 	})
 
 	t.Run("in unexported member gets an error", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type A struct{}
 		type in struct {
-			In
+			dig.In
 
 			A1 A // all is good
 			a2 A // oops, unexported type
@@ -2677,17 +2678,17 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
 		require.Error(t, err)
-		assertErrorMatches(t, err,
+		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
-			`bad field "a2" of dig.in:`,
-			`unexported fields not allowed in dig.In, did you mean to export "a2" \(dig.A\)\?`,
+			`bad field "a2" of dig_test.in:`,
+			`unexported fields not allowed in dig.In, did you mean to export "a2" \(dig_test.A\)\?`,
 		)
 	})
 
 	t.Run("in unexported member gets an error on Provide", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type in struct {
-			In
+			dig.In
 
 			foo string
 		}
@@ -2696,20 +2697,20 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 		err := c.Provide(func(in) int { return 0 })
 		require.Error(t, err, "Provide must fail")
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".testInvokeFailures\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testInvokeFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad argument 1:",
-			`bad field "foo" of dig.in:`,
+			`bad field "foo" of dig_test.in:`,
 			`unexported fields not allowed in dig.In, did you mean to export "foo" \(string\)\?`,
 		)
 	})
 
 	t.Run("embedded unexported member gets an error", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type A struct{}
 		type Embed struct {
-			In
+			dig.In
 
 			A1 A // all is good
 			a2 A // oops, unexported type
@@ -2724,18 +2725,18 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get in here") })
 		require.Error(t, err)
-		assertErrorMatches(t, err,
+		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
-			`bad field "Embed" of dig.in:`,
-			`bad field "a2" of dig.Embed:`,
-			`unexported fields not allowed in dig.In, did you mean to export "a2" \(dig.A\)\?`,
+			`bad field "Embed" of dig_test.in:`,
+			`bad field "a2" of dig_test.Embed:`,
+			`unexported fields not allowed in dig.In, did you mean to export "a2" \(dig_test.A\)\?`,
 		)
 	})
 
 	t.Run("embedded unexported member gets an error", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type param struct {
-			In
+			dig.In
 
 			string // embed an unexported std type
 		}
@@ -2744,35 +2745,35 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 		err := c.Invoke(func(p param) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
-		assertErrorMatches(t, err,
+		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
-			`bad field "string" of dig.param:`,
+			`bad field "string" of dig_test.param:`,
 			`unexported fields not allowed in dig.In, did you mean to export "string" \(string\)\?`,
 		)
 	})
 
 	t.Run("pointer in dependency is not supported", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type in struct {
-			In
+			dig.In
 
 			String string
 			Num    int
 		}
 		err := c.Invoke(func(i *in) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
-		assertErrorMatches(t, err,
+		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
 			"cannot depend on a pointer to a parameter object, use a value instead:",
-			`\*dig.in is a pointer to a struct that embeds dig.In`,
+			`\*dig_test.in is a pointer to a struct that embeds dig.In`,
 		)
 	})
 
 	t.Run("embedding dig.In and dig.Out is not supported", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type in struct {
-			In
-			Out
+			dig.In
+			dig.Out
 
 			String string
 		}
@@ -2781,34 +2782,34 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			assert.Fail(t, "should never get here")
 		})
 		require.Error(t, err)
-		assertErrorMatches(t, err,
+		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
 			"cannot depend on result objects:",
-			"dig.in embeds a dig.Out",
+			"dig_test.in embeds a dig.Out",
 		)
 	})
 
 	t.Run("embedding in pointer is not supported", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		type in struct {
-			*In
+			*dig.In
 
 			String string
 			Num    int
 		}
 		err := c.Invoke(func(i in) { assert.Fail(t, "should never get here") })
 		require.Error(t, err)
-		assertErrorMatches(t, err,
+		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
 			`cannot build a parameter object by embedding \*dig.In, embed dig.In instead:`,
-			`dig.in embeds \*dig.In`,
+			`dig_test.in embeds \*dig.In`,
 		)
 	})
 
 	t.Run("requesting a value or pointer when other is present", func(t *testing.T) {
 		type A struct{}
 		type outA struct {
-			Out
+			dig.Out
 
 			A `name:"hello"`
 		}
@@ -2825,7 +2826,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 				invoke:  func(A) {},
 				errContains: []string{
 					`missing type:`,
-					`dig.A \(did you mean (to use )?\*dig.A\?\)`,
+					`dig_test.A \(did you mean (to use )?\*dig_test.A\?\)`,
 				},
 			},
 			{
@@ -2834,27 +2835,27 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 				invoke:  func(*A) {},
 				errContains: []string{
 					`missing type:`,
-					`\*dig.A \(did you mean (to use )?dig.A\?\)`,
+					`\*dig_test.A \(did you mean (to use )?dig_test.A\?\)`,
 				},
 			},
 			{
 				name:    "named pointer missing, value present",
 				provide: func() outA { return outA{A: A{}} },
 				invoke: func(struct {
-					In
+					dig.In
 
 					*A `name:"hello"`
 				}) {
 				},
 				errContains: []string{
 					`missing type:`,
-					`\*dig.A\[name="hello"\] \(did you mean (to use )?dig.A\[name="hello"\]\?\)`,
+					`\*dig_test.A\[name="hello"\] \(did you mean (to use )?dig_test.A\[name="hello"\]\?\)`,
 				},
 			},
 		}
 
 		for _, tc := range cases {
-			c := New(DryRun(dryRun))
+			c := dig.New(dig.DryRun(dryRun))
 			t.Run(tc.name, func(t *testing.T) {
 				require.NoError(t, c.Provide(tc.provide))
 
@@ -2864,22 +2865,22 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 				lines := append([]string{
 					`dig_test.go:\d+`, // file:line
 				}, tc.errContains...)
-				assertErrorMatches(t, err,
-					`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+				dig.AssertErrorMatches(t, err,
+					`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 					lines...)
 			})
 		}
 	})
 
 	t.Run("requesting an interface when an implementation is available", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 		require.NoError(t, c.Provide(bytes.NewReader))
 		err := c.Invoke(func(io.Reader) {
 			t.Fatalf("this function should not be called")
 		})
 		require.Error(t, err)
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing type:`,
 			`io.Reader \(did you mean (to use )?\*bytes.Reader\?\)`,
@@ -2887,7 +2888,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 	})
 
 	t.Run("requesting an interface when multiple implementations are available", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(bytes.NewReader))
 		require.NoError(t, c.Provide(bytes.NewBufferString))
@@ -2896,8 +2897,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			t.Fatalf("this function should not be called")
 		})
 		require.Error(t, err)
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing type:`,
 			`io.Reader \(did you mean (to use one of )?\*bytes.Buffer, or \*bytes.Reader\?\)`,
@@ -2905,7 +2906,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 	})
 
 	t.Run("requesting multiple interfaces when multiple implementations are available", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(bytes.NewReader))
 		require.NoError(t, c.Provide(bytes.NewBufferString))
@@ -2914,8 +2915,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			t.Fatalf("this function should not be called")
 		})
 		require.Error(t, err)
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing types:`,
 			`io.Writer \(did you mean (to use )?\*bytes.Buffer\?\)`,
@@ -2923,7 +2924,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 	})
 
 	t.Run("requesting a type when an interface is available", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(func() io.Writer { return nil }))
 		err := c.Invoke(func(*bytes.Buffer) {
@@ -2931,8 +2932,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		})
 
 		require.Error(t, err)
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing type:`,
 			`\*bytes.Buffer \(did you mean (to use )?io.Writer\?\)`,
@@ -2940,7 +2941,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 	})
 
 	t.Run("requesting a type when multiple interfaces are available", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(func() io.Writer { return nil }))
 		require.NoError(t, c.Provide(func() io.Reader { return nil }))
@@ -2950,8 +2951,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		})
 
 		require.Error(t, err)
-		assertErrorMatches(t, err,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+		dig.AssertErrorMatches(t, err,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			`missing type:`,
 			`\*bytes.Buffer \(did you mean (to use one of )?io.Reader, or io.Writer\?\)`,
@@ -2961,7 +2962,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 	t.Run("direct dependency error", func(t *testing.T) {
 		type A struct{}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(func() (A, error) {
 			return A{}, errors.New("great sadness")
@@ -2970,19 +2971,19 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		err := c.Invoke(func(A) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
-		assertErrorMatches(t, err,
-			`received non-nil error from function "go.uber.org/dig".testInvokeFailures.func\S+`,
+		dig.AssertErrorMatches(t, err,
+			`received non-nil error from function "go.uber.org/dig_test".testInvokeFailures.func\S+`,
 			`dig_test.go:\d+`, // file:line
 			"great sadness",
 		)
-		assert.Equal(t, errors.New("great sadness"), RootCause(err))
+		assert.Equal(t, errors.New("great sadness"), dig.RootCause(err))
 	})
 
 	t.Run("transitive dependency error", func(t *testing.T) {
 		type A struct{}
 		type B struct{}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(func() (A, error) {
 			return A{}, errors.New("great sadness")
@@ -2995,29 +2996,29 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		err := c.Invoke(func(B) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures\S+`,
-			"failed to build dig.B",
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures\S+`,
-			"failed to build dig.A",
-			`received non-nil error from function "go.uber.org/dig".testInvokeFailures.func\S+`,
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures\S+`,
+			"failed to build dig_test.B",
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures\S+`,
+			"failed to build dig_test.A",
+			`received non-nil error from function "go.uber.org/dig_test".testInvokeFailures.func\S+`,
 			`dig_test.go:\d+`, // file:line
 			"great sadness",
 		)
-		assert.Equal(t, errors.New("great sadness"), RootCause(err))
+		assert.Equal(t, errors.New("great sadness"), dig.RootCause(err))
 	})
 
 	t.Run("direct parameter object error", func(t *testing.T) {
 		type A struct{}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(func() (A, error) {
 			return A{}, errors.New("great sadness")
 		}), "Provide failed")
 
 		type params struct {
-			In
+			dig.In
 
 			A A
 		}
@@ -3025,28 +3026,28 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		err := c.Invoke(func(params) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures.func\S+`,
-			"failed to build dig.A:",
-			`received non-nil error from function "go.uber.org/dig".testInvokeFailures.func\S+`,
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures.func\S+`,
+			"failed to build dig_test.A:",
+			`received non-nil error from function "go.uber.org/dig_test".testInvokeFailures.func\S+`,
 			`dig_test.go:\d+`, // file:line
 			"great sadness",
 		)
-		assert.Equal(t, errors.New("great sadness"), RootCause(err))
+		assert.Equal(t, errors.New("great sadness"), dig.RootCause(err))
 	})
 
 	t.Run("transitive parameter object error", func(t *testing.T) {
 		type A struct{}
 		type B struct{}
 
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		require.NoError(t, c.Provide(func() (A, error) {
 			return A{}, errors.New("great sadness")
 		}), "Provide failed")
 
 		type params struct {
-			In
+			dig.In
 
 			A A
 		}
@@ -3058,27 +3059,27 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		err := c.Invoke(func(B) { panic("impossible") })
 
 		require.Error(t, err, "expected Invoke error")
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures.func\S+`,
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures.func\S+`,
 			`dig_test.go:\d+`, // file:line
-			"failed to build dig.B:",
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures.func\S+`,
-			"failed to build dig.A:",
-			`received non-nil error from function "go.uber.org/dig".testInvokeFailures.func\S+`,
+			"failed to build dig_test.B:",
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures.func\S+`,
+			"failed to build dig_test.A:",
+			`received non-nil error from function "go.uber.org/dig_test".testInvokeFailures.func\S+`,
 			`dig_test.go:\d+`, // file:line
 			"great sadness",
 		)
-		assert.Equal(t, errors.New("great sadness"), RootCause(err))
+		assert.Equal(t, errors.New("great sadness"), dig.RootCause(err))
 	})
 
 	t.Run("unmet dependency of a group value", func(t *testing.T) {
-		c := New(DryRun(dryRun))
+		c := dig.New(dig.DryRun(dryRun))
 
 		type A struct{}
 		type B struct{}
 
 		type out struct {
-			Out
+			dig.Out
 
 			B B `group:"b"`
 		}
@@ -3089,7 +3090,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		}))
 
 		type in struct {
-			In
+			dig.In
 
 			Bs []B `group:"b"`
 		}
@@ -3098,36 +3099,22 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			require.FailNow(t, "must not be called")
 		})
 		require.Error(t, err, "expected failure")
-		assertErrorMatches(t, err,
-			`could not build arguments for function "go.uber.org/dig".testInvokeFailures.\S+`,
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
-			`could not build value group dig.B\[group="b"\]:`,
-			`missing dependencies for function "go.uber.org/dig".testInvokeFailures.\S+`,
+			`could not build value group dig_test.B\[group="b"\]:`,
+			`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
 			`dig_test.go:\d+`, // file:line
 			"missing type:",
-			"dig.A",
+			"dig_test.A",
 		)
 	})
-}
-
-func TestNodeAlreadyCalled(t *testing.T) {
-	type type1 struct{}
-	f := func() type1 { return type1{} }
-
-	n, err := newConstructorNode(f, newScope(), constructorOptions{})
-	require.NoError(t, err, "failed to build node")
-	require.False(t, n.called, "node must not have been called")
-
-	c := New()
-	require.NoError(t, n.Call(c.scope), "invoke failed")
-	require.True(t, n.called, "node must be called")
-	require.NoError(t, n.Call(c.scope), "calling again should be okay")
 }
 
 func TestFailingFunctionDoesNotCreateInvalidState(t *testing.T) {
 	type type1 struct{}
 
-	c := New()
+	c := dig.New()
 	require.NoError(t, c.Provide(func() (type1, error) {
 		return type1{}, errors.New("great sadness")
 	}), "provide failed")
@@ -3215,7 +3202,7 @@ func BenchmarkProvideCycleDetection(b *testing.B) {
 	newZ := func() *Z { return &Z{} }
 
 	for n := 0; n < b.N; n++ {
-		c := New()
+		c := dig.New()
 		c.Provide(newZ)
 		c.Provide(newY)
 		c.Provide(newX)
@@ -3255,9 +3242,9 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 			return &type1{}, &type2{}
 		}
 
-		c := New()
+		c := dig.New()
 		type param struct {
-			In `ignore-unexported:""`
+			dig.In `ignore-unexported:""`
 
 			T1 *type1 // regular 'ol type
 			T2 *type2 `optional:"true"` // optional type present in the graph
@@ -3272,7 +3259,7 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
-			`bad argument 1: bad field "t3" of dig.param: unexported fields not allowed in dig.In, did you mean to export "t3" (*dig.type3)`)
+			`bad argument 1: bad field "t3" of dig_test.param: unexported fields not allowed in dig.In, did you mean to export "t3" (*dig_test.type3)`)
 	})
 
 	t.Run("invalid tag value", func(t *testing.T) {
@@ -3283,9 +3270,9 @@ func TestUnexportedFieldsFailures(t *testing.T) {
 			return &type1{}, &type2{}
 		}
 
-		c := New()
+		c := dig.New()
 		type param struct {
-			In `ignore-unexported:"foo"`
+			dig.In `ignore-unexported:"foo"`
 
 			T1 *type1 // regular 'ol type
 			T2 *type2 `optional:"true"` // optional type present in the graph
@@ -3313,15 +3300,15 @@ func TestProvideInfoOption(t *testing.T) {
 			return &type1{}, &type2{}
 		}
 
-		c := New()
-		var info ProvideInfo
-		require.NoError(t, c.Provide(ctor, FillProvideInfo(&info)))
+		c := dig.New()
+		var info dig.ProvideInfo
+		require.NoError(t, c.Provide(ctor, dig.FillProvideInfo(&info)))
 
 		assert.Empty(t, info.Inputs)
 		assert.Equal(t, 2, len(info.Outputs))
 
-		assert.Equal(t, "*dig.type1", info.Outputs[0].String())
-		assert.Equal(t, "*dig.type2", info.Outputs[1].String())
+		assert.Equal(t, "*dig_test.type1", info.Outputs[0].String())
+		assert.Equal(t, "*dig_test.type2", info.Outputs[1].String())
 	})
 
 	t.Run("two inputs and one output", func(t *testing.T) {
@@ -3331,22 +3318,22 @@ func TestProvideInfoOption(t *testing.T) {
 		ctor := func(*type1, *type2) *type3 {
 			return &type3{}
 		}
-		c := New()
-		var info ProvideInfo
-		require.NoError(t, c.Provide(ctor, Name("n"), FillProvideInfo(&info)))
+		c := dig.New()
+		var info dig.ProvideInfo
+		require.NoError(t, c.Provide(ctor, dig.Name("n"), dig.FillProvideInfo(&info)))
 
 		assert.Equal(t, 2, len(info.Inputs))
 		assert.Equal(t, 1, len(info.Outputs))
 
-		assert.Equal(t, `*dig.type3[name = "n"]`, info.Outputs[0].String())
-		assert.Equal(t, "*dig.type1", info.Inputs[0].String())
-		assert.Equal(t, "*dig.type2", info.Inputs[1].String())
+		assert.Equal(t, `*dig_test.type3[name = "n"]`, info.Outputs[0].String())
+		assert.Equal(t, "*dig_test.type1", info.Inputs[0].String())
+		assert.Equal(t, "*dig_test.type2", info.Inputs[1].String())
 	})
 
 	t.Run("two inputs, output and error", func(t *testing.T) {
 		type type1 struct{}
 		type GatewayParams struct {
-			In
+			dig.In
 
 			WriteToConn  *io.Writer `name:"rw" optional:"true"`
 			ReadFromConn *io.Reader `name:"ro"`
@@ -3358,15 +3345,15 @@ func TestProvideInfoOption(t *testing.T) {
 		ctor := func(*type1, GatewayParams) (*type3, error) {
 			return &type3{}, nil
 		}
-		c := New()
-		var info ProvideInfo
-		require.NoError(t, c.Provide(ctor, FillProvideInfo(&info)))
+		c := dig.New()
+		var info dig.ProvideInfo
+		require.NoError(t, c.Provide(ctor, dig.FillProvideInfo(&info)))
 
 		assert.Equal(t, 4, len(info.Inputs))
 		assert.Equal(t, 1, len(info.Outputs))
 
-		assert.Equal(t, "*dig.type3", info.Outputs[0].String())
-		assert.Equal(t, "*dig.type1", info.Inputs[0].String())
+		assert.Equal(t, "*dig_test.type3", info.Outputs[0].String())
+		assert.Equal(t, "*dig_test.type1", info.Inputs[0].String())
 		assert.Equal(t, `*io.Writer[optional, name = "rw"]`, info.Inputs[1].String())
 		assert.Equal(t, `*io.Reader[name = "ro"]`, info.Inputs[2].String())
 		assert.Equal(t, `[]string[group = "server"]`, info.Inputs[3].String())
@@ -3380,18 +3367,18 @@ func TestProvideInfoOption(t *testing.T) {
 		ctor := func(*type1, *type2) (*type3, *type4) {
 			return &type3{}, &type4{}
 		}
-		c := New()
-		info := ProvideInfo{}
-		require.NoError(t, c.Provide(ctor, Group("g"), FillProvideInfo(&info)))
+		c := dig.New()
+		info := dig.ProvideInfo{}
+		require.NoError(t, c.Provide(ctor, dig.Group("g"), dig.FillProvideInfo(&info)))
 
 		assert.Equal(t, 2, len(info.Inputs))
 		assert.Equal(t, 2, len(info.Outputs))
 
-		assert.Equal(t, "*dig.type1", info.Inputs[0].String())
-		assert.Equal(t, "*dig.type2", info.Inputs[1].String())
+		assert.Equal(t, "*dig_test.type1", info.Inputs[0].String())
+		assert.Equal(t, "*dig_test.type2", info.Inputs[1].String())
 
-		assert.Equal(t, `*dig.type3[group = "g"]`, info.Outputs[0].String())
-		assert.Equal(t, `*dig.type4[group = "g"]`, info.Outputs[1].String())
+		assert.Equal(t, `*dig_test.type3[group = "g"]`, info.Outputs[0].String())
+		assert.Equal(t, `*dig_test.type4[group = "g"]`, info.Outputs[1].String())
 	})
 
 	t.Run("two ctors", func(t *testing.T) {
@@ -3405,11 +3392,11 @@ func TestProvideInfoOption(t *testing.T) {
 		ctor2 := func(*type3) *type4 {
 			return &type4{}
 		}
-		c := New()
-		info1 := ProvideInfo{}
-		info2 := ProvideInfo{}
-		require.NoError(t, c.Provide(ctor1, FillProvideInfo(&info1)))
-		require.NoError(t, c.Provide(ctor2, FillProvideInfo(&info2)))
+		c := dig.New()
+		info1 := dig.ProvideInfo{}
+		info2 := dig.ProvideInfo{}
+		require.NoError(t, c.Provide(ctor1, dig.FillProvideInfo(&info1)))
+		require.NoError(t, c.Provide(ctor2, dig.FillProvideInfo(&info2)))
 
 		assert.NotEqual(t, info1.ID, info2.ID)
 
@@ -3418,11 +3405,11 @@ func TestProvideInfoOption(t *testing.T) {
 		assert.Equal(t, 1, len(info2.Inputs))
 		assert.Equal(t, 1, len(info2.Outputs))
 
-		assert.Equal(t, "*dig.type1", info1.Inputs[0].String())
-		assert.Equal(t, "*dig.type2", info1.Outputs[0].String())
+		assert.Equal(t, "*dig_test.type1", info1.Inputs[0].String())
+		assert.Equal(t, "*dig_test.type2", info1.Outputs[0].String())
 
-		assert.Equal(t, "*dig.type3", info2.Inputs[0].String())
-		assert.Equal(t, "*dig.type4", info2.Outputs[0].String())
+		assert.Equal(t, "*dig_test.type3", info2.Inputs[0].String())
+		assert.Equal(t, "*dig_test.type4", info2.Outputs[0].String())
 	})
 }
 
@@ -3430,7 +3417,7 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 	t.Run("pointer constructor", func(t *testing.T) {
 		type Buffer = *bytes.Buffer
 
-		c := New()
+		c := dig.New()
 
 		var b Buffer
 		require.NoError(t, c.Provide(func() *bytes.Buffer {
@@ -3448,29 +3435,29 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 		type A struct{}
 		type B = A
 
-		c := New()
+		c := dig.New()
 		require.NoError(t, c.Provide(func() A {
 			return A{}
 		}), "A should not fail to provide")
 
 		err := c.Provide(func() B { return B{} })
 		require.Error(t, err, "B should fail to provide")
-		assertErrorMatches(t, err,
-			`cannot provide function "go.uber.org/dig".TestEndToEndSuccessWithAliases\S+`,
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".TestEndToEndSuccessWithAliases\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cannot provide dig.A from \[0\]:`,
-			`already provided by "go.uber.org/dig".TestEndToEndSuccessWithAliases\S+`,
+			`cannot provide dig_test.A from \[0\]:`,
+			`already provided by "go.uber.org/dig_test".TestEndToEndSuccessWithAliases\S+`,
 		)
 	})
 
 	t.Run("named instances", func(t *testing.T) {
-		c := New()
+		c := dig.New()
 		type A1 struct{ s string }
 		type A2 = A1
 		type A3 = A2
 
 		type ret struct {
-			Out
+			dig.Out
 
 			A A1 `name:"a"`
 			B A2 `name:"b"`
@@ -3478,7 +3465,7 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 		}
 
 		type param struct {
-			In
+			dig.In
 
 			A1 A1 `name:"a"`
 			B1 A2 `name:"b"`

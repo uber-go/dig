@@ -54,7 +54,7 @@ func TestNewResultListErrors(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			_, err := newResultList(reflect.TypeOf(tt.give), resultOptions{})
 			require.Error(t, err)
-			assertErrorMatches(t, err,
+			AssertErrorMatches(t, err,
 				"bad result 1:",
 				"cannot provide parameter objects:",
 				"embeds a dig.In")

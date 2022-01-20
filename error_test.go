@@ -49,7 +49,7 @@ import (
 // Because "bar" is not after "baz" in the error message.
 //
 // Messages will be treated as regular expressions.
-func assertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
+func AssertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
 	t.Helper()
 
 	// We have one positional argument in addition to the variadic argument to
