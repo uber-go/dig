@@ -332,7 +332,7 @@ func TestDecorateFailure(t *testing.T) {
 
 		err := c.Decorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
 		require.Error(t, err, "expected second call to decorate to fail.")
-		assert.Contains(t, err.Error(), "decorating *dig_test.A multiple times")
+		assert.Contains(t, err.Error(), "*dig_test.A already decorated")
 	})
 
 	t.Run("decorator returns an error", func(t *testing.T) {
@@ -471,6 +471,6 @@ func TestDecorateFailure(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot decorate using function func(dig_test.Param) dig_test.Result")
-		assert.Contains(t, err.Error(), "decorating *dig_test.A multiple times")
+		assert.Contains(t, err.Error(), "*dig_test.A already decorated")
 	})
 }

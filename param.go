@@ -49,7 +49,7 @@ type param interface {
 	// Container.
 	//
 	// This MAY panic if the param does not produce a single value.
-	Build(containerStore, bool) (reflect.Value, error)
+	Build(store containerStore, decorating bool) (reflect.Value, error)
 
 	// DotParam returns a slice of dot.Param(s).
 	DotParam() []*dot.Param
@@ -197,7 +197,7 @@ func (ps paramSingle) String() string {
 	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
 }
 
-// searches the given container and its parent for decorated values.
+// search the given container and its parent for decorated values.
 func (ps paramSingle) getDecoratedValue(c containerStore) (reflect.Value, bool) {
 	for _, c := range c.storesToRoot() {
 		if v, ok := c.getDecoratedValue(ps.Name, ps.Type); ok {
@@ -207,7 +207,7 @@ func (ps paramSingle) getDecoratedValue(c containerStore) (reflect.Value, bool) 
 	return _noValue, false
 }
 
-// searches the given container and its parent for a matching value.
+// search the given container and its parent for a matching value.
 func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 	for _, c := range c.storesToRoot() {
 		if v, ok := c.getValue(ps.Name, ps.Type); ok {
@@ -218,7 +218,7 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 }
 
 // builds the parameter using decorators, if any. If there are no decorators associated
-// with this parameter, this returns _noValue.
+// with this parameter, _noValue is returned.
 func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, found bool, err error) {
 	decorators := c.getValueDecorators(ps.Name, ps.Type)
 	if len(decorators) != 0 {
@@ -289,7 +289,7 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 
 		// If we're missing dependencies but the parameter itself is optional,
 		// we can just move on.
-		if errors.As(err, new(errMissingDependencies)) && ps.Optional {
+		if _, ok := err.(errMissingDependencies); ok && ps.Optional {
 			return reflect.Zero(ps.Type), nil
 		}
 
@@ -535,19 +535,17 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 
 func (pt paramGroupedSlice) getDecoratedValues(c containerStore) []reflect.Value {
 	var items []reflect.Value
-	stores := c.storesToRoot()
-	for _, c := range stores {
+	for _, c := range c.storesToRoot() {
 		items = append(items, c.getDecoratedValueGroup(pt.Group, pt.Type.Elem())...)
 	}
 	return items
 }
 
-// searches the given container and its parent for matching group decorators
-// and calls them to commit values. If any of the decorators returns an error,
-// it returns that error immediately. If all decorators succeeds, it returns nil.
+// search the given container and its parent for matching group decorators
+// and call them to commit values. If any decorators return an error,
+// that error is returned immediately. If all decorators succeeds, nil is returned.
 func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
-	stores := c.storesToRoot()
-	for _, c := range stores {
+	for _, c := range c.storesToRoot() {
 		for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
 			if err := d.Call(c); err != nil {
 				return errParamGroupFailed{
@@ -561,14 +559,12 @@ func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
 	return nil
 }
 
-// searches the given container and its parent for matching group providers and
-// calls them to commit values. Returns the total number of providers it ended up
-// calling as well as an error which indicates whether any of the providers encountered
-// an error when getting called.
+// search the given container and its parent for matching group providers and
+// call them to commit values. If an error is encountered, return the number
+// of providers called and a non-nil error from the first provided.
 func (pt paramGroupedSlice) callGroupProviders(c containerStore) (int, error) {
 	itemCount := 0
-	stores := c.storesToRoot()
-	for _, c := range stores {
+	for _, c := range c.storesToRoot() {
 		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
 		itemCount += len(providers)
 		for _, n := range providers {

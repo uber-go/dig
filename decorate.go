@@ -45,10 +45,10 @@ type decoratorNode struct {
 	// Whether the decorator owned by this node was already called.
 	called bool
 
-	// Parameters of the decorator
+	// Parameters of the decorator.
 	params paramList
 
-	// Results of the decorator
+	// Results of the decorator.
 	results resultList
 
 	// order of this node in each Scopes' graphHolders.
@@ -63,7 +63,6 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	dtype := dval.Type()
 	dptr := dval.Pointer()
 
-	// Create parameter / result list.
 	pl, err := newParamList(dtype, s)
 	if err != nil {
 		return nil, err
@@ -99,7 +98,7 @@ func (n *decoratorNode) Call(s containerStore) error {
 		}
 	}
 
-	args, err := n.params.BuildList(n.s, true)
+	args, err := n.params.BuildList(n.s, true /* decorating */)
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   n.location,
@@ -120,46 +119,12 @@ func (n *decoratorNode) ID() dot.CtorID { return n.id }
 // DecorateOption modifies the default behavior of Provide.
 // Currently there is no implementation of it yet.
 type DecorateOption interface {
-	applyDecorateOption(*decorateOptions)
-}
-
-type decorateOptions struct {
+	noOptionsYet()
 }
 
 // Decorate provides a decorator for a type that has already been provided in the Container.
-//
-// Similar to Provide, Decorate takes in a function with zero or more dependencies and one
-// or more results. Decorate can be used to modify a type that was already introduced to the
-// container, or completely replace it with a new object.
-//
-// For example,
-//  c.Decorate(func(log *zap.Logger) *zap.Logger {
-//    return log.Named("myapp")
-//  }
-//
-// takes in a value, augments it with a name, and returns a replacement for it. Functions
-// in the container's dependency graph that use *zap.Logger will now use the *zap.Logger
-// returned by this decorator.
-//
-// A decorator can also take in multiple parameters and replace one of them:
-//  c.Decorate(func(log *zap.Logger, cfg *Config) *zap.Logger {
-//    return log.Named(cfg.Name)
-//  }
-//
-// Or replace a subset of them:
-//  c.Decorate(func(
-//    log *zap.Logger,
-//    cfg *Config,
-//    scope metrics.Scope
-//  ) (*zap.Logger, metrics.Scope) {
-//    log = log.Named(cfg.Name)
-//    scope = scope.With(metrics.Tag("service", cfg.Name))
-//    return log, scope
-//  })
-//
-// Decorating a Container affects all the child scopes of this Container.
-//
-// Similar to a provider, the decorator function gets called *at most once*.
+// Decorations at this level affect all scopes of the container.
+// See Scope.Decorate for information on how to use this method.
 func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) error {
 	return c.scope.Decorate(decorator, opts...)
 }
@@ -175,7 +140,7 @@ func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) erro
 //    return log.Named("myapp")
 //  }
 //
-// takes in a value, augments it with a name, and returns a replacement for it. Functions
+// This takes in a value, augments it with a name, and returns a replacement for it. Functions
 // in the Scope's dependency graph that use *zap.Logger will now use the *zap.Logger
 // returned by this decorator.
 //
@@ -199,10 +164,7 @@ func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) erro
 //
 // Similar to a provider, the decorator function gets called *at most once*.
 func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
-	options := decorateOptions{}
-	for _, opt := range opts {
-		opt.applyDecorateOption(&options)
-	}
+	_ = opts // there are no options at this time
 
 	dn, err := newDecoratorNode(decorator, s)
 	if err != nil {
@@ -212,7 +174,7 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 	keys := findResultKeys(dn.results)
 	for _, k := range keys {
 		if len(s.decorators[k]) > 0 {
-			return fmt.Errorf("cannot decorate using function %v: decorating %s multiple times",
+			return fmt.Errorf("cannot decorate using function %v: %s already decorated",
 				dn.dtype,
 				k,
 			)
@@ -223,9 +185,11 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 }
 
 func findResultKeys(r resultList) []key {
-	// use BFS to search for all keys included in a resultList
-	var q []result
-	var keys []key
+	// use BFS to search for all keys included in a resultList.
+	var (
+		q    []result
+		keys []key
+	)
 	q = append(q, r)
 
 	for len(q) > 0 {
@@ -236,7 +200,6 @@ func findResultKeys(r resultList) []key {
 		case resultSingle:
 			keys = append(keys, key{t: innerResult.Type, name: innerResult.Name})
 		case resultGrouped:
-			// Flatten the result.
 			keys = append(keys, key{t: innerResult.Type.Elem(), group: innerResult.Group})
 		case resultObject:
 			for _, f := range innerResult.Fields {
