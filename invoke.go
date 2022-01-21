@@ -82,7 +82,7 @@ func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 		s.isVerifiedAcyclic = true
 	}
 
-	args, err := pl.BuildList(s, false)
+	args, err := pl.BuildList(s, false /* decorating */)
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   digreflect.InspectFunc(function),

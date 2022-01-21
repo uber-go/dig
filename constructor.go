@@ -136,7 +136,7 @@ func (n *constructorNode) Call(c containerStore) error {
 		}
 	}
 
-	args, err := n.paramList.BuildList(c, false)
+	args, err := n.paramList.BuildList(c, false /* decorating */)
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   n.location,
@@ -146,7 +146,7 @@ func (n *constructorNode) Call(c containerStore) error {
 
 	receiver := newStagingContainerWriter()
 	results := c.invoker()(reflect.ValueOf(n.ctor), args)
-	if err := n.resultList.ExtractList(receiver, false, results); err != nil {
+	if err := n.resultList.ExtractList(receiver, false /* decorating */, results); err != nil {
 		return errConstructorFailed{Func: n.location, Reason: err}
 	}
 

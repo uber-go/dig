@@ -107,7 +107,7 @@ func (n *decoratorNode) Call(s containerStore) error {
 	}
 
 	results := reflect.ValueOf(n.dcor).Call(args)
-	if err := n.results.ExtractList(n.s, true, results); err != nil {
+	if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
 		return err
 	}
 	n.called = true
