@@ -219,7 +219,7 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 
 // builds the parameter using decorators, if any. If there are no decorators associated
 // with this parameter, this returns _noValue.
-func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, err error, found bool) {
+func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, found bool, err error) {
 	decorators := c.getValueDecorators(ps.Name, ps.Type)
 	if len(decorators) != 0 {
 		found = true
@@ -229,22 +229,23 @@ func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, er
 				continue
 			}
 			if _, ok := err.(errMissingDependencies); ok && ps.Optional {
-				v, err = reflect.Zero(ps.Type), nil
+				continue
 			}
-			return _noValue, errParamSingleFailed{
+			v, err = _noValue, errParamSingleFailed{
 				CtorID: 1,
 				Key:    key{t: ps.Type, name: ps.Name},
 				Reason: err,
-			}, true
+			}
+			return v, found, err
 		}
 		v, _ = c.getDecoratedValue(ps.Name, ps.Type)
 	}
-	return v, err, found
+	return
 }
 
 func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, error) {
 	if !decorating {
-		v, err, found := ps.buildWithDecorators(c)
+		v, found, err := ps.buildWithDecorators(c)
 		if found {
 			return v, err
 		}
