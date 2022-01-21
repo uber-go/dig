@@ -217,26 +217,36 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 	return _noValue, false
 }
 
+// builds the parameter using decorators, if any. If there are no decorators associated
+// with this parameter, this returns _noValue.
+func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, err error, found bool) {
+	decorators := c.getValueDecorators(ps.Name, ps.Type)
+	if len(decorators) != 0 {
+		found = true
+		for _, d := range decorators {
+			err := d.Call(c)
+			if err == nil {
+				continue
+			}
+			if _, ok := err.(errMissingDependencies); ok && ps.Optional {
+				v, err = reflect.Zero(ps.Type), nil
+			}
+			return _noValue, errParamSingleFailed{
+				CtorID: 1,
+				Key:    key{t: ps.Type, name: ps.Name},
+				Reason: err,
+			}, true
+		}
+		v, _ = c.getDecoratedValue(ps.Name, ps.Type)
+	}
+	return v, err, found
+}
+
 func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, error) {
 	if !decorating {
-		decorators := c.getValueDecorators(ps.Name, ps.Type)
-		if len(decorators) != 0 {
-			for _, d := range decorators {
-				err := d.Call(c)
-				if err == nil {
-					continue
-				}
-				if _, ok := err.(errMissingDependencies); ok && ps.Optional {
-					return reflect.Zero(ps.Type), nil
-				}
-				return _noValue, errParamSingleFailed{
-					CtorID: 1,
-					Key:    key{t: ps.Type, name: ps.Name},
-					Reason: err,
-				}
-			}
-			v, _ := c.getDecoratedValue(ps.Name, ps.Type)
-			return v, nil
+		v, err, found := ps.buildWithDecorators(c)
+		if found {
+			return v, err
 		}
 	}
 
@@ -278,7 +288,7 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 
 		// If we're missing dependencies but the parameter itself is optional,
 		// we can just move on.
-		if _, ok := err.(errMissingDependencies); ok && ps.Optional {
+		if errors.As(err, new(errMissingDependencies)) && ps.Optional {
 			return reflect.Zero(ps.Type), nil
 		}
 
