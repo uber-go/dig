@@ -221,25 +221,26 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 // with this parameter, _noValue is returned.
 func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, found bool, err error) {
 	decorators := c.getValueDecorators(ps.Name, ps.Type)
-	if len(decorators) != 0 {
-		found = true
-		for _, d := range decorators {
-			err := d.Call(c)
-			if err == nil {
-				continue
-			}
-			if _, ok := err.(errMissingDependencies); ok && ps.Optional {
-				continue
-			}
-			v, err = _noValue, errParamSingleFailed{
-				CtorID: 1,
-				Key:    key{t: ps.Type, name: ps.Name},
-				Reason: err,
-			}
-			return v, found, err
-		}
-		v, _ = c.getDecoratedValue(ps.Name, ps.Type)
+	if len(decorators) == 0 {
+		return _noValue, false, nil
 	}
+	found = true
+	for _, d := range decorators {
+		err := d.Call(c)
+		if err == nil {
+			continue
+		}
+		if _, ok := err.(errMissingDependencies); ok && ps.Optional {
+			continue
+		}
+		v, err = _noValue, errParamSingleFailed{
+			CtorID: 1,
+			Key:    key{t: ps.Type, name: ps.Name},
+			Reason: err,
+		}
+		return v, found, err
+	}
+	v, _ = c.getDecoratedValue(ps.Name, ps.Type)
 	return
 }
 
@@ -538,8 +539,7 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 // are decorating the same type, the closest scope in effect will be replacing
 // any decorated value groups provided in further scopes.
 func (pt paramGroupedSlice) getDecoratedValues(c containerStore) (reflect.Value, bool) {
-	stores := c.storesToRoot()
-	for _, c := range stores {
+	for _, c := range c.storesToRoot() {
 		if items, ok := c.getDecoratedValueGroup(pt.Group, pt.Type); ok {
 			return items, true
 		}
@@ -547,9 +547,12 @@ func (pt paramGroupedSlice) getDecoratedValues(c containerStore) (reflect.Value,
 	return _noValue, false
 }
 
-// search the given container and its parent for matching group decorators
+// search the given container and its parents for matching group decorators
 // and call them to commit values. If any decorators return an error,
 // that error is returned immediately. If all decorators succeeds, nil is returned.
+// The order in which the decorators are invoked is from the top level scope to
+// the current scope, to account for decorators that decorate values that were
+// already decorated.
 func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
 	stores := c.storesToRoot()
 	for i := len(stores) - 1; i >= 0; i-- {

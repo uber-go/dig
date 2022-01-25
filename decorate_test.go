@@ -224,6 +224,8 @@ func TestDecorateSuccess(t *testing.T) {
 
 		c.RequireInvoke(func(p Param) {
 			assert.Equal(t, 3, len(p.Values))
+			assert.ElementsMatch(t, []string{"a", "b", "c"}, p.Values)
+			assert.Nil(t, p.A)
 		})
 
 	})
