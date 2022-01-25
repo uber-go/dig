@@ -533,19 +533,28 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	return pg, nil
 }
 
+// retrieves any decorated values that may be committed in this scope, or
+// any of the parent Scopes. In the case where there are multiple scopes that
+// are decorating the same type, the closest scope in effect will be replacing
+// any decorated value groups provided in further scopes.
 func (pt paramGroupedSlice) getDecoratedValues(c containerStore) []reflect.Value {
-	var items []reflect.Value
-	for _, c := range c.storesToRoot() {
-		items = append(items, c.getDecoratedValueGroup(pt.Group, pt.Type.Elem())...)
+	stores := c.storesToRoot()
+	for _, c := range stores {
+		items := c.getDecoratedValueGroup(pt.Group, pt.Type.Elem())
+		if len(items) > 0 {
+			return items
+		}
 	}
-	return items
+	return nil
 }
 
 // search the given container and its parent for matching group decorators
 // and call them to commit values. If any decorators return an error,
 // that error is returned immediately. If all decorators succeeds, nil is returned.
 func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
-	for _, c := range c.storesToRoot() {
+	stores := c.storesToRoot()
+	for i := len(stores) - 1; i >= 0; i-- {
+		c := stores[i]
 		for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
 			if err := d.Call(c); err != nil {
 				return errParamGroupFailed{

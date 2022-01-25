@@ -252,12 +252,10 @@ func TestDecorateSuccess(t *testing.T) {
 	})
 
 	t.Run("group value decorator from parent and child", func(t *testing.T) {
-		t.Parallel()
-
 		type DecorateIn struct {
 			dig.In
 
-			Values []string `group:"values"`
+			Values []string `group:"decoratedVals"`
 		}
 
 		type DecorateOut struct {
@@ -274,8 +272,8 @@ func TestDecorateSuccess(t *testing.T) {
 
 		parent := digtest.New(t)
 
-		parent.RequireProvide(func() string { return "dog" }, dig.Group("values"))
-		parent.RequireProvide(func() string { return "cat" }, dig.Group("values"))
+		parent.RequireProvide(func() string { return "dog" }, dig.Group("decoratedVals"))
+		parent.RequireProvide(func() string { return "cat" }, dig.Group("decoratedVals"))
 
 		child := parent.Scope("child")
 
@@ -300,7 +298,7 @@ func TestDecorateSuccess(t *testing.T) {
 		})
 
 		child.Invoke(func(i InvokeIn) {
-			assert.ElementsMatch(t, []string{"happy dog", "happy cat", "good dog", "good cat"}, i.Values)
+			assert.ElementsMatch(t, []string{"good happy dog", "good happy cat"}, i.Values)
 		})
 	})
 }
