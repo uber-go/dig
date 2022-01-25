@@ -537,15 +537,14 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 // any of the parent Scopes. In the case where there are multiple scopes that
 // are decorating the same type, the closest scope in effect will be replacing
 // any decorated value groups provided in further scopes.
-func (pt paramGroupedSlice) getDecoratedValues(c containerStore) []reflect.Value {
+func (pt paramGroupedSlice) getDecoratedValues(c containerStore) (reflect.Value, bool) {
 	stores := c.storesToRoot()
 	for _, c := range stores {
-		items := c.getDecoratedValueGroup(pt.Group, pt.Type.Elem())
-		if len(items) > 0 {
-			return items
+		if items, ok := c.getDecoratedValueGroup(pt.Group, pt.Type); ok {
+			return items, true
 		}
 	}
-	return nil
+	return _noValue, false
 }
 
 // search the given container and its parent for matching group decorators
@@ -600,13 +599,8 @@ func (pt paramGroupedSlice) Build(c containerStore, decorating bool) (reflect.Va
 	}
 
 	// Check if we have decorated values
-	decoratedItems := pt.getDecoratedValues(c)
-	if len(decoratedItems) != 0 {
-		result := reflect.MakeSlice(pt.Type, 0, len(decoratedItems))
-		for _, item := range decoratedItems {
-			result = reflect.Append(result, item)
-		}
-		return result, nil
+	if decoratedItems, ok := pt.getDecoratedValues(c); ok {
+		return decoratedItems, nil
 	}
 
 	// If we do not have any decorated values, find the

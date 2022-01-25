@@ -489,11 +489,12 @@ func (rt resultGrouped) Extract(cw containerWriter, decorated bool, v reflect.Va
 		cw.submitGroupedValue(rt.Group, rt.Type, v)
 		return
 	}
-	for i := 0; i < v.Len(); i++ {
-		if !decorated {
+
+	if decorated {
+		cw.submitDecoratedGroupedValue(rt.Group, rt.Type, v)
+	} else {
+		for i := 0; i < v.Len(); i++ {
 			cw.submitGroupedValue(rt.Group, rt.Type, v.Index(i))
-		} else {
-			cw.submitDecoratedGroupedValue(rt.Group, rt.Type.Elem(), v.Index(i))
 		}
 	}
 }

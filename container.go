@@ -107,10 +107,10 @@ type containerStore interface {
 	// The order in which the values are returned is undefined.
 	getValueGroup(name string, t reflect.Type) []reflect.Value
 
-	// Retrieves all decorated values for the provided group and type.
+	// Retrieves all decorated values for the provided group and type, if any.
 	//
 	// The order in which the values are returned is undefined.
-	getDecoratedValueGroup(name string, t reflect.Type) []reflect.Value
+	getDecoratedValueGroup(name string, t reflect.Type) (reflect.Value, bool)
 
 	// Returns the providers that can produce a value with the given name and
 	// type.

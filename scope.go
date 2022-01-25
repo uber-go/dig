@@ -64,7 +64,7 @@ type Scope struct {
 	groups map[key][]reflect.Value
 
 	// Values groups that generated via decoraters in the Scope.
-	decoratedGroups map[key][]reflect.Value
+	decoratedGroups map[key]reflect.Value
 
 	// Source of randomness.
 	rand *rand.Rand
@@ -96,7 +96,7 @@ func newScope() *Scope {
 		values:          make(map[key]reflect.Value),
 		decoratedValues: make(map[key]reflect.Value),
 		groups:          make(map[key][]reflect.Value),
-		decoratedGroups: make(map[key][]reflect.Value),
+		decoratedGroups: make(map[key]reflect.Value),
 		invokerFn:       defaultInvoker,
 		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
@@ -192,10 +192,9 @@ func (s *Scope) getValueGroup(name string, t reflect.Type) []reflect.Value {
 	return shuffledCopy(s.rand, items)
 }
 
-func (s *Scope) getDecoratedValueGroup(name string, t reflect.Type) []reflect.Value {
-	items := s.decoratedGroups[key{group: name, t: t}]
-	// shuffle the list so users don't rely on the ordering of grouped values
-	return shuffledCopy(s.rand, items)
+func (s *Scope) getDecoratedValueGroup(name string, t reflect.Type) (reflect.Value, bool) {
+	items, ok := s.decoratedGroups[key{group: name, t: t}]
+	return items, ok
 }
 
 func (s *Scope) submitGroupedValue(name string, t reflect.Type, v reflect.Value) {
@@ -205,7 +204,7 @@ func (s *Scope) submitGroupedValue(name string, t reflect.Type, v reflect.Value)
 
 func (s *Scope) submitDecoratedGroupedValue(name string, t reflect.Type, v reflect.Value) {
 	k := key{group: name, t: t}
-	s.decoratedGroups[k] = append(s.decoratedGroups[k], v)
+	s.decoratedGroups[k] = v
 }
 
 func (s *Scope) getValueProviders(name string, t reflect.Type) []provider {

@@ -301,6 +301,39 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.ElementsMatch(t, []string{"good happy dog", "good happy cat"}, i.Values)
 		})
 	})
+
+	t.Run("decorate a value group with an empty slice", func(t *testing.T) {
+		type A struct {
+			dig.In
+
+			Values []string `group:"decoratedVals"`
+		}
+
+		type B struct {
+			dig.Out
+
+			Values []string `group:"decoratedVals"`
+		}
+
+		c := digtest.New(t)
+
+		c.RequireProvide(func() string { return "v1" }, dig.Group("decoratedVals"))
+		c.RequireProvide(func() string { return "v2" }, dig.Group("decoratedVals"))
+
+		c.RequireInvoke(func(a A) {
+			assert.ElementsMatch(t, []string{"v1", "v2"}, a.Values)
+		})
+
+		c.RequireDecorate(func(a A) B {
+			return B{
+				Values: nil,
+			}
+		})
+
+		c.RequireInvoke(func(a A) {
+			assert.Nil(t, a.Values)
+		})
+	})
 }
 
 func TestDecorateFailure(t *testing.T) {
