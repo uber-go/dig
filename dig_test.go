@@ -29,6 +29,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -3565,4 +3566,92 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 
 	})
 
+}
+
+func TestConcurrency(t *testing.T) {
+	// Ensures providers will run at the same time
+	t.Run("TestMaxConcurrency", func(t *testing.T) {
+		t.Parallel()
+
+		type (
+			A int
+			B int
+			C int
+		)
+
+		var (
+			timer           = time.NewTimer(10 * time.Second)
+			max       int32 = 3
+			done            = make(chan struct{})
+			running   int32 = 0
+			waitForUs       = func() error {
+				if atomic.AddInt32(&running, 1) == max {
+					close(done)
+				}
+				select {
+				case <-timer.C:
+					return errors.New("timeout expired")
+				case <-done:
+					return nil
+				}
+			}
+			c = digtest.New(t, dig.MaxConcurrency(int(max)))
+		)
+
+		c.RequireProvide(func() (A, error) { return 0, waitForUs() })
+		c.RequireProvide(func() (B, error) { return 1, waitForUs() })
+		c.RequireProvide(func() (C, error) { return 2, waitForUs() })
+
+		c.RequireInvoke(func(a A, b B, c C) {
+			require.Equal(t, a, A(0))
+			require.Equal(t, b, B(1))
+			require.Equal(t, c, C(2))
+			require.Equal(t, running, int32(3))
+		})
+	})
+
+	t.Run("TestUnboundConcurrency", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			timer           = time.NewTimer(10 * time.Second)
+			max       int32 = 20
+			done            = make(chan struct{})
+			running   int32 = 0
+			waitForUs       = func() error {
+				if atomic.AddInt32(&running, 1) >= max {
+					close(done)
+				}
+				select {
+				case <-timer.C:
+					return errors.New("timeout expired")
+				case <-done:
+					return nil
+				}
+			}
+			c        = digtest.New(t, dig.UnboundedConcurrency)
+			expected []int
+		)
+
+		for i := 0; i < int(max); i++ {
+			i := i
+			expected = append(expected, i)
+			type out struct {
+				dig.Out
+
+				Value int `group:"a"`
+			}
+			c.RequireProvide(func() (out, error) { return out{Value: i}, waitForUs() })
+		}
+
+		type in struct {
+			dig.In
+
+			Values []int `group:"a"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			require.ElementsMatch(t, expected, i.Values)
+		})
+	})
 }

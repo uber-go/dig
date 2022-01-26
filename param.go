@@ -46,10 +46,13 @@ type param interface {
 	fmt.Stringer
 
 	// Build this dependency and any of its dependencies from the provided
-	// Container.
+	// Container. It stores the result in the pointed-to reflect.Value, allocating
+	// it first if it points to an invalid reflect.Value.
+	//
+	// Build returns a deferred that resolves once the reflect.Value is filled in.
 	//
 	// This MAY panic if the param does not produce a single value.
-	Build(store containerStore, decorating bool) (reflect.Value, error)
+	Build(store containerStore, decorating bool, target *reflect.Value) *deferred
 
 	// DotParam returns a slice of dot.Param(s).
 	DotParam() []*dot.Param
@@ -137,23 +140,21 @@ func newParamList(ctype reflect.Type, c containerStore) (paramList, error) {
 	return pl, nil
 }
 
-func (pl paramList) Build(containerStore, bool) (reflect.Value, error) {
+func (pl paramList) Build(containerStore, bool, *reflect.Value) *deferred {
 	digerror.BugPanicf("paramList.Build() must never be called")
 	panic("") // Unreachable, as BugPanicf above will panic.
 }
 
-// BuildList returns an ordered list of values which may be passed directly
-// to the underlying constructor.
-func (pl paramList) BuildList(c containerStore, decorating bool) ([]reflect.Value, error) {
-	args := make([]reflect.Value, len(pl.Params))
+// BuildList builds an ordered list of values which may be passed directly
+// to the underlying constructor and stores them in the pointed-to slice.
+// It returns a deferred that resolves when the slice is filled out.
+func (pl paramList) BuildList(c containerStore, decorating bool, targets *[]reflect.Value) *deferred {
+	children := make([]*deferred, len(pl.Params))
+	*targets = make([]reflect.Value, len(pl.Params))
 	for i, p := range pl.Params {
-		var err error
-		args[i], err = p.Build(c, decorating)
-		if err != nil {
-			return nil, err
-		}
+		children[i] = p.Build(c, decorating, &(*targets)[i])
 	}
-	return args, nil
+	return whenAll(children...)
 }
 
 // paramSingle is an explicitly requested type, optionally with a name.
@@ -244,7 +245,11 @@ func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, fo
 	return
 }
 
-func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, error) {
+func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
+	if !target.IsValid() {
+		*target = reflect.New(ps.Type).Elem()
+	}
+
 	if !decorating {
 		v, found, err := ps.buildWithDecorators(c)
 		if found {
@@ -258,7 +263,8 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 	}
 
 	if v, ok := ps.getValue(c); ok {
-		return v, nil
+		target.Set(v)
+		return &alreadyResolved
 	}
 
 	// Starting at the given container and working our way up its parents,
@@ -277,34 +283,52 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 
 	if len(providers) == 0 {
 		if ps.Optional {
-			return reflect.Zero(ps.Type), nil
-		}
-		return _noValue, newErrMissingTypes(c, key{name: ps.Name, t: ps.Type})
-	}
-
-	for _, n := range providers {
-		err := n.Call(c)
-		if err == nil {
-			continue
-		}
-
-		// If we're missing dependencies but the parameter itself is optional,
-		// we can just move on.
-		if _, ok := err.(errMissingDependencies); ok && ps.Optional {
-			return reflect.Zero(ps.Type), nil
-		}
-
-		return _noValue, errParamSingleFailed{
-			CtorID: n.ID(),
-			Key:    key{t: ps.Type, name: ps.Name},
-			Reason: err,
+			target.Set(reflect.Zero(ps.Type))
+			return &alreadyResolved
+		} else {
+			return failedDeferred(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
 		}
 	}
 
-	// If we get here, it's impossible for the value to be absent from the
-	// container.
-	v, _ := ps.getValue(c)
-	return v, nil
+	var (
+		doNext func(i int)
+		d      = new(deferred)
+	)
+
+	doNext = func(i int) {
+		if i == len(providers) {
+			// If we get here, it's impossible for the value to be absent from the
+			// container.
+			v, _ := ps.getValue(c)
+			if v.IsValid() {
+				// Not valid during a dry run
+				target.Set(v)
+			}
+			d.resolve(nil)
+			return
+		}
+
+		n := providers[i]
+
+		n.Call(c).observe(func(err error) {
+			if err != nil {
+				// If we're missing dependencies but the parameter itself is optional,
+				// we can just move on.
+				if _, ok := err.(errMissingDependencies); !ok || !ps.Optional {
+					d.resolve(errParamSingleFailed{
+						CtorID: n.ID(),
+						Key:    key{t: ps.Type, name: ps.Name},
+						Reason: err,
+					})
+					return
+				}
+			}
+			doNext(i + 1)
+		})
+	}
+
+	doNext(0)
+	return d
 }
 
 // paramObject is a dig.In struct where each field is another param.
@@ -391,16 +415,19 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 	return po, nil
 }
 
-func (po paramObject) Build(c containerStore, decorating bool) (reflect.Value, error) {
-	dest := reflect.New(po.Type).Elem()
-	for _, f := range po.Fields {
-		v, err := f.Build(c, decorating)
-		if err != nil {
-			return dest, err
-		}
-		dest.Field(f.FieldIndex).Set(v)
+func (po paramObject) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
+	if !target.IsValid() {
+		*target = reflect.New(po.Type).Elem()
 	}
-	return dest, nil
+
+	children := make([]*deferred, len(po.Fields))
+	for i, f := range po.Fields {
+		f := f
+		field := target.Field(f.FieldIndex)
+		children[i] = f.Build(c, decorating, &field)
+	}
+
+	return whenAll(children...)
 }
 
 // paramObjectField is a single field of a dig.In struct.
@@ -466,12 +493,8 @@ func newParamObjectField(idx int, f reflect.StructField, c containerStore) (para
 	return pof, nil
 }
 
-func (pof paramObjectField) Build(c containerStore, decorating bool) (reflect.Value, error) {
-	v, err := pof.Param.Build(c, decorating)
-	if err != nil {
-		return v, err
-	}
-	return v, nil
+func (pof paramObjectField) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
+	return pof.Param.Build(c, decorating, target)
 }
 
 // paramGroupedSlice is a param which produces a slice of values with the same
@@ -573,25 +596,26 @@ func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
 // search the given container and its parent for matching group providers and
 // call them to commit values. If an error is encountered, return the number
 // of providers called and a non-nil error from the first provided.
-func (pt paramGroupedSlice) callGroupProviders(c containerStore) (int, error) {
-	itemCount := 0
+func (pt paramGroupedSlice) callGroupProviders(c containerStore) []*deferred {
+	var children []*deferred
 	for _, c := range c.storesToRoot() {
 		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
-		itemCount += len(providers)
 		for _, n := range providers {
-			if err := n.Call(c); err != nil {
-				return 0, errParamGroupFailed{
+			n := n
+			child := n.Call(c)
+			children = append(children, child.catch(func(err error) error {
+				return errParamGroupFailed{
 					CtorID: n.ID(),
 					Key:    key{group: pt.Group, t: pt.Type.Elem()},
 					Reason: err,
 				}
-			}
+			}))
 		}
 	}
-	return itemCount, nil
+	return children
 }
 
-func (pt paramGroupedSlice) Build(c containerStore, decorating bool) (reflect.Value, error) {
+func (pt paramGroupedSlice) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
 	// do not call this if we are already inside a decorator since
 	// it will result in an infinite recursion. (i.e. decorate -> params.BuildList() -> Decorate -> params.BuildList...)
 	// this is safe since a value can be decorated at most once in a given scope.
@@ -608,17 +632,18 @@ func (pt paramGroupedSlice) Build(c containerStore, decorating bool) (reflect.Va
 
 	// If we do not have any decorated values, find the
 	// providers and call them.
-	itemCount, err := pt.callGroupProviders(c)
-	if err != nil {
-		return _noValue, err
-	}
+	children := pt.callGroupProviders(c)
 
-	stores := c.storesToRoot()
-	result := reflect.MakeSlice(pt.Type, 0, itemCount)
-	for _, c := range stores {
-		result = reflect.Append(result, c.getValueGroup(pt.Group, pt.Type.Elem())...)
-	}
-	return result, nil
+	return whenAll(children...).then(func() error {
+		if !target.IsValid() {
+			*target = reflect.MakeSlice(pt.Type, 0, len(children))
+		}
+
+		for _, c := range c.storesToRoot() {
+			target.Set(reflect.Append(*target, c.getValueGroup(pt.Group, pt.Type.Elem())...))
+		}
+		return nil
+	})
 }
 
 // Checks if ignoring unexported files in an In struct is allowed.

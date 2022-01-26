@@ -78,6 +78,8 @@ type Scope struct {
 	// invokerFn calls a function with arguments provided to Provide or Invoke.
 	invokerFn invokerFn
 
+	sched scheduler
+
 	// graph of this Scope. Note that this holds the dependency graph of all the
 	// nodes that affect this Scope, not just the ones provided directly to this Scope.
 	gh *graphHolder
@@ -99,6 +101,7 @@ func newScope() *Scope {
 		decoratedGroups: make(map[key]reflect.Value),
 		invokerFn:       defaultInvoker,
 		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
+		sched:     synchronousScheduler{},
 	}
 	s.gh = newGraphHolder(s)
 	return s
@@ -263,6 +266,10 @@ func (s *Scope) getAllProviders(k key) []provider {
 
 func (s *Scope) invoker() invokerFn {
 	return s.invokerFn
+}
+
+func (s *Scope) scheduler() scheduler {
+	return s.sched
 }
 
 // adds a new graphNode to this Scope and all of its descendent

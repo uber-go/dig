@@ -59,7 +59,11 @@ func TestNodeAlreadyCalled(t *testing.T) {
 	require.False(t, n.called, "node must not have been called")
 
 	c := New()
-	require.NoError(t, n.Call(c.scope), "invoke failed")
+	d := n.Call(c.scope)
+	c.scope.sched.flush()
+	require.NoError(t, d.err, "invoke failed")
 	require.True(t, n.called, "node must be called")
-	require.NoError(t, n.Call(c.scope), "calling again should be okay")
+	d = n.Call(c.scope)
+	c.scope.sched.flush()
+	require.NoError(t, d.err, "calling again should be okay")
 }

@@ -355,7 +355,7 @@ type provider interface {
 	//
 	// The values produced by this provider should be submitted into the
 	// containerStore.
-	Call(containerStore) error
+	Call(store containerStore) *deferred
 
 	CType() reflect.Type
 }

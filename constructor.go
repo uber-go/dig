@@ -45,11 +45,17 @@ type constructorNode struct {
 	// id uniquely identifies the constructor that produces a node.
 	id dot.CtorID
 
+	// Whether this node is already building its paramList and calling the constructor
+	calling bool
+
 	// Whether the constructor owned by this node was already called.
 	called bool
 
 	// Type information about constructor parameters.
 	paramList paramList
+
+	// The result of calling the constructor
+	deferred deferred
 
 	// Type information about constructor results.
 	resultList resultList
@@ -122,42 +128,66 @@ func (n *constructorNode) String() string {
 	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)
 }
 
-// Call calls this constructor if it hasn't already been called and
-// injects any values produced by it into the provided container.
-func (n *constructorNode) Call(c containerStore) error {
-	if n.called {
-		return nil
+// Call calls this constructor if it hasn't already been called and injects any values produced by it into the container
+// passed to newConstructorNode.
+//
+// If constructorNode has a unresolved deferred already in the process of building, it will return that one. If it has
+// already been successfully called, it will return an already-resolved deferred. Together these mean it will try the
+// call again if it failed last time.
+//
+// On failure, the returned pointer is not guaranteed to stay in a failed state; another call will reset it back to its
+// zero value; don't store the returned pointer. (It will still call each observer only once.)
+func (n *constructorNode) Call(c containerStore) *deferred {
+	if n.calling || n.called {
+		return &n.deferred
 	}
+
+	n.calling = true
+	n.deferred = deferred{}
 
 	if err := shallowCheckDependencies(c, n.paramList); err != nil {
-		return errMissingDependencies{
+		n.deferred.resolve(errMissingDependencies{
 			Func:   n.location,
 			Reason: err,
+		})
+	}
+
+	var args []reflect.Value
+	d := n.paramList.BuildList(c, false /* decorating */, &args)
+
+	d.observe(func(err error) {
+		if err != nil {
+			n.calling = false
+			n.deferred.resolve(errArgumentsFailed{
+				Func:   n.location,
+				Reason: err,
+			})
+			return
 		}
-	}
 
-	args, err := n.paramList.BuildList(c, false /* decorating */)
-	if err != nil {
-		return errArgumentsFailed{
-			Func:   n.location,
-			Reason: err,
-		}
-	}
+		var results []reflect.Value
 
-	receiver := newStagingContainerWriter()
-	results := c.invoker()(reflect.ValueOf(n.ctor), args)
-	if err := n.resultList.ExtractList(receiver, false /* decorating */, results); err != nil {
-		return errConstructorFailed{Func: n.location, Reason: err}
-	}
+		c.scheduler().schedule(func() {
+			results = c.invoker()(reflect.ValueOf(n.ctor), args)
+		}).observe(func(_ error) {
+			n.calling = false
+			receiver := newStagingContainerWriter()
+			if err := n.resultList.ExtractList(receiver, false /* decorating */, results); err != nil {
+				n.deferred.resolve(errConstructorFailed{Func: n.location, Reason: err})
+				return
+			}
 
-	// Commit the result to the original container that this constructor
-	// was supplied to. The provided constructor is only used for a view of
-	// the rest of the graph to instantiate the dependencies of this
-	// container.
-	receiver.Commit(n.s)
-	n.called = true
+			// Commit the result to the original container that this constructor
+			// was supplied to. The provided container is only used for a view of
+			// the rest of the graph to instantiate the dependencies of this
+			// container.
+			receiver.Commit(n.s)
+			n.called = true
+			n.deferred.resolve(nil)
+		})
+	})
 
-	return nil
+	return &n.deferred
 }
 
 // stagingContainerWriter is a containerWriter that records the changes that

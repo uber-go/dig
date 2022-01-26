@@ -142,6 +142,9 @@ type containerStore interface {
 
 	// Returns invokerFn function to use when calling arguments.
 	invoker() invokerFn
+
+	// Returns the scheduler to use for this scope.
+	scheduler() scheduler
 }
 
 // New constructs a Container.
@@ -229,6 +232,29 @@ func dryInvoker(fn reflect.Value, _ []reflect.Value) []reflect.Value {
 	}
 
 	return results
+}
+
+type maxConcurrencyOption int
+
+// MaxConcurrency run constructors in this container with a fixed pool of executor
+// goroutines. max is the number of goroutines to start.
+func MaxConcurrency(max int) Option {
+	return maxConcurrencyOption(max)
+}
+
+func (m maxConcurrencyOption) applyOption(container *Container) {
+	container.scope.sched = &parallelScheduler{concurrency: int(m)}
+}
+
+type unboundedConcurrency struct{}
+
+// UnboundedConcurrency run constructors in this container as concurrently as possible.
+// Go's resource limits like GOMAXPROCS will inherently limit how much can happen in
+// parallel.
+var UnboundedConcurrency Option = unboundedConcurrency{}
+
+func (u unboundedConcurrency) applyOption(container *Container) {
+	container.scope.sched = &unboundedScheduler{}
 }
 
 // String representation of the entire Container
