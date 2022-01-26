@@ -49,7 +49,6 @@ func TestDecorateSuccess(t *testing.T) {
 		c.RequireInvoke(func(a *A) {
 			assert.Equal(t, "A'", a.name, "expected name to equal decorated name.")
 		})
-
 	})
 
 	t.Run("simple decorate a provider from child scope", func(t *testing.T) {
@@ -70,7 +69,6 @@ func TestDecorateSuccess(t *testing.T) {
 		child.RequireInvoke(func(a *A) {
 			assert.Equal(t, "A'", a.name, "expected name to equal decorated name in child scope")
 		})
-
 	})
 
 	t.Run("simple decorate a provider to a scope and its descendants", func(t *testing.T) {
@@ -114,12 +112,12 @@ func TestDecorateSuccess(t *testing.T) {
 
 		sibling := c.Scope("sibling")
 		grandchild := child.Scope("grandchild")
-		sibling.Invoke(func(a *A) {
+		require.NoError(t, sibling.Invoke(func(a *A) {
 			assert.Equal(t, "A'", a.name, "expected single-decorated name in sibling")
-		})
-		grandchild.Invoke(func(a *A) {
+		}))
+		require.NoError(t, grandchild.Invoke(func(a *A) {
 			assert.Equal(t, "A''", a.name, "expected double-decorated name in grandchild")
-		})
+		}))
 	})
 
 	t.Run("decorate with In struct", func(t *testing.T) {
@@ -159,7 +157,6 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.Equal(t, "A'", b.A.Name)
 			assert.Equal(t, "b'", b.B)
 		})
-
 	})
 
 	t.Run("decorate with value groups", func(t *testing.T) {
@@ -193,7 +190,6 @@ func TestDecorateSuccess(t *testing.T) {
 		c.RequireInvoke(func(p Params) {
 			assert.Contains(t, p.Animals, "good dog")
 		})
-
 	})
 
 	t.Run("decorate with optional parameter", func(t *testing.T) {
@@ -227,7 +223,6 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.ElementsMatch(t, []string{"a", "b", "c"}, p.Values)
 			assert.Nil(t, p.A)
 		})
-
 	})
 
 	t.Run("replace a type completely", func(t *testing.T) {
@@ -250,7 +245,6 @@ func TestDecorateSuccess(t *testing.T) {
 		c.RequireInvoke(func(a A) {
 			assert.Equal(t, a.From, "decorator", "value should be from decorator")
 		})
-
 	})
 
 	t.Run("group value decorator from parent and child", func(t *testing.T) {
@@ -279,7 +273,7 @@ func TestDecorateSuccess(t *testing.T) {
 
 		child := parent.Scope("child")
 
-		parent.Decorate(func(i DecorateIn) DecorateOut {
+		require.NoError(t, parent.Decorate(func(i DecorateIn) DecorateOut {
 			var result []string
 			for _, val := range i.Values {
 				result = append(result, "happy "+val)
@@ -287,9 +281,9 @@ func TestDecorateSuccess(t *testing.T) {
 			return DecorateOut{
 				Values: result,
 			}
-		})
+		}))
 
-		child.Decorate(func(i DecorateIn) DecorateOut {
+		require.NoError(t, child.Decorate(func(i DecorateIn) DecorateOut {
 			var result []string
 			for _, val := range i.Values {
 				result = append(result, "good "+val)
@@ -297,11 +291,11 @@ func TestDecorateSuccess(t *testing.T) {
 			return DecorateOut{
 				Values: result,
 			}
-		})
+		}))
 
-		child.Invoke(func(i InvokeIn) {
+		require.NoError(t, child.Invoke(func(i InvokeIn) {
 			assert.ElementsMatch(t, []string{"good happy dog", "good happy cat"}, i.Values)
-		})
+		}))
 	})
 
 	t.Run("decorate a value group with an empty slice", func(t *testing.T) {
@@ -419,8 +413,8 @@ func TestDecorateFailure(t *testing.T) {
 
 		err := c.Invoke(func(c InvokeIn) {})
 		require.Error(t, err, "expected one of the group providers for a decorator to fail")
-		assert.Contains(t, err.Error(), `could not build value group string[group="decoratedVal"]`)
-		assert.Contains(t, err.Error(), `received non-nil error from function "go.uber.org/dig_test".TestDecorateFailure.func4.3`)
+		assert.Contains(t, err.Error(), `could not build value group`)
+		assert.Contains(t, err.Error(), `string[group="decoratedVal"]`)
 	})
 
 	t.Run("use dig.Out parameter for decorator", func(t *testing.T) {
@@ -467,7 +461,7 @@ func TestDecorateFailure(t *testing.T) {
 		c.RequireDecorate(func(p Param) string { return p.Value })
 		err := c.Invoke(func(s string) {})
 		require.Error(t, err, "expected missing dep check to fail the decorator")
-		assert.Contains(t, err.Error(), `missing dependencies for function "go.uber.org/dig_test".TestDecorateFailure.func7.2`)
+		assert.Contains(t, err.Error(), `missing dependencies`)
 	})
 
 	t.Run("duplicate decoration through value groups", func(t *testing.T) {
@@ -503,7 +497,8 @@ func TestDecorateFailure(t *testing.T) {
 			}
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot decorate using function func(dig_test.Param) dig_test.Result")
+		assert.Contains(t, err.Error(), "cannot decorate")
+		assert.Contains(t, err.Error(), "function func(dig_test.Param) dig_test.Result")
 		assert.Contains(t, err.Error(), "*dig_test.A already decorated")
 	})
 }

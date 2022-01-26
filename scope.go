@@ -224,7 +224,10 @@ func (s *Scope) getGroupDecorators(name string, t reflect.Type) []decorator {
 }
 
 func (s *Scope) getDecorators(k key) []decorator {
-	nodes := s.decorators[k]
+	nodes, ok := s.decorators[k]
+	if !ok {
+		return nil
+	}
 	decorators := make([]decorator, len(nodes))
 	for i, n := range nodes {
 		decorators[i] = n

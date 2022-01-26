@@ -126,6 +126,10 @@ func findMissingDependencies(c containerStore, params ...param) []paramSingle {
 		case paramSingle:
 			allProviders := c.getAllValueProviders(p.Name, p.Type)
 			_, hasDecoratedValue := c.getDecoratedValue(p.Name, p.Type)
+			// This means that there is no provider that provides this value,
+			// and it is NOT being decorated and is NOT optional.
+			// In the case that there is no providers but there is a decorated value
+			// of this type, it can be provided safely so we can safely skip this.
 			if len(allProviders) == 0 && !hasDecoratedValue && !p.Optional {
 				missingDeps = append(missingDeps, p)
 			}

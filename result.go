@@ -307,12 +307,12 @@ func (rs resultSingle) DotResult() []*dot.Result {
 func (rs resultSingle) Extract(cw containerWriter, decorated bool, v reflect.Value) {
 	if decorated {
 		cw.setDecoratedValue(rs.Name, rs.Type, v)
-	} else {
-		cw.setValue(rs.Name, rs.Type, v)
+		return
+	}
+	cw.setValue(rs.Name, rs.Type, v)
 
-		for _, asType := range rs.As {
-			cw.setValue(rs.Name, asType, v)
-		}
+	for _, asType := range rs.As {
+		cw.setValue(rs.Name, asType, v)
 	}
 }
 
@@ -492,9 +492,9 @@ func (rt resultGrouped) Extract(cw containerWriter, decorated bool, v reflect.Va
 
 	if decorated {
 		cw.submitDecoratedGroupedValue(rt.Group, rt.Type, v)
-	} else {
-		for i := 0; i < v.Len(); i++ {
-			cw.submitGroupedValue(rt.Group, rt.Type, v.Index(i))
-		}
+		return
+	}
+	for i := 0; i < v.Len(); i++ {
+		cw.submitGroupedValue(rt.Group, rt.Type, v.Index(i))
 	}
 }

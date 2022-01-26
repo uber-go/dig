@@ -181,7 +181,7 @@ func (sr *stagingContainerWriter) setValue(name string, t reflect.Type, v reflec
 }
 
 func (sr *stagingContainerWriter) setDecoratedValue(_ string, _ reflect.Type, _ reflect.Value) {
-	digerror.BugPanicf("stagingContainerWriter.setDecoratedValue() must never be called")
+	digerror.BugPanicf("stagingContainerWriter.setDecoratedValue must never be called")
 }
 
 func (sr *stagingContainerWriter) submitGroupedValue(group string, t reflect.Type, v reflect.Value) {
@@ -190,7 +190,7 @@ func (sr *stagingContainerWriter) submitGroupedValue(group string, t reflect.Typ
 }
 
 func (sr *stagingContainerWriter) submitDecoratedGroupedValue(_ string, _ reflect.Type, _ reflect.Value) {
-	digerror.BugPanicf("stagingContainerWriter.submitDecoratedGroupedValue() must never be called")
+	digerror.BugPanicf("stagingContainerWriter.submitDecoratedGroupedValue must never be called")
 }
 
 // Commit commits the received results to the provided containerWriter.

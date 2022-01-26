@@ -117,7 +117,7 @@ func (n *decoratorNode) Call(s containerStore) error {
 func (n *decoratorNode) ID() dot.CtorID { return n.id }
 
 // DecorateOption modifies the default behavior of Provide.
-// Currently there is no implementation of it yet.
+// Currently, there is no implementation of it yet.
 type DecorateOption interface {
 	noOptionsYet()
 }
@@ -138,7 +138,7 @@ func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) erro
 // For example,
 //  s.Decorate(func(log *zap.Logger) *zap.Logger {
 //    return log.Named("myapp")
-//  }
+//  })
 //
 // This takes in a value, augments it with a name, and returns a replacement for it. Functions
 // in the Scope's dependency graph that use *zap.Logger will now use the *zap.Logger
@@ -147,7 +147,7 @@ func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) erro
 // A decorator can also take in multiple parameters and replace one of them:
 //  s.Decorate(func(log *zap.Logger, cfg *Config) *zap.Logger {
 //    return log.Named(cfg.Name)
-//  }
+//  })
 //
 // Or replace a subset of them:
 //  s.Decorate(func(

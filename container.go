@@ -76,6 +76,9 @@ type containerWriter interface {
 	// overwritten.
 	setValue(name string, t reflect.Type, v reflect.Value)
 
+	// setDecoratedValue sets a decorated value with the given name and type
+	// in the container. If a decorated value with the same name and type already
+	// exists, it will be overwritten.
 	setDecoratedValue(name string, t reflect.Type, v reflect.Value)
 
 	// submitGroupedValue submits a value to the value group with the provided
@@ -108,8 +111,6 @@ type containerStore interface {
 	getValueGroup(name string, t reflect.Type) []reflect.Value
 
 	// Retrieves all decorated values for the provided group and type, if any.
-	//
-	// The order in which the values are returned is undefined.
 	getDecoratedValueGroup(name string, t reflect.Type) (reflect.Value, bool)
 
 	// Returns the providers that can produce a value with the given name and
