@@ -175,7 +175,7 @@ func TestDecorateSuccess(t *testing.T) {
 		c := digtest.New(t)
 		c.RequireProvide(func() string { return "dog" }, dig.Group("animals"))
 		c.RequireProvide(func() string { return "cat" }, dig.Group("animals"))
-		c.RequireProvide(func() string { return "alpaca" }, dig.Group("animals"))
+		c.RequireProvide(func() string { return "gopher" }, dig.Group("animals"))
 
 		c.RequireDecorate(func(p Params) Result {
 			animals := p.Animals
@@ -188,7 +188,7 @@ func TestDecorateSuccess(t *testing.T) {
 		})
 
 		c.RequireInvoke(func(p Params) {
-			assert.Contains(t, p.Animals, "good dog")
+			assert.ElementsMatch(t, []string{"good dog", "good cat", "good gopher"}, p.Animals)
 		})
 	})
 

@@ -197,7 +197,7 @@ func (ps paramSingle) String() string {
 	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
 }
 
-// search the given container and its parent for decorated values.
+// search the given container and its ancestors for a decorated value.
 func (ps paramSingle) getDecoratedValue(c containerStore) (reflect.Value, bool) {
 	for _, c := range c.storesToRoot() {
 		if v, ok := c.getDecoratedValue(ps.Name, ps.Type); ok {
@@ -207,7 +207,7 @@ func (ps paramSingle) getDecoratedValue(c containerStore) (reflect.Value, bool) 
 	return _noValue, false
 }
 
-// search the given container and its parent for a matching value.
+// search the given container and its ancestors for a matching value.
 func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 	for _, c := range c.storesToRoot() {
 		if v, ok := c.getValue(ps.Name, ps.Type); ok {
