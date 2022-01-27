@@ -379,6 +379,27 @@ func TestDecorateFailure(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to build *dig_test.A: great sadness")
 	})
 
+	t.Run("missing decorator dependency", func(t *testing.T) {
+		t.Parallel()
+
+		c := digtest.New(t)
+
+		type A struct{}
+		type B struct{}
+
+		c.RequireProvide(func() A { return A{} })
+		c.RequireDecorate(func(A, B) A {
+			assert.Fail(t, "this function must never be called")
+			return A{}
+		})
+
+		err := c.Invoke(func(A) {
+			assert.Fail(t, "this function must never be called")
+		})
+		require.Error(t, err, "must not invoke if a dependency is missing")
+		assert.Contains(t, err.Error(), "missing type: dig_test.B")
+	})
+
 	t.Run("one of the decorators dependencies returns an error", func(t *testing.T) {
 		t.Parallel()
 		type DecorateIn struct {
