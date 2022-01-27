@@ -44,7 +44,7 @@ type result interface {
 	// stores them into the provided containerWriter.
 	//
 	// This MAY panic if the result does not consume a single value.
-	Extract(containerWriter, reflect.Value)
+	Extract(containerWriter, bool, reflect.Value)
 
 	// DotResult returns a slice of dot.Result(s).
 	DotResult() []*dot.Result
@@ -221,14 +221,14 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 	return rl, nil
 }
 
-func (resultList) Extract(containerWriter, reflect.Value) {
+func (resultList) Extract(containerWriter, bool, reflect.Value) {
 	digerror.BugPanicf("resultList.Extract() must never be called")
 }
 
-func (rl resultList) ExtractList(cw containerWriter, values []reflect.Value) error {
+func (rl resultList) ExtractList(cw containerWriter, decorated bool, values []reflect.Value) error {
 	for i, v := range values {
 		if resultIdx := rl.resultIndexes[i]; resultIdx >= 0 {
-			rl.Results[resultIdx].Extract(cw, v)
+			rl.Results[resultIdx].Extract(cw, decorated, v)
 			continue
 		}
 
@@ -304,7 +304,11 @@ func (rs resultSingle) DotResult() []*dot.Result {
 	return dotResults
 }
 
-func (rs resultSingle) Extract(cw containerWriter, v reflect.Value) {
+func (rs resultSingle) Extract(cw containerWriter, decorated bool, v reflect.Value) {
+	if decorated {
+		cw.setDecoratedValue(rs.Name, rs.Type, v)
+		return
+	}
 	cw.setValue(rs.Name, rs.Type, v)
 
 	for _, asType := range rs.As {
@@ -358,9 +362,9 @@ func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 	return ro, nil
 }
 
-func (ro resultObject) Extract(cw containerWriter, v reflect.Value) {
+func (ro resultObject) Extract(cw containerWriter, decorated bool, v reflect.Value) {
 	for _, f := range ro.Fields {
-		f.Result.Extract(cw, v.Field(f.FieldIndex))
+		f.Result.Extract(cw, decorated, v.Field(f.FieldIndex))
 	}
 }
 
@@ -479,9 +483,15 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	return rg, nil
 }
 
-func (rt resultGrouped) Extract(cw containerWriter, v reflect.Value) {
-	if !rt.Flatten {
+func (rt resultGrouped) Extract(cw containerWriter, decorated bool, v reflect.Value) {
+	// Decorated values are always flattened.
+	if !decorated && !rt.Flatten {
 		cw.submitGroupedValue(rt.Group, rt.Type, v)
+		return
+	}
+
+	if decorated {
+		cw.submitDecoratedGroupedValue(rt.Group, rt.Type, v)
 		return
 	}
 	for i := 0; i < v.Len(); i++ {

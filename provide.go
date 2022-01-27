@@ -459,7 +459,7 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 		return err
 	}
 
-	keys, err := s.findAndValidateResults(n)
+	keys, err := s.findAndValidateResults(n.ResultList())
 	if err != nil {
 		return err
 	}
@@ -526,10 +526,10 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 }
 
 // Builds a collection of all result types produced by this constructor.
-func (s *Scope) findAndValidateResults(n *constructorNode) (map[key]struct{}, error) {
+func (s *Scope) findAndValidateResults(rl resultList) (map[key]struct{}, error) {
 	var err error
 	keyPaths := make(map[key]string)
-	walkResult(n.ResultList(), connectionVisitor{
+	walkResult(rl, connectionVisitor{
 		s:        s,
 		err:      &err,
 		keyPaths: keyPaths,

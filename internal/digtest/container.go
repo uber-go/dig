@@ -95,6 +95,22 @@ func (s *Scope) RequireInvoke(f interface{}, opts ...dig.InvokeOption) {
 	require.NoError(s.t, s.Invoke(f, opts...), "failed to invoke")
 }
 
+// RequireDecorate decorates the scope using the given function,
+// halting the test if it fails.
+func (c *Container) RequireDecorate(f interface{}, opts ...dig.DecorateOption) {
+	c.t.Helper()
+
+	require.NoError(c.t, c.Decorate(f, opts...), "failed to decorate")
+}
+
+// RequireDecorate decorates the scope using the given function,
+// halting the test if it fails.
+func (s *Scope) RequireDecorate(f interface{}, opts ...dig.DecorateOption) {
+	s.t.Helper()
+
+	require.NoError(s.t, s.Decorate(f, opts...), "failed to decorate")
+}
+
 // Scope builds a subscope of this container with the given name.
 // The returned Scope is similarly augmented to ease testing.
 func (c *Container) Scope(name string, opts ...dig.ScopeOption) *Scope {

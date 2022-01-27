@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"go.uber.org/dig/internal/digerror"
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
 )
@@ -135,7 +136,7 @@ func (n *constructorNode) Call(c containerStore) error {
 		}
 	}
 
-	args, err := n.paramList.BuildList(c)
+	args, err := n.paramList.BuildList(c, false /* decorating */)
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   n.location,
@@ -145,7 +146,7 @@ func (n *constructorNode) Call(c containerStore) error {
 
 	receiver := newStagingContainerWriter()
 	results := c.invoker()(reflect.ValueOf(n.ctor), args)
-	if err := n.resultList.ExtractList(receiver, results); err != nil {
+	if err := n.resultList.ExtractList(receiver, false /* decorating */, results); err != nil {
 		return errConstructorFailed{Func: n.location, Reason: err}
 	}
 
@@ -179,9 +180,17 @@ func (sr *stagingContainerWriter) setValue(name string, t reflect.Type, v reflec
 	sr.values[key{t: t, name: name}] = v
 }
 
+func (sr *stagingContainerWriter) setDecoratedValue(_ string, _ reflect.Type, _ reflect.Value) {
+	digerror.BugPanicf("stagingContainerWriter.setDecoratedValue must never be called")
+}
+
 func (sr *stagingContainerWriter) submitGroupedValue(group string, t reflect.Type, v reflect.Value) {
 	k := key{t: t, group: group}
 	sr.groups[k] = append(sr.groups[k], v)
+}
+
+func (sr *stagingContainerWriter) submitDecoratedGroupedValue(_ string, _ reflect.Type, _ reflect.Value) {
+	digerror.BugPanicf("stagingContainerWriter.submitDecoratedGroupedValue must never be called")
 }
 
 // Commit commits the received results to the provided containerWriter.

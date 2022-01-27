@@ -45,11 +45,11 @@ import (
 type param interface {
 	fmt.Stringer
 
-	// Builds this dependency and any of its dependencies from the provided
+	// Build this dependency and any of its dependencies from the provided
 	// Container.
 	//
 	// This MAY panic if the param does not produce a single value.
-	Build(containerStore) (reflect.Value, error)
+	Build(store containerStore, decorating bool) (reflect.Value, error)
 
 	// DotParam returns a slice of dot.Param(s).
 	DotParam() []*dot.Param
@@ -137,18 +137,18 @@ func newParamList(ctype reflect.Type, c containerStore) (paramList, error) {
 	return pl, nil
 }
 
-func (pl paramList) Build(containerStore) (reflect.Value, error) {
+func (pl paramList) Build(containerStore, bool) (reflect.Value, error) {
 	digerror.BugPanicf("paramList.Build() must never be called")
 	panic("") // Unreachable, as BugPanicf above will panic.
 }
 
 // BuildList returns an ordered list of values which may be passed directly
 // to the underlying constructor.
-func (pl paramList) BuildList(c containerStore) ([]reflect.Value, error) {
+func (pl paramList) BuildList(c containerStore, decorating bool) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(pl.Params))
 	for i, p := range pl.Params {
 		var err error
-		args[i], err = p.Build(c)
+		args[i], err = p.Build(c, decorating)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +197,17 @@ func (ps paramSingle) String() string {
 	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
 }
 
-// searches the given container and its parent for a matching value.
+// search the given container and its ancestors for a decorated value.
+func (ps paramSingle) getDecoratedValue(c containerStore) (reflect.Value, bool) {
+	for _, c := range c.storesToRoot() {
+		if v, ok := c.getDecoratedValue(ps.Name, ps.Type); ok {
+			return v, ok
+		}
+	}
+	return _noValue, false
+}
+
+// search the given container and its ancestors for a matching value.
 func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 	for _, c := range c.storesToRoot() {
 		if v, ok := c.getValue(ps.Name, ps.Type); ok {
@@ -207,7 +217,46 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 	return _noValue, false
 }
 
-func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
+// builds the parameter using decorators, if any. If there are no decorators associated
+// with this parameter, _noValue is returned.
+func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, found bool, err error) {
+	decorators := c.getValueDecorators(ps.Name, ps.Type)
+	if len(decorators) == 0 {
+		return _noValue, false, nil
+	}
+	found = true
+	for _, d := range decorators {
+		err := d.Call(c)
+		if err == nil {
+			continue
+		}
+		if _, ok := err.(errMissingDependencies); ok && ps.Optional {
+			continue
+		}
+		v, err = _noValue, errParamSingleFailed{
+			CtorID: 1,
+			Key:    key{t: ps.Type, name: ps.Name},
+			Reason: err,
+		}
+		return v, found, err
+	}
+	v, _ = c.getDecoratedValue(ps.Name, ps.Type)
+	return
+}
+
+func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, error) {
+	if !decorating {
+		v, found, err := ps.buildWithDecorators(c)
+		if found {
+			return v, err
+		}
+	}
+
+	// Check whether the value is a decorated value first.
+	if v, ok := ps.getDecoratedValue(c); ok {
+		return v, nil
+	}
+
 	if v, ok := ps.getValue(c); ok {
 		return v, nil
 	}
@@ -342,10 +391,10 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 	return po, nil
 }
 
-func (po paramObject) Build(c containerStore) (reflect.Value, error) {
+func (po paramObject) Build(c containerStore, decorating bool) (reflect.Value, error) {
 	dest := reflect.New(po.Type).Elem()
 	for _, f := range po.Fields {
-		v, err := f.Build(c)
+		v, err := f.Build(c, decorating)
 		if err != nil {
 			return dest, err
 		}
@@ -417,8 +466,8 @@ func newParamObjectField(idx int, f reflect.StructField, c containerStore) (para
 	return pof, nil
 }
 
-func (pof paramObjectField) Build(c containerStore) (reflect.Value, error) {
-	v, err := pof.Param.Build(c)
+func (pof paramObjectField) Build(c containerStore, decorating bool) (reflect.Value, error) {
+	v, err := pof.Param.Build(c, decorating)
 	if err != nil {
 		return v, err
 	}
@@ -485,15 +534,53 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	return pg, nil
 }
 
-func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
-	var itemCount int
+// retrieves any decorated values that may be committed in this scope, or
+// any of the parent Scopes. In the case where there are multiple scopes that
+// are decorating the same type, the closest scope in effect will be replacing
+// any decorated value groups provided in further scopes.
+func (pt paramGroupedSlice) getDecoratedValues(c containerStore) (reflect.Value, bool) {
+	for _, c := range c.storesToRoot() {
+		if items, ok := c.getDecoratedValueGroup(pt.Group, pt.Type); ok {
+			return items, true
+		}
+	}
+	return _noValue, false
+}
+
+// search the given container and its parents for matching group decorators
+// and call them to commit values. If any decorators return an error,
+// that error is returned immediately. If all decorators succeeds, nil is returned.
+// The order in which the decorators are invoked is from the top level scope to
+// the current scope, to account for decorators that decorate values that were
+// already decorated.
+func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
 	stores := c.storesToRoot()
-	for _, c := range stores {
+	for i := len(stores) - 1; i >= 0; i-- {
+		c := stores[i]
+		for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
+			if err := d.Call(c); err != nil {
+				return errParamGroupFailed{
+					CtorID: d.ID(),
+					Key:    key{group: pt.Group, t: pt.Type.Elem()},
+					Reason: err,
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// search the given container and its parent for matching group providers and
+// call them to commit values. If an error is encountered, return the number
+// of providers called and a non-nil error from the first provided.
+func (pt paramGroupedSlice) callGroupProviders(c containerStore) (int, error) {
+	itemCount := 0
+	for _, c := range c.storesToRoot() {
 		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
 		itemCount += len(providers)
 		for _, n := range providers {
 			if err := n.Call(c); err != nil {
-				return _noValue, errParamGroupFailed{
+				return 0, errParamGroupFailed{
 					CtorID: n.ID(),
 					Key:    key{group: pt.Group, t: pt.Type.Elem()},
 					Reason: err,
@@ -501,7 +588,32 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 			}
 		}
 	}
+	return itemCount, nil
+}
 
+func (pt paramGroupedSlice) Build(c containerStore, decorating bool) (reflect.Value, error) {
+	// do not call this if we are already inside a decorator since
+	// it will result in an infinite recursion. (i.e. decorate -> params.BuildList() -> Decorate -> params.BuildList...)
+	// this is safe since a value can be decorated at most once in a given scope.
+	if !decorating {
+		if err := pt.callGroupDecorators(c); err != nil {
+			return _noValue, err
+		}
+	}
+
+	// Check if we have decorated values
+	if decoratedItems, ok := pt.getDecoratedValues(c); ok {
+		return decoratedItems, nil
+	}
+
+	// If we do not have any decorated values, find the
+	// providers and call them.
+	itemCount, err := pt.callGroupProviders(c)
+	if err != nil {
+		return _noValue, err
+	}
+
+	stores := c.storesToRoot()
 	result := reflect.MakeSlice(pt.Type, 0, itemCount)
 	for _, c := range stores {
 		result = reflect.Append(result, c.getValueGroup(pt.Group, pt.Type.Elem())...)

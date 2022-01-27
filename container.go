@@ -76,9 +76,18 @@ type containerWriter interface {
 	// overwritten.
 	setValue(name string, t reflect.Type, v reflect.Value)
 
+	// setDecoratedValue sets a decorated value with the given name and type
+	// in the container. If a decorated value with the same name and type already
+	// exists, it will be overwritten.
+	setDecoratedValue(name string, t reflect.Type, v reflect.Value)
+
 	// submitGroupedValue submits a value to the value group with the provided
 	// name.
 	submitGroupedValue(name string, t reflect.Type, v reflect.Value)
+
+	// submitDecoratedGroupedValue submits a decorated value to the value group
+	// with the provided name.
+	submitDecoratedGroupedValue(name string, t reflect.Type, v reflect.Value)
 }
 
 // containerStore provides access to the Container's underlying data store.
@@ -94,10 +103,16 @@ type containerStore interface {
 	// Retrieves the value with the provided name and type, if any.
 	getValue(name string, t reflect.Type) (v reflect.Value, ok bool)
 
+	// Retrieves a decorated value with the provided name and type, if any.
+	getDecoratedValue(name string, t reflect.Type) (v reflect.Value, ok bool)
+
 	// Retrieves all values for the provided group and type.
 	//
 	// The order in which the values are returned is undefined.
 	getValueGroup(name string, t reflect.Type) []reflect.Value
+
+	// Retrieves all decorated values for the provided group and type, if any.
+	getDecoratedValueGroup(name string, t reflect.Type) (reflect.Value, bool)
 
 	// Returns the providers that can produce a value with the given name and
 	// type.
@@ -110,6 +125,14 @@ type containerStore interface {
 	// Returns the providers that can produce a value with the given name and
 	// type across all the Scopes that are in effect of this containerStore.
 	getAllValueProviders(name string, t reflect.Type) []provider
+
+	// Returns the decorators that can produce values for the given name and
+	// type.
+	getValueDecorators(name string, t reflect.Type) []decorator
+
+	// Reutrns the decorators that can produce values for the given group and
+	// type.
+	getGroupDecorators(name string, t reflect.Type) []decorator
 
 	// Reports a list of stores (starting at this store) up to the root
 	// store.
