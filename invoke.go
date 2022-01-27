@@ -84,7 +84,7 @@ func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 
 	var args []reflect.Value
 
-	d := pl.BuildList(s, &args, false /* decorating */)
+	d := pl.BuildList(s, false /* decorating */, &args)
 	d.observe(func(err2 error) {
 		err = err2
 	})

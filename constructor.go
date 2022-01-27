@@ -153,38 +153,36 @@ func (n *constructorNode) Call(c containerStore) *deferred {
 	}
 
 	var args []reflect.Value
-	d := n.paramList.BuildList(c, false /* decorating */, &args)
+	var results []reflect.Value
 
-	d.observe(func(err error) {
-		if err != nil {
-			n.calling = false
-			n.deferred.resolve(errArgumentsFailed{
-				Func:   n.location,
-				Reason: err,
-			})
-			return
+	n.paramList.BuildList(c, false /* decorating */, &args).catch(func(err error) error {
+		return errArgumentsFailed{
+			Func:   n.location,
+			Reason: err,
+		}
+	}).then(func() *deferred {
+		return c.scheduler().schedule(func() {
+			results = c.invoker()(reflect.ValueOf(n.ctor), args)
+		})
+	}).then(func() *deferred {
+		receiver := newStagingContainerWriter()
+		if err := n.resultList.ExtractList(receiver, false /* decorating */, results); err != nil {
+			return failedDeferred(errConstructorFailed{Func: n.location, Reason: err})
 		}
 
-		var results []reflect.Value
-
-		c.scheduler().schedule(func() {
-			results = c.invoker()(reflect.ValueOf(n.ctor), args)
-		}).observe(func(_ error) {
-			n.calling = false
-			receiver := newStagingContainerWriter()
-			if err := n.resultList.ExtractList(receiver, false /* decorating */, results); err != nil {
-				n.deferred.resolve(errConstructorFailed{Func: n.location, Reason: err})
-				return
-			}
-
-			// Commit the result to the original container that this constructor
-			// was supplied to. The provided container is only used for a view of
-			// the rest of the graph to instantiate the dependencies of this
-			// container.
-			receiver.Commit(n.s)
-			n.called = true
-			n.deferred.resolve(nil)
-		})
+		// Commit the result to the original container that this constructor
+		// was supplied to. The provided container is only used for a view of
+		// the rest of the graph to instantiate the dependencies of this
+		// container.
+		receiver.Commit(n.s)
+		n.calling = false
+		n.called = true
+		n.deferred.resolve(nil)
+		return &alreadyResolved
+	}).catch(func(err error) error {
+		n.calling = false
+		n.deferred.resolve(err)
+		return nil
 	})
 
 	return &n.deferred

@@ -218,75 +218,39 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 	return _noValue, false
 }
 
-// builds the parameter using decorators, if any. If there are no decorators associated
-// with this parameter, _noValue is returned.
-func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, found bool, err error) {
-	decorators := c.getValueDecorators(ps.Name, ps.Type)
-	if len(decorators) == 0 {
-		return _noValue, false, nil
-	}
-	found = true
-	for _, d := range decorators {
-		err := d.Call(c)
-		if err == nil {
-			continue
-		}
-		if _, ok := err.(errMissingDependencies); ok && ps.Optional {
-			continue
-		}
-		v, err = _noValue, errParamSingleFailed{
-			CtorID: 1,
-			Key:    key{t: ps.Type, name: ps.Name},
-			Reason: err,
-		}
-		return v, found, err
-	}
-	v, _ = c.getDecoratedValue(ps.Name, ps.Type)
-	return
-}
+// builds the parameter using decorators, if any. useDecorators controls whether to use decorator functions (true) or
+// provider functions (false).
+func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *reflect.Value) *deferred {
+	var decorators []decorator
 
-func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
-	if !target.IsValid() {
-		*target = reflect.New(ps.Type).Elem()
-	}
+	if useDecorators {
+		decorators = c.getValueDecorators(ps.Name, ps.Type)
 
-	if !decorating {
-		v, found, err := ps.buildWithDecorators(c)
-		if found {
-			return v, err
-		}
-	}
-
-	// Check whether the value is a decorated value first.
-	if v, ok := ps.getDecoratedValue(c); ok {
-		return v, nil
-	}
-
-	if v, ok := ps.getValue(c); ok {
-		target.Set(v)
-		return &alreadyResolved
-	}
-
-	// Starting at the given container and working our way up its parents,
-	// find one that provides this dependency.
-	//
-	// Once found, we'll use that container for the rest of the invocation.
-	// Dependencies of this type will begin searching at that container,
-	// rather than starting at base.
-	var providers []provider
-	for _, container := range c.storesToRoot() {
-		providers = container.getValueProviders(ps.Name, ps.Type)
-		if len(providers) > 0 {
-			break
-		}
-	}
-
-	if len(providers) == 0 {
-		if ps.Optional {
-			target.Set(reflect.Zero(ps.Type))
+		if len(decorators) == 0 {
 			return &alreadyResolved
-		} else {
-			return failedDeferred(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
+		}
+	} else {
+		// A provider is-a decorator ({methods of decorator} ⊆ {methods of provider})
+		var providers []provider
+		for _, container := range c.storesToRoot() {
+			providers = container.getValueProviders(ps.Name, ps.Type)
+			if len(providers) > 0 {
+				break
+			}
+		}
+
+		if len(providers) == 0 {
+			if ps.Optional {
+				target.Set(reflect.Zero(ps.Type))
+				return &alreadyResolved
+			} else {
+				return failedDeferred(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
+			}
+		}
+
+		decorators = make([]decorator, len(providers))
+		for i, provider := range providers {
+			decorators[i] = provider.(decorator)
 		}
 	}
 
@@ -296,7 +260,7 @@ func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.V
 	)
 
 	doNext = func(i int) {
-		if i == len(providers) {
+		if i == len(decorators) {
 			// If we get here, it's impossible for the value to be absent from the
 			// container.
 			v, _ := ps.getValue(c)
@@ -308,7 +272,7 @@ func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.V
 			return
 		}
 
-		n := providers[i]
+		n := decorators[i]
 
 		n.Call(c).observe(func(err error) {
 			if err != nil {
@@ -329,6 +293,34 @@ func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.V
 
 	doNext(0)
 	return d
+}
+
+func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
+	if !target.IsValid() {
+		*target = reflect.New(ps.Type).Elem()
+	}
+
+	d := &alreadyResolved
+
+	if !decorating {
+		d = ps.buildWith(c, true, target)
+	}
+
+	return d.then(func() *deferred {
+		// Check whether the value is a decorated value first.
+		if v, ok := ps.getDecoratedValue(c); ok {
+			target.Set(v)
+			return &alreadyResolved
+		}
+
+		// See if it's already in the store
+		if v, ok := ps.getValue(c); ok {
+			target.Set(v)
+			return &alreadyResolved
+		}
+
+		return ps.buildWith(c, false, target)
+	})
 }
 
 // paramObject is a dig.In struct where each field is another param.
@@ -576,27 +568,30 @@ func (pt paramGroupedSlice) getDecoratedValues(c containerStore) (reflect.Value,
 // The order in which the decorators are invoked is from the top level scope to
 // the current scope, to account for decorators that decorate values that were
 // already decorated.
-func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
+func (pt paramGroupedSlice) callGroupDecorators(c containerStore) *deferred {
+	var children []*deferred
 	stores := c.storesToRoot()
 	for i := len(stores) - 1; i >= 0; i-- {
 		c := stores[i]
 		for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
-			if err := d.Call(c); err != nil {
+			d := d
+			child := d.Call(c)
+			children = append(children, child.catch(func(err error) error {
 				return errParamGroupFailed{
 					CtorID: d.ID(),
 					Key:    key{group: pt.Group, t: pt.Type.Elem()},
 					Reason: err,
 				}
-			}
+			}))
 		}
 	}
-	return nil
+	return whenAll(children...)
 }
 
 // search the given container and its parent for matching group providers and
 // call them to commit values. If an error is encountered, return the number
 // of providers called and a non-nil error from the first provided.
-func (pt paramGroupedSlice) callGroupProviders(c containerStore) []*deferred {
+func (pt paramGroupedSlice) callGroupProviders(c containerStore) *deferred {
 	var children []*deferred
 	for _, c := range c.storesToRoot() {
 		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
@@ -612,37 +607,42 @@ func (pt paramGroupedSlice) callGroupProviders(c containerStore) []*deferred {
 			}))
 		}
 	}
-	return children
+	return whenAll(children...)
 }
 
 func (pt paramGroupedSlice) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
+	d := &alreadyResolved
+
 	// do not call this if we are already inside a decorator since
 	// it will result in an infinite recursion. (i.e. decorate -> params.BuildList() -> Decorate -> params.BuildList...)
 	// this is safe since a value can be decorated at most once in a given scope.
 	if !decorating {
-		if err := pt.callGroupDecorators(c); err != nil {
-			return _noValue, err
-		}
+		d = pt.callGroupDecorators(c)
 	}
 
-	// Check if we have decorated values
-	if decoratedItems, ok := pt.getDecoratedValues(c); ok {
-		return decoratedItems, nil
-	}
+	return d.then(func() *deferred {
+		// Check if we have decorated values
+		if decoratedItems, ok := pt.getDecoratedValues(c); ok {
+			if !target.IsValid() {
+				newCap := 0
+				if decoratedItems.Kind() == reflect.Slice {
+					newCap = decoratedItems.Len()
+				}
+				*target = reflect.MakeSlice(pt.Type, 0, newCap)
+			}
 
-	// If we do not have any decorated values, find the
-	// providers and call them.
-	children := pt.callGroupProviders(c)
-
-	return whenAll(children...).then(func() error {
-		if !target.IsValid() {
-			*target = reflect.MakeSlice(pt.Type, 0, len(children))
+			target.Set(decoratedItems)
+			return &alreadyResolved
 		}
 
-		for _, c := range c.storesToRoot() {
-			target.Set(reflect.Append(*target, c.getValueGroup(pt.Group, pt.Type.Elem())...))
-		}
-		return nil
+		// If we do not have any decorated values, find the
+		// providers and call them.
+		return pt.callGroupProviders(c).then(func() *deferred {
+			for _, c := range c.storesToRoot() {
+				target.Set(reflect.Append(*target, c.getValueGroup(pt.Group, pt.Type.Elem())...))
+			}
+			return &alreadyResolved
+		})
 	})
 }
 

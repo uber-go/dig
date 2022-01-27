@@ -43,16 +43,27 @@ func (d *deferred) resolve(err error) {
 	d.observers = nil
 }
 
-// then returns a new deferred that is either resolved with the same error as this deferred, or any error returned from
-// the supplied function. The supplied function is only called if this deferred is resolved without error.
-func (d *deferred) then(res func() error) *deferred {
+// then returns a new deferred that is either resolved with the same error as this deferred or the eventual result of
+// the deferred returned by res.
+func (d *deferred) then(res func() *deferred) *deferred {
+	// Shortcut: if we're settled...
+	if d.settled {
+		if d.err == nil {
+			// ...successfully, then return the other deferred
+			return res()
+		} else {
+			// ...with an error, then return us
+			return d
+		}
+	}
+
 	d2 := new(deferred)
 	d.observe(func(err error) {
 		if err != nil {
 			d2.resolve(err)
-			return
+		} else {
+			res().observe(d2.resolve)
 		}
-		d2.resolve(res())
 	})
 	return d2
 }

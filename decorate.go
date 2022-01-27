@@ -29,7 +29,7 @@ import (
 )
 
 type decorator interface {
-	Call(c containerStore) error
+	Call(c containerStore) *deferred
 	ID() dot.CtorID
 }
 
@@ -42,11 +42,17 @@ type decoratorNode struct {
 	// Location where this function was defined.
 	location *digreflect.Func
 
+	// Whether this node is already building its paramList and calling the constructor
+	calling bool
+
 	// Whether the decorator owned by this node was already called.
 	called bool
 
 	// Parameters of the decorator.
 	params paramList
+
+	// The result of calling the constructor
+	deferred deferred
 
 	// Results of the decorator.
 	results resultList
@@ -86,32 +92,60 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	return n, nil
 }
 
-func (n *decoratorNode) Call(s containerStore) error {
-	if n.called {
-		return nil
+// Call calls this decorator if it hasn't already been called and injects any values produced by it into the container
+// passed to newConstructorNode.
+//
+// If constructorNode has a unresolved deferred already in the process of building, it will return that one. If it has
+// already been successfully called, it will return an already-resolved deferred. Together these mean it will try the
+// call again if it failed last time.
+//
+// On failure, the returned pointer is not guaranteed to stay in a failed state; another call will reset it back to its
+// zero value; don't store the returned pointer. (It will still call each observer only once.)
+func (n *decoratorNode) Call(s containerStore) *deferred {
+	if n.calling || n.called {
+		return &n.deferred
 	}
+
+	n.calling = true
+	n.deferred = deferred{}
 
 	if err := shallowCheckDependencies(s, n.params); err != nil {
-		return errMissingDependencies{
+		n.deferred.resolve(errMissingDependencies{
 			Func:   n.location,
 			Reason: err,
-		}
+		})
 	}
 
-	args, err := n.params.BuildList(n.s, true /* decorating */)
-	if err != nil {
-		return errArgumentsFailed{
-			Func:   n.location,
-			Reason: err,
-		}
-	}
+	var args []reflect.Value
+	d := n.params.BuildList(s, true /* decorating */, &args)
 
-	results := reflect.ValueOf(n.dcor).Call(args)
-	if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
-		return err
-	}
-	n.called = true
-	return nil
+	d.observe(func(err error) {
+		if err != nil {
+			n.calling = false
+			n.deferred.resolve(errArgumentsFailed{
+				Func:   n.location,
+				Reason: err,
+			})
+			return
+		}
+
+		var results []reflect.Value
+
+		s.scheduler().schedule(func() {
+			results = s.invoker()(reflect.ValueOf(n.dcor), args)
+		}).observe(func(_ error) {
+			n.calling = false
+			if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
+				n.deferred.resolve(err)
+				return
+			}
+
+			n.called = true
+			n.deferred.resolve(nil)
+		})
+	})
+
+	return &n.deferred
 }
 
 func (n *decoratorNode) ID() dot.CtorID { return n.id }
