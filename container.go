@@ -236,25 +236,31 @@ func dryInvoker(fn reflect.Value, _ []reflect.Value) []reflect.Value {
 
 type maxConcurrencyOption int
 
-// MaxConcurrency run constructors in this container with a fixed pool of executor
-// goroutines. max is the number of goroutines to start.
+// MaxConcurrency run constructors in this container with the given level of
+// concurrency:
+//
+// - max = 0 or 1: run one constructor at a time (this is the default)
+//
+// - max > 1: run at most 'max' constructors at a time
+//
+// - max < 0: run an unlimited number of constructors at a time
+//
+// Concurrency is limited by how many constructors' dependencies are satisfied at
+// once and Go's own allocation of OS threads to Goroutines. This is useful for
+// applications that have many slow, independent constructors.
 func MaxConcurrency(max int) Option {
 	return maxConcurrencyOption(max)
 }
 
 func (m maxConcurrencyOption) applyOption(container *Container) {
-	container.scope.sched = &parallelScheduler{concurrency: int(m)}
-}
-
-type unboundedConcurrency struct{}
-
-// UnboundedConcurrency run constructors in this container as concurrently as possible.
-// Go's resource limits like GOMAXPROCS will inherently limit how much can happen in
-// parallel.
-var UnboundedConcurrency Option = unboundedConcurrency{}
-
-func (u unboundedConcurrency) applyOption(container *Container) {
-	container.scope.sched = &unboundedScheduler{}
+	switch {
+	case m == 0, m == 1:
+		container.scope.sched = synchronousScheduler{}
+	case m > 1:
+		container.scope.sched = &parallelScheduler{concurrency: int(m)}
+	case m < 0:
+		container.scope.sched = &unboundedScheduler{}
+	}
 }
 
 // String representation of the entire Container
