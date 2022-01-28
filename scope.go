@@ -101,7 +101,7 @@ func newScope() *Scope {
 		decoratedGroups: make(map[key]reflect.Value),
 		invokerFn:       defaultInvoker,
 		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
-		sched:     synchronousScheduler{},
+		sched:           synchronousScheduler{},
 	}
 	s.gh = newGraphHolder(s)
 	return s

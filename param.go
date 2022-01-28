@@ -243,9 +243,9 @@ func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *re
 			if ps.Optional {
 				target.Set(reflect.Zero(ps.Type))
 				return &alreadyResolved
-			} else {
-				return failedDeferred(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
 			}
+
+			return failedDeferred(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
 		}
 
 		decorators = make([]decorator, len(providers))
