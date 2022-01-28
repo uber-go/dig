@@ -29,12 +29,12 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 	"go.uber.org/dig"
 	"go.uber.org/dig/internal/digtest"
 )
@@ -3579,13 +3579,14 @@ func TestConcurrency(t *testing.T) {
 			C int
 		)
 
+		const max = 3
+
 		var (
-			timer           = time.NewTimer(10 * time.Second)
-			max       int32 = 3
-			done            = make(chan struct{})
-			running   int32 = 0
-			waitForUs       = func() error {
-				if atomic.AddInt32(&running, 1) == max {
+			timer     = time.NewTimer(10 * time.Second)
+			done      = make(chan struct{})
+			running   = atomic.Int32{}
+			waitForUs = func() error {
+				if running.Inc() == max {
 					close(done)
 				}
 				select {
@@ -3595,7 +3596,7 @@ func TestConcurrency(t *testing.T) {
 					return nil
 				}
 			}
-			c = digtest.New(t, dig.MaxConcurrency(int(max)))
+			c = digtest.New(t, dig.MaxConcurrency(max))
 		)
 
 		c.RequireProvide(func() (A, error) { return 0, waitForUs() })
@@ -3606,20 +3607,21 @@ func TestConcurrency(t *testing.T) {
 			require.Equal(t, a, A(0))
 			require.Equal(t, b, B(1))
 			require.Equal(t, c, C(2))
-			require.Equal(t, running, int32(3))
+			require.Equal(t, running.Load(), int32(max))
 		})
 	})
 
 	t.Run("TestUnboundConcurrency", func(t *testing.T) {
 		t.Parallel()
 
+		const max = 20
+
 		var (
-			timer           = time.NewTimer(10 * time.Second)
-			max       int32 = 20
-			done            = make(chan struct{})
-			running   int32 = 0
-			waitForUs       = func() error {
-				if atomic.AddInt32(&running, 1) >= max {
+			timer     = time.NewTimer(10 * time.Second)
+			done      = make(chan struct{})
+			running   = atomic.NewInt32(0)
+			waitForUs = func() error {
+				if running.Inc() == max {
 					close(done)
 				}
 				select {
@@ -3629,11 +3631,11 @@ func TestConcurrency(t *testing.T) {
 					return nil
 				}
 			}
-			c        = digtest.New(t, dig.UnboundedConcurrency)
+			c        = digtest.New(t, dig.MaxConcurrency(-1))
 			expected []int
 		)
 
-		for i := 0; i < int(max); i++ {
+		for i := 0; i < max; i++ {
 			i := i
 			expected = append(expected, i)
 			type out struct {
