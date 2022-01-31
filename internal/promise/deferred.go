@@ -20,6 +20,7 @@
 
 package promise
 
+// Observer is a function that gets called when a Deferred resolves.
 type Observer func(error)
 
 // Deferred is an observable future result that may fail.

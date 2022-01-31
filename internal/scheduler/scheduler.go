@@ -22,7 +22,8 @@ package scheduler
 
 import "go.uber.org/dig/internal/promise"
 
-// A scheduler queues work during resolution of params.
+// Scheduler queues work during resolution of params.
+//
 // constructorNode uses it to call its constructor function.
 // This may happen in parallel with other calls (parallelScheduler) or
 // synchronously, right when enqueued.
