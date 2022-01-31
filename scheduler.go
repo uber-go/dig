@@ -20,6 +20,8 @@
 
 package dig
 
+import "go.uber.org/dig/internal/promise"
+
 // A scheduler queues work during resolution of params.
 // constructorNode uses it to call its constructor function.
 // This may happen in parallel with other calls (parallelScheduler) or
@@ -34,7 +36,7 @@ type scheduler interface {
 	// returns. The deferred will be resolved on the "main" goroutine, so
 	// it's safe to mutate containerStore during its resolution. It will
 	// always be resolved with a nil error.
-	schedule(func()) *deferred
+	schedule(func()) *promise.Deferred
 
 	// flush processes enqueued work. This may in turn enqueue more work;
 	// flush will keep processing the work until it's empty. After flush is
@@ -51,9 +53,9 @@ type scheduler interface {
 type synchronousScheduler struct{}
 
 // schedule calls func and returns an already-resolved deferred.
-func (s synchronousScheduler) schedule(fn func()) *deferred {
+func (s synchronousScheduler) schedule(fn func()) *promise.Deferred {
 	fn()
-	return &alreadyResolved
+	return promise.Done
 }
 
 // flush does nothing. All returned deferred values are already resolved.
@@ -65,7 +67,7 @@ func (s synchronousScheduler) flush() {
 // call and which deferred to notify afterwards.
 type task struct {
 	fn func()
-	d  *deferred
+	d  *promise.Deferred
 }
 
 // parallelScheduler processes enqueued work using a fixed-size worker pool.
@@ -77,8 +79,8 @@ type parallelScheduler struct {
 
 // schedule enqueues a task and returns an unresolved deferred. It will be
 // resolved during flush.
-func (p *parallelScheduler) schedule(fn func()) *deferred {
-	d := &deferred{}
+func (p *parallelScheduler) schedule(fn func()) *promise.Deferred {
+	d := new(promise.Deferred)
 	p.tasks = append(p.tasks, task{fn, d})
 	return d
 }
@@ -90,7 +92,7 @@ func (p *parallelScheduler) schedule(fn func()) *deferred {
 func (p *parallelScheduler) flush() {
 	inFlight := 0
 	taskChan := make(chan task)
-	resultChan := make(chan *deferred)
+	resultChan := make(chan *promise.Deferred)
 
 	for n := 0; n < p.concurrency; n++ {
 		go func() {
@@ -116,7 +118,7 @@ func (p *parallelScheduler) flush() {
 			p.tasks = p.tasks[0 : len(p.tasks)-1]
 		case d := <-resultChan:
 			inFlight--
-			d.resolve(nil)
+			d.Resolve(nil)
 		}
 	}
 
@@ -134,8 +136,8 @@ type unboundedScheduler struct {
 
 // schedule enqueues a task and returns an unresolved deferred. It will be
 // resolved during flush.
-func (p *unboundedScheduler) schedule(fn func()) *deferred {
-	d := &deferred{}
+func (p *unboundedScheduler) schedule(fn func()) *promise.Deferred {
+	d := new(promise.Deferred)
 	p.tasks = append(p.tasks, task{fn, d})
 	return d
 }
@@ -144,7 +146,7 @@ func (p *unboundedScheduler) schedule(fn func()) *deferred {
 // is up to Go's allocation of OS resources to goroutines.
 func (p *unboundedScheduler) flush() {
 	inFlight := 0
-	resultChan := make(chan *deferred)
+	resultChan := make(chan *promise.Deferred)
 
 	for inFlight > 0 || len(p.tasks) > 0 {
 		if len(p.tasks) > 0 {
@@ -162,7 +164,7 @@ func (p *unboundedScheduler) flush() {
 
 		d := <-resultChan
 		inFlight--
-		d.resolve(nil)
+		d.Resolve(nil)
 	}
 
 	close(resultChan)

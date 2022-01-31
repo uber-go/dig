@@ -26,10 +26,11 @@ import (
 
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
+	"go.uber.org/dig/internal/promise"
 )
 
 type decorator interface {
-	Call(c containerStore) *deferred
+	Call(c containerStore) *promise.Deferred
 	ID() dot.CtorID
 }
 
@@ -52,7 +53,7 @@ type decoratorNode struct {
 	params paramList
 
 	// The result of calling the constructor
-	deferred deferred
+	deferred promise.Deferred
 
 	// Results of the decorator.
 	results resultList
@@ -101,16 +102,16 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 //
 // On failure, the returned pointer is not guaranteed to stay in a failed state; another call will reset it back to its
 // zero value; don't store the returned pointer. (It will still call each observer only once.)
-func (n *decoratorNode) Call(s containerStore) *deferred {
+func (n *decoratorNode) Call(s containerStore) *promise.Deferred {
 	if n.calling || n.called {
 		return &n.deferred
 	}
 
 	n.calling = true
-	n.deferred = deferred{}
+	n.deferred = promise.Deferred{}
 
 	if err := shallowCheckDependencies(s, n.params); err != nil {
-		n.deferred.resolve(errMissingDependencies{
+		n.deferred.Resolve(errMissingDependencies{
 			Func:   n.location,
 			Reason: err,
 		})
@@ -119,10 +120,10 @@ func (n *decoratorNode) Call(s containerStore) *deferred {
 	var args []reflect.Value
 	d := n.params.BuildList(s, true /* decorating */, &args)
 
-	d.observe(func(err error) {
+	d.Observe(func(err error) {
 		if err != nil {
 			n.calling = false
-			n.deferred.resolve(errArgumentsFailed{
+			n.deferred.Resolve(errArgumentsFailed{
 				Func:   n.location,
 				Reason: err,
 			})
@@ -133,15 +134,15 @@ func (n *decoratorNode) Call(s containerStore) *deferred {
 
 		s.scheduler().schedule(func() {
 			results = s.invoker()(reflect.ValueOf(n.dcor), args)
-		}).observe(func(_ error) {
+		}).Observe(func(_ error) {
 			n.calling = false
 			if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
-				n.deferred.resolve(err)
+				n.deferred.Resolve(err)
 				return
 			}
 
 			n.called = true
-			n.deferred.resolve(nil)
+			n.deferred.Resolve(nil)
 		})
 	})
 

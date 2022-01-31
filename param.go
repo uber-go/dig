@@ -29,6 +29,7 @@ import (
 
 	"go.uber.org/dig/internal/digerror"
 	"go.uber.org/dig/internal/dot"
+	"go.uber.org/dig/internal/promise"
 )
 
 // The param interface represents a dependency for a constructor.
@@ -52,7 +53,7 @@ type param interface {
 	// Build returns a deferred that resolves once the reflect.Value is filled in.
 	//
 	// This MAY panic if the param does not produce a single value.
-	Build(store containerStore, decorating bool, target *reflect.Value) *deferred
+	Build(store containerStore, decorating bool, target *reflect.Value) *promise.Deferred
 
 	// DotParam returns a slice of dot.Param(s).
 	DotParam() []*dot.Param
@@ -140,7 +141,7 @@ func newParamList(ctype reflect.Type, c containerStore) (paramList, error) {
 	return pl, nil
 }
 
-func (pl paramList) Build(containerStore, bool, *reflect.Value) *deferred {
+func (pl paramList) Build(containerStore, bool, *reflect.Value) *promise.Deferred {
 	digerror.BugPanicf("paramList.Build() must never be called")
 	panic("") // Unreachable, as BugPanicf above will panic.
 }
@@ -148,13 +149,13 @@ func (pl paramList) Build(containerStore, bool, *reflect.Value) *deferred {
 // BuildList builds an ordered list of values which may be passed directly
 // to the underlying constructor and stores them in the pointed-to slice.
 // It returns a deferred that resolves when the slice is filled out.
-func (pl paramList) BuildList(c containerStore, decorating bool, targets *[]reflect.Value) *deferred {
-	children := make([]*deferred, len(pl.Params))
+func (pl paramList) BuildList(c containerStore, decorating bool, targets *[]reflect.Value) *promise.Deferred {
+	children := make([]*promise.Deferred, len(pl.Params))
 	*targets = make([]reflect.Value, len(pl.Params))
 	for i, p := range pl.Params {
 		children[i] = p.Build(c, decorating, &(*targets)[i])
 	}
-	return whenAll(children...)
+	return promise.WhenAll(children...)
 }
 
 // paramSingle is an explicitly requested type, optionally with a name.
@@ -220,14 +221,14 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 
 // builds the parameter using decorators, if any. useDecorators controls whether to use decorator functions (true) or
 // provider functions (false).
-func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *reflect.Value) *deferred {
+func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *reflect.Value) *promise.Deferred {
 	var decorators []decorator
 
 	if useDecorators {
 		decorators = c.getValueDecorators(ps.Name, ps.Type)
 
 		if len(decorators) == 0 {
-			return &alreadyResolved
+			return promise.Done
 		}
 	} else {
 		// A provider is-a decorator ({methods of decorator} ⊆ {methods of provider})
@@ -242,10 +243,10 @@ func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *re
 		if len(providers) == 0 {
 			if ps.Optional {
 				target.Set(reflect.Zero(ps.Type))
-				return &alreadyResolved
+				return promise.Done
 			}
 
-			return failedDeferred(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
+			return promise.Fail(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
 		}
 
 		decorators = make([]decorator, len(providers))
@@ -256,7 +257,7 @@ func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *re
 
 	var (
 		doNext func(i int)
-		d      = new(deferred)
+		d      = new(promise.Deferred)
 	)
 
 	doNext = func(i int) {
@@ -268,18 +269,18 @@ func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *re
 				// Not valid during a dry run
 				target.Set(v)
 			}
-			d.resolve(nil)
+			d.Resolve(nil)
 			return
 		}
 
 		n := decorators[i]
 
-		n.Call(c).observe(func(err error) {
+		n.Call(c).Observe(func(err error) {
 			if err != nil {
 				// If we're missing dependencies but the parameter itself is optional,
 				// we can just move on.
 				if _, ok := err.(errMissingDependencies); !ok || !ps.Optional {
-					d.resolve(errParamSingleFailed{
+					d.Resolve(errParamSingleFailed{
 						CtorID: n.ID(),
 						Key:    key{t: ps.Type, name: ps.Name},
 						Reason: err,
@@ -295,28 +296,28 @@ func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *re
 	return d
 }
 
-func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
+func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.Value) *promise.Deferred {
 	if !target.IsValid() {
 		*target = reflect.New(ps.Type).Elem()
 	}
 
-	d := &alreadyResolved
+	d := promise.Done
 
 	if !decorating {
 		d = ps.buildWith(c, true, target)
 	}
 
-	return d.then(func() *deferred {
+	return d.Then(func() *promise.Deferred {
 		// Check whether the value is a decorated value first.
 		if v, ok := ps.getDecoratedValue(c); ok {
 			target.Set(v)
-			return &alreadyResolved
+			return promise.Done
 		}
 
 		// See if it's already in the store
 		if v, ok := ps.getValue(c); ok {
 			target.Set(v)
-			return &alreadyResolved
+			return promise.Done
 		}
 
 		return ps.buildWith(c, false, target)
@@ -407,19 +408,19 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 	return po, nil
 }
 
-func (po paramObject) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
+func (po paramObject) Build(c containerStore, decorating bool, target *reflect.Value) *promise.Deferred {
 	if !target.IsValid() {
 		*target = reflect.New(po.Type).Elem()
 	}
 
-	children := make([]*deferred, len(po.Fields))
+	children := make([]*promise.Deferred, len(po.Fields))
 	for i, f := range po.Fields {
 		f := f
 		field := target.Field(f.FieldIndex)
 		children[i] = f.Build(c, decorating, &field)
 	}
 
-	return whenAll(children...)
+	return promise.WhenAll(children...)
 }
 
 // paramObjectField is a single field of a dig.In struct.
@@ -485,7 +486,7 @@ func newParamObjectField(idx int, f reflect.StructField, c containerStore) (para
 	return pof, nil
 }
 
-func (pof paramObjectField) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
+func (pof paramObjectField) Build(c containerStore, decorating bool, target *reflect.Value) *promise.Deferred {
 	return pof.Param.Build(c, decorating, target)
 }
 
@@ -568,15 +569,15 @@ func (pt paramGroupedSlice) getDecoratedValues(c containerStore) (reflect.Value,
 // The order in which the decorators are invoked is from the top level scope to
 // the current scope, to account for decorators that decorate values that were
 // already decorated.
-func (pt paramGroupedSlice) callGroupDecorators(c containerStore) *deferred {
-	var children []*deferred
+func (pt paramGroupedSlice) callGroupDecorators(c containerStore) *promise.Deferred {
+	var children []*promise.Deferred
 	stores := c.storesToRoot()
 	for i := len(stores) - 1; i >= 0; i-- {
 		c := stores[i]
 		for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
 			d := d
 			child := d.Call(c)
-			children = append(children, child.catch(func(err error) error {
+			children = append(children, child.Catch(func(err error) error {
 				return errParamGroupFailed{
 					CtorID: d.ID(),
 					Key:    key{group: pt.Group, t: pt.Type.Elem()},
@@ -585,20 +586,20 @@ func (pt paramGroupedSlice) callGroupDecorators(c containerStore) *deferred {
 			}))
 		}
 	}
-	return whenAll(children...)
+	return promise.WhenAll(children...)
 }
 
 // search the given container and its parent for matching group providers and
 // call them to commit values. If an error is encountered, return the number
 // of providers called and a non-nil error from the first provided.
-func (pt paramGroupedSlice) callGroupProviders(c containerStore) *deferred {
-	var children []*deferred
+func (pt paramGroupedSlice) callGroupProviders(c containerStore) *promise.Deferred {
+	var children []*promise.Deferred
 	for _, c := range c.storesToRoot() {
 		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
 		for _, n := range providers {
 			n := n
 			child := n.Call(c)
-			children = append(children, child.catch(func(err error) error {
+			children = append(children, child.Catch(func(err error) error {
 				return errParamGroupFailed{
 					CtorID: n.ID(),
 					Key:    key{group: pt.Group, t: pt.Type.Elem()},
@@ -607,11 +608,11 @@ func (pt paramGroupedSlice) callGroupProviders(c containerStore) *deferred {
 			}))
 		}
 	}
-	return whenAll(children...)
+	return promise.WhenAll(children...)
 }
 
-func (pt paramGroupedSlice) Build(c containerStore, decorating bool, target *reflect.Value) *deferred {
-	d := &alreadyResolved
+func (pt paramGroupedSlice) Build(c containerStore, decorating bool, target *reflect.Value) *promise.Deferred {
+	d := promise.Done
 
 	// do not call this if we are already inside a decorator since
 	// it will result in an infinite recursion. (i.e. decorate -> params.BuildList() -> Decorate -> params.BuildList...)
@@ -620,7 +621,7 @@ func (pt paramGroupedSlice) Build(c containerStore, decorating bool, target *ref
 		d = pt.callGroupDecorators(c)
 	}
 
-	return d.then(func() *deferred {
+	return d.Then(func() *promise.Deferred {
 		// Check if we have decorated values
 		if decoratedItems, ok := pt.getDecoratedValues(c); ok {
 			if !target.IsValid() {
@@ -632,16 +633,16 @@ func (pt paramGroupedSlice) Build(c containerStore, decorating bool, target *ref
 			}
 
 			target.Set(decoratedItems)
-			return &alreadyResolved
+			return promise.Done
 		}
 
 		// If we do not have any decorated values, find the
 		// providers and call them.
-		return pt.callGroupProviders(c).then(func() *deferred {
+		return pt.callGroupProviders(c).Then(func() *promise.Deferred {
 			for _, c := range c.storesToRoot() {
 				target.Set(reflect.Append(*target, c.getValueGroup(pt.Group, pt.Type.Elem())...))
 			}
-			return &alreadyResolved
+			return promise.Done
 		})
 	})
 }

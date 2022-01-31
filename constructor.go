@@ -27,6 +27,7 @@ import (
 	"go.uber.org/dig/internal/digerror"
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
+	"go.uber.org/dig/internal/promise"
 )
 
 // constructorNode is a node in the dependency graph that represents
@@ -55,7 +56,7 @@ type constructorNode struct {
 	paramList paramList
 
 	// The result of calling the constructor
-	deferred deferred
+	deferred promise.Deferred
 
 	// Type information about constructor results.
 	resultList resultList
@@ -137,16 +138,16 @@ func (n *constructorNode) String() string {
 //
 // On failure, the returned pointer is not guaranteed to stay in a failed state; another call will reset it back to its
 // zero value; don't store the returned pointer. (It will still call each observer only once.)
-func (n *constructorNode) Call(c containerStore) *deferred {
+func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 	if n.calling || n.called {
 		return &n.deferred
 	}
 
 	n.calling = true
-	n.deferred = deferred{}
+	n.deferred = promise.Deferred{}
 
 	if err := shallowCheckDependencies(c, n.paramList); err != nil {
-		n.deferred.resolve(errMissingDependencies{
+		n.deferred.Resolve(errMissingDependencies{
 			Func:   n.location,
 			Reason: err,
 		})
@@ -155,19 +156,19 @@ func (n *constructorNode) Call(c containerStore) *deferred {
 	var args []reflect.Value
 	var results []reflect.Value
 
-	n.paramList.BuildList(c, false /* decorating */, &args).catch(func(err error) error {
+	n.paramList.BuildList(c, false /* decorating */, &args).Catch(func(err error) error {
 		return errArgumentsFailed{
 			Func:   n.location,
 			Reason: err,
 		}
-	}).then(func() *deferred {
+	}).Then(func() *promise.Deferred {
 		return c.scheduler().schedule(func() {
 			results = c.invoker()(reflect.ValueOf(n.ctor), args)
 		})
-	}).then(func() *deferred {
+	}).Then(func() *promise.Deferred {
 		receiver := newStagingContainerWriter()
 		if err := n.resultList.ExtractList(receiver, false /* decorating */, results); err != nil {
-			return failedDeferred(errConstructorFailed{Func: n.location, Reason: err})
+			return promise.Fail(errConstructorFailed{Func: n.location, Reason: err})
 		}
 
 		// Commit the result to the original container that this constructor
@@ -177,11 +178,11 @@ func (n *constructorNode) Call(c containerStore) *deferred {
 		receiver.Commit(n.s)
 		n.calling = false
 		n.called = true
-		n.deferred.resolve(nil)
-		return &alreadyResolved
-	}).catch(func(err error) error {
+		n.deferred.Resolve(nil)
+		return promise.Done
+	}).Catch(func(err error) error {
 		n.calling = false
-		n.deferred.resolve(err)
+		n.deferred.Resolve(err)
 		return nil
 	})
 
