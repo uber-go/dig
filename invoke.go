@@ -88,7 +88,7 @@ func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 	d.Observe(func(err2 error) {
 		err = err2
 	})
-	s.sched.flush()
+	s.sched.Flush()
 
 	if err != nil {
 		return errArgumentsFailed{

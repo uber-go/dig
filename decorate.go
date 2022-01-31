@@ -132,7 +132,7 @@ func (n *decoratorNode) Call(s containerStore) *promise.Deferred {
 
 		var results []reflect.Value
 
-		s.scheduler().schedule(func() {
+		s.scheduler().Schedule(func() {
 			results = s.invoker()(reflect.ValueOf(n.dcor), args)
 		}).Observe(func(_ error) {
 			n.calling = false

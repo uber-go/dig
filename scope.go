@@ -27,6 +27,8 @@ import (
 	"reflect"
 	"sort"
 	"time"
+
+	"go.uber.org/dig/internal/scheduler"
 )
 
 // A ScopeOption modifies the default behavior of Scope; currently,
@@ -78,7 +80,7 @@ type Scope struct {
 	// invokerFn calls a function with arguments provided to Provide or Invoke.
 	invokerFn invokerFn
 
-	sched scheduler
+	sched scheduler.Scheduler
 
 	// graph of this Scope. Note that this holds the dependency graph of all the
 	// nodes that affect this Scope, not just the ones provided directly to this Scope.
@@ -101,7 +103,7 @@ func newScope() *Scope {
 		decoratedGroups: make(map[key]reflect.Value),
 		invokerFn:       defaultInvoker,
 		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
-		sched:           synchronousScheduler{},
+		sched:           scheduler.Synchronous,
 	}
 	s.gh = newGraphHolder(s)
 	return s
@@ -268,7 +270,7 @@ func (s *Scope) invoker() invokerFn {
 	return s.invokerFn
 }
 
-func (s *Scope) scheduler() scheduler {
+func (s *Scope) scheduler() scheduler.Scheduler {
 	return s.sched
 }
 

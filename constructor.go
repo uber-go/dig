@@ -162,7 +162,7 @@ func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 			Reason: err,
 		}
 	}).Then(func() *promise.Deferred {
-		return c.scheduler().schedule(func() {
+		return c.scheduler().Schedule(func() {
 			results = c.invoker()(reflect.ValueOf(n.ctor), args)
 		})
 	}).Then(func() *promise.Deferred {

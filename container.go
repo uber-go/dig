@@ -26,6 +26,7 @@ import (
 	"reflect"
 
 	"go.uber.org/dig/internal/dot"
+	"go.uber.org/dig/internal/scheduler"
 )
 
 const (
@@ -144,7 +145,7 @@ type containerStore interface {
 	invoker() invokerFn
 
 	// Returns the scheduler to use for this scope.
-	scheduler() scheduler
+	scheduler() scheduler.Scheduler
 }
 
 // New constructs a Container.
@@ -255,11 +256,11 @@ func MaxConcurrency(max int) Option {
 func (m maxConcurrencyOption) applyOption(container *Container) {
 	switch {
 	case m == 0, m == 1:
-		container.scope.sched = synchronousScheduler{}
+		container.scope.sched = scheduler.Synchronous
 	case m > 1:
-		container.scope.sched = &parallelScheduler{concurrency: int(m)}
+		container.scope.sched = scheduler.NewParallel(int(m))
 	case m < 0:
-		container.scope.sched = &unboundedScheduler{}
+		container.scope.sched = new(scheduler.Unbounded)
 	}
 }
 

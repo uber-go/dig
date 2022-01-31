@@ -60,7 +60,7 @@ func TestNodeAlreadyCalled(t *testing.T) {
 
 	c := New()
 	d := n.Call(c.scope)
-	c.scope.sched.flush()
+	c.scope.sched.Flush()
 
 	ok, err := d.Resolved()
 	require.True(t, ok, "deferred must be resolved")
@@ -68,7 +68,7 @@ func TestNodeAlreadyCalled(t *testing.T) {
 
 	require.True(t, n.called, "node must be called")
 	d = n.Call(c.scope)
-	c.scope.sched.flush()
+	c.scope.sched.Flush()
 
 	ok, err = d.Resolved()
 	require.True(t, ok, "deferred must be resolved")
