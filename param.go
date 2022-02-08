@@ -217,10 +217,21 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 	return _noValue, false
 }
 
-// builds the parameter using decorators, if any. If there are no decorators associated
-// with this parameter, _noValue is returned.
+// builds the parameter using decorators in all scopes that affect the
+// current scope, if there are any. If there are multiple Scopes that decorates
+// this parameter, the closest one to the Scope that invoked this will be used.
+// If there are no decorators associated with this parameter, _noValue is returned.
 func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, found bool, err error) {
-	decorators := c.getValueDecorators(ps.Name, ps.Type)
+	var (
+		decorators      []decorator
+		decoratingScope containerStore
+	)
+	for _, s := range c.storesToRoot() {
+		if decorators = s.getValueDecorators(ps.Name, ps.Type); len(decorators) > 0 {
+			decoratingScope = s
+			break
+		}
+	}
 	if len(decorators) == 0 {
 		return _noValue, false, nil
 	}
@@ -240,7 +251,7 @@ func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, fo
 		}
 		return v, found, err
 	}
-	v, _ = c.getDecoratedValue(ps.Name, ps.Type)
+	v, _ = decoratingScope.getDecoratedValue(ps.Name, ps.Type)
 	return
 }
 

@@ -71,6 +71,45 @@ func TestDecorateSuccess(t *testing.T) {
 		})
 	})
 
+	t.Run("check parent-provided decorator doesn't need parent to invoke", func(t *testing.T) {
+		type A struct {
+			Name string
+		}
+
+		type B struct {
+			dig.In
+
+			Values []string `group:"values"`
+		}
+		type C struct {
+			dig.Out
+
+			Values []string `group:"values"`
+		}
+
+		c := digtest.New(t)
+		child := c.Scope("child")
+
+		c.RequireProvide(func() *A { return &A{Name: "A"} })
+		c.RequireProvide(func() string { return "val1" }, dig.Group("values"))
+		c.RequireProvide(func() string { return "val2" }, dig.Group("values"))
+		c.RequireProvide(func() string { return "val3" }, dig.Group("values"))
+		c.RequireDecorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
+		c.RequireDecorate(func(b B) C {
+			var val []string
+			for _, v := range b.Values {
+				val = append(val, v+"'")
+			}
+			return C{
+				Values: val,
+			}
+		})
+		child.RequireInvoke(func(a *A, b B) {
+			assert.Equal(t, "A'", a.Name, "expected name to equal decorated name in child scope")
+			assert.ElementsMatch(t, []string{"val1'", "val2'", "val3'"}, b.Values)
+		})
+	})
+
 	t.Run("simple decorate a provider to a scope and its descendants", func(t *testing.T) {
 		t.Parallel()
 		type A struct {
