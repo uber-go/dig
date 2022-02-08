@@ -222,8 +222,10 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 // this parameter, the closest one to the Scope that invoked this will be used.
 // If there are no decorators associated with this parameter, _noValue is returned.
 func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, found bool, err error) {
-	var decorators []decorator
-	var decoratingScope containerStore
+	var (
+		decorators      []decorator
+		decoratingScope containerStore
+	)
 	for _, s := range c.storesToRoot() {
 		if decorators = s.getValueDecorators(ps.Name, ps.Type); len(decorators) > 0 {
 			decoratingScope = s

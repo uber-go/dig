@@ -34,40 +34,40 @@ func TestDecorateSuccess(t *testing.T) {
 	t.Run("simple decorate without names or groups", func(t *testing.T) {
 		t.Parallel()
 		type A struct {
-			Name string
+			name string
 		}
 
 		c := digtest.New(t)
-		c.RequireProvide(func() *A { return &A{Name: "A"} })
+		c.RequireProvide(func() *A { return &A{name: "A"} })
 
 		c.RequireInvoke(func(a *A) {
-			assert.Equal(t, "A", a.Name, "expected name to not be decorated yet.")
+			assert.Equal(t, "A", a.name, "expected name to not be decorated yet.")
 		})
 
-		c.RequireDecorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
+		c.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
 
 		c.RequireInvoke(func(a *A) {
-			assert.Equal(t, "A'", a.Name, "expected name to equal decorated name.")
+			assert.Equal(t, "A'", a.name, "expected name to equal decorated name.")
 		})
 	})
 
 	t.Run("simple decorate a provider from child scope", func(t *testing.T) {
 		t.Parallel()
 		type A struct {
-			Name string
+			name string
 		}
 
 		c := digtest.New(t)
 		child := c.Scope("child")
-		child.RequireProvide(func() *A { return &A{Name: "A"} }, dig.Export(true))
+		child.RequireProvide(func() *A { return &A{name: "A"} }, dig.Export(true))
 
-		child.RequireDecorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
+		child.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
 		c.RequireInvoke(func(a *A) {
-			assert.Equal(t, "A", a.Name, "expected name to equal original name in parent scope")
+			assert.Equal(t, "A", a.name, "expected name to equal original name in parent scope")
 		})
 
 		child.RequireInvoke(func(a *A) {
-			assert.Equal(t, "A'", a.Name, "expected name to equal decorated name in child scope")
+			assert.Equal(t, "A'", a.name, "expected name to equal decorated name in child scope")
 		})
 	})
 
@@ -90,10 +90,10 @@ func TestDecorateSuccess(t *testing.T) {
 		c := digtest.New(t)
 		child := c.Scope("child")
 
-		c.RequireProvide(func() *A { return &A{Name: "A"} }, dig.Export(true))
-		c.RequireProvide(func() string { return "val1" }, dig.Export(true), dig.Group("values"))
-		c.RequireProvide(func() string { return "val2" }, dig.Export(true), dig.Group("values"))
-		c.RequireProvide(func() string { return "val3" }, dig.Export(true), dig.Group("values"))
+		c.RequireProvide(func() *A { return &A{Name: "A"} })
+		c.RequireProvide(func() string { return "val1" }, dig.Group("values"))
+		c.RequireProvide(func() string { return "val2" }, dig.Group("values"))
+		c.RequireProvide(func() string { return "val3" }, dig.Group("values"))
 		c.RequireDecorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
 		c.RequireDecorate(func(b B) C {
 			var val []string
@@ -113,16 +113,16 @@ func TestDecorateSuccess(t *testing.T) {
 	t.Run("simple decorate a provider to a scope and its descendants", func(t *testing.T) {
 		t.Parallel()
 		type A struct {
-			Name string
+			name string
 		}
 
 		c := digtest.New(t)
 		child := c.Scope("child")
-		c.RequireProvide(func() *A { return &A{Name: "A"} })
+		c.RequireProvide(func() *A { return &A{name: "A"} })
 
-		c.RequireDecorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
+		c.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
 		assertDecoratedName := func(a *A) {
-			assert.Equal(t, a.Name, "A'", "expected name to equal decorated name")
+			assert.Equal(t, a.name, "A'", "expected name to equal decorated name")
 		}
 		c.RequireInvoke(assertDecoratedName)
 		child.RequireInvoke(assertDecoratedName)
@@ -131,31 +131,31 @@ func TestDecorateSuccess(t *testing.T) {
 	t.Run("modifications compose with descendants", func(t *testing.T) {
 		t.Parallel()
 		type A struct {
-			Name string
+			name string
 		}
 
 		c := digtest.New(t)
 		child := c.Scope("child")
-		c.RequireProvide(func() *A { return &A{Name: "A"} })
+		c.RequireProvide(func() *A { return &A{name: "A"} })
 
-		c.RequireDecorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
-		child.RequireDecorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
+		c.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
+		child.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
 
 		c.RequireInvoke(func(a *A) {
-			assert.Equal(t, "A'", a.Name, "expected decorated name in parent")
+			assert.Equal(t, "A'", a.name, "expected decorated name in parent")
 		})
 
 		child.RequireInvoke(func(a *A) {
-			assert.Equal(t, "A''", a.Name, "expected double-decorated name in child")
+			assert.Equal(t, "A''", a.name, "expected double-decorated name in child")
 		})
 
 		sibling := c.Scope("sibling")
 		grandchild := child.Scope("grandchild")
 		require.NoError(t, sibling.Invoke(func(a *A) {
-			assert.Equal(t, "A'", a.Name, "expected single-decorated name in sibling")
+			assert.Equal(t, "A'", a.name, "expected single-decorated name in sibling")
 		}))
 		require.NoError(t, grandchild.Invoke(func(a *A) {
-			assert.Equal(t, "A''", a.Name, "expected double-decorated name in grandchild")
+			assert.Equal(t, "A''", a.name, "expected double-decorated name in grandchild")
 		}))
 	})
 
