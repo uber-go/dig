@@ -200,7 +200,7 @@ func (o *Output) String() string {
 	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
 }
 
-// FillProvideInfo is a ProvideOption that writes info on what Dig was able to get out
+// FillProvideInfo is a ProvideOption that writes info on what Dig was able to get
 // out of the provided constructor into the provided ProvideInfo.
 func FillProvideInfo(info *ProvideInfo) ProvideOption {
 	return fillProvideInfoOption{info: info}
