@@ -152,7 +152,7 @@ type ProvideInfo struct {
 	Outputs []*Output
 }
 
-// Input contains information on an input parameter of the constructor.
+// Input contains information on an input parameter of a function.
 type Input struct {
 	t           reflect.Type
 	optional    bool
@@ -178,7 +178,7 @@ func (i *Input) String() string {
 	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
 }
 
-// Output contains information on an output produced by the constructor.
+// Output contains information on an output produced by a function.
 type Output struct {
 	t           reflect.Type
 	name, group string
