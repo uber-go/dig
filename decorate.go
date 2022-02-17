@@ -98,7 +98,7 @@ func (n *decoratorNode) Call(s containerStore) error {
 		}
 	}
 
-	args, err := n.params.BuildList(n.s, true /* decorating */)
+	args, err := n.params.BuildList(n.s, s == n.s /* decorating */)
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   n.location,
