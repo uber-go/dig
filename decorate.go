@@ -116,10 +116,37 @@ func (n *decoratorNode) Call(s containerStore) error {
 
 func (n *decoratorNode) ID() dot.CtorID { return n.id }
 
-// DecorateOption modifies the default behavior of Provide.
-// Currently, there is no implementation of it yet.
+// DecorateOption modifies the default behavior of Decorate.
 type DecorateOption interface {
-	noOptionsYet()
+	apply(*decorateOptions)
+}
+
+type decorateOptions struct {
+	Info *DecorateInfo
+}
+
+// FillDecorateInfo is a DecorateOption that writes info on what Dig was
+// able to get out of the provided decorator into the provided DecorateInfo.
+func FillDecorateInfo(info *DecorateInfo) DecorateOption {
+	return fillDecorateInfoOption{info: info}
+}
+
+type fillDecorateInfoOption struct{ info *DecorateInfo }
+
+func (o fillDecorateInfoOption) String() string {
+	return fmt.Sprintf("FillDecorateInfo(%p)", o.info)
+}
+
+func (o fillDecorateInfoOption) apply(opts *decorateOptions) {
+	opts.Info = o.info
+}
+
+// DecorateInfo provides information about the decorator's inputs and outputs
+// types as strings, as well as the ID of the decorator supplied to the Container.
+type DecorateInfo struct {
+	ID      ID
+	Inputs  []*Input
+	Outputs []*Output
 }
 
 // Decorate provides a decorator for a type that has already been provided in the Container.
@@ -164,7 +191,10 @@ func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) erro
 //
 // Similar to a provider, the decorator function gets called *at most once*.
 func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
-	_ = opts // there are no options at this time
+	var options decorateOptions
+	for _, opt := range opts {
+		opt.apply(&options)
+	}
 
 	dn, err := newDecoratorNode(decorator, s)
 	if err != nil {
@@ -180,6 +210,30 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 			)
 		}
 		s.decorators[k] = append(s.decorators[k], dn)
+	}
+
+	if info := options.Info; info != nil {
+		params := dn.params.DotParam()
+		results := dn.results.DotResult()
+		info.ID = (ID)(dn.id)
+		info.Inputs = make([]*Input, len(params))
+		info.Outputs = make([]*Output, len(results))
+
+		for i, param := range params {
+			info.Inputs[i] = &Input{
+				t:        param.Type,
+				optional: param.Optional,
+				name:     param.Name,
+				group:    param.Group,
+			}
+		}
+		for i, res := range results {
+			info.Outputs[i] = &Output{
+				t:     res.Type,
+				name:  res.Name,
+				group: res.Group,
+			}
+		}
 	}
 	return nil
 }

@@ -22,6 +22,7 @@ package dig_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,11 +45,17 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.Equal(t, "A", a.name, "expected name to not be decorated yet.")
 		})
 
-		c.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
+		var info dig.DecorateInfo
 
+		c.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} }, dig.FillDecorateInfo(&info))
 		c.RequireInvoke(func(a *A) {
 			assert.Equal(t, "A'", a.name, "expected name to equal decorated name.")
 		})
+
+		require.Equal(t, len(info.Inputs), 1)
+		require.Equal(t, len(info.Outputs), 1)
+		assert.Equal(t, "*dig_test.A", info.Inputs[0].String())
+		assert.Equal(t, "*dig_test.A", info.Outputs[0].String())
 	})
 
 	t.Run("simple decorate a provider from child scope", func(t *testing.T) {
@@ -61,7 +68,8 @@ func TestDecorateSuccess(t *testing.T) {
 		child := c.Scope("child")
 		child.RequireProvide(func() *A { return &A{name: "A"} }, dig.Export(true))
 
-		child.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
+		var info dig.DecorateInfo
+		child.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} }, dig.FillDecorateInfo(&info))
 		c.RequireInvoke(func(a *A) {
 			assert.Equal(t, "A", a.name, "expected name to equal original name in parent scope")
 		})
@@ -69,6 +77,11 @@ func TestDecorateSuccess(t *testing.T) {
 		child.RequireInvoke(func(a *A) {
 			assert.Equal(t, "A'", a.name, "expected name to equal decorated name in child scope")
 		})
+
+		require.Equal(t, len(info.Inputs), 1)
+		require.Equal(t, len(info.Outputs), 1)
+		assert.Equal(t, "*dig_test.A", info.Inputs[0].String())
+		assert.Equal(t, "*dig_test.A", info.Outputs[0].String())
 	})
 
 	t.Run("check parent-provided decorator doesn't need parent to invoke", func(t *testing.T) {
@@ -182,6 +195,7 @@ func TestDecorateSuccess(t *testing.T) {
 		c.RequireProvide(func() *A { return &A{Name: "A"} })
 		c.RequireProvide(func() string { return "b" }, dig.Name("b"))
 
+		var info dig.DecorateInfo
 		c.RequireDecorate(func(b B) C {
 			return C{
 				A: &A{
@@ -189,12 +203,17 @@ func TestDecorateSuccess(t *testing.T) {
 				},
 				B: b.B + "'",
 			}
-		})
+		}, dig.FillDecorateInfo(&info))
 
 		c.RequireInvoke(func(b B) {
 			assert.Equal(t, "A'", b.A.Name)
 			assert.Equal(t, "b'", b.B)
 		})
+
+		require.Equal(t, 2, len(info.Inputs))
+		require.Equal(t, 2, len(info.Outputs))
+		assert.Equal(t, "*dig_test.A", info.Inputs[0].String())
+		assert.Equal(t, `string[name = "b"]`, info.Inputs[1].String())
 	})
 
 	t.Run("decorate with value groups", func(t *testing.T) {
@@ -215,6 +234,7 @@ func TestDecorateSuccess(t *testing.T) {
 		c.RequireProvide(func() string { return "cat" }, dig.Group("animals"))
 		c.RequireProvide(func() string { return "gopher" }, dig.Group("animals"))
 
+		var info dig.DecorateInfo
 		c.RequireDecorate(func(p Params) Result {
 			animals := p.Animals
 			for i := 0; i < len(animals); i++ {
@@ -223,11 +243,14 @@ func TestDecorateSuccess(t *testing.T) {
 			return Result{
 				Animals: animals,
 			}
-		})
+		}, dig.FillDecorateInfo(&info))
 
 		c.RequireInvoke(func(p Params) {
 			assert.ElementsMatch(t, []string{"good dog", "good cat", "good gopher"}, p.Animals)
 		})
+
+		require.Equal(t, 1, len(info.Inputs))
+		assert.Equal(t, `[]string[group = "animals"]`, info.Inputs[0].String())
 	})
 
 	t.Run("decorate with optional parameter", func(t *testing.T) {
@@ -692,5 +715,23 @@ func TestMultipleDecorates(t *testing.T) {
 		child.Invoke(func(a A) {
 			assert.ElementsMatch(t, []int{2, 3, 4}, a.Values)
 		})
+	})
+}
+
+func TestFillDecorateInfoString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, "FillDecorateInfo(0x0)", fmt.Sprint(dig.FillDecorateInfo(nil)))
+	})
+
+	t.Run("not nil", func(t *testing.T) {
+		t.Parallel()
+
+		opt := dig.FillDecorateInfo(new(dig.DecorateInfo))
+		assert.NotEqual(t, fmt.Sprint(opt), "FillDecorateInfo(0x0)")
+		assert.Contains(t, fmt.Sprint(opt), "FillDecorateInfo(0x")
 	})
 }

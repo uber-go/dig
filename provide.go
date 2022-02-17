@@ -152,7 +152,7 @@ type ProvideInfo struct {
 	Outputs []*Output
 }
 
-// Input contains information on an input parameter of the constructor.
+// Input contains information on an input parameter of a function.
 type Input struct {
 	t           reflect.Type
 	optional    bool
@@ -178,7 +178,7 @@ func (i *Input) String() string {
 	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
 }
 
-// Output contains information on an output produced by the constructor.
+// Output contains information on an output produced by a function.
 type Output struct {
 	t           reflect.Type
 	name, group string
@@ -200,7 +200,7 @@ func (o *Output) String() string {
 	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
 }
 
-// FillProvideInfo is a ProvideOption that writes info on what Dig was able to get out
+// FillProvideInfo is a ProvideOption that writes info on what Dig was able to get
 // out of the provided constructor into the provided ProvideInfo.
 func FillProvideInfo(info *ProvideInfo) ProvideOption {
 	return fillProvideInfoOption{info: info}
