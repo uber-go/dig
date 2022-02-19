@@ -221,12 +221,19 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 // current scope, if there are any. If there are multiple Scopes that decorates
 // this parameter, the closest one to the Scope that invoked this will be used.
 // If there are no decorators associated with this parameter, _noValue is returned.
-func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, found bool, err error) {
+func (ps paramSingle) buildWithDecorators(c containerStore, decorating bool) (v reflect.Value, found bool, err error) {
 	var (
 		decorators      []decorator
 		decoratingScope containerStore
 	)
-	for _, s := range c.storesToRoot() {
+	stores := c.storesToRoot()
+	// If we are already in a decorating stack,
+	// skip the current Scope to avoid infinite
+	// recursion.
+	if decorating {
+		stores = stores[1:]
+	}
+	for _, s := range stores {
 		if decorators = s.getValueDecorators(ps.Name, ps.Type); len(decorators) > 0 {
 			decoratingScope = s
 			break
@@ -237,7 +244,7 @@ func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, fo
 	}
 	found = true
 	for _, d := range decorators {
-		err := d.Call(c)
+		err := d.Call(decoratingScope)
 		if err == nil {
 			continue
 		}
@@ -256,11 +263,9 @@ func (ps paramSingle) buildWithDecorators(c containerStore) (v reflect.Value, fo
 }
 
 func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, error) {
-	if !decorating {
-		v, found, err := ps.buildWithDecorators(c)
-		if found {
-			return v, err
-		}
+	v, found, err := ps.buildWithDecorators(c, decorating)
+	if found {
+		return v, err
 	}
 
 	// Check whether the value is a decorated value first.
@@ -314,7 +319,7 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 
 	// If we get here, it's impossible for the value to be absent from the
 	// container.
-	v, _ := ps.getValue(c)
+	v, _ = ps.getValue(c)
 	return v, nil
 }
 
