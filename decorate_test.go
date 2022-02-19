@@ -661,12 +661,10 @@ func TestMultipleDecorates(t *testing.T) {
 		// decorate +1 to each element in child
 		child.RequireDecorate(decorator)
 
-		// assert child sees 2, 3, 4
 		child.RequireInvoke(func(a A) {
 			assert.ElementsMatch(t, []int{2, 3, 4}, a.Values)
 		})
 
-		// assert parent sees 1, 2, 3
 		root.RequireInvoke(func(a A) {
 			assert.ElementsMatch(t, []int{1, 2, 3}, a.Values)
 		})
@@ -706,12 +704,10 @@ func TestMultipleDecorates(t *testing.T) {
 		// decorate +1 to each element in child
 		child.RequireDecorate(decorator)
 
-		// assert parent sees 1, 2, 3
 		root.Invoke(func(a A) {
 			assert.ElementsMatch(t, []int{1, 2, 3}, a.Values)
 		})
 
-		// assert child sees 2, 3, 4
 		child.Invoke(func(a A) {
 			assert.ElementsMatch(t, []int{2, 3, 4}, a.Values)
 		})
