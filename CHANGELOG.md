@@ -4,8 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-- No changes yet.
+## [1.14.0] - 2022-02-23
+### Added
+- Introduce `dig.Scope` which creates a scoped dependency injection
+  container to scope dependencies.
+- Introduce `Scope.Decorate` and `Container.Decorate` which allows a
+  decorator to modify a dependency already provided in the dependency graph.
+- Add `FillDecorateInfo` Option and `DecorateInfo` struct which exposes
+  information on what Dig was able to understand from the decorator provided
+  with `Scope.Decorate` or `Container.Decorate`.
+
+### Changed
+- The error message that appears when a cycle is detected in the dependency graph
+  has been changed slightly.
+
+### Fixed
+- A stack overflow bug that happens when cycles are introduced via self-pointing
+  dependencies with DeferAcyclicVerification.
 
 ## [1.13.0] - 2021-09-21
 ### Added
