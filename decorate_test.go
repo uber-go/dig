@@ -391,6 +391,35 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.Nil(t, a.Values)
 		})
 	})
+
+	t.Run("decorate a value and invoke it outside the context", func(t *testing.T) {
+		type Inner struct {
+			Int int
+		}
+
+		type Next struct {
+			MyInner *Inner
+		}
+
+		c := digtest.New(t)
+		child := c.Scope("child")
+
+		child.RequireProvide(func() *Inner {
+			return &Inner{Int: 42}
+		}, dig.Export(true))
+		child.RequireProvide(func(i *Inner) *Next {
+			return &Next{MyInner: i}
+		}, dig.Export(true))
+		child.RequireDecorate(func() *Inner {
+			return &Inner{Int: 5678}
+		})
+		c.RequireInvoke(func(n *Next) {
+			assert.Equal(t, 5678, n.MyInner.Int)
+		})
+		child.RequireInvoke(func(n *Next) {
+			assert.Equal(t, 5678, n.MyInner.Int)
+		})
+	})
 }
 
 func TestDecorateFailure(t *testing.T) {

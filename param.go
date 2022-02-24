@@ -299,8 +299,17 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 	}
 
 	for _, n := range providers {
-		err := n.Call(c)
+		// If this provider is exported, build it from the Scope it was
+		// originally provided from.
+		var err error
+		if n.Exported() {
+			err = n.Call(n.OrigScope())
+		} else {
+			err = n.Call(c)
+		}
+
 		if err == nil {
+			// Check for whether there is a decorator.
 			continue
 		}
 

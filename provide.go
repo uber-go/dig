@@ -358,6 +358,10 @@ type provider interface {
 	Call(containerStore) error
 
 	CType() reflect.Type
+
+	OrigScope() *Scope
+
+	Exported() bool
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -426,6 +430,7 @@ func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	// If Export option is provided to the constructor, this should be injected to the
 	// root-level Scope (Container) to allow it to propagate to all other Scopes.
+	origScope := s
 	if opts.Exported {
 		s = s.rootScope()
 	}
@@ -448,6 +453,7 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	n, err := newConstructorNode(
 		ctor,
 		s,
+		origScope,
 		constructorOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,

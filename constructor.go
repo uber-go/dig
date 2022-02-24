@@ -57,8 +57,15 @@ type constructorNode struct {
 	// order of this node in each Scopes' graphHolders.
 	orders map[*Scope]int
 
-	// scope this node was originally provided to.
+	// scope this node is part of
 	s *Scope
+
+	// scope this node was originally provided to.
+	// This is different from s if and only if the constructor was Provided with ExportOption.
+	origS *Scope
+
+	// whether this constructor was provided via "Exported" option
+	exported bool
 }
 
 type constructorOptions struct {
@@ -70,7 +77,7 @@ type constructorOptions struct {
 	Location    *digreflect.Func
 }
 
-func newConstructorNode(ctor interface{}, s *Scope, opts constructorOptions) (*constructorNode, error) {
+func newConstructorNode(ctor interface{}, s *Scope, origS *Scope, opts constructorOptions) (*constructorNode, error) {
 	cval := reflect.ValueOf(ctor)
 	ctype := cval.Type()
 	cptr := cval.Pointer()
@@ -106,6 +113,8 @@ func newConstructorNode(ctor interface{}, s *Scope, opts constructorOptions) (*c
 		resultList: results,
 		orders:     make(map[*Scope]int),
 		s:          s,
+		exported:   s != origS,
+		origS:      origS,
 	}
 	s.newGraphNode(n, n.orders)
 	return n, nil
@@ -117,6 +126,8 @@ func (n *constructorNode) ResultList() resultList     { return n.resultList }
 func (n *constructorNode) ID() dot.CtorID             { return n.id }
 func (n *constructorNode) CType() reflect.Type        { return n.ctype }
 func (n *constructorNode) Order(s *Scope) int         { return n.orders[s] }
+func (n *constructorNode) OrigScope() *Scope          { return n.origS }
+func (n *constructorNode) Exported() bool             { return n.exported }
 
 func (n *constructorNode) String() string {
 	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)

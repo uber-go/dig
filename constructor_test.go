@@ -32,7 +32,8 @@ func TestNewDotCtor(t *testing.T) {
 	type t1 struct{}
 	type t2 struct{}
 
-	n, err := newConstructorNode(func(A t1) t2 { return t2{} }, newScope(), constructorOptions{})
+	s := newScope()
+	n, err := newConstructorNode(func(A t1) t2 { return t2{} }, s, s, constructorOptions{})
 	require.NoError(t, err)
 
 	n.location = &digreflect.Func{
@@ -54,7 +55,8 @@ func TestNodeAlreadyCalled(t *testing.T) {
 	type type1 struct{}
 	f := func() type1 { return type1{} }
 
-	n, err := newConstructorNode(f, newScope(), constructorOptions{})
+	s := newScope()
+	n, err := newConstructorNode(f, s, s, constructorOptions{})
 	require.NoError(t, err, "failed to build node")
 	require.False(t, n.called, "node must not have been called")
 
