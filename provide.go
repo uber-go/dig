@@ -360,8 +360,6 @@ type provider interface {
 	CType() reflect.Type
 
 	OrigScope() *Scope
-
-	Exported() bool
 }
 
 // Provide teaches the container how to build values of one or more types and

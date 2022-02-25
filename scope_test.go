@@ -371,9 +371,9 @@ func TestScopeValueGroups(t *testing.T) {
 		})
 
 		child := root.Scope("child")
-		child.RequireProvide(func() string { return "a" }, dig.Group("foo"))
-		child.RequireProvide(func() string { return "b" }, dig.Group("foo"))
-		child.RequireProvide(func() string { return "c" }, dig.Group("foo"))
+		child.RequireProvide(func() string { return "a" }, dig.Group("foo"), dig.Export(true))
+		child.RequireProvide(func() string { return "b" }, dig.Group("foo"), dig.Export(true))
+		child.RequireProvide(func() string { return "c" }, dig.Group("foo"), dig.Export(true))
 
 		// Invocation in child should see values provided to the child,
 		// even though the constructor we're invoking is provided in

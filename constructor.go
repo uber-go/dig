@@ -63,9 +63,6 @@ type constructorNode struct {
 	// scope this node was originally provided to.
 	// This is different from s if and only if the constructor was Provided with ExportOption.
 	origS *Scope
-
-	// whether this constructor was provided via "Exported" option
-	exported bool
 }
 
 type constructorOptions struct {
@@ -113,7 +110,6 @@ func newConstructorNode(ctor interface{}, s *Scope, origS *Scope, opts construct
 		resultList: results,
 		orders:     make(map[*Scope]int),
 		s:          s,
-		exported:   s != origS,
 		origS:      origS,
 	}
 	s.newGraphNode(n, n.orders)
@@ -127,7 +123,6 @@ func (n *constructorNode) ID() dot.CtorID             { return n.id }
 func (n *constructorNode) CType() reflect.Type        { return n.ctype }
 func (n *constructorNode) Order(s *Scope) int         { return n.orders[s] }
 func (n *constructorNode) OrigScope() *Scope          { return n.origS }
-func (n *constructorNode) Exported() bool             { return n.exported }
 
 func (n *constructorNode) String() string {
 	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)

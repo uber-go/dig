@@ -299,13 +299,7 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 	}
 
 	for _, n := range providers {
-		var err error
-		if n.Exported() {
-			err = n.Call(n.OrigScope())
-		} else {
-			err = n.Call(c)
-		}
-
+		err := n.Call(n.OrigScope())
 		if err == nil {
 			continue
 		}
