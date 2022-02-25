@@ -392,7 +392,7 @@ func TestDecorateSuccess(t *testing.T) {
 		})
 	})
 
-	t.Run("decorate a value and invoke it outside the context", func(t *testing.T) {
+	t.Run("invoke with a transitive dependency on child-decorated exported type", func(t *testing.T) {
 		type Inner struct {
 			Int int
 		}
@@ -418,6 +418,35 @@ func TestDecorateSuccess(t *testing.T) {
 		})
 		child.RequireInvoke(func(n *Next) {
 			assert.Equal(t, 5678, n.MyInner.Int)
+		})
+		c.RequireInvoke(func(i *Inner) {
+			assert.Equal(t, 42, i.Int)
+		})
+	})
+
+	t.Run("transitive dependency with decoration on parent-provided type", func(t *testing.T) {
+		type Config struct {
+			Scope string
+		}
+		type Logger struct {
+			Cfg *Config
+		}
+		c := digtest.New(t).Scope("")
+		child := c.Scope("child")
+
+		c.RequireProvide(func() *Config {
+			return &Config{Scope: "root"}
+		}, dig.Export(true))
+		c.RequireProvide(func(cfg *Config) *Logger {
+			return &Logger{Cfg: &Config{
+				Scope: cfg.Scope + " logger",
+			}}
+		}, dig.Export(true))
+		child.RequireDecorate(func() *Config {
+			return &Config{Scope: "child"}
+		})
+		child.RequireInvoke(func(l *Logger) {
+			assert.Equal(t, "child logger", l.Cfg.Scope)
 		})
 	})
 }

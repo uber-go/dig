@@ -299,11 +299,16 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 	}
 
 	for _, n := range providers {
-		// If this provider is exported, build it from the Scope it was
-		// originally provided from.
 		var err error
 		if n.Exported() {
-			err = n.Call(n.OrigScope())
+			// Check if the original scope the provider was provided to has
+			// a "larger" scope.
+			// We use the more "specific" Scope to call.
+			if n.OrigScope().getDegree() > c.getDegree() {
+				n.Call(n.OrigScope())
+			} else {
+				n.Call(c)
+			}
 		} else {
 			err = n.Call(c)
 		}
