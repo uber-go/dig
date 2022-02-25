@@ -87,9 +87,6 @@ type Scope struct {
 
 	// All the child scopes of this Scope.
 	childScopes []*Scope
-
-	// The distance from the root Container.
-	degree int
 }
 
 func newScope() *Scope {
@@ -116,7 +113,6 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	child := newScope()
 	child.name = name
 	child.parentScope = s
-	child.degree = s.degree + 1
 	child.invokerFn = s.invokerFn
 	child.deferAcyclicVerification = s.deferAcyclicVerification
 
@@ -267,10 +263,6 @@ func (s *Scope) getAllProviders(k key) []provider {
 
 func (s *Scope) invoker() invokerFn {
 	return s.invokerFn
-}
-
-func (s *Scope) getDegree() int {
-	return s.degree
 }
 
 // adds a new graphNode to this Scope and all of its descendent

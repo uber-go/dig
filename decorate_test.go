@@ -423,32 +423,6 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.Equal(t, 42, i.Int)
 		})
 	})
-
-	t.Run("transitive dependency with decoration on parent-provided type", func(t *testing.T) {
-		type Config struct {
-			Scope string
-		}
-		type Logger struct {
-			Cfg *Config
-		}
-		c := digtest.New(t).Scope("")
-		child := c.Scope("child")
-
-		c.RequireProvide(func() *Config {
-			return &Config{Scope: "root"}
-		}, dig.Export(true))
-		c.RequireProvide(func(cfg *Config) *Logger {
-			return &Logger{Cfg: &Config{
-				Scope: cfg.Scope + " logger",
-			}}
-		}, dig.Export(true))
-		child.RequireDecorate(func() *Config {
-			return &Config{Scope: "child"}
-		})
-		child.RequireInvoke(func(l *Logger) {
-			assert.Equal(t, "child logger", l.Cfg.Scope)
-		})
-	})
 }
 
 func TestDecorateFailure(t *testing.T) {

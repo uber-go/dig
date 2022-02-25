@@ -301,20 +301,12 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 	for _, n := range providers {
 		var err error
 		if n.Exported() {
-			// Check if the original scope the provider was provided to has
-			// a "larger" scope.
-			// We use the more "specific" Scope to call.
-			if n.OrigScope().getDegree() > c.getDegree() {
-				err = n.Call(n.OrigScope())
-			} else {
-				err = n.Call(c)
-			}
+			err = n.Call(n.OrigScope())
 		} else {
 			err = n.Call(c)
 		}
 
 		if err == nil {
-			// Check for whether there is a decorator.
 			continue
 		}
 

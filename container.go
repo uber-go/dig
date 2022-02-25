@@ -142,15 +142,11 @@ type containerStore interface {
 
 	// Returns invokerFn function to use when calling arguments.
 	invoker() invokerFn
-
-	// getDegree returns the distance of this container from the root Container.
-	getDegree() int
 }
 
 // New constructs a Container.
 func New(opts ...Option) *Container {
 	s := newScope()
-	s.degree = 0
 	c := &Container{scope: s}
 
 	for _, opt := range opts {
