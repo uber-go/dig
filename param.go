@@ -305,9 +305,9 @@ func (ps paramSingle) Build(c containerStore, decorating bool) (reflect.Value, e
 			// a "larger" scope.
 			// We use the more "specific" Scope to call.
 			if n.OrigScope().getDegree() > c.getDegree() {
-				n.Call(n.OrigScope())
+				err = n.Call(n.OrigScope())
 			} else {
-				n.Call(c)
+				err = n.Call(c)
 			}
 		} else {
 			err = n.Call(c)
