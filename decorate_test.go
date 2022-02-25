@@ -391,6 +391,38 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.Nil(t, a.Values)
 		})
 	})
+
+	t.Run("invoke with a transitive dependency on child-decorated exported type", func(t *testing.T) {
+		type Inner struct {
+			Int int
+		}
+
+		type Next struct {
+			MyInner *Inner
+		}
+
+		c := digtest.New(t)
+		child := c.Scope("child")
+
+		child.RequireProvide(func() *Inner {
+			return &Inner{Int: 42}
+		}, dig.Export(true))
+		child.RequireProvide(func(i *Inner) *Next {
+			return &Next{MyInner: i}
+		}, dig.Export(true))
+		child.RequireDecorate(func() *Inner {
+			return &Inner{Int: 5678}
+		})
+		c.RequireInvoke(func(n *Next) {
+			assert.Equal(t, 5678, n.MyInner.Int)
+		})
+		child.RequireInvoke(func(n *Next) {
+			assert.Equal(t, 5678, n.MyInner.Int)
+		})
+		c.RequireInvoke(func(i *Inner) {
+			assert.Equal(t, 42, i.Int)
+		})
+	})
 }
 
 func TestDecorateFailure(t *testing.T) {
