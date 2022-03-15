@@ -234,7 +234,9 @@ storeLoop:
 		}
 		for _, d := range decorators {
 			if d.State() == decoratorOnStack {
-				decorators = nil // reset this stuff.
+				// This decorator is already being run.
+				// Avoid a cycle and look further.
+				decorators = nil
 				continue storeLoop
 			}
 		}
