@@ -2424,9 +2424,8 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		type ret struct {
 			dig.Out
 
-			A1 A // same type A provided three times
+			A1 A // same type A provided twice
 			A2 A
-			A3 A
 		}
 
 		locationFn := func() {}
@@ -2435,15 +2434,11 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 			return ret{
 				A1: A{idx: 1},
 				A2: A{idx: 2},
-				A3: A{idx: 3},
 			}
 		}, dig.LocationForPC(reflect.ValueOf(locationFn).Pointer()))
 		require.Error(t, err, "provide must return error")
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideFailures.func\d+.1`,
-			`dig_test.go:\d+`, // file:line
-			`cannot provide dig_test.A from \[0\].A2:`,
-			`already provided by \[0\].A1`,
 		)
 	})
 }
