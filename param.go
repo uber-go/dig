@@ -227,17 +227,21 @@ func (ps paramSingle) buildWithDecorators(c containerStore, decorating bool) (v 
 		decoratingScope containerStore
 	)
 	stores := c.storesToRoot()
-	// If we are already in a decorating stack,
-	// skip the current Scope to avoid infinite
-	// recursion.
-	if decorating {
-		stores = stores[1:]
-	}
+storeLoop:
 	for _, s := range stores {
-		if decorators = s.getValueDecorators(ps.Name, ps.Type); len(decorators) > 0 {
-			decoratingScope = s
-			break
+		if decorators = s.getValueDecorators(ps.Name, ps.Type); len(decorators) == 0 {
+			continue
 		}
+		for _, d := range decorators {
+			if d.State() == decoratorOnStack {
+				// This decorator is already being run.
+				// Avoid a cycle and look further.
+				decorators = nil
+				continue storeLoop
+			}
+		}
+		decoratingScope = s
+		break
 	}
 	if len(decorators) == 0 {
 		return _noValue, false, nil

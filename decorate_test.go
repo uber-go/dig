@@ -124,7 +124,6 @@ func TestDecorateSuccess(t *testing.T) {
 	})
 
 	t.Run("simple decorate a provider to a scope and its descendants", func(t *testing.T) {
-		t.Parallel()
 		type A struct {
 			name string
 		}
@@ -356,6 +355,24 @@ func TestDecorateSuccess(t *testing.T) {
 
 		require.NoError(t, child.Invoke(func(i InvokeIn) {
 			assert.ElementsMatch(t, []string{"good happy dog", "good happy cat"}, i.Values)
+		}))
+	})
+
+	t.Run("decorate two times within same scope", func(t *testing.T) {
+		type A struct {
+			name string
+		}
+		parent := digtest.New(t)
+		parent.RequireProvide(func() string { return "parent" })
+		parent.RequireProvide(func(n string) A { return A{name: n} })
+
+		child := parent.Scope("child")
+
+		child.RequireDecorate(func() string { return "child" })
+		child.RequireDecorate(func(n string) A { return A{name: n + " decorated"} })
+
+		require.NoError(t, child.Invoke(func(a A) {
+			assert.Equal(t, "child decorated", a.name)
 		}))
 	})
 

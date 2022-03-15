@@ -28,9 +28,18 @@ import (
 	"go.uber.org/dig/internal/dot"
 )
 
+type decoratorState int
+
+const (
+	decoratorReady decoratorState = iota
+	decoratorOnStack
+	decoratorCalled
+)
+
 type decorator interface {
 	Call(c containerStore) error
 	ID() dot.CtorID
+	State() decoratorState
 }
 
 type decoratorNode struct {
@@ -42,8 +51,8 @@ type decoratorNode struct {
 	// Location where this function was defined.
 	location *digreflect.Func
 
-	// Whether the decorator owned by this node was already called.
-	called bool
+	// Current state of this decorator
+	state decoratorState
 
 	// Parameters of the decorator.
 	params paramList
@@ -87,9 +96,11 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 }
 
 func (n *decoratorNode) Call(s containerStore) error {
-	if n.called {
+	if n.state == decoratorCalled {
 		return nil
 	}
+
+	n.state = decoratorOnStack
 
 	if err := shallowCheckDependencies(s, n.params); err != nil {
 		return errMissingDependencies{
@@ -110,11 +121,13 @@ func (n *decoratorNode) Call(s containerStore) error {
 	if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
 		return err
 	}
-	n.called = true
+	n.state = decoratorCalled
 	return nil
 }
 
 func (n *decoratorNode) ID() dot.CtorID { return n.id }
+
+func (n *decoratorNode) State() decoratorState { return n.state }
 
 // DecorateOption modifies the default behavior of Decorate.
 type DecorateOption interface {
