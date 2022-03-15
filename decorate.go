@@ -216,13 +216,13 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 
 	keys := findResultKeys(dn.results)
 	for _, k := range keys {
-		if len(s.decorators[k]) > 0 {
+		if _, ok := s.decorators[k]; ok {
 			return fmt.Errorf("cannot decorate using function %v: %s already decorated",
 				dn.dtype,
 				k,
 			)
 		}
-		s.decorators[k] = append(s.decorators[k], dn)
+		s.decorators[k] = dn
 	}
 
 	if info := options.Info; info != nil {
