@@ -3515,6 +3515,20 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 		)
 	})
 
+	t.Run("duplicate provide with LocationForPC", func(t *testing.T) {
+		c := digtest.New(t)
+		c.RequireProvide(func(x int) float64 {
+			return testStruct{}.TestMethod(x)
+		}, dig.LocationForPC(reflect.TypeOf(testStruct{}).Method(0).Func.Pointer()))
+		err := c.Provide(func(x int) float64 {
+			return testStruct{}.TestMethod(x)
+		}, dig.LocationForPC(reflect.TypeOf(testStruct{}).Method(0).Func.Pointer()))
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), `cannot provide function "go.uber.org/dig_test".testStruct.TestMethod`)
+		require.Contains(t, err.Error(), `already provided by "go.uber.org/dig_test".testStruct.TestMethod`)
+	})
+
 	t.Run("named instances", func(t *testing.T) {
 		c := digtest.New(t)
 		type A1 struct{ s string }
