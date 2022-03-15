@@ -227,23 +227,19 @@ func (ps paramSingle) buildWithDecorators(c containerStore, decorating bool) (v 
 		decoratingScope containerStore
 	)
 	stores := c.storesToRoot()
+storeLoop:
 	for _, s := range stores {
 		if decorators = s.getValueDecorators(ps.Name, ps.Type); len(decorators) == 0 {
 			continue
 		}
-		searchParentScope := false
 		for _, d := range decorators {
 			if d.State() == decoratorOnStack {
 				decorators = nil // reset this stuff.
-				searchParentScope = true
+				continue storeLoop
 			}
 		}
-		if searchParentScope {
-			continue
-		} else {
-			decoratingScope = s
-			break
-		}
+		decoratingScope = s
+		break
 	}
 	if len(decorators) == 0 {
 		return _noValue, false, nil
