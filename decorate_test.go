@@ -23,6 +23,7 @@ package dig_test
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -121,6 +122,46 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.Equal(t, "A'", a.Name, "expected name to equal decorated name in child scope")
 			assert.ElementsMatch(t, []string{"val1'", "val2'", "val3'"}, b.Values)
 		})
+	})
+
+	t.Run("value groups with multiple decorations", func(t *testing.T) {
+		type params struct {
+			dig.In
+
+			Strings []string `group:"strings"`
+		}
+
+		type childResult struct {
+			dig.Out
+
+			Strings []string `group:"strings"`
+		}
+
+		type A []string
+
+		parent := digtest.New(t)
+		parent.RequireProvide(func() string { return "a" }, dig.Group("strings"))
+		parent.RequireProvide(func() string { return "b" }, dig.Group("strings"))
+		parent.RequireProvide(func() string { return "c" }, dig.Group("strings"))
+
+		parent.RequireProvide(func(p params) A { return A(p.Strings) })
+
+		child := parent.Scope("child")
+
+		child.RequireDecorate(func(p params) childResult {
+			res := childResult{Strings: make([]string, len(p.Strings))}
+			for i, s := range p.Strings {
+				res.Strings[i] = strings.ToUpper(s)
+			}
+			return res
+		})
+		child.RequireDecorate(func(p params) A {
+			return append(A(p.Strings), "D")
+		})
+
+		require.NoError(t, child.Invoke(func(a A) {
+			assert.ElementsMatch(t, A{"A", "B", "C", "D"}, a)
+		}))
 	})
 
 	t.Run("simple decorate a provider to a scope and its descendants", func(t *testing.T) {
