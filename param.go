@@ -223,38 +223,28 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 // If there are no decorators associated with this parameter, _noValue is returned.
 func (ps paramSingle) buildWithDecorators(c containerStore, decorating bool) (v reflect.Value, found bool, err error) {
 	var (
-		decorators      []decorator
+		d               decorator
 		decoratingScope containerStore
 	)
 	stores := c.storesToRoot()
-storeLoop:
+
 	for _, s := range stores {
-		if decorators = s.getValueDecorators(ps.Name, ps.Type); len(decorators) == 0 {
+		if d, found = s.getValueDecorator(ps.Name, ps.Type); !found {
 			continue
 		}
-		for _, d := range decorators {
-			if d.State() == decoratorOnStack {
-				// This decorator is already being run.
-				// Avoid a cycle and look further.
-				decorators = nil
-				continue storeLoop
-			}
+		if d.State() == decoratorOnStack {
+			// This decorator is already being run.
+			// Avoid a cycle and look further.
+			d = nil
+			continue
 		}
 		decoratingScope = s
 		break
 	}
-	if len(decorators) == 0 {
+	if !found || d == nil {
 		return _noValue, false, nil
 	}
-	found = true
-	for _, d := range decorators {
-		err := d.Call(decoratingScope)
-		if err == nil {
-			continue
-		}
-		if _, ok := err.(errMissingDependencies); ok && ps.Optional {
-			continue
-		}
+	if err = d.Call(decoratingScope); err != nil {
 		v, err = _noValue, errParamSingleFailed{
 			CtorID: 1,
 			Key:    key{t: ps.Type, name: ps.Name},
@@ -577,7 +567,7 @@ func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
 	stores := c.storesToRoot()
 	for i := len(stores) - 1; i >= 0; i-- {
 		c := stores[i]
-		for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
+		if d, found := c.getGroupDecorator(pt.Group, pt.Type.Elem()); found {
 			if err := d.Call(c); err != nil {
 				return errParamGroupFailed{
 					CtorID: d.ID(),
