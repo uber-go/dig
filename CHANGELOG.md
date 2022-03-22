@@ -4,8 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-- No changes yet.
+## [1.14.1] - 2022-03-22
+### Fixed
+- Fix an issue where a dependency for a decoration supplied by another decorator in the
+  same scope is ignored.
+- Fix a panic when submitting a single value as a value group in `Scope.Decorate`.
+- Upon a provide error, make the error message contain the function named specified
+  by LocationForPC Option.
+
+[1.14.1]: https://github.com/uber-go/dig/compare/v1.14.0...v1.14.1
 
 ## [1.14.0] - 2022-02-23
 ### Added
