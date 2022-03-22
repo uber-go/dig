@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -214,7 +215,10 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 		return err
 	}
 
-	keys := findResultKeys(dn.results)
+	keys, err := findResultKeys(dn.results)
+	if err != nil {
+		return err
+	}
 	for _, k := range keys {
 		if _, ok := s.decorators[k]; ok {
 			return fmt.Errorf("cannot decorate using function %v: %s already decorated",
@@ -251,7 +255,7 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 	return nil
 }
 
-func findResultKeys(r resultList) []key {
+func findResultKeys(r resultList) ([]key, error) {
 	// use BFS to search for all keys included in a resultList.
 	var (
 		q    []result
@@ -267,6 +271,9 @@ func findResultKeys(r resultList) []key {
 		case resultSingle:
 			keys = append(keys, key{t: innerResult.Type, name: innerResult.Name})
 		case resultGrouped:
+			if innerResult.Type.Kind() != reflect.Slice {
+				return nil, errors.New("decorating a value group requires decorating the entire value group, not a single value")
+			}
 			keys = append(keys, key{t: innerResult.Type.Elem(), group: innerResult.Group})
 		case resultObject:
 			for _, f := range innerResult.Fields {
@@ -276,5 +283,5 @@ func findResultKeys(r resultList) []key {
 			q = append(q, innerResult.Results...)
 		}
 	}
-	return keys
+	return keys, nil
 }

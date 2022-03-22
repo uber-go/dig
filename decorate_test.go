@@ -673,6 +673,22 @@ func TestDecorateFailure(t *testing.T) {
 		assert.Contains(t, err.Error(), "function func(dig_test.Param) dig_test.Result")
 		assert.Contains(t, err.Error(), "*dig_test.A already decorated")
 	})
+
+	t.Run("decorate value group with a single value", func(t *testing.T) {
+		type A struct {
+			dig.Out
+
+			Value int `group:"val"`
+		}
+
+		root := digtest.New(t)
+
+		root.RequireProvide(func() A { return A{Value: 1} })
+		err := root.Decorate(func() A { return A{Value: 11} })
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "decorating a value group requires decorating the entire value group")
+	})
 }
 
 func TestMultipleDecorates(t *testing.T) {
