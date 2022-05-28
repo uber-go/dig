@@ -53,7 +53,7 @@ type param interface {
 	// Build returns a deferred that resolves once the reflect.Value is filled in.
 	//
 	// This MAY panic if the param does not produce a single value.
-	Build(store containerStore, decorating bool, target *reflect.Value) *promise.Deferred
+	Build(store containerStore, target *reflect.Value) *promise.Deferred
 
 	// DotParam returns a slice of dot.Param(s).
 	DotParam() []*dot.Param
@@ -141,7 +141,7 @@ func newParamList(ctype reflect.Type, c containerStore) (paramList, error) {
 	return pl, nil
 }
 
-func (pl paramList) Build(containerStore, bool, *reflect.Value) *promise.Deferred {
+func (pl paramList) Build(containerStore, *reflect.Value) *promise.Deferred {
 	digerror.BugPanicf("paramList.Build() must never be called")
 	panic("") // Unreachable, as BugPanicf above will panic.
 }
@@ -149,11 +149,11 @@ func (pl paramList) Build(containerStore, bool, *reflect.Value) *promise.Deferre
 // BuildList builds an ordered list of values which may be passed directly
 // to the underlying constructor and stores them in the pointed-to slice.
 // It returns a deferred that resolves when the slice is filled out.
-func (pl paramList) BuildList(c containerStore, decorating bool, targets *[]reflect.Value) *promise.Deferred {
+func (pl paramList) BuildList(c containerStore, targets *[]reflect.Value) *promise.Deferred {
 	children := make([]*promise.Deferred, len(pl.Params))
 	*targets = make([]reflect.Value, len(pl.Params))
 	for i, p := range pl.Params {
-		children[i] = p.Build(c, decorating, &(*targets)[i])
+		children[i] = p.Build(c, &(*targets)[i])
 	}
 	return promise.WhenAll(children...)
 }
@@ -221,19 +221,34 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 
 // builds the parameter using decorators, if any. useDecorators controls whether to use decorator functions (true) or
 // provider functions (false).
-func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *reflect.Value) *promise.Deferred {
+func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *reflect.Value) (*promise.Deferred, containerStore) {
 	var decorators []decorator
+	var providers []provider
+	var callScope containerStore
 
 	if useDecorators {
-		decorators = c.getValueDecorators(ps.Name, ps.Type)
-
-		if len(decorators) == 0 {
-			return promise.Done
+		var d decorator
+		var ok bool
+		for _, s := range c.storesToRoot() {
+			d, ok = s.getValueDecorator(ps.Name, ps.Type)
+			if !ok {
+				continue
+			}
+			// If the decorator is already on stack, we break
+			// here to not get into an infinite recursion.
+			if d.State() == functionOnStack {
+				d = nil
+				continue
+			}
+			// Reset the calling scope to the decorator's scope.
+			callScope = s
+			decorators = append(decorators, d)
+			break
 		}
 	} else {
-		// A provider is-a decorator ({methods of decorator} ⊆ {methods of provider})
-		var providers []provider
+
 		for _, container := range c.storesToRoot() {
+			// A provider is-a decorator ({methods of decorator} ⊆ {methods of provider})
 			providers = container.getValueProviders(ps.Name, ps.Type)
 			if len(providers) > 0 {
 				break
@@ -243,10 +258,10 @@ func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *re
 		if len(providers) == 0 {
 			if ps.Optional {
 				target.Set(reflect.Zero(ps.Type))
-				return promise.Done
+				return promise.Done, c
 			}
 
-			return promise.Fail(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
+			return promise.Fail(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type})), c
 		}
 
 		decorators = make([]decorator, len(providers))
@@ -274,8 +289,9 @@ func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *re
 		}
 
 		n := decorators[i]
+		callScope = n.OrigScope()
 
-		n.Call(c).Observe(func(err error) {
+		n.Call(callScope).Observe(func(err error) {
 			if err != nil {
 				// If we're missing dependencies but the parameter itself is optional,
 				// we can just move on.
@@ -293,19 +309,16 @@ func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *re
 	}
 
 	doNext(0)
-	return d
+	return d, c
 }
 
-func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.Value) *promise.Deferred {
+func (ps paramSingle) Build(c containerStore, target *reflect.Value) *promise.Deferred {
 	if !target.IsValid() {
 		*target = reflect.New(ps.Type).Elem()
 	}
 
-	d := promise.Done
-
-	if !decorating {
-		d = ps.buildWith(c, true, target)
-	}
+	// try building with decorators first, in case this parameter has decorators.
+	d, c := ps.buildWith(c, true, target)
 
 	return d.Then(func() *promise.Deferred {
 		// Check whether the value is a decorated value first.
@@ -319,8 +332,8 @@ func (ps paramSingle) Build(c containerStore, decorating bool, target *reflect.V
 			target.Set(v)
 			return promise.Done
 		}
-
-		return ps.buildWith(c, false, target)
+		p, _ := ps.buildWith(c, false, target)
+		return p
 	})
 }
 
@@ -408,7 +421,7 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 	return po, nil
 }
 
-func (po paramObject) Build(c containerStore, decorating bool, target *reflect.Value) *promise.Deferred {
+func (po paramObject) Build(c containerStore, target *reflect.Value) *promise.Deferred {
 	if !target.IsValid() {
 		*target = reflect.New(po.Type).Elem()
 	}
@@ -417,7 +430,7 @@ func (po paramObject) Build(c containerStore, decorating bool, target *reflect.V
 	for i, f := range po.Fields {
 		f := f
 		field := target.Field(f.FieldIndex)
-		children[i] = f.Build(c, decorating, &field)
+		children[i] = f.Build(c, &field)
 	}
 
 	return promise.WhenAll(children...)
@@ -486,8 +499,8 @@ func newParamObjectField(idx int, f reflect.StructField, c containerStore) (para
 	return pof, nil
 }
 
-func (pof paramObjectField) Build(c containerStore, decorating bool, target *reflect.Value) *promise.Deferred {
-	return pof.Param.Build(c, decorating, target)
+func (pof paramObjectField) Build(c containerStore, target *reflect.Value) *promise.Deferred {
+	return pof.Param.Build(c, target)
 }
 
 // paramGroupedSlice is a param which produces a slice of values with the same
@@ -574,8 +587,14 @@ func (pt paramGroupedSlice) callGroupDecorators(c containerStore) *promise.Defer
 	stores := c.storesToRoot()
 	for i := len(stores) - 1; i >= 0; i-- {
 		c := stores[i]
-		for _, d := range c.getGroupDecorators(pt.Group, pt.Type.Elem()) {
-			d := d
+		if d, ok := c.getGroupDecorator(pt.Group, pt.Type.Elem()); ok {
+
+			if d.State() == functionOnStack {
+				// This decorator is already being run. Avoid cycle
+				// and look further.
+				continue
+			}
+
 			child := d.Call(c)
 			children = append(children, child.Catch(func(err error) error {
 				return errParamGroupFailed{
@@ -611,15 +630,11 @@ func (pt paramGroupedSlice) callGroupProviders(c containerStore) *promise.Deferr
 	return promise.WhenAll(children...)
 }
 
-func (pt paramGroupedSlice) Build(c containerStore, decorating bool, target *reflect.Value) *promise.Deferred {
-	d := promise.Done
-
+func (pt paramGroupedSlice) Build(c containerStore, target *reflect.Value) *promise.Deferred {
 	// do not call this if we are already inside a decorator since
 	// it will result in an infinite recursion. (i.e. decorate -> params.BuildList() -> Decorate -> params.BuildList...)
 	// this is safe since a value can be decorated at most once in a given scope.
-	if !decorating {
-		d = pt.callGroupDecorators(c)
-	}
+	d := pt.callGroupDecorators(c)
 
 	return d.Then(func() *promise.Deferred {
 		// Check if we have decorated values

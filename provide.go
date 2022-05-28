@@ -153,7 +153,7 @@ type ProvideInfo struct {
 	Outputs []*Output
 }
 
-// Input contains information on an input parameter of the constructor.
+// Input contains information on an input parameter of a function.
 type Input struct {
 	t           reflect.Type
 	optional    bool
@@ -179,7 +179,7 @@ func (i *Input) String() string {
 	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
 }
 
-// Output contains information on an output produced by the constructor.
+// Output contains information on an output produced by a function.
 type Output struct {
 	t           reflect.Type
 	name, group string
@@ -201,7 +201,7 @@ func (o *Output) String() string {
 	return fmt.Sprintf("%v[%v]", t, strings.Join(toks, ", "))
 }
 
-// FillProvideInfo is a ProvideOption that writes info on what Dig was able to get out
+// FillProvideInfo is a ProvideOption that writes info on what Dig was able to get
 // out of the provided constructor into the provided ProvideInfo.
 func FillProvideInfo(info *ProvideInfo) ProvideOption {
 	return fillProvideInfoOption{info: info}
@@ -359,6 +359,8 @@ type provider interface {
 	Call(store containerStore) *promise.Deferred
 
 	CType() reflect.Type
+
+	OrigScope() *Scope
 }
 
 // Provide teaches the container how to build values of one or more types and
@@ -416,8 +418,15 @@ func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 	}
 
 	if err := s.provide(constructor, options); err != nil {
+		var errFunc *digreflect.Func
+		if options.Location == nil {
+			errFunc = digreflect.InspectFunc(constructor)
+		} else {
+			errFunc = options.Location
+		}
+
 		return errProvide{
-			Func:   digreflect.InspectFunc(constructor),
+			Func:   errFunc,
 			Reason: err,
 		}
 	}
@@ -427,6 +436,7 @@ func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	// If Export option is provided to the constructor, this should be injected to the
 	// root-level Scope (Container) to allow it to propagate to all other Scopes.
+	origScope := s
 	if opts.Exported {
 		s = s.rootScope()
 	}
@@ -449,6 +459,7 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	n, err := newConstructorNode(
 		ctor,
 		s,
+		origScope,
 		constructorOptions{
 			ResultName:  opts.Name,
 			ResultGroup: opts.Group,

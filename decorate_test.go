@@ -22,6 +22,8 @@ package dig_test
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,11 +46,17 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.Equal(t, "A", a.name, "expected name to not be decorated yet.")
 		})
 
-		c.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
+		var info dig.DecorateInfo
 
+		c.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} }, dig.FillDecorateInfo(&info))
 		c.RequireInvoke(func(a *A) {
 			assert.Equal(t, "A'", a.name, "expected name to equal decorated name.")
 		})
+
+		require.Equal(t, len(info.Inputs), 1)
+		require.Equal(t, len(info.Outputs), 1)
+		assert.Equal(t, "*dig_test.A", info.Inputs[0].String())
+		assert.Equal(t, "*dig_test.A", info.Outputs[0].String())
 	})
 
 	t.Run("simple decorate a provider from child scope", func(t *testing.T) {
@@ -61,7 +69,8 @@ func TestDecorateSuccess(t *testing.T) {
 		child := c.Scope("child")
 		child.RequireProvide(func() *A { return &A{name: "A"} }, dig.Export(true))
 
-		child.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
+		var info dig.DecorateInfo
+		child.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} }, dig.FillDecorateInfo(&info))
 		c.RequireInvoke(func(a *A) {
 			assert.Equal(t, "A", a.name, "expected name to equal original name in parent scope")
 		})
@@ -69,10 +78,93 @@ func TestDecorateSuccess(t *testing.T) {
 		child.RequireInvoke(func(a *A) {
 			assert.Equal(t, "A'", a.name, "expected name to equal decorated name in child scope")
 		})
+
+		require.Equal(t, len(info.Inputs), 1)
+		require.Equal(t, len(info.Outputs), 1)
+		assert.Equal(t, "*dig_test.A", info.Inputs[0].String())
+		assert.Equal(t, "*dig_test.A", info.Outputs[0].String())
+	})
+
+	t.Run("check parent-provided decorator doesn't need parent to invoke", func(t *testing.T) {
+		type A struct {
+			Name string
+		}
+
+		type B struct {
+			dig.In
+
+			Values []string `group:"values"`
+		}
+		type C struct {
+			dig.Out
+
+			Values []string `group:"values"`
+		}
+
+		c := digtest.New(t)
+		child := c.Scope("child")
+
+		c.RequireProvide(func() *A { return &A{Name: "A"} })
+		c.RequireProvide(func() string { return "val1" }, dig.Group("values"))
+		c.RequireProvide(func() string { return "val2" }, dig.Group("values"))
+		c.RequireProvide(func() string { return "val3" }, dig.Group("values"))
+		c.RequireDecorate(func(a *A) *A { return &A{Name: a.Name + "'"} })
+		c.RequireDecorate(func(b B) C {
+			var val []string
+			for _, v := range b.Values {
+				val = append(val, v+"'")
+			}
+			return C{
+				Values: val,
+			}
+		})
+		child.RequireInvoke(func(a *A, b B) {
+			assert.Equal(t, "A'", a.Name, "expected name to equal decorated name in child scope")
+			assert.ElementsMatch(t, []string{"val1'", "val2'", "val3'"}, b.Values)
+		})
+	})
+
+	t.Run("value groups with multiple decorations", func(t *testing.T) {
+		type params struct {
+			dig.In
+
+			Strings []string `group:"strings"`
+		}
+
+		type childResult struct {
+			dig.Out
+
+			Strings []string `group:"strings"`
+		}
+
+		type A []string
+
+		parent := digtest.New(t)
+		parent.RequireProvide(func() string { return "a" }, dig.Group("strings"))
+		parent.RequireProvide(func() string { return "b" }, dig.Group("strings"))
+		parent.RequireProvide(func() string { return "c" }, dig.Group("strings"))
+
+		parent.RequireProvide(func(p params) A { return A(p.Strings) })
+
+		child := parent.Scope("child")
+
+		child.RequireDecorate(func(p params) childResult {
+			res := childResult{Strings: make([]string, len(p.Strings))}
+			for i, s := range p.Strings {
+				res.Strings[i] = strings.ToUpper(s)
+			}
+			return res
+		})
+		child.RequireDecorate(func(p params) A {
+			return append(A(p.Strings), "D")
+		})
+
+		require.NoError(t, child.Invoke(func(a A) {
+			assert.ElementsMatch(t, A{"A", "B", "C", "D"}, a)
+		}))
 	})
 
 	t.Run("simple decorate a provider to a scope and its descendants", func(t *testing.T) {
-		t.Parallel()
 		type A struct {
 			name string
 		}
@@ -101,7 +193,6 @@ func TestDecorateSuccess(t *testing.T) {
 
 		c.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
 		child.RequireDecorate(func(a *A) *A { return &A{name: a.name + "'"} })
-
 		c.RequireInvoke(func(a *A) {
 			assert.Equal(t, "A'", a.name, "expected decorated name in parent")
 		})
@@ -144,6 +235,7 @@ func TestDecorateSuccess(t *testing.T) {
 		c.RequireProvide(func() *A { return &A{Name: "A"} })
 		c.RequireProvide(func() string { return "b" }, dig.Name("b"))
 
+		var info dig.DecorateInfo
 		c.RequireDecorate(func(b B) C {
 			return C{
 				A: &A{
@@ -151,12 +243,17 @@ func TestDecorateSuccess(t *testing.T) {
 				},
 				B: b.B + "'",
 			}
-		})
+		}, dig.FillDecorateInfo(&info))
 
 		c.RequireInvoke(func(b B) {
 			assert.Equal(t, "A'", b.A.Name)
 			assert.Equal(t, "b'", b.B)
 		})
+
+		require.Equal(t, 2, len(info.Inputs))
+		require.Equal(t, 2, len(info.Outputs))
+		assert.Equal(t, "*dig_test.A", info.Inputs[0].String())
+		assert.Equal(t, `string[name = "b"]`, info.Inputs[1].String())
 	})
 
 	t.Run("decorate with value groups", func(t *testing.T) {
@@ -177,6 +274,7 @@ func TestDecorateSuccess(t *testing.T) {
 		c.RequireProvide(func() string { return "cat" }, dig.Group("animals"))
 		c.RequireProvide(func() string { return "gopher" }, dig.Group("animals"))
 
+		var info dig.DecorateInfo
 		c.RequireDecorate(func(p Params) Result {
 			animals := p.Animals
 			for i := 0; i < len(animals); i++ {
@@ -185,11 +283,14 @@ func TestDecorateSuccess(t *testing.T) {
 			return Result{
 				Animals: animals,
 			}
-		})
+		}, dig.FillDecorateInfo(&info))
 
 		c.RequireInvoke(func(p Params) {
 			assert.ElementsMatch(t, []string{"good dog", "good cat", "good gopher"}, p.Animals)
 		})
+
+		require.Equal(t, 1, len(info.Inputs))
+		assert.Equal(t, `[]string[group = "animals"]`, info.Inputs[0].String())
 	})
 
 	t.Run("decorate with optional parameter", func(t *testing.T) {
@@ -298,6 +399,24 @@ func TestDecorateSuccess(t *testing.T) {
 		}))
 	})
 
+	t.Run("decorate two times within same scope", func(t *testing.T) {
+		type A struct {
+			name string
+		}
+		parent := digtest.New(t)
+		parent.RequireProvide(func() string { return "parent" })
+		parent.RequireProvide(func(n string) A { return A{name: n} })
+
+		child := parent.Scope("child")
+
+		child.RequireDecorate(func() string { return "child" })
+		child.RequireDecorate(func(n string) A { return A{name: n + " decorated"} })
+
+		require.NoError(t, child.Invoke(func(a A) {
+			assert.Equal(t, "child decorated", a.name)
+		}))
+	})
+
 	t.Run("decorate a value group with an empty slice", func(t *testing.T) {
 		type A struct {
 			dig.In
@@ -328,6 +447,38 @@ func TestDecorateSuccess(t *testing.T) {
 
 		c.RequireInvoke(func(a A) {
 			assert.Nil(t, a.Values)
+		})
+	})
+
+	t.Run("invoke with a transitive dependency on child-decorated exported type", func(t *testing.T) {
+		type Inner struct {
+			Int int
+		}
+
+		type Next struct {
+			MyInner *Inner
+		}
+
+		c := digtest.New(t)
+		child := c.Scope("child")
+
+		child.RequireProvide(func() *Inner {
+			return &Inner{Int: 42}
+		}, dig.Export(true))
+		child.RequireProvide(func(i *Inner) *Next {
+			return &Next{MyInner: i}
+		}, dig.Export(true))
+		child.RequireDecorate(func() *Inner {
+			return &Inner{Int: 5678}
+		})
+		c.RequireInvoke(func(n *Next) {
+			assert.Equal(t, 5678, n.MyInner.Int)
+		})
+		child.RequireInvoke(func(n *Next) {
+			assert.Equal(t, 5678, n.MyInner.Int)
+		})
+		c.RequireInvoke(func(i *Inner) {
+			assert.Equal(t, 42, i.Int)
 		})
 	})
 }
@@ -521,5 +672,168 @@ func TestDecorateFailure(t *testing.T) {
 		assert.Contains(t, err.Error(), "cannot decorate")
 		assert.Contains(t, err.Error(), "function func(dig_test.Param) dig_test.Result")
 		assert.Contains(t, err.Error(), "*dig_test.A already decorated")
+	})
+
+	t.Run("decorate value group with a single value", func(t *testing.T) {
+		type A struct {
+			dig.Out
+
+			Value int `group:"val"`
+		}
+
+		root := digtest.New(t)
+
+		root.RequireProvide(func() A { return A{Value: 1} })
+		err := root.Decorate(func() A { return A{Value: 11} })
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "decorating a value group requires decorating the entire value group")
+	})
+}
+
+func TestMultipleDecorates(t *testing.T) {
+	t.Run("decorate same type from parent and child, invoke child first", func(t *testing.T) {
+		t.Parallel()
+		type A struct{ value int }
+		root := digtest.New(t)
+		child := root.Scope("child")
+
+		decorator := func(a A) A {
+			return A{value: a.value + 1}
+		}
+		root.RequireProvide(func() A { return A{value: 0} })
+		root.RequireDecorate(decorator)
+		child.RequireDecorate(decorator)
+
+		child.RequireInvoke(func(a A) {
+			assert.Equal(t, 2, a.value)
+		})
+		root.RequireInvoke(func(a A) {
+			assert.Equal(t, 1, a.value)
+		})
+	})
+
+	t.Run("decorate same type from parent and child, invoke parent first", func(t *testing.T) {
+		t.Parallel()
+		type A struct{ value int }
+		root := digtest.New(t)
+		child := root.Scope("child")
+		decorator := func(a A) A {
+			return A{value: a.value + 1}
+		}
+		root.RequireProvide(func() A { return A{value: 0} })
+		root.RequireDecorate(decorator)
+		child.RequireDecorate(decorator)
+
+		root.RequireInvoke(func(a A) {
+			assert.Equal(t, 1, a.value)
+		})
+		child.RequireInvoke(func(a A) {
+			assert.Equal(t, 2, a.value)
+		})
+	})
+
+	t.Run("decorate same value group from parent and child, invoke child", func(t *testing.T) {
+		t.Parallel()
+		type A struct {
+			dig.In
+
+			Values []int `group:"val"`
+		}
+		type B struct {
+			dig.Out
+
+			Values []int `group:"val"`
+		}
+
+		root := digtest.New(t)
+		child := root.Scope("child")
+		decorator := func(a A) B {
+			var newV []int
+			for _, v := range a.Values {
+				newV = append(newV, v+1)
+			}
+			return B{Values: newV}
+		}
+
+		// provide {0, 1, 2}
+		root.Provide(func() int { return 0 }, dig.Group("val"))
+		root.Provide(func() int { return 1 }, dig.Group("val"))
+		root.Provide(func() int { return 2 }, dig.Group("val"))
+
+		// decorate +1 to each element in parent
+		root.RequireDecorate(decorator)
+
+		// decorate +1 to each element in child
+		child.RequireDecorate(decorator)
+
+		child.RequireInvoke(func(a A) {
+			assert.ElementsMatch(t, []int{2, 3, 4}, a.Values)
+		})
+
+		root.RequireInvoke(func(a A) {
+			assert.ElementsMatch(t, []int{1, 2, 3}, a.Values)
+		})
+	})
+
+	t.Run("decorate same value group from parent and child, invoke parent", func(t *testing.T) {
+		t.Parallel()
+		type A struct {
+			dig.In
+
+			Values []int `group:"val"`
+		}
+		type B struct {
+			dig.Out
+
+			Values []int `group:"val"`
+		}
+
+		root := digtest.New(t)
+		child := root.Scope("child")
+		decorator := func(a A) B {
+			var newV []int
+			for _, v := range a.Values {
+				newV = append(newV, v+1)
+			}
+			return B{Values: newV}
+		}
+
+		// provide {0, 1, 2}
+		root.Provide(func() int { return 0 }, dig.Group("val"))
+		root.Provide(func() int { return 1 }, dig.Group("val"))
+		root.Provide(func() int { return 2 }, dig.Group("val"))
+
+		// decorate +1 to each element in parent
+		root.RequireDecorate(decorator)
+
+		// decorate +1 to each element in child
+		child.RequireDecorate(decorator)
+
+		root.Invoke(func(a A) {
+			assert.ElementsMatch(t, []int{1, 2, 3}, a.Values)
+		})
+
+		child.Invoke(func(a A) {
+			assert.ElementsMatch(t, []int{2, 3, 4}, a.Values)
+		})
+	})
+}
+
+func TestFillDecorateInfoString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, "FillDecorateInfo(0x0)", fmt.Sprint(dig.FillDecorateInfo(nil)))
+	})
+
+	t.Run("not nil", func(t *testing.T) {
+		t.Parallel()
+
+		opt := dig.FillDecorateInfo(new(dig.DecorateInfo))
+		assert.NotEqual(t, fmt.Sprint(opt), "FillDecorateInfo(0x0)")
+		assert.Contains(t, fmt.Sprint(opt), "FillDecorateInfo(0x")
 	})
 }

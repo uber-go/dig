@@ -2418,6 +2418,30 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		assert.Contains(t, err.Error(), "cannot provide io.Reader")
 		assert.Contains(t, err.Error(), "already provided")
 	})
+
+	t.Run("error should refer to location given by LocationForPC ProvideOption", func(t *testing.T) {
+		c := digtest.New(t)
+		type A struct{ idx int }
+		type ret struct {
+			dig.Out
+
+			A1 A // same type A provided twice
+			A2 A
+		}
+
+		locationFn := func() {}
+
+		err := c.Provide(func() ret {
+			return ret{
+				A1: A{idx: 1},
+				A2: A{idx: 2},
+			}
+		}, dig.LocationForPC(reflect.ValueOf(locationFn).Pointer()))
+		require.Error(t, err, "provide must return error")
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures.func\d+.1`,
+		)
+	})
 }
 
 func TestInvokeFailures(t *testing.T) {
@@ -3514,6 +3538,20 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 			`cannot provide dig_test.A from \[0\]:`,
 			`already provided by "go.uber.org/dig_test".TestEndToEndSuccessWithAliases\S+`,
 		)
+	})
+
+	t.Run("duplicate provide with LocationForPC", func(t *testing.T) {
+		c := digtest.New(t)
+		c.RequireProvide(func(x int) float64 {
+			return testStruct{}.TestMethod(x)
+		}, dig.LocationForPC(reflect.TypeOf(testStruct{}).Method(0).Func.Pointer()))
+		err := c.Provide(func(x int) float64 {
+			return testStruct{}.TestMethod(x)
+		}, dig.LocationForPC(reflect.TypeOf(testStruct{}).Method(0).Func.Pointer()))
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), `cannot provide function "go.uber.org/dig_test".testStruct.TestMethod`)
+		require.Contains(t, err.Error(), `already provided by "go.uber.org/dig_test".testStruct.TestMethod`)
 	})
 
 	t.Run("named instances", func(t *testing.T) {

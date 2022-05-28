@@ -34,7 +34,7 @@ func TestParamListBuild(t *testing.T) {
 	require.NoError(t, err)
 	assert.Panics(t, func() {
 		var target reflect.Value
-		p.Build(newScope(), false /* decorating */, &target)
+		p.Build(newScope(), &target)
 	})
 }
 

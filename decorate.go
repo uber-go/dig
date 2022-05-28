@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -29,9 +30,19 @@ import (
 	"go.uber.org/dig/internal/promise"
 )
 
+type functionState int
+
+const (
+	functionReady functionState = iota
+	functionOnStack
+	functionCalled
+)
+
 type decorator interface {
 	Call(c containerStore) *promise.Deferred
 	ID() dot.CtorID
+	State() functionState
+	OrigScope() *Scope
 }
 
 type decoratorNode struct {
@@ -43,11 +54,8 @@ type decoratorNode struct {
 	// Location where this function was defined.
 	location *digreflect.Func
 
-	// Whether this node is already building its paramList and calling the constructor
-	calling bool
-
-	// Whether the decorator owned by this node was already called.
-	called bool
+	// Current state of this decorator
+	state functionState
 
 	// Parameters of the decorator.
 	params paramList
@@ -103,11 +111,11 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 // On failure, the returned pointer is not guaranteed to stay in a failed state; another call will reset it back to its
 // zero value; don't store the returned pointer. (It will still call each observer only once.)
 func (n *decoratorNode) Call(s containerStore) *promise.Deferred {
-	if n.calling || n.called {
+	if n.state == functionOnStack || n.state == functionCalled {
 		return &n.deferred
 	}
 
-	n.calling = true
+	n.state = functionOnStack
 	n.deferred = promise.Deferred{}
 
 	if err := shallowCheckDependencies(s, n.params); err != nil {
@@ -118,11 +126,11 @@ func (n *decoratorNode) Call(s containerStore) *promise.Deferred {
 	}
 
 	var args []reflect.Value
-	d := n.params.BuildList(s, true /* decorating */, &args)
+	d := n.params.BuildList(s, &args)
 
 	d.Observe(func(err error) {
 		if err != nil {
-			n.calling = false
+			n.state = functionCalled
 			n.deferred.Resolve(errArgumentsFailed{
 				Func:   n.location,
 				Reason: err,
@@ -135,13 +143,12 @@ func (n *decoratorNode) Call(s containerStore) *promise.Deferred {
 		s.scheduler().Schedule(func() {
 			results = s.invoker()(reflect.ValueOf(n.dcor), args)
 		}).Observe(func(_ error) {
-			n.calling = false
 			if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
 				n.deferred.Resolve(err)
 				return
 			}
 
-			n.called = true
+			n.state = functionCalled
 			n.deferred.Resolve(nil)
 		})
 	})
@@ -151,10 +158,41 @@ func (n *decoratorNode) Call(s containerStore) *promise.Deferred {
 
 func (n *decoratorNode) ID() dot.CtorID { return n.id }
 
-// DecorateOption modifies the default behavior of Provide.
-// Currently, there is no implementation of it yet.
+func (n *decoratorNode) State() functionState { return n.state }
+
+func (n *decoratorNode) OrigScope() *Scope { return n.s }
+
+// DecorateOption modifies the default behavior of Decorate.
 type DecorateOption interface {
-	noOptionsYet()
+	apply(*decorateOptions)
+}
+
+type decorateOptions struct {
+	Info *DecorateInfo
+}
+
+// FillDecorateInfo is a DecorateOption that writes info on what Dig was
+// able to get out of the provided decorator into the provided DecorateInfo.
+func FillDecorateInfo(info *DecorateInfo) DecorateOption {
+	return fillDecorateInfoOption{info: info}
+}
+
+type fillDecorateInfoOption struct{ info *DecorateInfo }
+
+func (o fillDecorateInfoOption) String() string {
+	return fmt.Sprintf("FillDecorateInfo(%p)", o.info)
+}
+
+func (o fillDecorateInfoOption) apply(opts *decorateOptions) {
+	opts.Info = o.info
+}
+
+// DecorateInfo provides information about the decorator's inputs and outputs
+// types as strings, as well as the ID of the decorator supplied to the Container.
+type DecorateInfo struct {
+	ID      ID
+	Inputs  []*Input
+	Outputs []*Output
 }
 
 // Decorate provides a decorator for a type that has already been provided in the Container.
@@ -199,27 +237,57 @@ func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) erro
 //
 // Similar to a provider, the decorator function gets called *at most once*.
 func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
-	_ = opts // there are no options at this time
+	var options decorateOptions
+	for _, opt := range opts {
+		opt.apply(&options)
+	}
 
 	dn, err := newDecoratorNode(decorator, s)
 	if err != nil {
 		return err
 	}
 
-	keys := findResultKeys(dn.results)
+	keys, err := findResultKeys(dn.results)
+	if err != nil {
+		return err
+	}
 	for _, k := range keys {
-		if len(s.decorators[k]) > 0 {
+		if _, ok := s.decorators[k]; ok {
 			return fmt.Errorf("cannot decorate using function %v: %s already decorated",
 				dn.dtype,
 				k,
 			)
 		}
-		s.decorators[k] = append(s.decorators[k], dn)
+		s.decorators[k] = dn
+	}
+
+	if info := options.Info; info != nil {
+		params := dn.params.DotParam()
+		results := dn.results.DotResult()
+		info.ID = (ID)(dn.id)
+		info.Inputs = make([]*Input, len(params))
+		info.Outputs = make([]*Output, len(results))
+
+		for i, param := range params {
+			info.Inputs[i] = &Input{
+				t:        param.Type,
+				optional: param.Optional,
+				name:     param.Name,
+				group:    param.Group,
+			}
+		}
+		for i, res := range results {
+			info.Outputs[i] = &Output{
+				t:     res.Type,
+				name:  res.Name,
+				group: res.Group,
+			}
+		}
 	}
 	return nil
 }
 
-func findResultKeys(r resultList) []key {
+func findResultKeys(r resultList) ([]key, error) {
 	// use BFS to search for all keys included in a resultList.
 	var (
 		q    []result
@@ -235,6 +303,9 @@ func findResultKeys(r resultList) []key {
 		case resultSingle:
 			keys = append(keys, key{t: innerResult.Type, name: innerResult.Name})
 		case resultGrouped:
+			if innerResult.Type.Kind() != reflect.Slice {
+				return nil, errors.New("decorating a value group requires decorating the entire value group, not a single value")
+			}
 			keys = append(keys, key{t: innerResult.Type.Elem(), group: innerResult.Group})
 		case resultObject:
 			for _, f := range innerResult.Fields {
@@ -244,5 +315,5 @@ func findResultKeys(r resultList) []key {
 			q = append(q, innerResult.Results...)
 		}
 	}
-	return keys
+	return keys, nil
 }

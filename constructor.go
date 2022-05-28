@@ -46,11 +46,8 @@ type constructorNode struct {
 	// id uniquely identifies the constructor that produces a node.
 	id dot.CtorID
 
-	// Whether this node is already building its paramList and calling the constructor
-	calling bool
-
-	// Whether the constructor owned by this node was already called.
-	called bool
+	// State of the underlying constructor function
+	state functionState
 
 	// Type information about constructor parameters.
 	paramList paramList
@@ -64,8 +61,12 @@ type constructorNode struct {
 	// order of this node in each Scopes' graphHolders.
 	orders map[*Scope]int
 
-	// scope this node was originally provided to.
+	// scope this node is part of
 	s *Scope
+
+	// scope this node was originally provided to.
+	// This is different from s if and only if the constructor was Provided with ExportOption.
+	origS *Scope
 }
 
 type constructorOptions struct {
@@ -77,7 +78,7 @@ type constructorOptions struct {
 	Location    *digreflect.Func
 }
 
-func newConstructorNode(ctor interface{}, s *Scope, opts constructorOptions) (*constructorNode, error) {
+func newConstructorNode(ctor interface{}, s *Scope, origS *Scope, opts constructorOptions) (*constructorNode, error) {
 	cval := reflect.ValueOf(ctor)
 	ctype := cval.Type()
 	cptr := cval.Pointer()
@@ -113,6 +114,7 @@ func newConstructorNode(ctor interface{}, s *Scope, opts constructorOptions) (*c
 		resultList: results,
 		orders:     make(map[*Scope]int),
 		s:          s,
+		origS:      origS,
 	}
 	s.newGraphNode(n, n.orders)
 	return n, nil
@@ -124,6 +126,8 @@ func (n *constructorNode) ResultList() resultList     { return n.resultList }
 func (n *constructorNode) ID() dot.CtorID             { return n.id }
 func (n *constructorNode) CType() reflect.Type        { return n.ctype }
 func (n *constructorNode) Order(s *Scope) int         { return n.orders[s] }
+func (n *constructorNode) OrigScope() *Scope          { return n.origS }
+func (n *constructorNode) State() functionState       { return n.state }
 
 func (n *constructorNode) String() string {
 	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)
@@ -139,11 +143,11 @@ func (n *constructorNode) String() string {
 // On failure, the returned pointer is not guaranteed to stay in a failed state; another call will reset it back to its
 // zero value; don't store the returned pointer. (It will still call each observer only once.)
 func (n *constructorNode) Call(c containerStore) *promise.Deferred {
-	if n.calling || n.called {
+	if n.State() == functionCalled || n.State() == functionOnStack {
 		return &n.deferred
 	}
 
-	n.calling = true
+	n.state = functionOnStack
 	n.deferred = promise.Deferred{}
 
 	if err := shallowCheckDependencies(c, n.paramList); err != nil {
@@ -156,11 +160,14 @@ func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 	var args []reflect.Value
 	var results []reflect.Value
 
-	n.paramList.BuildList(c, false /* decorating */, &args).Catch(func(err error) error {
-		return errArgumentsFailed{
-			Func:   n.location,
-			Reason: err,
+	n.paramList.BuildList(c, &args).Catch(func(err error) error {
+		if err != nil {
+			return errArgumentsFailed{
+				Func:   n.location,
+				Reason: err,
+			}
 		}
+		return nil
 	}).Then(func() *promise.Deferred {
 		return c.scheduler().Schedule(func() {
 			results = c.invoker()(reflect.ValueOf(n.ctor), args)
@@ -176,12 +183,11 @@ func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 		// the rest of the graph to instantiate the dependencies of this
 		// container.
 		receiver.Commit(n.s)
-		n.calling = false
-		n.called = true
+		n.state = functionCalled
 		n.deferred.Resolve(nil)
 		return promise.Done
 	}).Catch(func(err error) error {
-		n.calling = false
+		n.state = functionCalled
 		n.deferred.Resolve(err)
 		return nil
 	})
