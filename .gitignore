@@ -10,3 +10,4 @@
 *.coverprofile
 coverage.txt
 *.pprof
+.idea
