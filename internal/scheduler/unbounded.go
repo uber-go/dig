@@ -48,23 +48,18 @@ func (p *Unbounded) Flush() {
 	for inFlight > 0 || len(p.tasks) > 0 {
 		if len(p.tasks) > 0 {
 			t := p.tasks[len(p.tasks)-1]
-			p.tasks = p.tasks[0 : len(p.tasks)-1]
-
+			p.tasks = p.tasks[:len(p.tasks)-1]
 			go func() {
 				t.fn()
 				resultChan <- t.d
 			}()
-
 			inFlight++
 			continue
 		}
-
 		d := <-resultChan
 		inFlight--
 		d.Resolve(nil)
 	}
-
 	close(resultChan)
-
 	p.tasks = nil
 }

@@ -83,7 +83,7 @@ func (p *Parallel) Flush() {
 		select {
 		case outChan <- t:
 			inFlight++
-			p.tasks = p.tasks[0 : len(p.tasks)-1]
+			p.tasks = p.tasks[:len(p.tasks)-1]
 		case d := <-resultChan:
 			inFlight--
 			d.Resolve(nil)
@@ -92,6 +92,5 @@ func (p *Parallel) Flush() {
 
 	close(taskChan)
 	close(resultChan)
-
 	p.tasks = nil
 }

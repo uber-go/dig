@@ -155,6 +155,7 @@ func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 			Func:   n.location,
 			Reason: err,
 		})
+		return &n.deferred
 	}
 
 	var args []reflect.Value
