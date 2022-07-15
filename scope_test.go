@@ -73,10 +73,9 @@ func TestScopedOperations(t *testing.T) {
 
 	t.Run("private provides doesn't depend on invoke order", func(t *testing.T) {
 		c := digtest.New(t)
+		child := c.Scope("child")
 
 		c.RequireProvide(func() string { return "container" })
-
-		child := c.Scope("child")
 		child.RequireProvide(func() string { return "child" })
 
 		verifyContainerStr := func(s string) {
