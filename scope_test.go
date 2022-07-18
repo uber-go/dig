@@ -71,6 +71,24 @@ func TestScopedOperations(t *testing.T) {
 		assert.Error(t, c.Invoke(useB))
 	})
 
+	t.Run("private provides doesn't depend on invoke order", func(t *testing.T) {
+		c := digtest.New(t)
+		child := c.Scope("child")
+
+		c.RequireProvide(func() string { return "container" })
+		child.RequireProvide(func() string { return "child" })
+
+		verifyContainerStr := func(s string) {
+			assert.Equal(t, "container", s)
+		}
+		verifyChildStr := func(s string) {
+			assert.Equal(t, "child", s)
+		}
+
+		c.RequireInvoke(verifyContainerStr)
+		child.RequireInvoke(verifyChildStr)
+	})
+
 	t.Run("provides to top-level Container propogates to all scopes", func(t *testing.T) {
 		type A struct{}
 

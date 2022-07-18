@@ -213,6 +213,11 @@ func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
 		if v, ok := c.getValue(ps.Name, ps.Type); ok {
 			return v, ok
 		}
+		// If this scope can provide a value, we will build it instead of use upstream, since this
+		// is the closest provider
+		if providers := c.getValueProviders(ps.Name, ps.Type); len(providers) > 0 {
+			return _noValue, false
+		}
 	}
 	return _noValue, false
 }
