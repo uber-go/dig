@@ -264,6 +264,7 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	// Dependencies of this type will begin searching at that container,
 	// rather than starting at base.
 	var providers []provider
+	var providingContainer containerStore
 	for _, container := range c.storesToRoot() {
 		// first check if the scope already has cached a value for the type.
 		if v, ok := container.getValue(ps.Name, ps.Type); ok {
@@ -271,6 +272,7 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 		}
 		providers = container.getValueProviders(ps.Name, ps.Type)
 		if len(providers) > 0 {
+			providingContainer = container
 			break
 		}
 	}
@@ -303,11 +305,7 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 
 	// If we get here, it's impossible for the value to be absent from the
 	// container.
-	for _, container := range c.storesToRoot() {
-		if v, ok := container.getValue(ps.Name, ps.Type); ok {
-			return v, nil
-		}
-	}
+	v, _ = providingContainer.getValue(ps.Name, ps.Type)
 	return v, nil
 }
 
