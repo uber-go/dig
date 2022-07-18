@@ -207,21 +207,6 @@ func (ps paramSingle) getDecoratedValue(c containerStore) (reflect.Value, bool) 
 	return _noValue, false
 }
 
-// search the given container and its ancestors for a matching value.
-func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
-	for _, c := range c.storesToRoot() {
-		if v, ok := c.getValue(ps.Name, ps.Type); ok {
-			return v, ok
-		}
-		// If this scope can provide a value, we will build it instead of use upstream, since this
-		// is the closest provider
-		if providers := c.getValueProviders(ps.Name, ps.Type); len(providers) > 0 {
-			return _noValue, false
-		}
-	}
-	return _noValue, false
-}
-
 // builds the parameter using decorators in all scopes that affect the
 // current scope, if there are any. If there are multiple Scopes that decorates
 // this parameter, the closest one to the Scope that invoked this will be used.
@@ -272,10 +257,6 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 		return v, nil
 	}
 
-	if v, ok := ps.getValue(c); ok {
-		return v, nil
-	}
-
 	// Starting at the given container and working our way up its parents,
 	// find one that provides this dependency.
 	//
@@ -284,6 +265,10 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 	// rather than starting at base.
 	var providers []provider
 	for _, container := range c.storesToRoot() {
+		// first check if the scope already has cached a value for the type.
+		if v, ok := container.getValue(ps.Name, ps.Type); ok {
+			return v, nil
+		}
 		providers = container.getValueProviders(ps.Name, ps.Type)
 		if len(providers) > 0 {
 			break
@@ -318,7 +303,11 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 
 	// If we get here, it's impossible for the value to be absent from the
 	// container.
-	v, _ = ps.getValue(c)
+	for _, container := range c.storesToRoot() {
+		if v, ok := container.getValue(ps.Name, ps.Type); ok {
+			return v, nil
+		}
+	}
 	return v, nil
 }
 
