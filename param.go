@@ -395,7 +395,22 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 
 func (po paramObject) Build(c containerStore) (reflect.Value, error) {
 	dest := reflect.New(po.Type).Elem()
+	var groupQueue []paramObjectField
 	for _, f := range po.Fields {
+		p, ok := f.Param.(paramGroupedSlice)
+		if ok {
+			if p.Soft {
+				groupQueue = append(groupQueue, f)
+				continue
+			}
+		}
+		v, err := f.Build(c)
+		if err != nil {
+			return dest, err
+		}
+		dest.Field(f.FieldIndex).Set(v)
+	}
+	for _, f := range groupQueue {
 		v, err := f.Build(c)
 		if err != nil {
 			return dest, err

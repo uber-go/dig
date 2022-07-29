@@ -1380,6 +1380,29 @@ func TestGroups(t *testing.T) {
 		assert.Contains(t, err.Error(), "flatten can be applied to slices only")
 	})
 
+	t.Run("check providers for value groups aren't called if only they're provided", func(t *testing.T) {
+		type Param struct {
+			dig.In
+
+			Values []string `group:"foo,soft"`
+		}
+		type Result struct {
+			dig.Out
+
+			Value string `group:"foo"`
+		}
+		c := digtest.New(t)
+
+		c.RequireProvide(func() (Result, int) {
+			require.FailNow(t, "This shouldn't be called")
+			return Result{Value: "sad times"}, 20
+		})
+
+		c.RequireInvoke(func(p Param) {
+			assert.ElementsMatch(t, []string{}, p.Values)
+		})
+	})
+
 	t.Run("soft value group", func(t *testing.T) {
 		type Param1 struct {
 			dig.In

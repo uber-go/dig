@@ -475,7 +475,7 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 			"field %q (%v) is not a slice", f.Name, f.Type)
 	case g.Soft:
 		return rg, errf("cannot use soft with result value groups",
-			"soft was used with group:%q", rg.Group)
+			"soft was used with group %q", rg.Group)
 	case name != "":
 		return rg, errf(
 			"cannot use named values with value groups",
