@@ -44,6 +44,11 @@ func TestParseGroup(t *testing.T) {
 			wantG: group{Name: "somegroup", Flatten: true},
 		},
 		{
+			name:  "soft group",
+			group: "somegroup,soft",
+			wantG: group{Name: "somegroup", Soft: true},
+		},
+		{
 			name:    "error",
 			group:   `somegroup,abc`,
 			wantErr: `invalid option "abc"`,
