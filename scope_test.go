@@ -89,7 +89,7 @@ func TestScopedOperations(t *testing.T) {
 		child.RequireInvoke(verifyChildStr)
 	})
 
-	t.Run("provides to top-level Container propogates to all scopes", func(t *testing.T) {
+	t.Run("provides to top-level Container propagates to all scopes", func(t *testing.T) {
 		type A struct{}
 
 		// Scope tree:
@@ -355,14 +355,12 @@ func TestScopeValueGroups(t *testing.T) {
 			root.RequireInvoke(func(i param) {
 				assert.ElementsMatch(t, []string{"a", "b", "c"}, i.Values)
 			})
-
 		})
 
 		t.Run("invoke child", func(t *testing.T) {
 			child.RequireInvoke(func(i param) {
 				assert.ElementsMatch(t, []string{"a", "b", "c", "d"}, i.Values)
 			})
-
 		})
 	})
 

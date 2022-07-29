@@ -191,7 +191,6 @@ func TestNewResultObject(t *testing.T) {
 			assert.Equal(t, tt.wantFields, got.Fields)
 		})
 	}
-
 }
 
 func TestNewResultObjectErrors(t *testing.T) {
@@ -287,6 +286,15 @@ func TestNewResultObjectErrors(t *testing.T) {
 				Writer io.Writer `group:"writers,flatten"`
 			}{},
 			err: "flatten can be applied to slices only",
+		},
+		{
+			desc: "soft on value group",
+			give: struct {
+				Out
+
+				Fries []struct{} `group:"potato,flatten,soft"`
+			}{},
+			err: "cannot use soft with result value groups",
 		},
 	}
 

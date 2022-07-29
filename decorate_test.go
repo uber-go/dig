@@ -164,6 +164,55 @@ func TestDecorateSuccess(t *testing.T) {
 		}))
 	})
 
+	t.Run("decorate values in soft group", func(t *testing.T) {
+		type params struct {
+			dig.In
+
+			Strings []string `group:"strings,soft"`
+			Ints    []int    `group:"ints"`
+		}
+		type result struct {
+			dig.Out
+
+			String string `group:"strings"`
+			Int    int    `group:"ints"`
+		}
+		type childResult struct {
+			dig.Out
+
+			Strings []string `group:"strings"`
+		}
+
+		type A []string
+
+		parent := digtest.New(t)
+		parent.RequireProvide(func() string { return "a" }, dig.Group("strings"))
+		parent.RequireProvide(func() string { return "b" }, dig.Group("strings"))
+		parent.RequireProvide(func() result { return result{String: "c", Int: 10} })
+		parent.RequireProvide(func() result { return result{String: "d", Int: 11} })
+		parent.RequireProvide(func() result { return result{String: "e", Int: 12} })
+		parent.RequireProvide(func(p params) A {
+			return A(p.Strings)
+		})
+
+		child := parent.Scope("child")
+
+		child.RequireDecorate(func(p params) childResult {
+			res := childResult{Strings: make([]string, len(p.Strings))}
+			for i, s := range p.Strings {
+				res.Strings[i] = strings.ToUpper(s)
+			}
+			return res
+		})
+
+		child.RequireDecorate(func(p params) A {
+			return append(A(p.Strings), "F")
+		})
+		require.NoError(t, child.Invoke(func(a A) {
+			assert.ElementsMatch(t, A{"C", "D", "E", "F"}, a)
+		}))
+	})
+
 	t.Run("simple decorate a provider to a scope and its descendants", func(t *testing.T) {
 		type A struct {
 			name string

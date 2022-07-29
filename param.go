@@ -395,7 +395,20 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 
 func (po paramObject) Build(c containerStore) (reflect.Value, error) {
 	dest := reflect.New(po.Type).Elem()
+	// We have to build soft groups after all other fields, to avoid cases
+	// when a field calls a provider for a soft value group, but the value is
+	// not provided to it because the value group is declared before the field
+	var softGroupsQueue []paramObjectField
+	var fields []paramObjectField
 	for _, f := range po.Fields {
+		if p, ok := f.Param.(paramGroupedSlice); ok && p.Soft {
+			softGroupsQueue = append(softGroupsQueue, f)
+			continue
+		}
+		fields = append(fields, f)
+	}
+	fields = append(fields, softGroupsQueue...)
+	for _, f := range fields {
 		v, err := f.Build(c)
 		if err != nil {
 			return dest, err
@@ -485,6 +498,11 @@ type paramGroupedSlice struct {
 	// Type of the slice.
 	Type reflect.Type
 
+	// Soft is used to denote a soft dependency between this param and its
+	// constructors, if it's true its constructors are only called if they
+	// provide another value requested in the graph
+	Soft bool
+
 	orders map[*Scope]int
 }
 
@@ -513,7 +531,12 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	if err != nil {
 		return paramGroupedSlice{}, err
 	}
-	pg := paramGroupedSlice{Group: g.Name, Type: f.Type, orders: make(map[*Scope]int)}
+	pg := paramGroupedSlice{
+		Group:  g.Name,
+		Type:   f.Type,
+		orders: make(map[*Scope]int),
+		Soft:   g.Soft,
+	}
 
 	name := f.Tag.Get(_nameTag)
 	optional, _ := isFieldOptional(f)
@@ -611,11 +634,15 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 		return decoratedItems, nil
 	}
 
-	// If we do not have any decorated values, find the
-	// providers and call them.
-	itemCount, err := pt.callGroupProviders(c)
-	if err != nil {
-		return _noValue, err
+	// If we do not have any decorated values and the group isn't soft,
+	// find the providers and call them.
+	itemCount := 0
+	if !pt.Soft {
+		var err error
+		itemCount, err = pt.callGroupProviders(c)
+		if err != nil {
+			return _noValue, err
+		}
 	}
 
 	stores := c.storesToRoot()
