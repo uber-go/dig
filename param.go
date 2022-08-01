@@ -401,8 +401,7 @@ func (po paramObject) Build(c containerStore) (reflect.Value, error) {
 	var softGroupsQueue []paramObjectField
 	var fields []paramObjectField
 	for _, f := range po.Fields {
-		p, ok := f.Param.(paramGroupedSlice)
-		if ok && p.Soft {
+		if p, ok := f.Param.(paramGroupedSlice); ok && p.Soft {
 			softGroupsQueue = append(softGroupsQueue, f)
 			continue
 		}
@@ -499,7 +498,9 @@ type paramGroupedSlice struct {
 	// Type of the slice.
 	Type reflect.Type
 
-	// Soft
+	// Soft is used to denote a soft dependency between this param and its
+	// constructors, if it's true its constructors are only called if they
+	// provide another value requested in the graph
 	Soft bool
 
 	orders map[*Scope]int
