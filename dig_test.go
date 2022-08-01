@@ -1380,7 +1380,7 @@ func TestGroups(t *testing.T) {
 		assert.Contains(t, err.Error(), "flatten can be applied to slices only")
 	})
 
-	t.Run("check providers for value groups aren't called if only they're provided", func(t *testing.T) {
+	t.Run("a soft value group provider is not called when only that value group is consumed", func(t *testing.T) {
 		type Param struct {
 			dig.In
 
@@ -1394,7 +1394,7 @@ func TestGroups(t *testing.T) {
 		c := digtest.New(t)
 
 		c.RequireProvide(func() (Result, int) {
-			require.FailNow(t, "This shouldn't be called")
+			require.FailNow(t, "this function should not be called")
 			return Result{Value: "sad times"}, 20
 		})
 
@@ -1403,7 +1403,7 @@ func TestGroups(t *testing.T) {
 		})
 	})
 
-	t.Run("soft value group", func(t *testing.T) {
+	t.Run("soft value group is provided", func(t *testing.T) {
 		type Param1 struct {
 			dig.In
 
@@ -1460,7 +1460,12 @@ func TestGroups(t *testing.T) {
 			assert.Equal(t, float32(3.1416), p.Value3)
 		})
 	})
-
+	t.Run("soft in a result value group", func(t *testing.T) {
+		c := digtest.New(t)
+		err := c.Provide(func() int { return 10 }, dig.Group("foo,soft"))
+		require.Error(t, err, "failed to privide")
+		assert.Contains(t, err.Error(), "cannot use soft with result value groups")
+	})
 	t.Run("value group provided after a hard dependency is provided", func(t *testing.T) {
 		type Param struct {
 			dig.In

@@ -395,22 +395,21 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 
 func (po paramObject) Build(c containerStore) (reflect.Value, error) {
 	dest := reflect.New(po.Type).Elem()
-	var groupQueue []paramObjectField
+	// We have to build soft groups after all other fields, to avoid cases
+	// when a field calls a provider for a soft value group, but the value is
+	// not provided to it because the value group is declared before the field
+	var softGroupsQueue []paramObjectField
+	var fields []paramObjectField
 	for _, f := range po.Fields {
 		p, ok := f.Param.(paramGroupedSlice)
-		if ok {
-			if p.Soft {
-				groupQueue = append(groupQueue, f)
-				continue
-			}
+		if ok && p.Soft {
+			softGroupsQueue = append(softGroupsQueue, f)
+			continue
 		}
-		v, err := f.Build(c)
-		if err != nil {
-			return dest, err
-		}
-		dest.Field(f.FieldIndex).Set(v)
+		fields = append(fields, f)
 	}
-	for _, f := range groupQueue {
+	fields = append(fields, softGroupsQueue...)
+	for _, f := range fields {
 		v, err := f.Build(c)
 		if err != nil {
 			return dest, err
