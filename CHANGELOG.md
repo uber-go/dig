@@ -4,8 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-- No changes yet.
+## [1.15.0] - 2022-08-02
+### Added
+- Support for `soft` value groups, which specify a value group that only gets populated
+  with values from already-executed constructors.
+
+### Fixed
+- Fix an issue with invoke order affecting results provided by private provides
+
+Thanks to @hbdf for their contributions to this release.
+
+[1.15.0]: https://github.com/uber-go/dig/compare/v1.14.1...v1.15.0
 
 ## [1.14.1] - 2022-03-22
 ### Fixed
