@@ -34,14 +34,15 @@ import (
 // The param interface represents a dependency for a constructor.
 //
 // The following implementations exist:
-//  paramList     All arguments of the constructor.
-//  paramSingle   An explicitly requested type.
-//  paramObject   dig.In struct where each field in the struct can be another
-//                param.
-//  paramGroupedSlice
-//                A slice consuming a value group. This will receive all
-//                values produced with a `group:".."` tag with the same name
-//                as a slice.
+//
+//	paramList     All arguments of the constructor.
+//	paramSingle   An explicitly requested type.
+//	paramObject   dig.In struct where each field in the struct can be another
+//	              param.
+//	paramGroupedSlice
+//	              A slice consuming a value group. This will receive all
+//	              values produced with a `group:".."` tag with the same name
+//	              as a slice.
 type param interface {
 	fmt.Stringer
 
