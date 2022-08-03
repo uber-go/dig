@@ -47,9 +47,9 @@ type Scope struct {
 // Without this, digtest.Scope cannot have a Scope method because it has
 // an exported attribute Scope (the embedded dig.Scope) field. That is,
 //
-//   type Foo struct{ *dig.Scope }
+//	type Foo struct{ *dig.Scope }
 //
-//   func (*Foo) Scope()
+//	func (*Foo) Scope()
 //
 // The above is illegal because it's unclear what Foo.Scope refers to: the
 // attribute or the method.
