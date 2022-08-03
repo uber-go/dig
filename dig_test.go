@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"reflect"
@@ -165,7 +164,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireProvide(func() contents { return "hello world" })
 
 		c.RequireInvoke(func(buff *bytes.Buffer) {
-			out, err := ioutil.ReadAll(buff)
+			out, err := io.ReadAll(buff)
 			require.NoError(t, err, "read from buffer failed")
 			require.Equal(t, "hello world", string(out), "contents don't match")
 		})
@@ -656,7 +655,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(
 			func(s fmt.Stringer, r io.Reader) {
 				require.Equal(t, "foo", s.String(), "invoke got new buffer")
-				got, err := ioutil.ReadAll(r)
+				got, err := io.ReadAll(r)
 				assert.NoError(t, err, "failed to read from reader")
 				require.Equal(t, "foo", string(got), "invoke got new buffer")
 			})
