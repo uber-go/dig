@@ -41,9 +41,9 @@ type visualizeOptions struct {
 // VisualizeError includes a visualization of the given error in the output of
 // Visualize if an error was returned by Invoke or Provide.
 //
-//   if err := c.Provide(...); err != nil {
-//     dig.Visualize(c, w, dig.VisualizeError(err))
-//   }
+//	if err := c.Provide(...); err != nil {
+//	  dig.Visualize(c, w, dig.VisualizeError(err))
+//	}
 //
 // This option has no effect if the error was nil or if it didn't contain any
 // information to visualize.

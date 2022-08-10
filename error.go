@@ -97,21 +97,21 @@ func RootCause(err error) error {
 // string may be added to become the next error in the chain. Each new error
 // is the `cause()` for the prior error.
 //
-//   err := errf(
-//     "could not process %v", thing,
-//     "name %q is invalid", thing.Name,
-//  )
-//  fmt.Println(err)  // could not process Thing: name Foo is invalid
-//  fmt.Println(RootCause(err))  // name Foo is invalid
+//	 err := errf(
+//	   "could not process %v", thing,
+//	   "name %q is invalid", thing.Name,
+//	)
+//	fmt.Println(err)  // could not process Thing: name Foo is invalid
+//	fmt.Println(RootCause(err))  // name Foo is invalid
 //
 // In place of a string, the last error can be another error, in which case it
 // will be treated as the cause of the prior error chain.
 //
-//   errf(
-//     "could not process %v", thing,
-//     "date %q could not be parsed", thing.Date,
-//     parseError,
-//  )
+//	 errf(
+//	   "could not process %v", thing,
+//	   "date %q could not be parsed", thing.Date,
+//	   parseError,
+//	)
 func errf(msg string, args ...interface{}) error {
 	// By implementing buildErrf as a closure rather than a standalone
 	// function, we're able to ensure that it is called only from errf, or
@@ -171,7 +171,7 @@ func errf(msg string, args ...interface{}) error {
 // Returns the number of formatting arguments in the provided string. Does not
 // count escaped % symbols, specifically the string "%%".
 //
-//   fmt.Println(numFmtArgs("rate: %d%%"))  // 1
+//	fmt.Println(numFmtArgs("rate: %d%%"))  // 1
 func numFmtArgs(s string) int {
 	var (
 		count   int
@@ -372,15 +372,15 @@ type missingType struct {
 //
 // With %v, it prints a short representation ideal for an itemized list.
 //
-//   io.Writer
-//   io.Writer: did you mean *bytes.Buffer?
-//   io.Writer: did you mean *bytes.Buffer, or *os.File?
+//	io.Writer
+//	io.Writer: did you mean *bytes.Buffer?
+//	io.Writer: did you mean *bytes.Buffer, or *os.File?
 //
 // With %+v, it prints a longer representation ideal for standalone output.
 //
-//   io.Writer: did you mean to Provide it?
-//   io.Writer: did you mean to use *bytes.Buffer?
-//   io.Writer: did you mean to use one of *bytes.Buffer, or *os.File?
+//	io.Writer: did you mean to Provide it?
+//	io.Writer: did you mean to use *bytes.Buffer?
+//	io.Writer: did you mean to use one of *bytes.Buffer, or *os.File?
 func (mt missingType) Format(w fmt.State, v rune) {
 	plusV := w.Flag('+') && v == 'v'
 

@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"reflect"
@@ -54,7 +53,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.NotNil(t, got, "invoke got nil buffer")
 			require.True(t, got == b, "invoke got wrong buffer")
 		})
-
 	})
 
 	t.Run("nil pointer constructor", func(t *testing.T) {
@@ -66,7 +64,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(b *bytes.Buffer) {
 			require.Nil(t, b, "expected to get nil buffer")
 		})
-
 	})
 
 	t.Run("struct constructor", func(t *testing.T) {
@@ -81,7 +78,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			// ensure we're getting back the buffer we put in
 			require.Equal(t, "foo", b.String(), "invoke got new buffer")
 		})
-
 	})
 
 	t.Run("slice constructor", func(t *testing.T) {
@@ -97,7 +93,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.True(t, b1 == bs[0], "first item did not match")
 			require.True(t, b2 == bs[1], "second item did not match")
 		})
-
 	})
 
 	t.Run("array constructor", func(t *testing.T) {
@@ -107,7 +102,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(bs [1]*bytes.Buffer) {
 			require.NotNil(t, bs[0], "invoke got new array")
 		})
-
 	})
 
 	t.Run("map constructor", func(t *testing.T) {
@@ -119,7 +113,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(m map[string]string) {
 			require.NotNil(t, m, "invoke got zero value map")
 		})
-
 	})
 
 	t.Run("channel constructor", func(t *testing.T) {
@@ -131,7 +124,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(ch chan int) {
 			require.NotNil(t, ch, "invoke got nil chan")
 		})
-
 	})
 
 	t.Run("func constructor", func(t *testing.T) {
@@ -143,7 +135,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(f func(int)) {
 			require.NotNil(t, f, "invoke got nil function pointer")
 		})
-
 	})
 
 	t.Run("interface constructor", func(t *testing.T) {
@@ -155,7 +146,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(w io.Writer) {
 			require.NotNil(t, w, "invoke got nil interface")
 		})
-
 	})
 
 	t.Run("param", func(t *testing.T) {
@@ -175,11 +165,10 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireProvide(func() contents { return "hello world" })
 
 		c.RequireInvoke(func(buff *bytes.Buffer) {
-			out, err := ioutil.ReadAll(buff)
+			out, err := io.ReadAll(buff)
 			require.NoError(t, err, "read from buffer failed")
 			require.Equal(t, "hello world", string(out), "contents don't match")
 		})
-
 	})
 
 	t.Run("invoke param", func(t *testing.T) {
@@ -197,7 +186,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(args Args) {
 			require.NotNil(t, args.Buffer, "invoke got nil buffer")
 		})
-
 	})
 
 	t.Run("param wrapper", func(t *testing.T) {
@@ -227,7 +215,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.NotNil(t, args.Buffer, "invoke got nil buffer")
 			require.True(t, args.Buffer == buff, "buffer must match constructor's return value")
 		})
-
 	})
 
 	t.Run("param recurse", func(t *testing.T) {
@@ -266,7 +253,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.True(t, p.Buffer == p.Another.Buffer, "buffers fields must match")
 			require.True(t, p.Buffer == buff, "buffer must match constructor's return value")
 		})
-
 	})
 
 	t.Run("multiple-type constructor", func(t *testing.T) {
@@ -335,7 +321,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireProvide(func() *bytes.Buffer {
 			return &bytes.Buffer{}
 		})
-
 	})
 
 	t.Run("optional param field", func(t *testing.T) {
@@ -366,7 +351,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.NotNil(t, p.T4, "optional type in the graph should not return nil")
 			assert.Nil(t, p.T5, "optional type not in the graph should return nil")
 		})
-
 	})
 
 	t.Run("ignore unexported fields", func(t *testing.T) {
@@ -391,7 +375,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.NotNil(t, p.T2, "optional type in the graph should not return nil")
 			assert.Nil(t, p.t3, "unexported field should not be set")
 		})
-
 	})
 
 	t.Run("out type inserts multiple objects into the graph", func(t *testing.T) {
@@ -416,7 +399,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.True(t, myA == a, "should get the same pointer for &A")
 			assert.Equal(t, b, myB, "b and myB should be equal")
 		})
-
 	})
 
 	t.Run("constructor with optional", func(t *testing.T) {
@@ -441,7 +423,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(got *type2) {
 			require.True(t, got == gave, "type2 reference must be the same")
 		})
-
 	})
 
 	t.Run("nested dependencies", func(t *testing.T) {
@@ -459,7 +440,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, b, B{"A->B"})
 			assert.Equal(t, c, C{"AB->C"})
 		})
-
 	})
 
 	t.Run("primitives", func(t *testing.T) {
@@ -477,7 +457,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, "piper", s)
 			assert.Equal(t, 10*time.Second, d)
 		})
-
 	})
 
 	t.Run("out types recurse", func(t *testing.T) {
@@ -510,7 +489,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(a *A, b *B, c C) {
 			require.NotNil(t, a, "*A should be part of the container through Ret2->Ret1")
 		})
-
 	})
 
 	t.Run("named instances can be created with tags", func(t *testing.T) {
@@ -541,7 +519,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 3, p.A3.idx)
 		})
-
 	})
 
 	t.Run("named instances can be created with Name option", func(t *testing.T) {
@@ -568,7 +545,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 3, p.A3.idx)
 		})
-
 	})
 
 	t.Run("named and unnamed instances coexist", func(t *testing.T) {
@@ -594,7 +570,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 1, i.A1.idx)
 			assert.Equal(t, 2, i.A2.idx)
 		})
-
 	})
 
 	t.Run("named instances recurse", func(t *testing.T) {
@@ -630,7 +605,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
 		})
-
 	})
 
 	t.Run("named instances do not cause cycles", func(t *testing.T) {
@@ -667,7 +641,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
 		})
-
 	})
 
 	t.Run("struct constructor with as interface option", func(t *testing.T) {
@@ -683,7 +656,7 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(
 			func(s fmt.Stringer, r io.Reader) {
 				require.Equal(t, "foo", s.String(), "invoke got new buffer")
-				got, err := ioutil.ReadAll(r)
+				got, err := io.ReadAll(r)
 				assert.NoError(t, err, "failed to read from reader")
 				require.Equal(t, "foo", string(got), "invoke got new buffer")
 			})
@@ -691,7 +664,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		require.Error(t, c.Invoke(func(*bytes.Buffer) {
 			t.Fatalf("must not be called")
 		}), "must not have a *bytes.Buffer in the container")
-
 	})
 
 	t.Run("As with Name", func(t *testing.T) {
@@ -721,7 +693,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireProvide(func() io.Reader {
 			panic("this function should not be called")
 		}, dig.As(new(io.Reader)))
-
 	})
 
 	t.Run("As different interface", func(t *testing.T) {
@@ -729,7 +700,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireProvide(func() io.ReadCloser {
 			panic("this function should not be called")
 		}, dig.As(new(io.Reader), new(io.Closer)))
-
 	})
 
 	t.Run("invoke on a type that depends on named parameters", func(t *testing.T) {
@@ -763,7 +733,6 @@ func TestEndToEndSuccess(t *testing.T) {
 		c.RequireInvoke(func(b *B) {
 			require.Equal(t, 3, b.sum)
 		})
-
 	})
 
 	t.Run("optional and named ordering doesn't matter", func(t *testing.T) {
@@ -820,7 +789,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.True(t, called1)
 			assert.True(t, called2)
 		})
-
 	})
 
 	t.Run("dynamically generated dig.In", func(t *testing.T) {
@@ -938,7 +906,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			assert.Equal(t, &A{Value: 2}, p.Bar, "Bar must match")
 			assert.Nil(t, p.Baz, "Baz must be unset")
 		})
-
 	})
 
 	t.Run("variadic arguments invoke", func(t *testing.T) {
@@ -961,7 +928,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.True(t, a == gaveA, "A must match")
 			require.Empty(t, as, "varargs must be empty")
 		})
-
 	})
 
 	t.Run("variadic arguments dependency", func(t *testing.T) {
@@ -993,7 +959,6 @@ func TestEndToEndSuccess(t *testing.T) {
 			require.NotNil(t, b, "B must not be nil")
 			require.True(t, b == gaveB, "B must match")
 		})
-
 	})
 
 	t.Run("non-error return arguments from invoke are ignored", func(t *testing.T) {
@@ -1028,7 +993,6 @@ func TestGroups(t *testing.T) {
 		c.RequireInvoke(func(i in) {
 			require.Empty(t, i.Values)
 		})
-
 	})
 
 	t.Run("values are provided", func(t *testing.T) {
@@ -1044,7 +1008,6 @@ func TestGroups(t *testing.T) {
 			c.RequireProvide(func() out {
 				return out{Value: i}
 			})
-
 		}
 
 		provide(1)
@@ -1060,7 +1023,6 @@ func TestGroups(t *testing.T) {
 		c.RequireInvoke(func(i in) {
 			assert.Equal(t, []int{2, 3, 1}, i.Values)
 		})
-
 	})
 
 	t.Run("groups are provided via option", func(t *testing.T) {
@@ -1070,7 +1032,6 @@ func TestGroups(t *testing.T) {
 			c.RequireProvide(func() int {
 				return i
 			}, dig.Group("val"))
-
 		}
 
 		provide(1)
@@ -1086,7 +1047,6 @@ func TestGroups(t *testing.T) {
 		c.RequireInvoke(func(i in) {
 			assert.Equal(t, []int{2, 3, 1}, i.Values)
 		})
-
 	})
 
 	t.Run("different types may be grouped", func(t *testing.T) {
@@ -1096,7 +1056,6 @@ func TestGroups(t *testing.T) {
 			c.RequireProvide(func() (int, string) {
 				return i, s
 			}, dig.Group("val"))
-
 		}
 
 		provide(1, "a")
@@ -1114,7 +1073,6 @@ func TestGroups(t *testing.T) {
 			assert.Equal(t, []int{2, 3, 1}, i.Ivalues)
 			assert.Equal(t, []string{"a", "c", "b"}, i.Svalues)
 		})
-
 	})
 
 	t.Run("group options may not be provided for result structs", func(t *testing.T) {
@@ -1150,7 +1108,6 @@ func TestGroups(t *testing.T) {
 				calls[i]++
 				return out{Result: i}
 			})
-
 		}
 
 		provide("foo")
@@ -1175,7 +1132,6 @@ func TestGroups(t *testing.T) {
 			c.RequireInvoke(func(i in) {
 				require.Equal(t, want, i.Results)
 			})
-
 		}
 
 		for s, v := range calls {
@@ -1196,7 +1152,6 @@ func TestGroups(t *testing.T) {
 			c.RequireProvide(func() out {
 				return out{Result: strings}
 			})
-
 		}
 
 		provideStrings("1", "2")
@@ -1225,7 +1180,6 @@ func TestGroups(t *testing.T) {
 				"6": {}, "7": {}, "8": {}, "9": {}, "10": {},
 			}, got)
 		})
-
 	})
 
 	t.Run("provide multiple values", func(t *testing.T) {
@@ -1240,7 +1194,6 @@ func TestGroups(t *testing.T) {
 			c.RequireProvide(func() (outInt, error) {
 				return outInt{Int: i}, nil
 			})
-
 		}
 
 		type outString struct {
@@ -1252,7 +1205,6 @@ func TestGroups(t *testing.T) {
 			c.RequireProvide(func() outString {
 				return outString{String: s}
 			})
-
 		}
 
 		type outBoth struct {
@@ -1266,7 +1218,6 @@ func TestGroups(t *testing.T) {
 			c.RequireProvide(func() (outBoth, error) {
 				return outBoth{Int: i, String: s}, nil
 			})
-
 		}
 
 		provideInt(1)
@@ -1292,7 +1243,6 @@ func TestGroups(t *testing.T) {
 				Strings: []string{"foo", "bar", "baz", "quux", "qux"},
 			}, got)
 		})
-
 	})
 
 	t.Run("duplicate values are supported", func(t *testing.T) {
@@ -1308,7 +1258,6 @@ func TestGroups(t *testing.T) {
 			c.RequireProvide(func() out {
 				return out{Result: i}
 			})
-
 		}
 
 		provide("a")
@@ -1333,7 +1282,6 @@ func TestGroups(t *testing.T) {
 				stringSlice{"d", "c", "a", "a", "d", "e", "b", "a"},
 				i.Strings)
 		})
-
 	})
 
 	t.Run("failure to build a grouped value fails everything", func(t *testing.T) {
@@ -1392,7 +1340,6 @@ func TestGroups(t *testing.T) {
 			c.RequireProvide(func() out {
 				return out{Value: i}
 			})
-
 		}
 
 		provide([]int{1, 2})
@@ -1407,7 +1354,6 @@ func TestGroups(t *testing.T) {
 		c.RequireInvoke(func(i in) {
 			assert.Equal(t, []int{2, 3, 4, 1}, i.Values)
 		})
-
 	})
 
 	t.Run("flatten via option", func(t *testing.T) {
@@ -1425,7 +1371,6 @@ func TestGroups(t *testing.T) {
 		c.RequireInvoke(func(i in) {
 			assert.Equal(t, []int{2, 3, 1}, i.Values)
 		})
-
 	})
 
 	t.Run("flatten via option error if not a slice", func(t *testing.T) {
@@ -1433,6 +1378,117 @@ func TestGroups(t *testing.T) {
 		err := c.Provide(func() int { return 1 }, dig.Group("val,flatten"))
 		require.Error(t, err, "failed to provide")
 		assert.Contains(t, err.Error(), "flatten can be applied to slices only")
+	})
+
+	t.Run("a soft value group provider is not called when only that value group is consumed", func(t *testing.T) {
+		type Param struct {
+			dig.In
+
+			Values []string `group:"foo,soft"`
+		}
+		type Result struct {
+			dig.Out
+
+			Value string `group:"foo"`
+		}
+		c := digtest.New(t)
+
+		c.RequireProvide(func() (Result, int) {
+			require.FailNow(t, "this function should not be called")
+			return Result{Value: "sad times"}, 20
+		})
+
+		c.RequireInvoke(func(p Param) {
+			assert.ElementsMatch(t, []string{}, p.Values)
+		})
+	})
+
+	t.Run("soft value group is provided", func(t *testing.T) {
+		type Param1 struct {
+			dig.In
+
+			Values []string `group:"foo,soft"`
+		}
+		type Result struct {
+			dig.Out
+
+			Value1 string `group:"foo"`
+			Value2 int
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() Result { return Result{Value1: "a", Value2: 2} })
+		c.RequireProvide(func() string { return "b" }, dig.Group("foo"))
+
+		// The only value that must be in the group is the one that's provided
+		// because it would be provided anyways by another dependency, in
+		// this case we need an int, so the first constructor is called, and
+		// this provides a string, which is the one in the group
+		c.RequireInvoke(func(p2 int, p1 Param1) {
+			assert.ElementsMatch(t, []string{"a"}, p1.Values)
+		})
+	})
+
+	t.Run("two soft group values provided by one constructor", func(t *testing.T) {
+		type param struct {
+			dig.In
+
+			Value1 []string `group:"foo,soft"`
+			Value2 []int    `group:"bar,soft"`
+			Value3 float32
+		}
+
+		type result struct {
+			dig.Out
+
+			Result1 []string `group:"foo,flatten"`
+			Result2 int      `group:"bar"`
+		}
+		c := digtest.New(t)
+
+		c.RequireProvide(func() result {
+			return result{
+				Result1: []string{"a", "b", "c"},
+				Result2: 4,
+			}
+		})
+		c.RequireProvide(func() float32 { return 3.1416 })
+
+		c.RequireInvoke(func(p param) {
+			assert.ElementsMatch(t, []string{}, p.Value1)
+			assert.ElementsMatch(t, []int{}, p.Value2)
+			assert.Equal(t, float32(3.1416), p.Value3)
+		})
+	})
+	t.Run("soft in a result value group", func(t *testing.T) {
+		c := digtest.New(t)
+		err := c.Provide(func() int { return 10 }, dig.Group("foo,soft"))
+		require.Error(t, err, "failed to privide")
+		assert.Contains(t, err.Error(), "cannot use soft with result value groups")
+	})
+	t.Run("value group provided after a hard dependency is provided", func(t *testing.T) {
+		type Param struct {
+			dig.In
+
+			Value []string `group:"foo,soft"`
+		}
+
+		type Result struct {
+			dig.Out
+
+			Value1 string `group:"foo"`
+		}
+
+		c := digtest.New(t)
+		c.Provide(func() (Result, int) { return Result{Value1: "a"}, 2 })
+
+		c.RequireInvoke(func(param Param) {
+			assert.ElementsMatch(t, []string{}, param.Value)
+		})
+		c.RequireInvoke(func(int) {})
+		c.RequireInvoke(func(param Param) {
+			assert.ElementsMatch(t, []string{"a"}, param.Value)
+		})
 	})
 }
 
@@ -1562,7 +1618,6 @@ func TestProvideRespectsConstructorErrors(t *testing.T) {
 		c.RequireInvoke(func(b *bytes.Buffer) {
 			require.NotNil(t, b, "invoke got nil buffer")
 		})
-
 	})
 	t.Run("constructor fails", func(t *testing.T) {
 		c := digtest.New(t)
@@ -1629,7 +1684,6 @@ func TestProvideWithWeirdNames(t *testing.T) {
 		c.RequireInvoke(func(p params) {
 			assert.Equal(t, &type1{value: 42}, p.T)
 		})
-
 	})
 
 	t.Run("name with newline", func(t *testing.T) {
@@ -1650,7 +1704,6 @@ func TestProvideWithWeirdNames(t *testing.T) {
 		c.RequireInvoke(func(p params) {
 			assert.Equal(t, &type1{value: 42}, p.T)
 		})
-
 	})
 }
 
@@ -3518,7 +3571,6 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 			require.NotNil(t, got, "invoke got nil buffer")
 			require.True(t, got == b, "invoke got wrong buffer")
 		})
-
 	})
 
 	t.Run("duplicate provide", func(t *testing.T) {
@@ -3599,11 +3651,8 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 			assert.Equal(t, "a", p.A3.s, "A3 should match")
 			assert.Equal(t, "b", p.B3.s, "B3 should match")
 			assert.Equal(t, "c", p.C3.s, "C3 should match")
-
 		})
-
 	})
-
 }
 
 func TestConcurrency(t *testing.T) {

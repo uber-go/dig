@@ -40,11 +40,11 @@ import (
 //
 // The error must match each string in-order. That is, the following is valid,
 //
-//   assertErrorMatches(t, errors.New("foo bar baz"), "foo", "baz")
+//	assertErrorMatches(t, errors.New("foo bar baz"), "foo", "baz")
 //
 // But not,
 //
-//   assertErrorMatches(t, errors.New("foo bar baz"), "foo", "baz", "bar")
+//	assertErrorMatches(t, errors.New("foo bar baz"), "foo", "baz", "bar")
 //
 // Because "bar" is not after "baz" in the error message.
 //

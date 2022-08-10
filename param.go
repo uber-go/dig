@@ -35,14 +35,15 @@ import (
 // The param interface represents a dependency for a constructor.
 //
 // The following implementations exist:
-//  paramList     All arguments of the constructor.
-//  paramSingle   An explicitly requested type.
-//  paramObject   dig.In struct where each field in the struct can be another
-//                param.
-//  paramGroupedSlice
-//                A slice consuming a value group. This will receive all
-//                values produced with a `group:".."` tag with the same name
-//                as a slice.
+//
+//	paramList     All arguments of the constructor.
+//	paramSingle   An explicitly requested type.
+//	paramObject   dig.In struct where each field in the struct can be another
+//	              param.
+//	paramGroupedSlice
+//	              A slice consuming a value group. This will receive all
+//	              values produced with a `group:".."` tag with the same name
+//	              as a slice.
 type param interface {
 	fmt.Stringer
 
@@ -199,117 +200,98 @@ func (ps paramSingle) String() string {
 	return fmt.Sprintf("%v[%v]", ps.Type, strings.Join(opts, ", "))
 }
 
-// search the given container and its ancestors for a decorated value.
-func (ps paramSingle) getDecoratedValue(c containerStore) (reflect.Value, bool) {
-	for _, c := range c.storesToRoot() {
-		if v, ok := c.getDecoratedValue(ps.Name, ps.Type); ok {
-			return v, ok
-		}
-	}
-	return _noValue, false
-}
-
-// search the given container and its ancestors for a matching value.
-func (ps paramSingle) getValue(c containerStore) (reflect.Value, bool) {
-	for _, c := range c.storesToRoot() {
-		if v, ok := c.getValue(ps.Name, ps.Type); ok {
-			return v, ok
-		}
-	}
-	return _noValue, false
-}
-
-// builds the parameter using decorators, if any. useDecorators controls whether to use decorator functions (true) or
-// provider functions (false).
-func (ps paramSingle) buildWith(c containerStore, useDecorators bool, target *reflect.Value) (*promise.Deferred, containerStore) {
-	var decorators []decorator
-	var providers []provider
-	var callScope containerStore
-
-	if useDecorators {
-		var d decorator
-		var ok bool
-		for _, s := range c.storesToRoot() {
-			d, ok = s.getValueDecorator(ps.Name, ps.Type)
-			if !ok {
-				continue
-			}
-			// If the decorator is already on stack, we break
-			// here to not get into an infinite recursion.
-			if d.State() == functionOnStack {
-				d = nil
-				continue
-			}
-			// Reset the calling scope to the decorator's scope.
-			callScope = s
-			decorators = append(decorators, d)
-			break
-		}
-	} else {
-
-		for _, container := range c.storesToRoot() {
-			// A provider is-a decorator ({methods of decorator} ⊆ {methods of provider})
-			providers = container.getValueProviders(ps.Name, ps.Type)
-			if len(providers) > 0 {
-				break
-			}
-		}
-
-		if len(providers) == 0 {
-			if ps.Optional {
-				target.Set(reflect.Zero(ps.Type))
-				return promise.Done, c
-			}
-
-			return promise.Fail(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type})), c
-		}
-
-		decorators = make([]decorator, len(providers))
-		for i, provider := range providers {
-			decorators[i] = provider.(decorator)
-		}
-	}
-
+func (ps paramSingle) buildWithDecorators(c containerStore, target *reflect.Value) (*promise.Deferred, bool) {
 	var (
-		doNext func(i int)
-		d      = new(promise.Deferred)
+		d               decorator
+		decoratingScope containerStore
+		found           bool
 	)
 
-	doNext = func(i int) {
-		if i == len(decorators) {
-			// If we get here, it's impossible for the value to be absent from the
-			// container.
-			v, _ := ps.getValue(c)
-			if v.IsValid() {
-				// Not valid during a dry run
-				target.Set(v)
-			}
-			d.Resolve(nil)
+	def := new(promise.Deferred)
+	for _, s := range c.storesToRoot() {
+		if d, found = s.getValueDecorator(ps.Name, ps.Type); !found {
+			continue
+		}
+		if d.State() == functionOnStack {
+			d = nil
+			continue
+		}
+		decoratingScope = s
+		break
+	}
+	if !found || d == nil {
+		return promise.Done, false
+	}
+	d.Call(decoratingScope).Observe(func(err error) {
+		if err != nil {
+			def.Resolve(errParamSingleFailed{
+				CtorID: d.ID(),
+				Key:    key{t: ps.Type, name: ps.Name},
+				Reason: err,
+			})
 			return
 		}
+		v, _ := decoratingScope.getDecoratedValue(ps.Name, ps.Type)
+		if v.IsValid() {
+			target.Set(v)
+		}
+		def.Resolve(nil)
+	})
+	return def, found
+}
 
-		n := decorators[i]
-		callScope = n.OrigScope()
+func (ps paramSingle) build(c containerStore, target *reflect.Value) *promise.Deferred {
+	var providingContainer containerStore
+	var providers []provider
+	def := new(promise.Deferred)
+	for _, container := range c.storesToRoot() {
+		// First we check if the value it's stored in the current store
+		if v, ok := container.getValue(ps.Name, ps.Type); ok {
+			target.Set(v)
+			def.Resolve(nil)
+			return def
+		}
 
-		n.Call(callScope).Observe(func(err error) {
-			if err != nil {
-				// If we're missing dependencies but the parameter itself is optional,
-				// we can just move on.
-				if _, ok := err.(errMissingDependencies); !ok || !ps.Optional {
-					d.Resolve(errParamSingleFailed{
-						CtorID: n.ID(),
-						Key:    key{t: ps.Type, name: ps.Name},
-						Reason: err,
-					})
-					return
+		providers = container.getValueProviders(ps.Name, ps.Type)
+		if len(providers) > 0 {
+			providingContainer = container
+			break
+		}
+	}
+	if len(providers) == 0 {
+		if ps.Optional {
+			target.Set(reflect.Zero(ps.Type))
+			def.Resolve(nil)
+		}
+		def.Resolve(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
+		return def
+	}
+	for _, n := range providers {
+		n.Call(n.OrigScope()).Observe(func(err error) {
+			if err == nil {
+				// If we get here, it's impossible for the value to be absent from the
+				// container.
+				v, _ := providingContainer.getValue(ps.Name, ps.Type)
+				if target.IsValid() {
+					target.Set(v)
 				}
+				return
 			}
-			doNext(i + 1)
+
+			// If we're missing dependencies but the parameter itself is optional,
+			// we can just move on.
+			if _, ok := err.(errMissingDependencies); ok && ps.Optional {
+				return
+			}
+			def.Resolve(errParamSingleFailed{
+				CtorID: n.ID(),
+				Key:    key{t: ps.Type, name: ps.Name},
+				Reason: err,
+			})
 		})
 	}
-
-	doNext(0)
-	return d, c
+	def.Resolve(nil)
+	return def
 }
 
 func (ps paramSingle) Build(c containerStore, target *reflect.Value) *promise.Deferred {
@@ -318,22 +300,15 @@ func (ps paramSingle) Build(c containerStore, target *reflect.Value) *promise.De
 	}
 
 	// try building with decorators first, in case this parameter has decorators.
-	d, c := ps.buildWith(c, true, target)
+	d, found := ps.buildWithDecorators(c, target)
 
 	return d.Then(func() *promise.Deferred {
 		// Check whether the value is a decorated value first.
-		if v, ok := ps.getDecoratedValue(c); ok {
-			target.Set(v)
+		if found {
 			return promise.Done
 		}
 
-		// See if it's already in the store
-		if v, ok := ps.getValue(c); ok {
-			target.Set(v)
-			return promise.Done
-		}
-		p, _ := ps.buildWith(c, false, target)
-		return p
+		return ps.build(c, target)
 	})
 }
 
@@ -425,9 +400,22 @@ func (po paramObject) Build(c containerStore, target *reflect.Value) *promise.De
 	if !target.IsValid() {
 		*target = reflect.New(po.Type).Elem()
 	}
+	// We have to build soft groups after all other fields, to avoid cases
+	// when a field calls a provider for a soft value group, but the value is
+	// not provided to it because the value group is declared before the field
+	var softGroupsQueue []paramObjectField
+	var fields []paramObjectField
+	for _, f := range po.Fields {
+		if p, ok := f.Param.(paramGroupedSlice); ok && p.Soft {
+			softGroupsQueue = append(softGroupsQueue, f)
+			continue
+		}
+		fields = append(fields, f)
+	}
+	fields = append(fields, softGroupsQueue...)
+	children := make([]*promise.Deferred, len(fields))
 
-	children := make([]*promise.Deferred, len(po.Fields))
-	for i, f := range po.Fields {
+	for i, f := range fields {
 		f := f
 		field := target.Field(f.FieldIndex)
 		children[i] = f.Build(c, &field)
@@ -512,6 +500,11 @@ type paramGroupedSlice struct {
 	// Type of the slice.
 	Type reflect.Type
 
+	// Soft is used to denote a soft dependency between this param and its
+	// constructors, if it's true its constructors are only called if they
+	// provide another value requested in the graph
+	Soft bool
+
 	orders map[*Scope]int
 }
 
@@ -540,7 +533,12 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	if err != nil {
 		return paramGroupedSlice{}, err
 	}
-	pg := paramGroupedSlice{Group: g.Name, Type: f.Type, orders: make(map[*Scope]int)}
+	pg := paramGroupedSlice{
+		Group:  g.Name,
+		Type:   f.Type,
+		orders: make(map[*Scope]int),
+		Soft:   g.Soft,
+	}
 
 	name := f.Tag.Get(_nameTag)
 	optional, _ := isFieldOptional(f)
@@ -650,15 +648,18 @@ func (pt paramGroupedSlice) Build(c containerStore, target *reflect.Value) *prom
 			target.Set(decoratedItems)
 			return promise.Done
 		}
-
-		// If we do not have any decorated values, find the
-		// providers and call them.
-		return pt.callGroupProviders(c).Then(func() *promise.Deferred {
+		setValues := func() *promise.Deferred {
 			for _, c := range c.storesToRoot() {
 				target.Set(reflect.Append(*target, c.getValueGroup(pt.Group, pt.Type.Elem())...))
 			}
 			return promise.Done
-		})
+		}
+		if pt.Soft {
+			return setValues()
+		}
+		// If we do not have any decorated values and the group isn't soft,
+		// find the providers and call them.
+		return pt.callGroupProviders(c).Then(setValues)
 	})
 }
 

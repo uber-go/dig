@@ -95,14 +95,14 @@ func (o *provideOptions) Validate() error {
 //
 // Given,
 //
-//   func NewReadOnlyConnection(...) (*Connection, error)
-//   func NewReadWriteConnection(...) (*Connection, error)
+//	func NewReadOnlyConnection(...) (*Connection, error)
+//	func NewReadWriteConnection(...) (*Connection, error)
 //
 // The following will provide two connections to the container: one under the
 // name "ro" and the other under the name "rw".
 //
-//   c.Provide(NewReadOnlyConnection, dig.Name("ro"))
-//   c.Provide(NewReadWriteConnection, dig.Name("rw"))
+//	c.Provide(NewReadOnlyConnection, dig.Name("ro"))
+//	c.Provide(NewReadWriteConnection, dig.Name("rw"))
 //
 // This option cannot be provided for constructors which produce result
 // objects.
@@ -228,34 +228,34 @@ func (o fillProvideInfoOption) applyProvideOption(opts *provideOptions) {
 // For example, the following will make io.Reader and io.Writer available
 // in the container, but not buffer.
 //
-//   c.Provide(newBuffer, dig.As(new(io.Reader), new(io.Writer)))
+//	c.Provide(newBuffer, dig.As(new(io.Reader), new(io.Writer)))
 //
 // That is, the above is equivalent to the following.
 //
-//   c.Provide(func(...) (io.Reader, io.Writer) {
-//     b := newBuffer(...)
-//     return b, b
-//   })
+//	c.Provide(func(...) (io.Reader, io.Writer) {
+//	  b := newBuffer(...)
+//	  return b, b
+//	})
 //
 // If used with dig.Name, the type produced by the constructor and the types
 // specified with dig.As will all use the same name. For example,
 //
-//   c.Provide(newFile, dig.As(new(io.Reader)), dig.Name("temp"))
+//	c.Provide(newFile, dig.As(new(io.Reader)), dig.Name("temp"))
 //
 // The above is equivalent to the following.
 //
-//   type Result struct {
-//     dig.Out
+//	type Result struct {
+//	  dig.Out
 //
-//     Reader io.Reader `name:"temp"`
-//   }
+//	  Reader io.Reader `name:"temp"`
+//	}
 //
-//   c.Provide(func(...) Result {
-//     f := newFile(...)
-//     return Result{
-//       Reader: f,
-//     }
-//   })
+//	c.Provide(func(...) Result {
+//	  f := newFile(...)
+//	  return Result{
+//	    Reader: f,
+//	  }
+//	})
 //
 // This option cannot be provided for constructors which produce result
 // objects.
@@ -308,15 +308,18 @@ func (o provideLocationOption) applyProvideOption(opts *provideOptions) {
 // of which Scope it was provided from. By default, it is false.
 //
 // For example,
-//  c := New()
-//  s1 := c.Scope("child 1")
-//  s2:= c.Scope("child 2")
-//  s1.Provide(func() *bytes.Buffer { ... })
+//
+//	c := New()
+//	s1 := c.Scope("child 1")
+//	s2:= c.Scope("child 2")
+//	s1.Provide(func() *bytes.Buffer { ... })
+//
 // does not allow the constructor returning *bytes.Buffer to be made available to
 // the root Container c or its sibling Scope s2.
 //
 // With Export, you can make this constructor available to all the Scopes:
-//  s1.Provide(func() *bytes.Buffer { ... }, Export(true))
+//
+//	s1.Provide(func() *bytes.Buffer { ... }, Export(true))
 func Export(export bool) ProvideOption {
 	return provideExportOption{exported: export}
 }
