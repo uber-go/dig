@@ -147,7 +147,7 @@ func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 		return &n.deferred
 	}
 
-	n.state = functionOnStack
+	n.state = functionVisited
 	n.deferred = promise.Deferred{}
 
 	if err := shallowCheckDependencies(c, n.paramList); err != nil {
@@ -161,7 +161,11 @@ func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 	var args []reflect.Value
 	var results []reflect.Value
 
-	n.paramList.BuildList(c, &args).Catch(func(err error) error {
+	d := n.paramList.BuildList(c, &args)
+
+	n.state = functionOnStack
+
+	d.Catch(func(err error) error {
 		if err != nil {
 			return errArgumentsFailed{
 				Func:   n.location,
@@ -192,7 +196,6 @@ func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 		n.deferred.Resolve(err)
 		return nil
 	})
-
 	return &n.deferred
 }
 

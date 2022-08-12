@@ -212,7 +212,10 @@ func (ps paramSingle) buildWithDecorators(c containerStore, target *reflect.Valu
 		if d, found = s.getValueDecorator(ps.Name, ps.Type); !found {
 			continue
 		}
-		if d.State() == functionOnStack {
+		// This is for avoiding cycles i.e decorator -> function
+		//                                      ^           |
+		//                                       \ ------- /
+		if d.State() == functionVisited {
 			d = nil
 			continue
 		}
@@ -275,6 +278,7 @@ func (ps paramSingle) build(c containerStore, target *reflect.Value) *promise.De
 				if target.IsValid() {
 					target.Set(v)
 				}
+				def.Resolve(nil)
 				return
 			}
 
@@ -290,7 +294,6 @@ func (ps paramSingle) build(c containerStore, target *reflect.Value) *promise.De
 			})
 		})
 	}
-	def.Resolve(nil)
 	return def
 }
 
@@ -412,16 +415,22 @@ func (po paramObject) Build(c containerStore, target *reflect.Value) *promise.De
 		}
 		fields = append(fields, f)
 	}
-	fields = append(fields, softGroupsQueue...)
-	children := make([]*promise.Deferred, len(fields))
 
-	for i, f := range fields {
-		f := f
-		field := target.Field(f.FieldIndex)
-		children[i] = f.Build(c, &field)
+	buildFields := func(fields []paramObjectField) *promise.Deferred {
+		children := make([]*promise.Deferred, len(fields))
+
+		for i, f := range fields {
+			f := f
+			field := target.Field(f.FieldIndex)
+			children[i] = f.Build(c, &field)
+		}
+
+		return promise.WhenAll(children...)
 	}
 
-	return promise.WhenAll(children...)
+	return buildFields(fields).Then(func() *promise.Deferred {
+		return buildFields(softGroupsQueue)
+	})
 }
 
 // paramObjectField is a single field of a dig.In struct.
@@ -575,8 +584,6 @@ func (pt paramGroupedSlice) getDecoratedValues(c containerStore) (reflect.Value,
 }
 
 // search the given container and its parents for matching group decorators
-// and call them to commit values. If any decorators return an error,
-// that error is returned immediately. If all decorators succeeds, nil is returned.
 // The order in which the decorators are invoked is from the top level scope to
 // the current scope, to account for decorators that decorate values that were
 // already decorated.
@@ -587,7 +594,7 @@ func (pt paramGroupedSlice) callGroupDecorators(c containerStore) *promise.Defer
 		c := stores[i]
 		if d, ok := c.getGroupDecorator(pt.Group, pt.Type.Elem()); ok {
 
-			if d.State() == functionOnStack {
+			if d.State() == functionVisited {
 				// This decorator is already being run. Avoid cycle
 				// and look further.
 				continue

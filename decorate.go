@@ -33,8 +33,9 @@ import (
 type functionState int
 
 const (
-	functionReady functionState = iota
-	functionOnStack
+	functionReady   functionState = iota
+	functionVisited               // For avoiding cycles
+	functionOnStack               // For telling that this function is already scheduled
 	functionCalled
 )
 
@@ -115,7 +116,8 @@ func (n *decoratorNode) Call(s containerStore) *promise.Deferred {
 		return &n.deferred
 	}
 
-	n.state = functionOnStack
+	// We mark it as "visited" to avoid cycles
+	n.state = functionVisited
 	n.deferred = promise.Deferred{}
 
 	if err := shallowCheckDependencies(s, n.params); err != nil {
@@ -127,6 +129,8 @@ func (n *decoratorNode) Call(s containerStore) *promise.Deferred {
 
 	var args []reflect.Value
 	d := n.params.BuildList(s, &args)
+
+	n.state = functionOnStack
 
 	d.Observe(func(err error) {
 		if err != nil {
