@@ -246,13 +246,13 @@ func (ps paramSingle) buildWithDecorators(c containerStore, target *reflect.Valu
 func (ps paramSingle) build(c containerStore, target *reflect.Value) *promise.Deferred {
 	var providingContainer containerStore
 	var providers []provider
-	def := new(promise.Deferred)
 	for _, container := range c.storesToRoot() {
 		// First we check if the value it's stored in the current store
 		if v, ok := container.getValue(ps.Name, ps.Type); ok {
-			target.Set(v)
-			def.Resolve(nil)
-			return def
+			if v.IsValid() {
+				target.Set(v)
+			}
+			return promise.Done
 		}
 
 		providers = container.getValueProviders(ps.Name, ps.Type)
@@ -264,37 +264,37 @@ func (ps paramSingle) build(c containerStore, target *reflect.Value) *promise.De
 	if len(providers) == 0 {
 		if ps.Optional {
 			target.Set(reflect.Zero(ps.Type))
-			def.Resolve(nil)
+			return promise.Done
 		}
-		def.Resolve(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
-		return def
+		return promise.Fail(newErrMissingTypes(c, key{name: ps.Name, t: ps.Type}))
 	}
+	var children []*promise.Deferred
+	def := new(promise.Deferred)
 	for _, n := range providers {
-		n.Call(n.OrigScope()).Observe(func(err error) {
-			if err == nil {
-				// If we get here, it's impossible for the value to be absent from the
-				// container.
-				v, _ := providingContainer.getValue(ps.Name, ps.Type)
-				if target.IsValid() {
-					target.Set(v)
-				}
-				def.Resolve(nil)
-				return
-			}
-
+		child := n.Call(n.OrigScope()).Catch(func(err error) error {
 			// If we're missing dependencies but the parameter itself is optional,
 			// we can just move on.
 			if _, ok := err.(errMissingDependencies); ok && ps.Optional {
-				return
+				return nil
 			}
-			def.Resolve(errParamSingleFailed{
+			return errParamSingleFailed{
 				CtorID: n.ID(),
 				Key:    key{t: ps.Type, name: ps.Name},
 				Reason: err,
-			})
+			}
 		})
+		children = append(children, child)
 	}
-	return def
+	return promise.WhenAll(children...).Then(func() *promise.Deferred {
+		// If we get here, it's impossible for the value to be absent from the
+		// container.
+		v, _ := providingContainer.getValue(ps.Name, ps.Type)
+		if v.IsValid() {
+			target.Set(v)
+		}
+		def.Resolve(nil)
+		return def
+	})
 }
 
 func (ps paramSingle) Build(c containerStore, target *reflect.Value) *promise.Deferred {
