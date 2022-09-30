@@ -1376,7 +1376,7 @@ func TestGroups(t *testing.T) {
 		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
 		err := c.Provide(func() int { return 1 }, dig.Group("val,flatten"))
 		require.Error(t, err, "failed to provide")
-		assert.Contains(t, err.Error(), "flatten can be applied to slices only")
+		assert.Contains(t, err.Error(), "attempted to use flatten on non-slice: int")
 	})
 
 	t.Run("a soft value group provider is not called when only that value group is consumed", func(t *testing.T) {
@@ -1463,7 +1463,7 @@ func TestGroups(t *testing.T) {
 		c := digtest.New(t)
 		err := c.Provide(func() int { return 10 }, dig.Group("foo,soft"))
 		require.Error(t, err, "failed to privide")
-		assert.Contains(t, err.Error(), "cannot use soft with result value groups")
+		assert.Contains(t, err.Error(), "attempted to use soft with result value group: ")
 	})
 	t.Run("value group provided after a hard dependency is provided", func(t *testing.T) {
 		type Param struct {
@@ -1525,17 +1525,17 @@ func TestProvideConstructorErrors(t *testing.T) {
 			{
 				desc:        "dig.Out",
 				constructor: func(out) io.Writer { return nil },
-				msg:         "dig_test.out embeds a dig.Out",
+				msg:         `attempted to depend on result object: dig_test.out embeds dig.Out`,
 			},
 			{
 				desc:        "*dig.Out",
 				constructor: func(*out) io.Writer { return nil },
-				msg:         `\*dig_test.out embeds a dig.Out`,
+				msg:         `attempted to depend on result object: \*dig_test.out embeds dig.Out`,
 			},
 			{
 				desc:        "embeds *dig.Out",
 				constructor: func(outPtr) io.Writer { return nil },
-				msg:         `dig_test.outPtr embeds a dig.Out`,
+				msg:         `attempted to depend on result object: dig_test.outPtr embeds dig.Out`,
 			},
 		}
 
@@ -1547,7 +1547,6 @@ func TestProvideConstructorErrors(t *testing.T) {
 					`cannot provide function "go.uber.org/dig_test".TestProvideConstructorErrors\S+`,
 					`dig_test.go:\d+`, // file:line
 					`bad argument 1:`,
-					`cannot depend on result objects:`,
 					tt.msg)
 			})
 		}
@@ -1572,8 +1571,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 			`cannot provide function "go.uber.org/dig_test".TestProvideConstructorErrors\S+`,
 			`dig_test.go:\d+`, // file:line
 			`bad result 1:`,
-			"cannot specify a name for result objects:",
-			"dig_test.out embeds dig.Out",
+			"attempted to specify a name for result object which embeds dig.Out: dig_test.out",
 		)
 	})
 
@@ -1601,8 +1599,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 			`cannot provide function "go.uber.org/dig_test".TestProvideConstructorErrors\S+`,
 			`dig_test.go:\d+`, // file:line
 			`bad field "Result1" of dig_test.Result2:`,
-			"cannot specify a name for result objects:",
-			"dig_test.Result1 embeds dig.Out",
+			"attempted to specify a name for result object which embeds dig.Out: dig_test.Result1",
 		)
 	})
 }
@@ -1909,8 +1906,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 			`cannot provide function "go.uber.org/dig_test".TestCantProvideParameterObjects\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad result 1:",
-			`cannot provide parameter objects:`,
-			`dig_test.Args embeds a dig.In`,
+			`cannot provide parameter objects: dig_test.Args embeds a dig.In`,
 		)
 	})
 
@@ -1926,8 +1922,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 			`cannot provide function "go.uber.org/dig_test".TestCantProvideParameterObjects\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad result 1:",
-			`cannot provide parameter objects:`,
-			`\*dig_test.Args embeds a dig.In`,
+			`cannot provide parameter objects: \*dig_test.Args embeds a dig.In`,
 		)
 	})
 }
@@ -2016,7 +2011,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
-			`this function introduces a cycle:`,
+			`cycle detected in dependency graph:`,
 			`func\(\*dig_test.C\) \*dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails\S+ \(\S+\)`,
 			`depends on func\(\*dig_test.B\) \*dig_test.C provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 			`depends on func\(\*dig_test.A\) \*dig_test.B provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
@@ -2065,7 +2060,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
-			`this function introduces a cycle:`,
+			`cycle detected in dependency graph:`,
 			`func\(dig_test.AParams\) dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails\S+ \(\S+\)`,
 			`depends on func\(dig_test.CParams\) dig_test.C provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 			`depends on func\(dig_test.BParams\) dig_test.B provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
@@ -2137,7 +2132,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
-			`this function introduces a cycle:`,
+			`cycle detected in dependency graph:`,
 			`func\(\*dig_test.D\) dig_test.outB provided by "go.uber.org/dig_test".testProvideCycleFails\S+ \(\S+\)`,
 			`depends on func\(dig_test.inD\) \*dig_test.D provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 			`depends on func\(dig_test.inC\) dig_test.outC provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
@@ -2314,8 +2309,7 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cannot provide dig_test.A from \[0\].A2:`,
-			`already provided by \[0\].A1`,
+			`cannot provide dig_test.A from \[0\].A2: already provided by \[0\].A1`,
 		)
 	})
 
@@ -2341,8 +2335,7 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cannot provide interface {} from \[0\].A2:`,
-			`already provided by \[0\].A1`,
+			`cannot provide interface {} from \[0\].A2: already provided by \[0\].A1`,
 		)
 	})
 
@@ -2368,8 +2361,7 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cannot provide \*dig_test.A\[name="foo"\] from \[0\].A:`,
-			`already provided by "go.uber.org/dig_test".testProvideFailures\S+`,
+			`cannot provide \*dig_test.A\[name="foo"\] from \[0\].A: already provided by "go.uber.org/dig_test".testProvideFailures\S+`,
 		)
 	})
 
@@ -2407,8 +2399,7 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad result 1:",
-			`cannot return a pointer to a result object, use a value instead:`,
-			`\*dig_test.out is a pointer to a struct that embeds dig.Out`,
+			`\*dig_test.out is a pointer to a result object, must use a value embedding dig.Out instead`,
 		)
 	})
 
@@ -2427,8 +2418,7 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
 			`dig_test.go:\d+`, // file:line
 			"bad result 1:",
-			`cannot build a result object by embedding \*dig.Out, embed dig.Out instead:`,
-			`dig_test.out embeds \*dig.Out`,
+			`dig_test.out embeds \*dig.Out in result object, embed dig.Out instead`,
 		)
 	})
 
@@ -2905,8 +2895,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		require.Error(t, err)
 		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
-			"cannot depend on a pointer to a parameter object, use a value instead:",
-			`\*dig_test.in is a pointer to a struct that embeds dig.In`,
+			`\*dig_test.in is a pointer to a parameter object, must use a value embedding dig.In instead`,
 		)
 	})
 
@@ -2925,8 +2914,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		require.Error(t, err)
 		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
-			"cannot depend on result objects:",
-			"dig_test.in embeds a dig.Out",
+			"attempted to depend on result object: dig_test.in embeds dig.Out",
 		)
 	})
 
@@ -2942,8 +2930,9 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		require.Error(t, err)
 		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
-			`cannot build a parameter object by embedding \*dig.In, embed dig.In instead:`,
-			`dig_test.in embeds \*dig.In`,
+			`dig_test.in embeds \*dig.In in parameter object, must embed dig.In instead`,
+			// `cannot build a parameter object by embedding \*dig.In, embed dig.In instead:`,
+			// `dig_test.in embeds \*dig.In`,
 		)
 	})
 
@@ -3586,8 +3575,7 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".TestEndToEndSuccessWithAliases\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cannot provide dig_test.A from \[0\]:`,
-			`already provided by "go.uber.org/dig_test".TestEndToEndSuccessWithAliases\S+`,
+			`cannot provide dig_test.A from \[0\]: already provided by "go.uber.org/dig_test".TestEndToEndSuccessWithAliases\S+`,
 		)
 	})
 

@@ -41,17 +41,19 @@ type nestedErr struct {
 	err error
 }
 
-var _ causer = nestedErr{}
+var _ DigError = nestedErr{}
+
+func (e nestedErr) dummy() {}
 
 func (e nestedErr) Error() string {
 	return fmt.Sprint(e)
 }
 
 func (e nestedErr) Format(w fmt.State, c rune) {
-	formatCauser(e, w, c)
+	formatError(e, w, c)
 }
 
-func (e nestedErr) cause() error {
+func (e nestedErr) Unwrap() error {
 	return e.err
 }
 

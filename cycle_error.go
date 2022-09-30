@@ -22,6 +22,7 @@ package dig
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"go.uber.org/dig/internal/digreflect"
@@ -36,6 +37,10 @@ type errCycleDetected struct {
 	Path  []cycleErrPathEntry
 	scope *Scope
 }
+
+var _ DigError = errCycleDetected{}
+
+func (e errCycleDetected) dummy() {}
 
 func (e errCycleDetected) Error() string {
 	// We get something like,
@@ -63,6 +68,13 @@ func (e errCycleDetected) Error() string {
 // IsCycleDetected returns a boolean as to whether the provided error indicates
 // a cycle was detected in the container graph.
 func IsCycleDetected(err error) bool {
-	_, ok := RootCause(err).(errCycleDetected)
-	return ok
+	for err != nil {
+		_, ok := err.(errCycleDetected)
+		if ok {
+			return true
+		} else {
+			err = errors.Unwrap(err)
+		}
+	}
+	return false
 }

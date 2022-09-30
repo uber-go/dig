@@ -150,6 +150,150 @@ func (s stringFinder) Find(got string) (rest string, ok bool) {
 	return got[i+len(s):], true
 }
 
+func TestErrorsAs(t *testing.T) {
+	tests := []struct {
+		desc          string
+		give          error
+		wantAs        bool
+		wantRootCause error
+	}{
+		{
+			"defaultWrappedError",
+			defaultWrappedError{},
+			true,
+			nil,
+		},
+		{
+			"errProvide",
+			errProvide{},
+			true,
+			nil,
+		},
+		{
+			"errConstructorFailed",
+			errConstructorFailed{},
+			true,
+			nil,
+		},
+		{
+			"errArgumentsFailed",
+			errArgumentsFailed{},
+			true,
+			nil,
+		},
+		{
+			"errMissingDependencies",
+			errMissingDependencies{},
+			true,
+			nil,
+		},
+		{
+			"errParamSingleFailed",
+			errParamSingleFailed{},
+			true,
+			nil,
+		},
+		{
+			"errParamGroupFailed",
+			errParamGroupFailed{},
+			true,
+			nil,
+		},
+		{
+			"errMissingTypes",
+			errMissingTypes{},
+			true,
+			nil,
+		},
+		{
+			"errCycleDetected",
+			errCycleDetected{},
+			true,
+			nil,
+		},
+		{
+			"errInvalidGroupOption",
+			errInvalidGroupOption{},
+			true,
+			nil,
+		},
+		{
+			"errSpecification",
+			errSpecification{},
+			true,
+			nil,
+		},
+		{
+			"errValueGroup",
+			errValueGroup{},
+			true,
+			nil,
+		},
+		{
+			"errDuplicateProvide",
+			errDuplicateProvide{},
+			true,
+			nil,
+		},
+		{
+			"wrappedErrSpecification",
+			errSpecification{"foo", newError("bar")},
+			true,
+			nil,
+		},
+		{
+			"DIG wrapped non-DIG error",
+			defaultWrappedError{errors.New("Non-DIG Issue"), "DIG Issue"},
+			true,
+			errors.New("Non-DIG Issue"),
+		},
+		{
+			"random unformatted error",
+			errors.New("This non-DIG error is not formatted"),
+			false,
+			errors.New("This non-DIG error is not formatted"),
+		},
+		{
+			"random formatted error",
+			fmt.Errorf("This non-DIG error is %v", "formatted"),
+			false,
+			fmt.Errorf("This non-DIG error is %v", "formatted"),
+		},
+		{
+			"random newError()",
+			newError("random DIG error"),
+			true,
+			nil,
+		},
+		{
+			"errf just strings",
+			errf("foo", "bar", "gaz"),
+			true,
+			nil,
+		},
+		{
+			"errf with non-DIG error cause",
+			errf("foo", errors.New("error")),
+			true,
+			errors.New("error"),
+		},
+	}
+	msgs := map[bool]string{
+		true:  "Should actually be a DigError",
+		false: "Should not actually be a DigError",
+	}
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			var digError DigError
+			got := errors.As(tt.give, &digError)
+			assert.Equal(t, tt.wantAs, got, msgs[tt.wantAs])
+			rootCause := RootCause(tt.give)
+			assert.Equal(t, tt.wantRootCause, rootCause, "Incorrect root cause")
+			assert.Equal(t, false, errors.As(rootCause, &digError), "Root cause should never be a DIG error")
+		})
+	}
+}
+
 func TestErrf(t *testing.T) {
 	type args = []interface{}
 
@@ -167,28 +311,28 @@ func TestErrf(t *testing.T) {
 			give:          errf("foo"),
 			wantV:         "foo",
 			wantPlusV:     "foo",
-			wantRootCause: errors.New("foo"),
+			wantRootCause: nil,
 		},
 		{
 			desc:          "single formatted error",
 			give:          errf("foo %d %s", 42, "bar"),
 			wantV:         "foo 42 bar",
 			wantPlusV:     "foo 42 bar",
-			wantRootCause: errors.New("foo 42 bar"),
+			wantRootCause: nil,
 		},
 		{
 			desc:          "multiple unformatted errors",
 			give:          errf("foo", "bar", "baz"),
 			wantV:         "foo: bar: baz",
 			wantPlusV:     joinLines("foo:", "bar:", "baz"),
-			wantRootCause: errors.New("baz"),
+			wantRootCause: nil,
 		},
 		{
 			desc:          "multiple formatted errors",
 			give:          errf("foo %d", 42, "bar %s", "baz", "qux %q", "quux"),
 			wantV:         `foo 42: bar baz: qux "quux"`,
 			wantPlusV:     joinLines("foo 42:", "bar baz:", `qux "quux"`),
-			wantRootCause: errors.New(`qux "quux"`),
+			wantRootCause: nil,
 		},
 		{
 			desc:          "single error",
@@ -209,7 +353,7 @@ func TestErrf(t *testing.T) {
 			give:          errf("foo %% %v", "bar"),
 			wantV:         "foo % bar",
 			wantPlusV:     "foo % bar",
-			wantRootCause: errors.New("foo % bar"),
+			wantRootCause: nil,
 		},
 	}
 
@@ -382,7 +526,7 @@ func TestErrorFormatting(t *testing.T) {
 	}{
 		{
 			desc: "wrappedError/simple",
-			give: wrappedError{
+			give: defaultWrappedError{
 				msg: "something went wrong",
 				err: simpleErr,
 			},
@@ -393,8 +537,8 @@ func TestErrorFormatting(t *testing.T) {
 			),
 		},
 		{
-			desc: "wrappedError/rich",
-			give: wrappedError{
+			desc: "defaultWrappedError/rich",
+			give: defaultWrappedError{
 				msg: "something went wrong",
 				err: richError,
 			},

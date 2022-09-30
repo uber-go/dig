@@ -22,6 +22,7 @@ package dig
 
 import (
 	"container/list"
+	"fmt"
 	"reflect"
 	"strconv"
 )
@@ -166,9 +167,8 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 
 	optional, err := strconv.ParseBool(tag)
 	if err != nil {
-		err = errf(
-			"invalid value %q for %q tag on field %v",
-			tag, _optionalTag, f.Name, err)
+		err = newErrSpecification(
+			fmt.Sprintf("invalid value %q for %q tag on field %v", tag, _optionalTag, f.Name), err)
 	}
 
 	return optional, err

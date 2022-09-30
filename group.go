@@ -37,6 +37,10 @@ type group struct {
 
 type errInvalidGroupOption struct{ Option string }
 
+var _ DigError = errInvalidGroupOption{}
+
+func (e errInvalidGroupOption) dummy() {}
+
 func (e errInvalidGroupOption) Error() string {
 	return fmt.Sprintf("invalid option %q", e.Option)
 }

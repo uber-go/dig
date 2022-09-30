@@ -32,12 +32,14 @@ import (
 
 func TestNewResultListErrors(t *testing.T) {
 	tests := []struct {
-		desc string
-		give interface{}
+		desc    string
+		give    interface{}
+		wantErr string
 	}{
 		{
-			desc: "returns dig.In",
-			give: func() struct{ In } { panic("invalid") },
+			desc:    "returns dig.In",
+			give:    func() struct{ In } { panic("invalid") },
+			wantErr: "cannot provide parameter objects: struct { dig.In } embeds a dig.In",
 		},
 		{
 			desc: "returns dig.Out+dig.In",
@@ -47,6 +49,7 @@ func TestNewResultListErrors(t *testing.T) {
 			} {
 				panic("invalid")
 			},
+			wantErr: "cannot provide parameter objects: struct { dig.Out; dig.In } embeds a dig.In",
 		},
 	}
 
@@ -56,8 +59,7 @@ func TestNewResultListErrors(t *testing.T) {
 			require.Error(t, err)
 			AssertErrorMatches(t, err,
 				"bad result 1:",
-				"cannot provide parameter objects:",
-				"embeds a dig.In")
+				tt.wantErr)
 		})
 	}
 }
@@ -87,11 +89,11 @@ func TestNewResultErrors(t *testing.T) {
 	}{
 		{
 			give: outPtr{},
-			err:  "cannot build a result object by embedding *dig.Out, embed dig.Out instead: dig.outPtr embeds *dig.Out",
+			err:  "dig.outPtr embeds *dig.Out in result object, embed dig.Out instead",
 		},
 		{
 			give: (*out)(nil),
-			err:  "cannot return a pointer to a result object, use a value instead: *dig.out is a pointer to a struct that embeds dig.Out",
+			err:  "*dig.out is a pointer to a result object, must use a value embedding dig.Out instead",
 		},
 		{
 			give: in{},
@@ -234,8 +236,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 
 				Foo string `group:"foo" name:"bar"`
 			}{},
-			err: "cannot use named values with value groups: " +
-				`name:"bar" provided with group:"foo"`,
+			err: "attempted to use named value with value group: ",
 		},
 		{
 			desc: "group marked as optional",
@@ -254,7 +255,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 				Reader io.Reader
 			}{},
 			opts: resultOptions{Name: "foo"},
-			err:  `cannot specify a name for result objects`,
+			err:  `attempted to specify a name for result object which embeds dig.Out:`,
 		},
 		{
 			desc: "name option with name tag",
@@ -265,7 +266,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 				B io.Writer
 			}{},
 			opts: resultOptions{Name: "stream"},
-			err:  `cannot specify a name for result objects`,
+			err:  `attempted to specify a name for result object which embeds dig.Out:`,
 		},
 		{
 			desc: "group tag with name option",
@@ -276,7 +277,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 				Writer io.Writer `group:"writers"`
 			}{},
 			opts: resultOptions{Name: "foo"},
-			err:  `cannot specify a name for result objects`,
+			err:  `attempted to specify a name for result object which embeds dig.Out:`,
 		},
 		{
 			desc: "flatten on non-slice",
@@ -285,7 +286,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 
 				Writer io.Writer `group:"writers,flatten"`
 			}{},
-			err: "flatten can be applied to slices only",
+			err: "attempted to use flatten on a non-slice: ",
 		},
 		{
 			desc: "soft on value group",
@@ -294,7 +295,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 
 				Fries []struct{} `group:"potato,flatten,soft"`
 			}{},
-			err: "cannot use soft with result value groups",
+			err: "attempted to use soft with result value group: ",
 		},
 	}
 
