@@ -98,7 +98,7 @@
 //
 // # Invoke
 //
-// Types added to to the container may be consumed by using the Invoke method.
+// Types added to the container may be consumed by using the Invoke method.
 // Invoke accepts any function that accepts one or more parameters and
 // optionally, returns an error. Dig calls the function with the requested
 // type, instantiating only those types that were requested by the function.
