@@ -31,7 +31,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/dig/internal/digreflect"
 )
 
@@ -88,10 +87,6 @@ func AssertErrorMatches(t *testing.T, err error, msg string, msgs ...string) {
 	})
 }
 
-func Errf(msg string, args ...interface{}) error {
-	return errf(msg, args...)
-}
-
 // consumingFinder matches a string and returns the rest of the string *after*
 // the match.
 type consumingFinder interface {
@@ -117,9 +112,9 @@ func runFinders(original string, finders []consumingFinder) error {
 			// We won't use %q for the error message itself
 			// because we want it to be printed to the console as
 			// it would actually show.
-			return errf(`"%v" contains %v in the wrong place`, original, f)
+			return fmt.Errorf(`"%v" contains %v in the wrong place`, original, f)
 		}
-		return errf(`"%v" does not contain %v`, original, f)
+		return fmt.Errorf(`"%v" does not contain %v`, original, f)
 	}
 	return nil
 }
@@ -150,276 +145,74 @@ func (s stringFinder) Find(got string) (rest string, ok bool) {
 	return got[i+len(s):], true
 }
 
-func TestErrorsAs(t *testing.T) {
+func TestRootCause(t *testing.T) {
 	tests := []struct {
-		desc          string
-		give          error
-		wantAs        bool
-		wantRootCause error
+		desc string
+		give error
+		want error
 	}{
-		{
-			"defaultWrappedError",
-			defaultWrappedError{},
-			true,
-			nil,
-		},
-		{
-			"errProvide",
-			errProvide{},
-			true,
-			nil,
-		},
-		{
-			"errConstructorFailed",
-			errConstructorFailed{},
-			true,
-			nil,
-		},
-		{
-			"errArgumentsFailed",
-			errArgumentsFailed{},
-			true,
-			nil,
-		},
-		{
-			"errMissingDependencies",
-			errMissingDependencies{},
-			true,
-			nil,
-		},
-		{
-			"errParamSingleFailed",
-			errParamSingleFailed{},
-			true,
-			nil,
-		},
-		{
-			"errParamGroupFailed",
-			errParamGroupFailed{},
-			true,
-			nil,
-		},
-		{
-			"errMissingTypes",
-			errMissingTypes{},
-			true,
-			nil,
-		},
-		{
-			"errCycleDetected",
-			errCycleDetected{},
-			true,
-			nil,
-		},
-		{
-			"errInvalidGroupOption",
-			errInvalidGroupOption{},
-			true,
-			nil,
-		},
-		{
-			"errSpecification",
-			errSpecification{},
-			true,
-			nil,
-		},
-		{
-			"errValueGroup",
-			errValueGroup{},
-			true,
-			nil,
-		},
-		{
-			"errDuplicateProvide",
-			errDuplicateProvide{},
-			true,
-			nil,
-		},
-		{
-			"wrappedErrSpecification",
-			errSpecification{"foo", newError("bar")},
-			true,
-			nil,
-		},
-		{
-			"DIG wrapped non-DIG error",
-			defaultWrappedError{errors.New("Non-DIG Issue"), "DIG Issue"},
-			true,
-			errors.New("Non-DIG Issue"),
-		},
 		{
 			"random unformatted error",
 			errors.New("This non-DIG error is not formatted"),
-			false,
 			errors.New("This non-DIG error is not formatted"),
 		},
 		{
 			"random formatted error",
 			fmt.Errorf("This non-DIG error is %v", "formatted"),
-			false,
 			fmt.Errorf("This non-DIG error is %v", "formatted"),
 		},
 		{
-			"random newError()",
-			newError("random DIG error"),
-			true,
+			"errSpecification",
+			errSpecification{Message: "baz", Cause: nil},
 			nil,
 		},
 		{
-			"errf just strings",
-			errf("foo", "bar", "gaz"),
-			true,
-			nil,
+			"wrappedErrSpecification",
+			errSpecification{Message: "foo", Cause: errors.New("bar")},
+			errors.New("bar"),
 		},
 		{
-			"errf with non-DIG error cause",
-			errf("foo", errors.New("error")),
-			true,
-			errors.New("error"),
+			"nil",
+			nil,
+			nil,
 		},
-	}
-	msgs := map[bool]string{
-		true:  "Should actually be a DigError",
-		false: "Should not actually be a DigError",
 	}
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			var digError DigError
-			got := errors.As(tt.give, &digError)
-			assert.Equal(t, tt.wantAs, got, msgs[tt.wantAs])
-			rootCause := RootCause(tt.give)
-			assert.Equal(t, tt.wantRootCause, rootCause, "Incorrect root cause")
-			assert.Equal(t, false, errors.As(rootCause, &digError), "Root cause should never be a DIG error")
+			got := RootCause(tt.give)
+			assert.Equal(t, tt.want, got, "Incorrect root cause")
+			assert.Equal(t, false, errors.As(got, &digError), "Root cause should never be a DigError")
 		})
 	}
 }
 
-func TestErrf(t *testing.T) {
-	type args = []interface{}
-
-	tests := []struct {
-		desc string
-		give error
-
-		wantV     string // output for %v
-		wantPlusV string // output for %+v
-
-		wantRootCause error
-	}{
-		{
-			desc:          "single unformatted error",
-			give:          errf("foo"),
-			wantV:         "foo",
-			wantPlusV:     "foo",
-			wantRootCause: nil,
-		},
-		{
-			desc:          "single formatted error",
-			give:          errf("foo %d %s", 42, "bar"),
-			wantV:         "foo 42 bar",
-			wantPlusV:     "foo 42 bar",
-			wantRootCause: nil,
-		},
-		{
-			desc:          "multiple unformatted errors",
-			give:          errf("foo", "bar", "baz"),
-			wantV:         "foo: bar: baz",
-			wantPlusV:     joinLines("foo:", "bar:", "baz"),
-			wantRootCause: nil,
-		},
-		{
-			desc:          "multiple formatted errors",
-			give:          errf("foo %d", 42, "bar %s", "baz", "qux %q", "quux"),
-			wantV:         `foo 42: bar baz: qux "quux"`,
-			wantPlusV:     joinLines("foo 42:", "bar baz:", `qux "quux"`),
-			wantRootCause: nil,
-		},
-		{
-			desc:          "single error",
-			give:          errf("foo", "bar", errors.New("great sadness")),
-			wantV:         "foo: bar: great sadness",
-			wantPlusV:     joinLines("foo:", "bar:", "great sadness"),
-			wantRootCause: errors.New("great sadness"),
-		},
-		{
-			desc:          "multiple errors",
-			give:          errf("foo", "bar: %v", errors.New("baz"), errors.New("great sadness")),
-			wantV:         "foo: bar: baz: great sadness",
-			wantPlusV:     joinLines("foo:", "bar: baz:", "great sadness"),
-			wantRootCause: errors.New("great sadness"),
-		},
-		{
-			desc:          "escaped percent",
-			give:          errf("foo %% %v", "bar"),
-			wantV:         "foo % bar",
-			wantPlusV:     "foo % bar",
-			wantRootCause: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			err := tt.give
-			require.NotNil(t, err, "invalid test: must not be nil")
-
-			t.Run("Error", func(t *testing.T) {
-				assert.Equal(t, tt.wantV, err.Error())
-			})
-
-			t.Run("format with %+v", func(t *testing.T) {
-				assert.Equal(t, tt.wantPlusV, fmt.Sprintf("%+v", err))
-			})
-
-			t.Run("RootCause", func(t *testing.T) {
-				assert.Equal(t, tt.wantRootCause, RootCause(err))
-			})
-		})
-	}
+type MyNonDigError struct {
+	msg string
 }
 
-func TestErrfInvalid(t *testing.T) {
-	t.Run("nil panics", func(t *testing.T) {
-		assert.Panics(t, func() {
-			errf("foo", nil)
-		})
-	})
-
-	t.Run("too few argumetns", func(t *testing.T) {
-		assert.Panics(t, func() {
-			errf("foo %v")
-		})
-	})
-
-	t.Run("error before last", func(t *testing.T) {
-		assert.Panics(t, func() {
-			errf("foo", errors.New("bar"), "baz %v", 42)
-		})
-	})
-
-	t.Run("unknown type", func(t *testing.T) {
-		assert.Panics(t, func() {
-			errf("foo %v", 42, 43)
-		})
-	})
+func (e MyNonDigError) Error() string {
+	return e.msg
 }
 
-func TestNumFmtArgs(t *testing.T) {
-	tests := []struct {
-		desc string
-		give string
-		want int
-	}{
-		{"empty", "", 0},
-		{"none", "foo bar", 0},
-		{"some", "foo %v b %d ar", 2},
-		{"trailing", "foo %v 100%", 1},
-		{"escaped", "foo %v bar %% baz %d", 2},
-	}
+func TestRootCauseEndToEnd(t *testing.T) {
+	c := New()
 
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			assert.Equal(t, tt.want, numFmtArgs(tt.give))
-		})
+	assert.NoError(t, c.Provide(func() (string, error) {
+		return "hello", MyNonDigError{
+			msg: "great sadness",
+		}
+	}))
+	err := c.Invoke(func(s string) {
+		fmt.Println(s)
+	})
+	if assert.Error(t, err) {
+		var de DigError
+		var me MyNonDigError
+		assert.ErrorAs(t, err, &de)
+		rootCause := RootCause(err)
+		assert.False(t, errors.As(rootCause, &de), "RootCause should never return a DigError")
+		assert.ErrorAs(t, rootCause, &me)
 	}
 }
 
@@ -525,10 +318,10 @@ func TestErrorFormatting(t *testing.T) {
 		wantPlusV  string
 	}{
 		{
-			desc: "wrappedError/simple",
-			give: defaultWrappedError{
-				msg: "something went wrong",
-				err: simpleErr,
+			desc: "wrapped error/simple",
+			give: errSpecification{
+				Message: "something went wrong",
+				Cause:   simpleErr,
 			},
 			wantString: "something went wrong: great sadness",
 			wantPlusV: joinLines(
@@ -537,10 +330,10 @@ func TestErrorFormatting(t *testing.T) {
 			),
 		},
 		{
-			desc: "defaultWrappedError/rich",
-			give: defaultWrappedError{
-				msg: "something went wrong",
-				err: richError,
+			desc: "wrapped error/rich",
+			give: errSpecification{
+				Message: "something went wrong",
+				Cause:   richError,
 			},
 			wantString: "something went wrong: great sadness",
 			wantPlusV: joinLines(

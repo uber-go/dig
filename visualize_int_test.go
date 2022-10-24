@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -74,12 +75,12 @@ func TestCanVisualizeError(t *testing.T) {
 	}{
 		{
 			desc:         "unvisualizable error",
-			err:          errf("great sadness"),
+			err:          errors.New("great sadness"),
 			canVisualize: false,
 		},
 		{
 			desc:         "nested unvisualizable error",
-			err:          nestedErr{err: errf("great sadness")},
+			err:          nestedErr{err: errors.New("great sadness")},
 			canVisualize: false,
 		},
 		{
