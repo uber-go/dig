@@ -147,42 +147,56 @@ func (s stringFinder) Find(got string) (rest string, ok bool) {
 
 func TestRootCause(t *testing.T) {
 	tests := []struct {
-		desc string
-		give error
-		want error
+		desc                    string
+		give                    error
+		wantAsDigError          bool
+		wantRootCause           error
+		wantRootCauseAsDigError bool
 	}{
 		{
 			"random unformatted error",
 			errors.New("This non-DIG error is not formatted"),
+			false,
 			errors.New("This non-DIG error is not formatted"),
+			false,
 		},
 		{
 			"random formatted error",
 			fmt.Errorf("This non-DIG error is %v", "formatted"),
+			false,
 			fmt.Errorf("This non-DIG error is %v", "formatted"),
+			false,
 		},
 		{
 			"errSpecification",
 			errSpecification{Message: "baz", Cause: nil},
-			nil,
+			true,
+			errSpecification{Message: "baz", Cause: nil},
+			true,
 		},
 		{
 			"wrappedErrSpecification",
 			errSpecification{Message: "foo", Cause: errors.New("bar")},
+			true,
 			errors.New("bar"),
+			false,
 		},
 		{
 			"nil",
 			nil,
+			false,
 			nil,
+			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			var digError DigError
-			got := RootCause(tt.give)
-			assert.Equal(t, tt.want, got, "Incorrect root cause")
-			assert.Equal(t, false, errors.As(got, &digError), "Root cause should never be a DigError")
+			var de DigError
+			assert.Equal(t, tt.wantAsDigError, errors.As(tt.give, &de))
+			gotRootCause := RootCause(tt.give)
+			assert.Equal(t, gotRootCause, tt.wantRootCause)
+			assert.Equal(t, tt.wantRootCause, gotRootCause, "Incorrect root cause")
+			assert.Equal(t, tt.wantRootCauseAsDigError, errors.As(gotRootCause, &de))
 		})
 	}
 }
@@ -196,24 +210,90 @@ func (e MyNonDigError) Error() string {
 }
 
 func TestRootCauseEndToEnd(t *testing.T) {
-	c := New()
 
-	assert.NoError(t, c.Provide(func() (string, error) {
-		return "hello", MyNonDigError{
-			msg: "great sadness",
-		}
-	}))
-	err := c.Invoke(func(s string) {
-		fmt.Println(s)
-	})
-	if assert.Error(t, err) {
-		var de DigError
-		var me MyNonDigError
-		assert.ErrorAs(t, err, &de)
-		rootCause := RootCause(err)
-		assert.False(t, errors.As(rootCause, &de), "RootCause should never return a DigError")
-		assert.ErrorAs(t, rootCause, &me)
+	tests := []struct {
+		desc                    string
+		setup                   func(c *Container)
+		invoke                  interface{}
+		wantAsDigError          bool
+		wantRootCause           error // nil if same as original error
+		wantRootCauseAsDigError bool
+	}{
+		{
+			desc: "error thrown in constructor",
+			setup: func(c *Container) {
+				assert.NoError(t, c.Provide(func() (string, error) {
+					return "hello", MyNonDigError{msg: "great sadness"}
+				}))
+			},
+			invoke: func(s string) {
+				fmt.Println(s)
+			},
+			wantAsDigError:          true,
+			wantRootCause:           MyNonDigError{msg: "great sadness"},
+			wantRootCauseAsDigError: false,
+		},
+		{
+			desc: "parameter not available in container",
+			setup: func(c *Container) {
+				assert.NoError(t, c.Provide(func() int { return 5 }))
+			},
+			invoke: func(s string) {
+				fmt.Println(s)
+			},
+			wantAsDigError:          true,
+			wantRootCause:           nil,
+			wantRootCauseAsDigError: true,
+		},
+		{
+			desc: "error in invoke",
+			setup: func(c *Container) {
+				assert.NoError(t, c.Provide(func() (string, error) {
+					return "hello", nil
+				}))
+			},
+			invoke: func(s string) error {
+				return MyNonDigError{msg: "great sadness"}
+			},
+			wantAsDigError:          false,
+			wantRootCause:           MyNonDigError{msg: "great sadness"},
+			wantRootCauseAsDigError: false,
+		},
 	}
+
+	for _, tt := range tests {
+		c := New()
+		tt.setup(c)
+		var de DigError
+		err := c.Invoke(tt.invoke)
+		assert.Equal(t, tt.wantAsDigError, errors.As(err, &de),
+			fmt.Sprintf("expected errors.As() to return %v", tt.wantAsDigError))
+		rcErr := RootCause(err)
+		if tt.wantRootCause == nil { // nil -> we want root cause to be same as original error
+			assert.Equal(t, err, rcErr, "expected root cause to be same as original error")
+		} else {
+			assert.Equal(t, tt.wantRootCause, rcErr, "expected a different root cause")
+		}
+		assert.Equal(t, tt.wantRootCauseAsDigError, errors.As(rcErr, &de),
+			fmt.Sprintf("expected errors.As() on the root cause to return %v", tt.wantRootCauseAsDigError))
+	}
+
+	// assert.NoError(t, c.Provide(func() (string, error) {
+	// 	return "hello", MyNonDigError{
+	// 		msg: "great sadness",
+	// 	}
+	// }))
+	// err := c.Invoke(func(s string) {
+	// 	fmt.Println(s)
+	// })
+	// if assert.Error(t, err) {
+	// 	var de DigError
+	// 	var me MyNonDigError
+	// 	assert.ErrorAs(t, err, &de)
+	// 	rootCause := RootCause(err)
+	// 	assert.False(t, errors.As(rootCause, &de))
+	// 	assert.ErrorAs(t, rootCause, &me)
+	// }
 }
 
 func joinLines(ls ...string) string { return strings.Join(ls, "\n") }

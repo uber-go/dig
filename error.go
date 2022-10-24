@@ -104,16 +104,18 @@ func formatError(e wrappedError, w fmt.State, v rune) {
 	}
 }
 
-// RootCause returns the original error that caused the provided dig failure.
-//
-// RootCause may be used on errors returned by Invoke to get the original
-// error returned by a constructor or invoked function.
-// If there is no non-dig error in the chain, RootCause will return nil.
+// RootCause returns the first non-DigError in a chain of wrapped errors.
+// If there are no non-DigErrors in the chain,
+// RootCause returns the originally passed in error.
 func RootCause(err error) error {
 	var de DigError
+	originalErr := err
 	for {
-		if ok := errors.As(err, &de); ok { // This is a dig error
-			err = errors.Unwrap(de) // Attempt to unwrap error
+		if err == nil {
+			return originalErr
+		}
+		if ok := errors.As(err, &de); ok {
+			err = errors.Unwrap(de)
 		} else { // This is not a dig error
 			return err
 		}
