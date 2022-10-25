@@ -191,7 +191,7 @@ func TestRootCause(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			var de DigError
+			var de Error
 			assert.Equal(t, tt.wantAsDigError, errors.As(tt.give, &de))
 			gotRootCause := RootCause(tt.give)
 			assert.Equal(t, gotRootCause, tt.wantRootCause)
@@ -264,7 +264,7 @@ func TestRootCauseEndToEnd(t *testing.T) {
 	for _, tt := range tests {
 		c := New()
 		tt.setup(c)
-		var de DigError
+		var de Error
 		err := c.Invoke(tt.invoke)
 		assert.Equal(t, tt.wantAsDigError, errors.As(err, &de),
 			fmt.Sprintf("expected errors.As() to return %v", tt.wantAsDigError))
@@ -277,23 +277,6 @@ func TestRootCauseEndToEnd(t *testing.T) {
 		assert.Equal(t, tt.wantRootCauseAsDigError, errors.As(rcErr, &de),
 			fmt.Sprintf("expected errors.As() on the root cause to return %v", tt.wantRootCauseAsDigError))
 	}
-
-	// assert.NoError(t, c.Provide(func() (string, error) {
-	// 	return "hello", MyNonDigError{
-	// 		msg: "great sadness",
-	// 	}
-	// }))
-	// err := c.Invoke(func(s string) {
-	// 	fmt.Println(s)
-	// })
-	// if assert.Error(t, err) {
-	// 	var de DigError
-	// 	var me MyNonDigError
-	// 	assert.ErrorAs(t, err, &de)
-	// 	rootCause := RootCause(err)
-	// 	assert.False(t, errors.As(rootCause, &de))
-	// 	assert.ErrorAs(t, rootCause, &me)
-	// }
 }
 
 func joinLines(ls ...string) string { return strings.Join(ls, "\n") }

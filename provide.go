@@ -650,7 +650,7 @@ type errDuplicateProvide struct {
 	Message string
 }
 
-var _ DigError = errDuplicateProvide{}
+var _ Error = errDuplicateProvide{}
 
 func (e errDuplicateProvide) dummy() {}
 

@@ -38,7 +38,7 @@ type errCycleDetected struct {
 	scope *Scope
 }
 
-var _ DigError = errCycleDetected{}
+var _ Error = errCycleDetected{}
 
 func (e errCycleDetected) dummy() {}
 
@@ -72,9 +72,8 @@ func IsCycleDetected(err error) bool {
 		_, ok := err.(errCycleDetected)
 		if ok {
 			return true
-		} else {
-			err = errors.Unwrap(err)
 		}
+		err = errors.Unwrap(err)
 	}
 	return false
 }

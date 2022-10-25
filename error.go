@@ -31,8 +31,8 @@ import (
 	"go.uber.org/dig/internal/dot"
 )
 
-// DigError is an interface implemented by all Dig errors.
-type DigError interface {
+// Error is an interface implemented by all Dig errors.
+type Error interface {
 	error
 	dummy()
 }
@@ -51,7 +51,7 @@ func newErrSpecification(msg string, cause error) errSpecification {
 	return errSpecification{msg, cause}
 }
 
-var _ DigError = errSpecification{}
+var _ Error = errSpecification{}
 
 func (e errSpecification) dummy() {}
 
@@ -68,10 +68,10 @@ func (e errSpecification) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
 
-// wrappedError is a DigError with additional functionality
+// wrappedError is a dig.Error with additional functionality
 // that allows them to be formatted via formatError()
 type wrappedError interface {
-	DigError
+	Error
 	fmt.Formatter
 	Unwrap() error
 	writeMessage(w io.Writer, v string)
@@ -104,11 +104,11 @@ func formatError(e wrappedError, w fmt.State, v rune) {
 	}
 }
 
-// RootCause returns the first non-DigError in a chain of wrapped errors.
-// If there are no non-DigErrors in the chain,
+// RootCause returns the first non-Error in a chain of wrapped errors.
+// If there are no non-dig.Errors in the chain,
 // RootCause returns the originally passed in error.
 func RootCause(err error) error {
-	var de DigError
+	var de Error
 	originalErr := err
 	for {
 		if err == nil {
@@ -129,7 +129,7 @@ type errProvide struct {
 	Reason error
 }
 
-var _ DigError = errProvide{}
+var _ Error = errProvide{}
 
 func (e errProvide) dummy() {}
 
@@ -153,7 +153,7 @@ type errConstructorFailed struct {
 	Reason error
 }
 
-var _ DigError = errConstructorFailed{}
+var _ Error = errConstructorFailed{}
 
 func (e errConstructorFailed) dummy() {}
 
@@ -175,7 +175,7 @@ type errValueGroup struct {
 	Message string
 }
 
-var _ DigError = errValueGroup{}
+var _ Error = errValueGroup{}
 
 func (e errValueGroup) dummy() {}
 
@@ -188,7 +188,7 @@ type errArgumentsFailed struct {
 	Reason error
 }
 
-var _ DigError = errArgumentsFailed{}
+var _ Error = errArgumentsFailed{}
 
 func (e errArgumentsFailed) dummy() {}
 
@@ -212,7 +212,7 @@ type errMissingDependencies struct {
 	Reason error
 }
 
-var _ DigError = errMissingDependencies{}
+var _ Error = errMissingDependencies{}
 
 func (e errMissingDependencies) dummy() {}
 
@@ -236,7 +236,7 @@ type errParamSingleFailed struct {
 	CtorID dot.CtorID
 }
 
-var _ DigError = errParamSingleFailed{}
+var _ Error = errParamSingleFailed{}
 
 func (e errParamSingleFailed) dummy() {}
 
@@ -272,7 +272,7 @@ type errParamGroupFailed struct {
 	CtorID dot.CtorID
 }
 
-var _ DigError = errParamGroupFailed{}
+var _ Error = errParamGroupFailed{}
 
 func (e errParamGroupFailed) dummy() {}
 
@@ -359,7 +359,7 @@ func (mt missingType) Format(w fmt.State, v rune) {
 // Multiple instances of this error may be merged together by appending them.
 type errMissingTypes []missingType // inv: len > 0
 
-var _ DigError = make(errMissingTypes, 0)
+var _ Error = make(errMissingTypes, 0)
 
 func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 	// Possible types we will look for in the container. We will always look

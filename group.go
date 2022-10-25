@@ -37,7 +37,7 @@ type group struct {
 
 type errInvalidGroupOption struct{ Option string }
 
-var _ DigError = errInvalidGroupOption{}
+var _ Error = errInvalidGroupOption{}
 
 func (e errInvalidGroupOption) dummy() {}
 

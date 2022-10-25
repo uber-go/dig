@@ -42,7 +42,7 @@ type nestedErr struct {
 	err error
 }
 
-var _ DigError = nestedErr{}
+var _ Error = nestedErr{}
 
 func (e nestedErr) dummy() {}
 
