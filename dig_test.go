@@ -2011,7 +2011,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cycle detected in dependency graph:`,
+			`this function introduces a cycle:`,
 			`func\(\*dig_test.C\) \*dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails\S+ \(\S+\)`,
 			`depends on func\(\*dig_test.B\) \*dig_test.C provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 			`depends on func\(\*dig_test.A\) \*dig_test.B provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
@@ -2060,7 +2060,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cycle detected in dependency graph:`,
+			`this function introduces a cycle:`,
 			`func\(dig_test.AParams\) dig_test.A provided by "go.uber.org/dig_test".testProvideCycleFails\S+ \(\S+\)`,
 			`depends on func\(dig_test.CParams\) dig_test.C provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 			`depends on func\(dig_test.BParams\) dig_test.B provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
@@ -2132,7 +2132,7 @@ func testProvideCycleFails(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideCycleFails.\S+`,
 			`dig_test.go:\d+`, // file:line
-			`cycle detected in dependency graph:`,
+			`this function introduces a cycle:`,
 			`func\(\*dig_test.D\) dig_test.outB provided by "go.uber.org/dig_test".testProvideCycleFails\S+ \(\S+\)`,
 			`depends on func\(dig_test.inD\) \*dig_test.D provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,
 			`depends on func\(dig_test.inC\) dig_test.outC provided by "go.uber.org/dig_test".testProvideCycleFails.\S+ \(\S+\)`,

@@ -508,7 +508,7 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 				s.providers[k] = ops
 			}
 
-			return newErrSpecification("cycle detected in dependency graph", s.cycleDetectedError(cycle))
+			return newErrSpecification("this function introduces a cycle:", s.cycleDetectedError(cycle))
 		}
 		s.isVerifiedAcyclic = true
 	}
