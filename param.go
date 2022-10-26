@@ -67,16 +67,16 @@ var (
 func newParam(t reflect.Type, c containerStore) (param, error) {
 	switch {
 	case IsOut(t) || (t.Kind() == reflect.Ptr && IsOut(t.Elem())) || embedsType(t, _outPtrType):
-		return nil, newErrSpecification(
-			fmt.Sprintf("attempted to depend on result object: %v embeds dig.Out", t), nil)
+		return nil, newErrInvalidInput("cannot depend on result objects",
+			newErrInvalidInput(fmt.Sprintf("%v embeds a dig.Out", t), nil))
 	case IsIn(t):
 		return newParamObject(t, c)
 	case embedsType(t, _inPtrType):
-		return nil, newErrSpecification(
-			fmt.Sprintf("%v embeds *dig.In in parameter object, must embed dig.In instead", t), nil)
+		return nil, newErrInvalidInput("cannot build a parameter object by embedding *dig.In, embed dig.In instead",
+			newErrInvalidInput(fmt.Sprintf("%v embeds *dig.In", t), nil))
 	case t.Kind() == reflect.Ptr && IsIn(t.Elem()):
-		return nil, newErrSpecification(
-			fmt.Sprintf("%v is a pointer to a parameter object, must use a value embedding dig.In instead", t), nil)
+		return nil, newErrInvalidInput("cannot depend on a pointer to a parameter object, use a value instead",
+			newErrInvalidInput(fmt.Sprintf("%v is a pointer to a struct that embeds dig.In", t), nil))
 	default:
 		return paramSingle{Type: t}, nil
 	}
@@ -128,7 +128,7 @@ func newParamList(ctype reflect.Type, c containerStore) (paramList, error) {
 	for i := 0; i < numArgs; i++ {
 		p, err := newParam(ctype.In(i), c)
 		if err != nil {
-			return pl, newErrSpecification(fmt.Sprintf("bad argument %d", i+1), err)
+			return pl, newErrInvalidInput(fmt.Sprintf("bad argument %d", i+1), err)
 		}
 		pl.Params = append(pl.Params, p)
 	}
@@ -385,7 +385,7 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 		}
 		pof, err := newParamObjectField(i, f, c)
 		if err != nil {
-			return po, newErrSpecification(
+			return po, newErrInvalidInput(
 				fmt.Sprintf("bad field %q of %v", f.Name, t), err)
 		}
 		po.Fields = append(po.Fields, pof)
@@ -446,7 +446,7 @@ func newParamObjectField(idx int, f reflect.StructField, c containerStore) (para
 	var p param
 	switch {
 	case f.PkgPath != "":
-		return pof, newErrSpecification(
+		return pof, newErrInvalidInput(
 			fmt.Sprintf("unexported fields not allowed in dig.In, did you mean to export %q (%v)?", f.Name, f.Type), nil)
 
 	case f.Tag.Get(_groupTag) != "":
@@ -541,17 +541,17 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	optional, _ := isFieldOptional(f)
 	switch {
 	case f.Type.Kind() != reflect.Slice:
-		return pg, errValueGroup{
-			fmt.Sprintf("value groups must be consumed as slices but field %q (%v) is not a slice", f.Name, f.Type)}
+		return pg, newErrInvalidInput("value groups may be consumed as slices only",
+			newErrInvalidInput(fmt.Sprintf("field %q (%v) is not a slice", f.Name, f.Type), nil))
 	case g.Flatten:
-		return pg, errValueGroup{
-			fmt.Sprintf("attempted to use flatten for field %q in value group %q", f.Name, f.Type)}
+		return pg, newErrInvalidInput("cannot use flatten in parameter value groups",
+			newErrInvalidInput(fmt.Sprintf("field %q (%v) specifies flatten", f.Name, f.Type), nil))
 	case name != "":
-		return pg, errValueGroup{
-			fmt.Sprintf("attempted to use name %q with value group %q", name, pg.Group)}
+		return pg, newErrInvalidInput("cannot use named values with value groups",
+			newErrInvalidInput(fmt.Sprintf("name:%q requested with group:%q", name, pg.Group), nil))
 
 	case optional:
-		return pg, errValueGroup{"value groups cannot be optional"}
+		return pg, newErrInvalidInput("value groups cannot be optional", nil)
 	}
 	c.newGraphNode(&pg, pg.orders)
 	return pg, nil
@@ -661,7 +661,7 @@ func isIgnoreUnexportedSet(f reflect.StructField) (bool, error) {
 
 	allowed, err := strconv.ParseBool(tag)
 	if err != nil {
-		err = newErrSpecification(
+		err = newErrInvalidInput(
 			fmt.Sprintf("invalid value %q for %q tag on field %v", tag, _ignoreUnexportedTag, f.Name), err)
 	}
 

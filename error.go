@@ -32,55 +32,19 @@ import (
 )
 
 // Error is an interface implemented by all Dig errors.
+// dig.Errors require additional functionality for recursively
+// formatting string representations of wrapped errors.
 type Error interface {
 	error
-	dummy()
-}
-
-// errSpecification is returned whenever the user provides bad input when
-// interacting with the container. May optionally have a more detailed
-// error wrapped underneath.
-type errSpecification struct {
-	Message string
-	Cause   error
-}
-
-// newErrSpecification creates a new errSpecification. If there is no other
-// error to wrap, it is safe to pass nil.
-func newErrSpecification(msg string, cause error) errSpecification {
-	return errSpecification{msg, cause}
-}
-
-var _ Error = errSpecification{}
-
-func (e errSpecification) dummy() {}
-
-func (e errSpecification) Unwrap() error {
-	return e.Cause
-}
-
-func (e errSpecification) writeMessage(w io.Writer, _ string) {
-	fmt.Fprintf(w, e.Message)
-}
-
-func (e errSpecification) Error() string { return fmt.Sprint(e) }
-func (e errSpecification) Format(w fmt.State, c rune) {
-	formatError(e, w, c)
-}
-
-// wrappedError is a dig.Error with additional functionality
-// that allows them to be formatted via formatError()
-type wrappedError interface {
-	Error
 	fmt.Formatter
 	Unwrap() error
 	writeMessage(w io.Writer, v string)
 }
 
-// formatError will call a wrappedError's writeMessage() method to print the error message
+// formatError will call a dig.Error's writeMessage() method to print the error message
 // and then will automatically attempt to print errors wrapped underneath (which can create
-// a recursive effect if the wrapped error's Format() method points back to this function).
-func formatError(e wrappedError, w fmt.State, v rune) {
+// a recursive effect if the wrapped error's Format() method then points back to this function).
+func formatError(e Error, w fmt.State, v rune) {
 	multiline := w.Flag('+') && v == 'v'
 	verb := "%v"
 	if multiline {
@@ -122,6 +86,36 @@ func RootCause(err error) error {
 	}
 }
 
+// errInvalidInput is returned whenever the user provides bad input when
+// interacting with the container. May optionally have a more detailed
+// error wrapped underneath.
+type errInvalidInput struct {
+	Message string
+	Cause   error
+}
+
+var _ Error = errInvalidInput{}
+
+// newErrInvalidInput creates a new errInvalidInput, wrapping the given
+// other error that caused this error. If there is no underlying cause,
+// pass in nil. This will cause all attempts to unwrap this error to return
+// nil, replicating errors.Unwrap's behavior when passed an error without
+// an Unwrap() method.
+func newErrInvalidInput(msg string, cause error) errInvalidInput {
+	return errInvalidInput{msg, cause}
+}
+
+func (e errInvalidInput) Error() string { return fmt.Sprint(e) }
+
+func (e errInvalidInput) Unwrap() error { return e.Cause }
+
+func (e errInvalidInput) writeMessage(w io.Writer, _ string) {
+	fmt.Fprintf(w, e.Message)
+}
+func (e errInvalidInput) Format(w fmt.State, c rune) {
+	formatError(e, w, c)
+}
+
 // errProvide is returned when a constructor could not be Provided into the
 // container.
 type errProvide struct {
@@ -131,17 +125,14 @@ type errProvide struct {
 
 var _ Error = errProvide{}
 
-func (e errProvide) dummy() {}
+func (e errProvide) Error() string { return fmt.Sprint(e) }
 
-func (e errProvide) Unwrap() error {
-	return e.Reason
-}
+func (e errProvide) Unwrap() error { return e.Reason }
 
 func (e errProvide) writeMessage(w io.Writer, verb string) {
 	fmt.Fprintf(w, "cannot provide function "+verb, e.Func)
 }
 
-func (e errProvide) Error() string { return fmt.Sprint(e) }
 func (e errProvide) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -155,31 +146,16 @@ type errConstructorFailed struct {
 
 var _ Error = errConstructorFailed{}
 
-func (e errConstructorFailed) dummy() {}
+func (e errConstructorFailed) Error() string { return fmt.Sprint(e) }
 
-func (e errConstructorFailed) Unwrap() error {
-	return e.Reason
-}
+func (e errConstructorFailed) Unwrap() error { return e.Reason }
 
 func (e errConstructorFailed) writeMessage(w io.Writer, verb string) {
 	fmt.Fprintf(w, "received non-nil error from function "+verb, e.Func)
 }
-
-func (e errConstructorFailed) Error() string { return fmt.Sprint(e) }
 func (e errConstructorFailed) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
-
-// errValueGroup is a more specific type of specification error specific to value groups
-type errValueGroup struct {
-	Message string
-}
-
-var _ Error = errValueGroup{}
-
-func (e errValueGroup) dummy() {}
-
-func (e errValueGroup) Error() string { return e.Message }
 
 // errArgumentsFailed is returned when a function could not be run because one
 // of its dependencies failed to build for any reason.
@@ -190,17 +166,13 @@ type errArgumentsFailed struct {
 
 var _ Error = errArgumentsFailed{}
 
-func (e errArgumentsFailed) dummy() {}
+func (e errArgumentsFailed) Error() string { return fmt.Sprint(e) }
 
-func (e errArgumentsFailed) Unwrap() error {
-	return e.Reason
-}
+func (e errArgumentsFailed) Unwrap() error { return e.Reason }
 
 func (e errArgumentsFailed) writeMessage(w io.Writer, verb string) {
 	fmt.Fprintf(w, "could not build arguments for function "+verb, e.Func)
 }
-
-func (e errArgumentsFailed) Error() string { return fmt.Sprint(e) }
 func (e errArgumentsFailed) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -214,17 +186,13 @@ type errMissingDependencies struct {
 
 var _ Error = errMissingDependencies{}
 
-func (e errMissingDependencies) dummy() {}
+func (e errMissingDependencies) Error() string { return fmt.Sprint(e) }
 
-func (e errMissingDependencies) Unwrap() error {
-	return e.Reason
-}
+func (e errMissingDependencies) Unwrap() error { return e.Reason }
 
 func (e errMissingDependencies) writeMessage(w io.Writer, verb string) {
 	fmt.Fprintf(w, "missing dependencies for function "+verb, e.Func)
 }
-
-func (e errMissingDependencies) Error() string { return fmt.Sprint(e) }
 func (e errMissingDependencies) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -238,17 +206,14 @@ type errParamSingleFailed struct {
 
 var _ Error = errParamSingleFailed{}
 
-func (e errParamSingleFailed) dummy() {}
+func (e errParamSingleFailed) Error() string { return fmt.Sprint(e) }
 
-func (e errParamSingleFailed) Unwrap() error {
-	return e.Reason
-}
+func (e errParamSingleFailed) Unwrap() error { return e.Reason }
 
 func (e errParamSingleFailed) writeMessage(w io.Writer, _ string) {
 	fmt.Fprintf(w, "failed to build %v", e.Key)
 }
 
-func (e errParamSingleFailed) Error() string { return fmt.Sprint(e) }
 func (e errParamSingleFailed) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -274,17 +239,13 @@ type errParamGroupFailed struct {
 
 var _ Error = errParamGroupFailed{}
 
-func (e errParamGroupFailed) dummy() {}
+func (e errParamGroupFailed) Error() string { return fmt.Sprint(e) }
 
-func (e errParamGroupFailed) Unwrap() error {
-	return e.Reason
-}
+func (e errParamGroupFailed) Unwrap() error { return e.Reason }
 
 func (e errParamGroupFailed) writeMessage(w io.Writer, _ string) {
 	fmt.Fprintf(w, "could not build value group %v", e.Key)
 }
-
-func (e errParamGroupFailed) Error() string { return fmt.Sprint(e) }
 func (e errParamGroupFailed) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -405,10 +366,12 @@ func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 	return errMissingTypes{mt}
 }
 
-func (e errMissingTypes) dummy() {}
+func (e errMissingTypes) Error() string { return fmt.Sprint(e) }
 
-func (e errMissingTypes) Error() string {
-	return fmt.Sprint(e)
+func (e errMissingTypes) Unwrap() error { return nil }
+
+func (e errMissingTypes) writeMessage(w io.Writer, v string) {
+	fmt.Fprintf(w, v, e)
 }
 
 func (e errMissingTypes) Format(w fmt.State, v rune) {

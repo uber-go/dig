@@ -192,7 +192,8 @@ func TestParamGroupSliceErrors(t *testing.T) {
 
 				Foo string `group:"foo"`
 			}{},
-			wantErr: `value groups must be consumed as slices but field "Foo" (string) is not a slice`,
+			wantErr: "value groups may be consumed as slices only: " +
+				`field "Foo" (string) is not a slice`,
 		},
 		{
 			desc: "cannot provide name for a group",
@@ -201,7 +202,8 @@ func TestParamGroupSliceErrors(t *testing.T) {
 
 				Foo []string `group:"foo" name:"bar"`
 			}{},
-			wantErr: `attempted to use name "bar" with value group "foo"`,
+			wantErr: "cannot use named values with value groups: " +
+				`name:"bar" requested with group:"foo"`,
 		},
 		{
 			desc: "cannot be optional",
@@ -219,7 +221,7 @@ func TestParamGroupSliceErrors(t *testing.T) {
 
 				Foo []string `group:"foo,flatten"`
 			}{},
-			wantErr: `attempted to use flatten for field "Foo" in value group "[]string"`,
+			wantErr: "cannot use flatten in parameter value groups",
 		},
 	}
 

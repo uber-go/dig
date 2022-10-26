@@ -651,7 +651,7 @@ func TestDecorateFailure(t *testing.T) {
 		c.RequireProvide(func() string { return "hello" }, dig.Name("val"))
 		err := c.Decorate(func(p Param) string { return "fail" })
 		require.Error(t, err, "expected dig.Out struct used as param to fail")
-		assert.Contains(t, err.Error(), "attempted to depend on result object: dig_test.Param embeds dig.Out")
+		assert.Contains(t, err.Error(), "cannot depend on result objects")
 	})
 
 	t.Run("use dig.In as out parameter for decorator", func(t *testing.T) {

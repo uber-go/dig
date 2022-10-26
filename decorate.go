@@ -223,7 +223,7 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 	}
 	for _, k := range keys {
 		if _, ok := s.decorators[k]; ok {
-			return newErrSpecification(
+			return newErrInvalidInput(
 				fmt.Sprintf("cannot decorate using function %v: %s already decorated", dn.dtype, k), nil)
 		}
 		s.decorators[k] = dn
@@ -272,7 +272,7 @@ func findResultKeys(r resultList) ([]key, error) {
 			keys = append(keys, key{t: innerResult.Type, name: innerResult.Name})
 		case resultGrouped:
 			if innerResult.Type.Kind() != reflect.Slice {
-				return nil, newErrSpecification("decorating a value group requires decorating the entire value group, not a single value", nil)
+				return nil, newErrInvalidInput("decorating a value group requires decorating the entire value group, not a single value", nil)
 			}
 			keys = append(keys, key{t: innerResult.Type.Elem(), group: innerResult.Group})
 		case resultObject:

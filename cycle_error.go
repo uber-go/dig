@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 
 	"go.uber.org/dig/internal/digreflect"
 )
@@ -39,8 +40,6 @@ type errCycleDetected struct {
 }
 
 var _ Error = errCycleDetected{}
-
-func (e errCycleDetected) dummy() {}
 
 func (e errCycleDetected) Error() string {
 	// We get something like,
@@ -65,15 +64,18 @@ func (e errCycleDetected) Error() string {
 	return b.String()
 }
 
+func (e errCycleDetected) Unwrap() error { return nil }
+
+func (e errCycleDetected) writeMessage(w io.Writer, v string) {
+	fmt.Fprint(w, e.Error())
+}
+
+func (e errCycleDetected) Format(w fmt.State, c rune) {
+	formatError(e, w, c)
+}
+
 // IsCycleDetected returns a boolean as to whether the provided error indicates
 // a cycle was detected in the container graph.
 func IsCycleDetected(err error) bool {
-	for err != nil {
-		_, ok := err.(errCycleDetected)
-		if ok {
-			return true
-		}
-		err = errors.Unwrap(err)
-	}
-	return false
+	return errors.As(err, &errCycleDetected{})
 }

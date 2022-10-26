@@ -69,33 +69,33 @@ type resultOptions struct {
 func newResult(t reflect.Type, opts resultOptions) (result, error) {
 	switch {
 	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
-		return nil, newErrSpecification(
-			fmt.Sprintf("cannot provide parameter objects: %v embeds a dig.In", t), nil)
+		return nil, newErrInvalidInput("cannot provide parameter objects",
+			newErrInvalidInput(fmt.Sprintf("%v embeds a dig.In", t), nil))
 	case isError(t):
-		return nil, newErrSpecification("cannot return an error here, return it from the constructor instead", nil)
+		return nil, newErrInvalidInput("cannot return an error here, return it from the constructor instead", nil)
 	case IsOut(t):
 		return newResultObject(t, opts)
 	case embedsType(t, _outPtrType):
-		return nil, newErrSpecification(
-			fmt.Sprintf("%v embeds *dig.Out in result object, embed dig.Out instead", t), nil)
+		return nil, newErrInvalidInput("cannot build a result object by embedding *dig.Out, embed dig.Out instead",
+			newErrInvalidInput(fmt.Sprintf("%v embeds *dig.Out", t), nil))
 	case t.Kind() == reflect.Ptr && IsOut(t.Elem()):
-		return nil, newErrSpecification(
-			fmt.Sprintf("%v is a pointer to a result object, must use a value embedding dig.Out instead", t), nil)
+		return nil, newErrInvalidInput("cannot return a pointer to a result object, use a value instead",
+			newErrInvalidInput(fmt.Sprintf("%v is a pointer to a struct that embeds dig.Out", t), nil))
 	case len(opts.Group) > 0:
 		g, err := parseGroupString(opts.Group)
 		if err != nil {
-			return nil, newErrSpecification(
+			return nil, newErrInvalidInput(
 				fmt.Sprintf("cannot parse group %q", opts.Group), err)
 		}
 		rg := resultGrouped{Type: t, Group: g.Name, Flatten: g.Flatten}
 		if g.Soft {
-			return nil, errValueGroup{
-				fmt.Sprintf("attempted to use soft with result value group: %q", g.Name)}
+			return nil, newErrInvalidInput("cannot use soft with result value groups",
+				newErrInvalidInput(fmt.Sprintf("soft was used with group:%q", g.Name), nil))
 		}
 		if g.Flatten {
 			if t.Kind() != reflect.Slice {
-				return nil, newErrSpecification(
-					fmt.Sprintf("attempted to use flatten on non-slice: %v", t), nil)
+				return nil, newErrInvalidInput("flatten can be applied to slices only",
+					newErrInvalidInput(fmt.Sprintf("%v is not a slice", t), nil))
 			}
 			rg.Type = rg.Type.Elem()
 		}
@@ -211,8 +211,7 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 
 		r, err := newResult(t, opts)
 		if err != nil {
-			return rl, newErrSpecification(
-				fmt.Sprintf("bad result %d", i+1), err)
+			return rl, newErrInvalidInput(fmt.Sprintf("bad result %d", i+1), err)
 		}
 
 		rl.Results = append(rl.Results, r)
@@ -272,7 +271,7 @@ func newResultSingle(t reflect.Type, opts resultOptions) (resultSingle, error) {
 			continue
 		}
 		if !t.Implements(ifaceType) {
-			return r, newErrSpecification(
+			return r, newErrInvalidInput(
 				fmt.Sprintf("invalid dig.As: %v does not implement %v", t, ifaceType), nil)
 		}
 		asTypes = append(asTypes, ifaceType)
@@ -339,13 +338,13 @@ func (ro resultObject) DotResult() []*dot.Result {
 func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 	ro := resultObject{Type: t}
 	if len(opts.Name) > 0 {
-		return ro, newErrSpecification(
-			fmt.Sprintf("attempted to specify a name for result object which embeds dig.Out: %v", t), nil)
+		return ro, newErrInvalidInput("cannot specify a name for result objects",
+			newErrInvalidInput(fmt.Sprintf("%v embeds dig.Out", t), nil))
 	}
 
 	if len(opts.Group) > 0 {
-		return ro, newErrSpecification(
-			fmt.Sprintf("attempted to specify a group for result object which embeds dig.Out: %v", t), nil)
+		return ro, newErrInvalidInput("cannot specify a group for result objects",
+			newErrInvalidInput(fmt.Sprintf("%v embeds dig.Out", t), nil))
 	}
 
 	for i := 0; i < t.NumField(); i++ {
@@ -357,8 +356,7 @@ func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 
 		rof, err := newResultObjectField(i, f, opts)
 		if err != nil {
-			return ro, newErrSpecification(
-				fmt.Sprintf("bad field %q of %v", f.Name, t), err)
+			return ro, newErrInvalidInput(fmt.Sprintf("bad field %q of %v", f.Name, t), err)
 		}
 
 		ro.Fields = append(ro.Fields, rof)
@@ -402,7 +400,7 @@ func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (r
 	var r result
 	switch {
 	case f.PkgPath != "":
-		return rof, newErrSpecification(
+		return rof, newErrInvalidInput(
 			fmt.Sprintf("unexported fields not allowed in dig.Out, did you mean to export %q (%v)?", f.Name, f.Type), nil)
 
 	case f.Tag.Get(_groupTag) != "":
@@ -471,16 +469,16 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	optional, _ := isFieldOptional(f)
 	switch {
 	case g.Flatten && f.Type.Kind() != reflect.Slice:
-		return rg, newErrSpecification(
-			fmt.Sprintf("attempted to use flatten on a non-slice: %q (%v)", f.Name, f.Type), nil)
+		return rg, newErrInvalidInput("flatten can be applied to slices only",
+			newErrInvalidInput(fmt.Sprintf("field %q (%v) is not a slice", f.Name, f.Type), nil))
 	case g.Soft:
-		return rg, errValueGroup{
-			fmt.Sprintf("attempted to use soft with result value group: %q", rg.Group)}
+		return rg, newErrInvalidInput("cannot use soft with result value groups",
+			newErrInvalidInput(fmt.Sprintf("soft was used with group %q", rg.Group), nil))
 	case name != "":
-		return rg, errValueGroup{
-			fmt.Sprintf("attempted to use named value with value group: %q provided with group %q", name, rg.Group)}
+		return rg, newErrInvalidInput("cannot use named values with value groups",
+			newErrInvalidInput(fmt.Sprintf("name:%q provided with group:%q", name, rg.Group), nil))
 	case optional:
-		return rg, errValueGroup{"value groups cannot be optional"}
+		return rg, newErrInvalidInput("value groups cannot be optional", nil)
 	}
 	if g.Flatten {
 		rg.Type = f.Type.Elem()

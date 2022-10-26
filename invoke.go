@@ -57,10 +57,10 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
-		return newErrSpecification("can't invoke an untyped nil", nil)
+		return newErrInvalidInput("can't invoke an untyped nil", nil)
 	}
 	if ftype.Kind() != reflect.Func {
-		return newErrSpecification(
+		return newErrInvalidInput(
 			fmt.Sprintf("can't invoke non-function %v (type %v)", function, ftype), nil)
 	}
 
@@ -78,7 +78,7 @@ func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 
 	if !s.isVerifiedAcyclic {
 		if ok, cycle := graph.IsAcyclic(s.gh); !ok {
-			return newErrSpecification("cycle detected in dependency graph", s.cycleDetectedError(cycle))
+			return newErrInvalidInput("cycle detected in dependency graph", s.cycleDetectedError(cycle))
 		}
 		s.isVerifiedAcyclic = true
 	}

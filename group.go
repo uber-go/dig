@@ -22,6 +22,7 @@ package dig
 
 import (
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -39,10 +40,16 @@ type errInvalidGroupOption struct{ Option string }
 
 var _ Error = errInvalidGroupOption{}
 
-func (e errInvalidGroupOption) dummy() {}
+func (e errInvalidGroupOption) Error() string { return fmt.Sprint(e) }
 
-func (e errInvalidGroupOption) Error() string {
-	return fmt.Sprintf("invalid option %q", e.Option)
+func (e errInvalidGroupOption) Unwrap() error { return nil }
+
+func (e errInvalidGroupOption) writeMessage(w io.Writer, v string) {
+	fmt.Fprintf(w, "invalid option %q", e.Option)
+}
+
+func (e errInvalidGroupOption) Format(w fmt.State, c rune) {
+	formatError(e, w, c)
 }
 
 func parseGroupString(s string) (group, error) {

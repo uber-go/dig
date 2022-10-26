@@ -44,14 +44,8 @@ type nestedErr struct {
 
 var _ Error = nestedErr{}
 
-func (e nestedErr) dummy() {}
-
 func (e nestedErr) Error() string {
 	return fmt.Sprint(e)
-}
-
-func (e nestedErr) Format(w fmt.State, c rune) {
-	formatError(e, w, c)
 }
 
 func (e nestedErr) Unwrap() error {
@@ -60,6 +54,10 @@ func (e nestedErr) Unwrap() error {
 
 func (e nestedErr) writeMessage(w io.Writer, _ string) {
 	io.WriteString(w, "oh no")
+}
+
+func (e nestedErr) Format(w fmt.State, c rune) {
+	formatError(e, w, c)
 }
 
 type visualizableErr struct{}

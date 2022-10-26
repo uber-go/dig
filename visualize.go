@@ -72,9 +72,8 @@ func updateGraph(dg *dot.Graph, err error) error {
 		e := errors.Unwrap(err)
 		if e == nil {
 			break
-		} else {
-			err = e
 		}
+		err = e
 	}
 
 	// If there are no errVisualizers included, we do not modify the graph.
@@ -161,9 +160,8 @@ func CanVisualizeError(err error) bool {
 		e := errors.Unwrap(err)
 		if e == nil {
 			break
-		} else {
-			err = e
 		}
+		err = e
 	}
 
 	return false

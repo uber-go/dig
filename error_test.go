@@ -168,15 +168,15 @@ func TestRootCause(t *testing.T) {
 			false,
 		},
 		{
-			"errSpecification",
-			errSpecification{Message: "baz", Cause: nil},
+			"errInvalidInput",
+			errInvalidInput{Message: "baz", Cause: nil},
 			true,
-			errSpecification{Message: "baz", Cause: nil},
+			errInvalidInput{Message: "baz", Cause: nil},
 			true,
 		},
 		{
-			"wrappedErrSpecification",
-			errSpecification{Message: "foo", Cause: errors.New("bar")},
+			"wrappedErrInvalidInput",
+			errInvalidInput{Message: "foo", Cause: errors.New("bar")},
 			true,
 			errors.New("bar"),
 			false,
@@ -382,7 +382,7 @@ func TestErrorFormatting(t *testing.T) {
 	}{
 		{
 			desc: "wrapped error/simple",
-			give: errSpecification{
+			give: errInvalidInput{
 				Message: "something went wrong",
 				Cause:   simpleErr,
 			},
@@ -394,7 +394,7 @@ func TestErrorFormatting(t *testing.T) {
 		},
 		{
 			desc: "wrapped error/rich",
-			give: errSpecification{
+			give: errInvalidInput{
 				Message: "something went wrong",
 				Cause:   richError,
 			},
