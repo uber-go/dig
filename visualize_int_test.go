@@ -42,7 +42,7 @@ type nestedErr struct {
 	err error
 }
 
-var _ Error = nestedErr{}
+var _ digError = nestedErr{}
 
 func (e nestedErr) Error() string {
 	return fmt.Sprint(e)

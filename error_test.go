@@ -154,39 +154,46 @@ func TestRootCause(t *testing.T) {
 		wantRootCauseAsDigError bool
 	}{
 		{
-			"random unformatted error",
-			errors.New("This non-DIG error is not formatted"),
-			false,
-			errors.New("This non-DIG error is not formatted"),
-			false,
+			desc:                    "random unformatted error",
+			give:                    errors.New("This non-DIG error is not formatted"),
+			wantAsDigError:          false,
+			wantRootCause:           errors.New("This non-DIG error is not formatted"),
+			wantRootCauseAsDigError: false,
 		},
 		{
-			"random formatted error",
-			fmt.Errorf("This non-DIG error is %v", "formatted"),
-			false,
-			fmt.Errorf("This non-DIG error is %v", "formatted"),
-			false,
+			desc:                    "random formatted error",
+			give:                    fmt.Errorf("This non-DIG error is %v", "formatted"),
+			wantAsDigError:          false,
+			wantRootCause:           fmt.Errorf("This non-DIG error is %v", "formatted"),
+			wantRootCauseAsDigError: false,
 		},
 		{
-			"errInvalidInput",
-			errInvalidInput{Message: "baz", Cause: nil},
-			true,
-			errInvalidInput{Message: "baz", Cause: nil},
-			true,
+			desc:                    "simple errInvalidInput",
+			give:                    errInvalidInput{Message: "baz", Cause: nil},
+			wantAsDigError:          true,
+			wantRootCause:           errInvalidInput{Message: "baz", Cause: nil},
+			wantRootCauseAsDigError: true,
 		},
 		{
-			"wrappedErrInvalidInput",
-			errInvalidInput{Message: "foo", Cause: errors.New("bar")},
-			true,
-			errors.New("bar"),
-			false,
+			desc:                    "errInvalidInput wrapping errInvalidInput",
+			give:                    errInvalidInput{Message: "foo", Cause: errInvalidInput{Message: "bar", Cause: nil}},
+			wantAsDigError:          true,
+			wantRootCause:           errInvalidInput{Message: "bar", Cause: nil},
+			wantRootCauseAsDigError: true,
 		},
 		{
-			"nil",
-			nil,
-			false,
-			nil,
-			false,
+			desc:                    "errInvalidInput wrapping non-dig.Error",
+			give:                    errInvalidInput{Message: "foo", Cause: errors.New("bar")},
+			wantAsDigError:          true,
+			wantRootCause:           errors.New("bar"),
+			wantRootCauseAsDigError: false,
+		},
+		{
+			desc:                    "nil",
+			give:                    nil,
+			wantAsDigError:          false,
+			wantRootCause:           nil,
+			wantRootCauseAsDigError: false,
 		},
 	}
 	for _, tt := range tests {
@@ -216,7 +223,7 @@ func TestRootCauseEndToEnd(t *testing.T) {
 		setup                   func(c *Container)
 		invoke                  interface{}
 		wantAsDigError          bool
-		wantRootCause           error // nil if same as original error
+		wantRootCauseMessage    string
 		wantRootCauseAsDigError bool
 	}{
 		{
@@ -230,7 +237,7 @@ func TestRootCauseEndToEnd(t *testing.T) {
 				fmt.Println(s)
 			},
 			wantAsDigError:          true,
-			wantRootCause:           MyNonDigError{msg: "great sadness"},
+			wantRootCauseMessage:    "great sadness",
 			wantRootCauseAsDigError: false,
 		},
 		{
@@ -242,7 +249,7 @@ func TestRootCauseEndToEnd(t *testing.T) {
 				fmt.Println(s)
 			},
 			wantAsDigError:          true,
-			wantRootCause:           nil,
+			wantRootCauseMessage:    "missing type: string",
 			wantRootCauseAsDigError: true,
 		},
 		{
@@ -256,7 +263,7 @@ func TestRootCauseEndToEnd(t *testing.T) {
 				return MyNonDigError{msg: "great sadness"}
 			},
 			wantAsDigError:          false,
-			wantRootCause:           MyNonDigError{msg: "great sadness"},
+			wantRootCauseMessage:    "great sadness",
 			wantRootCauseAsDigError: false,
 		},
 	}
@@ -269,11 +276,7 @@ func TestRootCauseEndToEnd(t *testing.T) {
 		assert.Equal(t, tt.wantAsDigError, errors.As(err, &de),
 			fmt.Sprintf("expected errors.As() to return %v", tt.wantAsDigError))
 		rcErr := RootCause(err)
-		if tt.wantRootCause == nil { // nil -> we want root cause to be same as original error
-			assert.Equal(t, err, rcErr, "expected root cause to be same as original error")
-		} else {
-			assert.Equal(t, tt.wantRootCause, rcErr, "expected a different root cause")
-		}
+		assert.Equal(t, tt.wantRootCauseMessage, rcErr.Error())
 		assert.Equal(t, tt.wantRootCauseAsDigError, errors.As(rcErr, &de),
 			fmt.Sprintf("expected errors.As() on the root cause to return %v", tt.wantRootCauseAsDigError))
 	}

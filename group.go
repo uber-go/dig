@@ -38,11 +38,9 @@ type group struct {
 
 type errInvalidGroupOption struct{ Option string }
 
-var _ Error = errInvalidGroupOption{}
+var _ digError = errInvalidGroupOption{}
 
 func (e errInvalidGroupOption) Error() string { return fmt.Sprint(e) }
-
-func (e errInvalidGroupOption) Unwrap() error { return nil }
 
 func (e errInvalidGroupOption) writeMessage(w io.Writer, v string) {
 	fmt.Fprintf(w, "invalid option %q", e.Option)

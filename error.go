@@ -32,19 +32,31 @@ import (
 )
 
 // Error is an interface implemented by all Dig errors.
-// dig.Errors require additional functionality for recursively
-// formatting string representations of wrapped errors.
+//
+// This interface must always have a private function in order
+// for it to be properly sealed. This allows users to deduce
+// whether an error in their code comes from Dig or not, in
+// combination with the RootCause function.
 type Error interface {
 	error
-	fmt.Formatter
-	Unwrap() error
+
+	// Writes the message or context for this error in the chain.
+	//
+	// verb is either %v or %+v.
 	writeMessage(w io.Writer, v string)
+}
+
+// a digError is a dig.Error with additional functionality for
+// internal use - namely that ability to be formatted.
+type digError interface {
+	Error
+	fmt.Formatter
 }
 
 // formatError will call a dig.Error's writeMessage() method to print the error message
 // and then will automatically attempt to print errors wrapped underneath (which can create
 // a recursive effect if the wrapped error's Format() method then points back to this function).
-func formatError(e Error, w fmt.State, v rune) {
+func formatError(e digError, w fmt.State, v rune) {
 	multiline := w.Flag('+') && v == 'v'
 	verb := "%v"
 	if multiline {
@@ -57,33 +69,43 @@ func formatError(e Error, w fmt.State, v rune) {
 	// Will route back to this function recursively if next error
 	// is also wrapped and points back here
 	wrappedError := errors.Unwrap(e)
-	if wrappedError != nil {
-		io.WriteString(w, ":")
-		if multiline {
-			io.WriteString(w, "\n")
-		} else {
-			io.WriteString(w, " ")
-		}
-		fmt.Fprintf(w, verb, wrappedError)
+	if wrappedError == nil {
+		return
 	}
+	io.WriteString(w, ":")
+	if multiline {
+		io.WriteString(w, "\n")
+	} else {
+		io.WriteString(w, " ")
+	}
+	fmt.Fprintf(w, verb, wrappedError)
 }
 
-// RootCause returns the first non-Error in a chain of wrapped errors.
-// If there are no non-dig.Errors in the chain,
-// RootCause returns the originally passed in error.
+// RootCause returns the first non-dig.Error in a chain of wrapped
+// errors, if there is one. Otherwise, RootCause returns the error
+// on the bottom of the chain of wrapped errors.
+//
+// Users can use this function and errors.As to differentiate between
+// Dig errors and errors thrown by code they've provided or invoked:
+//
+//	rootCause := dig.RootCause(err)
+//	var de dig.Error
+//	if errors.As(rootCause, &de) {
+//	    // Is a Dig error
+//	} else {
+//	    // Is an error thrown by one of my provided or invoked functions
+//	}
 func RootCause(err error) error {
 	var de Error
-	originalErr := err
-	for {
-		if err == nil {
-			return originalErr
-		}
-		if ok := errors.As(err, &de); ok {
-			err = errors.Unwrap(de)
-		} else { // This is not a dig error
-			return err
-		}
+	// Dig down to first non dig.Error, or bottom of chain
+	for ; errors.As(err, &de); err = errors.Unwrap(de) {
 	}
+
+	if err == nil {
+		return de
+	}
+
+	return err
 }
 
 // errInvalidInput is returned whenever the user provides bad input when
@@ -94,7 +116,7 @@ type errInvalidInput struct {
 	Cause   error
 }
 
-var _ Error = errInvalidInput{}
+var _ digError = errInvalidInput{}
 
 // newErrInvalidInput creates a new errInvalidInput, wrapping the given
 // other error that caused this error. If there is no underlying cause,
@@ -112,6 +134,7 @@ func (e errInvalidInput) Unwrap() error { return e.Cause }
 func (e errInvalidInput) writeMessage(w io.Writer, _ string) {
 	fmt.Fprintf(w, e.Message)
 }
+
 func (e errInvalidInput) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -123,7 +146,7 @@ type errProvide struct {
 	Reason error
 }
 
-var _ Error = errProvide{}
+var _ digError = errProvide{}
 
 func (e errProvide) Error() string { return fmt.Sprint(e) }
 
@@ -144,7 +167,7 @@ type errConstructorFailed struct {
 	Reason error
 }
 
-var _ Error = errConstructorFailed{}
+var _ digError = errConstructorFailed{}
 
 func (e errConstructorFailed) Error() string { return fmt.Sprint(e) }
 
@@ -153,6 +176,7 @@ func (e errConstructorFailed) Unwrap() error { return e.Reason }
 func (e errConstructorFailed) writeMessage(w io.Writer, verb string) {
 	fmt.Fprintf(w, "received non-nil error from function "+verb, e.Func)
 }
+
 func (e errConstructorFailed) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -164,7 +188,7 @@ type errArgumentsFailed struct {
 	Reason error
 }
 
-var _ Error = errArgumentsFailed{}
+var _ digError = errArgumentsFailed{}
 
 func (e errArgumentsFailed) Error() string { return fmt.Sprint(e) }
 
@@ -173,6 +197,7 @@ func (e errArgumentsFailed) Unwrap() error { return e.Reason }
 func (e errArgumentsFailed) writeMessage(w io.Writer, verb string) {
 	fmt.Fprintf(w, "could not build arguments for function "+verb, e.Func)
 }
+
 func (e errArgumentsFailed) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -184,7 +209,7 @@ type errMissingDependencies struct {
 	Reason error
 }
 
-var _ Error = errMissingDependencies{}
+var _ digError = errMissingDependencies{}
 
 func (e errMissingDependencies) Error() string { return fmt.Sprint(e) }
 
@@ -193,6 +218,7 @@ func (e errMissingDependencies) Unwrap() error { return e.Reason }
 func (e errMissingDependencies) writeMessage(w io.Writer, verb string) {
 	fmt.Fprintf(w, "missing dependencies for function "+verb, e.Func)
 }
+
 func (e errMissingDependencies) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -204,7 +230,7 @@ type errParamSingleFailed struct {
 	CtorID dot.CtorID
 }
 
-var _ Error = errParamSingleFailed{}
+var _ digError = errParamSingleFailed{}
 
 func (e errParamSingleFailed) Error() string { return fmt.Sprint(e) }
 
@@ -237,7 +263,7 @@ type errParamGroupFailed struct {
 	CtorID dot.CtorID
 }
 
-var _ Error = errParamGroupFailed{}
+var _ digError = errParamGroupFailed{}
 
 func (e errParamGroupFailed) Error() string { return fmt.Sprint(e) }
 
@@ -246,6 +272,7 @@ func (e errParamGroupFailed) Unwrap() error { return e.Reason }
 func (e errParamGroupFailed) writeMessage(w io.Writer, _ string) {
 	fmt.Fprintf(w, "could not build value group %v", e.Key)
 }
+
 func (e errParamGroupFailed) Format(w fmt.State, c rune) {
 	formatError(e, w, c)
 }
@@ -320,7 +347,7 @@ func (mt missingType) Format(w fmt.State, v rune) {
 // Multiple instances of this error may be merged together by appending them.
 type errMissingTypes []missingType // inv: len > 0
 
-var _ Error = make(errMissingTypes, 0)
+var _ digError = make(errMissingTypes, 0)
 
 func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 	// Possible types we will look for in the container. We will always look
@@ -368,14 +395,9 @@ func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 
 func (e errMissingTypes) Error() string { return fmt.Sprint(e) }
 
-func (e errMissingTypes) Unwrap() error { return nil }
-
 func (e errMissingTypes) writeMessage(w io.Writer, v string) {
-	fmt.Fprintf(w, v, e)
-}
 
-func (e errMissingTypes) Format(w fmt.State, v rune) {
-	multiline := w.Flag('+') && v == 'v'
+	multiline := v == "%+v"
 
 	if len(e) == 1 {
 		io.WriteString(w, "missing type:")
@@ -402,6 +424,10 @@ func (e errMissingTypes) Format(w fmt.State, v rune) {
 			fmt.Fprintf(w, "%v", mt)
 		}
 	}
+}
+
+func (e errMissingTypes) Format(w fmt.State, c rune) {
+	formatError(e, w, c)
 }
 
 func (e errMissingTypes) updateGraph(g *dot.Graph) {

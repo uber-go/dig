@@ -39,7 +39,7 @@ type errCycleDetected struct {
 	scope *Scope
 }
 
-var _ Error = errCycleDetected{}
+var _ digError = errCycleDetected{}
 
 func (e errCycleDetected) Error() string {
 	// We get something like,
@@ -63,8 +63,6 @@ func (e errCycleDetected) Error() string {
 	}
 	return b.String()
 }
-
-func (e errCycleDetected) Unwrap() error { return nil }
 
 func (e errCycleDetected) writeMessage(w io.Writer, v string) {
 	fmt.Fprint(w, e.Error())

@@ -1525,17 +1525,17 @@ func TestProvideConstructorErrors(t *testing.T) {
 			{
 				desc:        "dig.Out",
 				constructor: func(out) io.Writer { return nil },
-				msg:         `cannot depend on result objects`,
+				msg:         `dig_test.out embeds a dig.Out`,
 			},
 			{
 				desc:        "*dig.Out",
 				constructor: func(*out) io.Writer { return nil },
-				msg:         `cannot depend on result objects`,
+				msg:         `\*dig_test.out embeds a dig.Out`,
 			},
 			{
 				desc:        "embeds *dig.Out",
 				constructor: func(outPtr) io.Writer { return nil },
-				msg:         `cannot depend on result objects`,
+				msg:         `dig_test.outPtr embeds a dig.Out`,
 			},
 		}
 
@@ -1547,6 +1547,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 					`cannot provide function "go.uber.org/dig_test".TestProvideConstructorErrors\S+`,
 					`dig_test.go:\d+`, // file:line
 					`bad argument 1:`,
+					`cannot depend on result objects:`,
 					tt.msg)
 			})
 		}
@@ -2937,6 +2938,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		dig.AssertErrorMatches(t, err,
 			"bad argument 1:",
 			"cannot depend on result objects",
+			"dig_test.in embeds a dig.Out",
 		)
 	})
 
