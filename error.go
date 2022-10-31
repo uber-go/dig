@@ -347,7 +347,7 @@ func (mt missingType) Format(w fmt.State, v rune) {
 // Multiple instances of this error may be merged together by appending them.
 type errMissingTypes []missingType // inv: len > 0
 
-var _ digError = make(errMissingTypes, 0)
+var _ digError = errMissingTypes(nil)
 
 func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 	// Possible types we will look for in the container. We will always look
