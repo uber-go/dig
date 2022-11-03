@@ -69,18 +69,18 @@ type resultOptions struct {
 func newResult(t reflect.Type, opts resultOptions) (result, error) {
 	switch {
 	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
-		return nil, newErrInvalidInput("cannot provide parameter objects",
-			newErrInvalidInput(fmt.Sprintf("%v embeds a dig.In", t), nil))
+		return nil, newErrInvalidInput(fmt.Sprintf(
+			"cannot provide parameter objects: %v embeds a dig.In", t), nil)
 	case isError(t):
 		return nil, newErrInvalidInput("cannot return an error here, return it from the constructor instead", nil)
 	case IsOut(t):
 		return newResultObject(t, opts)
 	case embedsType(t, _outPtrType):
-		return nil, newErrInvalidInput("cannot build a result object by embedding *dig.Out, embed dig.Out instead",
-			newErrInvalidInput(fmt.Sprintf("%v embeds *dig.Out", t), nil))
+		return nil, newErrInvalidInput(fmt.Sprintf(
+			"cannot build a result object by embedding *dig.Out, embed dig.Out instead: %v embeds *dig.Out", t), nil)
 	case t.Kind() == reflect.Ptr && IsOut(t.Elem()):
-		return nil, newErrInvalidInput("cannot return a pointer to a result object, use a value instead",
-			newErrInvalidInput(fmt.Sprintf("%v is a pointer to a struct that embeds dig.Out", t), nil))
+		return nil, newErrInvalidInput(fmt.Sprintf(
+			"cannot return a pointer to a result object, use a value instead: %v is a pointer to a struct that embeds dig.Out", t), nil)
 	case len(opts.Group) > 0:
 		g, err := parseGroupString(opts.Group)
 		if err != nil {
@@ -89,13 +89,13 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 		}
 		rg := resultGrouped{Type: t, Group: g.Name, Flatten: g.Flatten}
 		if g.Soft {
-			return nil, newErrInvalidInput("cannot use soft with result value groups",
-				newErrInvalidInput(fmt.Sprintf("soft was used with group:%q", g.Name), nil))
+			return nil, newErrInvalidInput(fmt.Sprintf(
+				"cannot use soft with result value groups: soft was used with group:%q", g.Name), nil)
 		}
 		if g.Flatten {
 			if t.Kind() != reflect.Slice {
-				return nil, newErrInvalidInput("flatten can be applied to slices only",
-					newErrInvalidInput(fmt.Sprintf("%v is not a slice", t), nil))
+				return nil, newErrInvalidInput(fmt.Sprintf(
+					"flatten can be applied to slices only: %v is not a slice", t), nil)
 			}
 			rg.Type = rg.Type.Elem()
 		}
@@ -338,13 +338,13 @@ func (ro resultObject) DotResult() []*dot.Result {
 func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 	ro := resultObject{Type: t}
 	if len(opts.Name) > 0 {
-		return ro, newErrInvalidInput("cannot specify a name for result objects",
-			newErrInvalidInput(fmt.Sprintf("%v embeds dig.Out", t), nil))
+		return ro, newErrInvalidInput(fmt.Sprintf(
+			"cannot specify a name for result objects: %v embeds dig.Out", t), nil)
 	}
 
 	if len(opts.Group) > 0 {
-		return ro, newErrInvalidInput("cannot specify a group for result objects",
-			newErrInvalidInput(fmt.Sprintf("%v embeds dig.Out", t), nil))
+		return ro, newErrInvalidInput(fmt.Sprintf(
+			"cannot specify a group for result objects: %v embeds dig.Out", t), nil)
 	}
 
 	for i := 0; i < t.NumField(); i++ {
@@ -469,14 +469,14 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	optional, _ := isFieldOptional(f)
 	switch {
 	case g.Flatten && f.Type.Kind() != reflect.Slice:
-		return rg, newErrInvalidInput("flatten can be applied to slices only",
-			newErrInvalidInput(fmt.Sprintf("field %q (%v) is not a slice", f.Name, f.Type), nil))
+		return rg, newErrInvalidInput(fmt.Sprintf(
+			"flatten can be applied to slices only: field %q (%v) is not a slice", f.Name, f.Type), nil)
 	case g.Soft:
-		return rg, newErrInvalidInput("cannot use soft with result value groups",
-			newErrInvalidInput(fmt.Sprintf("soft was used with group %q", rg.Group), nil))
+		return rg, newErrInvalidInput(fmt.Sprintf(
+			"cannot use soft with result value groups: soft was used with group %q", rg.Group), nil)
 	case name != "":
-		return rg, newErrInvalidInput("cannot use named values with value groups",
-			newErrInvalidInput(fmt.Sprintf("name:%q provided with group:%q", name, rg.Group), nil))
+		return rg, newErrInvalidInput(fmt.Sprintf(
+			"cannot use named values with value groups: name:%q provided with group:%q", name, rg.Group), nil)
 	case optional:
 		return rg, newErrInvalidInput("value groups cannot be optional", nil)
 	}

@@ -67,16 +67,16 @@ var (
 func newParam(t reflect.Type, c containerStore) (param, error) {
 	switch {
 	case IsOut(t) || (t.Kind() == reflect.Ptr && IsOut(t.Elem())) || embedsType(t, _outPtrType):
-		return nil, newErrInvalidInput("cannot depend on result objects",
-			newErrInvalidInput(fmt.Sprintf("%v embeds a dig.Out", t), nil))
+		return nil, newErrInvalidInput(fmt.Sprintf(
+			"cannot depend on result objects: %v embeds a dig.Out", t), nil)
 	case IsIn(t):
 		return newParamObject(t, c)
 	case embedsType(t, _inPtrType):
-		return nil, newErrInvalidInput("cannot build a parameter object by embedding *dig.In, embed dig.In instead",
-			newErrInvalidInput(fmt.Sprintf("%v embeds *dig.In", t), nil))
+		return nil, newErrInvalidInput(fmt.Sprintf(
+			"cannot build a parameter object by embedding *dig.In, embed dig.In instead: %v embeds *dig.In", t), nil)
 	case t.Kind() == reflect.Ptr && IsIn(t.Elem()):
-		return nil, newErrInvalidInput("cannot depend on a pointer to a parameter object, use a value instead",
-			newErrInvalidInput(fmt.Sprintf("%v is a pointer to a struct that embeds dig.In", t), nil))
+		return nil, newErrInvalidInput(fmt.Sprintf(
+			"cannot depend on a pointer to a parameter object, use a value instead: %v is a pointer to a struct that embeds dig.In", t), nil)
 	default:
 		return paramSingle{Type: t}, nil
 	}
@@ -541,15 +541,14 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	optional, _ := isFieldOptional(f)
 	switch {
 	case f.Type.Kind() != reflect.Slice:
-		return pg, newErrInvalidInput("value groups may be consumed as slices only",
-			newErrInvalidInput(fmt.Sprintf("field %q (%v) is not a slice", f.Name, f.Type), nil))
+		return pg, newErrInvalidInput(
+			fmt.Sprintf("value groups may be consumed as slices only: field %q (%v) is not a slice", f.Name, f.Type), nil)
 	case g.Flatten:
-		return pg, newErrInvalidInput("cannot use flatten in parameter value groups",
-			newErrInvalidInput(fmt.Sprintf("field %q (%v) specifies flatten", f.Name, f.Type), nil))
+		return pg, newErrInvalidInput(
+			fmt.Sprintf("cannot use flatten in parameter value groups: field %q (%v) specifies flatten", f.Name, f.Type), nil)
 	case name != "":
-		return pg, newErrInvalidInput("cannot use named values with value groups",
-			newErrInvalidInput(fmt.Sprintf("name:%q requested with group:%q", name, pg.Group), nil))
-
+		return pg, newErrInvalidInput(
+			fmt.Sprintf("cannot use named values with value groups: name:%q requested with group:%q", name, pg.Group), nil)
 	case optional:
 		return pg, newErrInvalidInput("value groups cannot be optional", nil)
 	}

@@ -32,12 +32,14 @@ import (
 
 func TestNewResultListErrors(t *testing.T) {
 	tests := []struct {
-		desc string
-		give interface{}
+		desc      string
+		give      interface{}
+		wantError string
 	}{
 		{
-			desc: "returns dig.In",
-			give: func() struct{ In } { panic("invalid") },
+			desc:      "returns dig.In",
+			give:      func() struct{ In } { panic("invalid") },
+			wantError: "struct { dig.In } embeds a dig.In",
 		},
 		{
 			desc: "returns dig.Out+dig.In",
@@ -47,6 +49,7 @@ func TestNewResultListErrors(t *testing.T) {
 			} {
 				panic("invalid")
 			},
+			wantError: "struct { dig.Out; dig.In } embeds a dig.In",
 		},
 	}
 
@@ -56,8 +59,7 @@ func TestNewResultListErrors(t *testing.T) {
 			require.Error(t, err)
 			AssertErrorMatches(t, err,
 				"bad result 1:",
-				"cannot provide parameter objects:",
-				"embeds a dig.In")
+				`cannot provide parameter objects: `+tt.wantError)
 		})
 	}
 }
