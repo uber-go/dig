@@ -33,14 +33,17 @@ import (
 
 // Error is an interface implemented by all Dig errors.
 //
-// This interface must always have a private function in order
-// for it to be properly sealed. This allows users to deduce
-// whether an error in their code comes from Dig or not, in
-// combination with the RootCause function.
+// Use this interface, in conjunction with [RootCause], in order to
+// determine if errors you encounter come from Dig, or if they come
+// from provided constructors or invoked functions. See [RootCause]
+// for more info.
 type Error interface {
 	error
 
 	// Writes the message or context for this error in the chain.
+	//
+	// Note: the Error interface must always have a private function
+	// such as this one in order to maintain properly sealed.
 	//
 	// verb is either %v or %+v.
 	writeMessage(w io.Writer, v string)
