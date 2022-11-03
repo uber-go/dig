@@ -47,7 +47,7 @@ type Error interface {
 }
 
 // a digError is a dig.Error with additional functionality for
-// internal use - namely that ability to be formatted.
+// internal use - namely the ability to be formatted.
 type digError interface {
 	Error
 	fmt.Formatter
@@ -85,8 +85,8 @@ func formatError(e digError, w fmt.State, v rune) {
 // errors, if there is one. Otherwise, RootCause returns the error
 // on the bottom of the chain of wrapped errors.
 //
-// Users can use this function and errors.As to differentiate between
-// Dig errors and errors thrown by code they've provided or invoked:
+// Use this function and errors.As to differentiate between Dig errors
+// and errors thrown by provided constructors or invoked functions:
 //
 //	rootCause := dig.RootCause(err)
 //	var de dig.Error

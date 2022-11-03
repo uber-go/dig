@@ -155,16 +155,16 @@ func TestRootCause(t *testing.T) {
 	}{
 		{
 			desc:                    "random unformatted error",
-			give:                    errors.New("This non-DIG error is not formatted"),
+			give:                    errors.New("This non-Dig error is not formatted"),
 			wantAsDigError:          false,
-			wantRootCause:           errors.New("This non-DIG error is not formatted"),
+			wantRootCause:           errors.New("This non-Dig error is not formatted"),
 			wantRootCauseAsDigError: false,
 		},
 		{
 			desc:                    "random formatted error",
-			give:                    fmt.Errorf("This non-DIG error is %v", "formatted"),
+			give:                    fmt.Errorf("This non-Dig error is %v", "formatted"),
 			wantAsDigError:          false,
-			wantRootCause:           fmt.Errorf("This non-DIG error is %v", "formatted"),
+			wantRootCause:           fmt.Errorf("This non-Dig error is %v", "formatted"),
 			wantRootCauseAsDigError: false,
 		},
 		{
@@ -202,7 +202,7 @@ func TestRootCause(t *testing.T) {
 			assert.Equal(t, tt.wantAsDigError, errors.As(tt.give, &de))
 			gotRootCause := RootCause(tt.give)
 			assert.Equal(t, gotRootCause, tt.wantRootCause)
-			assert.Equal(t, tt.wantRootCause, gotRootCause, "Incorrect root cause")
+			assert.Equal(t, tt.wantRootCause, gotRootCause, "incorrect root cause")
 			assert.Equal(t, tt.wantRootCauseAsDigError, errors.As(gotRootCause, &de))
 		})
 	}
@@ -260,10 +260,10 @@ func TestRootCauseEndToEnd(t *testing.T) {
 				}))
 			},
 			invoke: func(s string) error {
-				return MyNonDigError{msg: "great sadness"}
+				return errors.New("terrible unhappiness")
 			},
 			wantAsDigError:          false,
-			wantRootCauseMessage:    "great sadness",
+			wantRootCauseMessage:    "terrible unhappiness",
 			wantRootCauseAsDigError: false,
 		},
 	}
