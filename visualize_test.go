@@ -512,7 +512,7 @@ func TestVisualize(t *testing.T) {
 		c.Provide(func(in1) out1 { return out1{} })
 		c.Provide(func(in2) t4 { return t4{} })
 		c.Provide(func() out2 { return out2{} })
-		c.Provide(func() (out3, error) { return out3{}, dig.Errf("great sadness") })
+		c.Provide(func() (out3, error) { return out3{}, errors.New("great sadness") })
 		err := c.Invoke(func(t4 t4) {})
 
 		dig.VerifyVisualization(t, "error", c.Container, dig.VisualizeError(err))
@@ -523,7 +523,7 @@ func TestVisualize(t *testing.T) {
 				c := digtest.New(t)
 				c.Provide(func(in1) out1 { return out1{} })
 				c.Provide(func(in2) t4 { return t4{} })
-				c.Provide(func() (out2, error) { return out2{}, dig.Errf("great sadness") })
+				c.Provide(func() (out2, error) { return out2{}, errors.New("great sadness") })
 				c.Provide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) {})
 
@@ -533,7 +533,7 @@ func TestVisualize(t *testing.T) {
 			t.Run("if only the root node fails all node except for the root should be pruned", func(t *testing.T) {
 				c := digtest.New(t)
 				c.Provide(func(in1) out1 { return out1{} })
-				c.Provide(func(in2) (t4, error) { return t4{}, dig.Errf("great sadness") })
+				c.Provide(func(in2) (t4, error) { return t4{}, errors.New("great sadness") })
 				c.Provide(func() out2 { return out2{} })
 				c.Provide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) {})

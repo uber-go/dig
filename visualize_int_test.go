@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -41,22 +42,22 @@ type nestedErr struct {
 	err error
 }
 
-var _ causer = nestedErr{}
+var _ digError = nestedErr{}
 
 func (e nestedErr) Error() string {
 	return fmt.Sprint(e)
 }
 
-func (e nestedErr) Format(w fmt.State, c rune) {
-	formatCauser(e, w, c)
-}
-
-func (e nestedErr) cause() error {
+func (e nestedErr) Unwrap() error {
 	return e.err
 }
 
 func (e nestedErr) writeMessage(w io.Writer, _ string) {
 	io.WriteString(w, "oh no")
+}
+
+func (e nestedErr) Format(w fmt.State, c rune) {
+	formatError(e, w, c)
 }
 
 type visualizableErr struct{}
@@ -72,12 +73,12 @@ func TestCanVisualizeError(t *testing.T) {
 	}{
 		{
 			desc:         "unvisualizable error",
-			err:          errf("great sadness"),
+			err:          errors.New("great sadness"),
 			canVisualize: false,
 		},
 		{
 			desc:         "nested unvisualizable error",
-			err:          nestedErr{err: errf("great sadness")},
+			err:          nestedErr{err: errors.New("great sadness")},
 			canVisualize: false,
 		},
 		{
