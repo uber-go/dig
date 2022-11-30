@@ -166,13 +166,10 @@ func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 	n.state = functionOnStack
 
 	d.Catch(func(err error) error {
-		if err != nil {
-			return errArgumentsFailed{
-				Func:   n.location,
-				Reason: err,
-			}
+		return errArgumentsFailed{
+			Func:   n.location,
+			Reason: err,
 		}
-		return nil
 	}).Then(func() *promise.Deferred {
 		return c.scheduler().Schedule(func() {
 			results = c.invoker()(reflect.ValueOf(n.ctor), args)
