@@ -83,7 +83,14 @@ func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 		s.isVerifiedAcyclic = true
 	}
 
-	args, err := pl.BuildList(s)
+	var args []reflect.Value
+
+	d := pl.BuildList(s, &args)
+	d.Observe(func(err2 error) {
+		err = err2
+	})
+	s.sched.Flush()
+
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   digreflect.InspectFunc(function),

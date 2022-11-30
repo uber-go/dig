@@ -33,6 +33,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 	"go.uber.org/dig"
 	"go.uber.org/dig/internal/digtest"
 )
@@ -3652,6 +3653,96 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 			assert.Equal(t, "a", p.A3.s, "A3 should match")
 			assert.Equal(t, "b", p.B3.s, "B3 should match")
 			assert.Equal(t, "c", p.C3.s, "C3 should match")
+		})
+	})
+}
+
+func TestConcurrency(t *testing.T) {
+	// Ensures providers will run at the same time
+	t.Run("TestMaxConcurrency", func(t *testing.T) {
+		t.Parallel()
+
+		type (
+			A int
+			B int
+			C int
+		)
+
+		const max = 3
+
+		var (
+			timer     = time.NewTimer(10 * time.Second)
+			done      = make(chan struct{})
+			running   = atomic.Int32{}
+			waitForUs = func() error {
+				if running.Inc() == max {
+					close(done)
+				}
+				select {
+				case <-timer.C:
+					return errors.New("timeout expired")
+				case <-done:
+					return nil
+				}
+			}
+			c = digtest.New(t, dig.MaxConcurrency(max))
+		)
+
+		c.RequireProvide(func() (A, error) { return 0, waitForUs() })
+		c.RequireProvide(func() (B, error) { return 1, waitForUs() })
+		c.RequireProvide(func() (C, error) { return 2, waitForUs() })
+
+		c.RequireInvoke(func(a A, b B, c C) {
+			require.Equal(t, a, A(0))
+			require.Equal(t, b, B(1))
+			require.Equal(t, c, C(2))
+			require.Equal(t, running.Load(), int32(max))
+		})
+	})
+
+	t.Run("TestUnboundConcurrency", func(t *testing.T) {
+		t.Parallel()
+
+		const max = 20
+
+		var (
+			timer     = time.NewTimer(10 * time.Second)
+			done      = make(chan struct{})
+			running   = atomic.NewInt32(0)
+			waitForUs = func() error {
+				if running.Inc() == max {
+					close(done)
+				}
+				select {
+				case <-timer.C:
+					return errors.New("timeout expired")
+				case <-done:
+					return nil
+				}
+			}
+			c        = digtest.New(t, dig.MaxConcurrency(-1))
+			expected []int
+		)
+
+		for i := 0; i < max; i++ {
+			i := i
+			expected = append(expected, i)
+			type out struct {
+				dig.Out
+
+				Value int `group:"a"`
+			}
+			c.RequireProvide(func() (out, error) { return out{Value: i}, waitForUs() })
+		}
+
+		type in struct {
+			dig.In
+
+			Values []int `group:"a"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			require.ElementsMatch(t, expected, i.Values)
 		})
 	})
 }

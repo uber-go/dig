@@ -26,20 +26,23 @@ import (
 
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
+	"go.uber.org/dig/internal/promise"
 )
 
-type decoratorState int
+type functionState int
 
 const (
-	decoratorReady decoratorState = iota
-	decoratorOnStack
-	decoratorCalled
+	functionReady   functionState = iota
+	functionVisited               // For avoiding cycles
+	functionOnStack               // For telling that this function is already scheduled
+	functionCalled
 )
 
 type decorator interface {
-	Call(c containerStore) error
+	Call(c containerStore) *promise.Deferred
 	ID() dot.CtorID
-	State() decoratorState
+	State() functionState
+	OrigScope() *Scope
 }
 
 type decoratorNode struct {
@@ -52,10 +55,13 @@ type decoratorNode struct {
 	location *digreflect.Func
 
 	// Current state of this decorator
-	state decoratorState
+	state functionState
 
 	// Parameters of the decorator.
 	params paramList
+
+	// The result of calling the constructor
+	deferred promise.Deferred
 
 	// Results of the decorator.
 	results resultList
@@ -95,39 +101,69 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	return n, nil
 }
 
-func (n *decoratorNode) Call(s containerStore) error {
-	if n.state == decoratorCalled {
-		return nil
+// Call calls this decorator if it hasn't already been called and injects any values produced by it into the container
+// passed to newConstructorNode.
+//
+// If constructorNode has a unresolved deferred already in the process of building, it will return that one. If it has
+// already been successfully called, it will return an already-resolved deferred. Together these mean it will try the
+// call again if it failed last time.
+//
+// On failure, the returned pointer is not guaranteed to stay in a failed state; another call will reset it back to its
+// zero value; don't store the returned pointer. (It will still call each observer only once.)
+func (n *decoratorNode) Call(s containerStore) *promise.Deferred {
+	if n.state == functionOnStack || n.state == functionCalled {
+		return &n.deferred
 	}
 
-	n.state = decoratorOnStack
+	// We mark it as "visited" to avoid cycles
+	n.state = functionVisited
+	n.deferred = promise.Deferred{}
 
 	if err := shallowCheckDependencies(s, n.params); err != nil {
-		return errMissingDependencies{
+		n.deferred.Resolve(errMissingDependencies{
 			Func:   n.location,
 			Reason: err,
-		}
+		})
 	}
 
-	args, err := n.params.BuildList(n.s)
-	if err != nil {
-		return errArgumentsFailed{
-			Func:   n.location,
-			Reason: err,
-		}
-	}
+	var args []reflect.Value
+	d := n.params.BuildList(s, &args)
 
-	results := reflect.ValueOf(n.dcor).Call(args)
-	if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
-		return err
-	}
-	n.state = decoratorCalled
-	return nil
+	n.state = functionOnStack
+
+	d.Observe(func(err error) {
+		if err != nil {
+			n.state = functionCalled
+			n.deferred.Resolve(errArgumentsFailed{
+				Func:   n.location,
+				Reason: err,
+			})
+			return
+		}
+
+		var results []reflect.Value
+
+		s.scheduler().Schedule(func() {
+			results = s.invoker()(reflect.ValueOf(n.dcor), args)
+		}).Observe(func(_ error) {
+			if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
+				n.deferred.Resolve(err)
+				return
+			}
+
+			n.state = functionCalled
+			n.deferred.Resolve(nil)
+		})
+	})
+
+	return &n.deferred
 }
 
 func (n *decoratorNode) ID() dot.CtorID { return n.id }
 
-func (n *decoratorNode) State() decoratorState { return n.state }
+func (n *decoratorNode) State() functionState { return n.state }
+
+func (n *decoratorNode) OrigScope() *Scope { return n.s }
 
 // DecorateOption modifies the default behavior of Decorate.
 type DecorateOption interface {

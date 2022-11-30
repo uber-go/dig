@@ -29,6 +29,7 @@ import (
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
 	"go.uber.org/dig/internal/graph"
+	"go.uber.org/dig/internal/promise"
 )
 
 // A ProvideOption modifies the default behavior of Provide.
@@ -361,7 +362,7 @@ type provider interface {
 	//
 	// The values produced by this provider should be submitted into the
 	// containerStore.
-	Call(containerStore) error
+	Call(store containerStore) *promise.Deferred
 
 	CType() reflect.Type
 

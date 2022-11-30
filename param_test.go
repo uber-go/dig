@@ -33,7 +33,8 @@ func TestParamListBuild(t *testing.T) {
 	p, err := newParamList(reflect.TypeOf(func() io.Writer { return nil }), newScope())
 	require.NoError(t, err)
 	assert.Panics(t, func() {
-		p.Build(newScope())
+		var target reflect.Value
+		p.Build(newScope(), &target)
 	})
 }
 

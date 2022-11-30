@@ -27,6 +27,7 @@ import (
 	"go.uber.org/dig/internal/digerror"
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
+	"go.uber.org/dig/internal/promise"
 )
 
 // constructorNode is a node in the dependency graph that represents
@@ -45,11 +46,14 @@ type constructorNode struct {
 	// id uniquely identifies the constructor that produces a node.
 	id dot.CtorID
 
-	// Whether the constructor owned by this node was already called.
-	called bool
+	// State of the underlying constructor function
+	state functionState
 
 	// Type information about constructor parameters.
 	paramList paramList
+
+	// The result of calling the constructor
+	deferred promise.Deferred
 
 	// Type information about constructor results.
 	resultList resultList
@@ -123,47 +127,72 @@ func (n *constructorNode) ID() dot.CtorID             { return n.id }
 func (n *constructorNode) CType() reflect.Type        { return n.ctype }
 func (n *constructorNode) Order(s *Scope) int         { return n.orders[s] }
 func (n *constructorNode) OrigScope() *Scope          { return n.origS }
+func (n *constructorNode) State() functionState       { return n.state }
 
 func (n *constructorNode) String() string {
 	return fmt.Sprintf("deps: %v, ctor: %v", n.paramList, n.ctype)
 }
 
-// Call calls this constructor if it hasn't already been called and
-// injects any values produced by it into the provided container.
-func (n *constructorNode) Call(c containerStore) error {
-	if n.called {
-		return nil
+// Call calls this constructor if it hasn't already been called and injects any values produced by it into the container
+// passed to newConstructorNode.
+//
+// If constructorNode has a unresolved deferred already in the process of building, it will return that one. If it has
+// already been called, it will return an already-resolved deferred. errMissingDependencies is non-fatal; any other
+// errors means this node is permanently in an error state.
+//
+// Don't store the returned pointer; it points into a field that may be reused on non-fatal errors.
+func (n *constructorNode) Call(c containerStore) *promise.Deferred {
+	if n.State() == functionCalled || n.State() == functionOnStack {
+		return &n.deferred
 	}
+
+	n.state = functionVisited
+	n.deferred = promise.Deferred{}
 
 	if err := shallowCheckDependencies(c, n.paramList); err != nil {
-		return errMissingDependencies{
+		n.deferred.Resolve(errMissingDependencies{
 			Func:   n.location,
 			Reason: err,
-		}
+		})
+		return &n.deferred
 	}
 
-	args, err := n.paramList.BuildList(c)
-	if err != nil {
+	var args []reflect.Value
+	var results []reflect.Value
+
+	d := n.paramList.BuildList(c, &args)
+
+	n.state = functionOnStack
+
+	d.Catch(func(err error) error {
 		return errArgumentsFailed{
 			Func:   n.location,
 			Reason: err,
 		}
-	}
+	}).Then(func() *promise.Deferred {
+		return c.scheduler().Schedule(func() {
+			results = c.invoker()(reflect.ValueOf(n.ctor), args)
+		})
+	}).Then(func() *promise.Deferred {
+		receiver := newStagingContainerWriter()
+		if err := n.resultList.ExtractList(receiver, false /* decorating */, results); err != nil {
+			return promise.Fail(errConstructorFailed{Func: n.location, Reason: err})
+		}
 
-	receiver := newStagingContainerWriter()
-	results := c.invoker()(reflect.ValueOf(n.ctor), args)
-	if err := n.resultList.ExtractList(receiver, false /* decorating */, results); err != nil {
-		return errConstructorFailed{Func: n.location, Reason: err}
-	}
-
-	// Commit the result to the original container that this constructor
-	// was supplied to. The provided constructor is only used for a view of
-	// the rest of the graph to instantiate the dependencies of this
-	// container.
-	receiver.Commit(n.s)
-	n.called = true
-
-	return nil
+		// Commit the result to the original container that this constructor
+		// was supplied to. The provided container is only used for a view of
+		// the rest of the graph to instantiate the dependencies of this
+		// container.
+		receiver.Commit(n.s)
+		n.state = functionCalled
+		n.deferred.Resolve(nil)
+		return promise.Done
+	}).Catch(func(err error) error {
+		n.state = functionCalled
+		n.deferred.Resolve(err)
+		return nil
+	})
+	return &n.deferred
 }
 
 // stagingContainerWriter is a containerWriter that records the changes that
