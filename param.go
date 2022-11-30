@@ -420,7 +420,6 @@ func (po paramObject) Build(c containerStore, target *reflect.Value) *promise.De
 		children := make([]*promise.Deferred, len(fields))
 
 		for i, f := range fields {
-			f := f
 			field := target.Field(f.FieldIndex)
 			children[i] = f.Build(c, &field)
 		}
