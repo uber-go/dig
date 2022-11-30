@@ -137,11 +137,10 @@ func (n *constructorNode) String() string {
 // passed to newConstructorNode.
 //
 // If constructorNode has a unresolved deferred already in the process of building, it will return that one. If it has
-// already been successfully called, it will return an already-resolved deferred. Together these mean it will try the
-// call again if it failed last time.
+// already been called, it will return an already-resolved deferred. errMissingDependencies is non-fatal; any other
+// errors means this node is permanently in an error state.
 //
-// On failure, the returned pointer is not guaranteed to stay in a failed state; another call will reset it back to its
-// zero value; don't store the returned pointer. (It will still call each observer only once.)
+// Don't store the returned pointer; it points into a field that may be reused on non-fatal errors.
 func (n *constructorNode) Call(c containerStore) *promise.Deferred {
 	if n.State() == functionCalled || n.State() == functionOnStack {
 		return &n.deferred
