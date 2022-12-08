@@ -37,6 +37,79 @@ import (
 	"go.uber.org/dig/internal/digtest"
 )
 
+func TestRecoverFromPanic(t *testing.T) {
+
+	tests := []struct {
+		name    string
+		setup   func(*digtest.Container)
+		invoke  interface{}
+		wantErr []string
+	}{
+		{
+			name: "panic in provided function",
+			setup: func(c *digtest.Container) {
+				c.RequireProvide(func() int {
+					panic("terrible sadness")
+				})
+			},
+			invoke: func(i int) {},
+			wantErr: []string{
+				`could not build arguments for function "go.uber.org/dig_test".TestRecoverFromPanic.\S+`,
+				`failed to build int:`,
+				`panic: "terrible sadness" in func: "go.uber.org/dig_test".TestRecoverFromPanic.\S+`,
+			},
+		},
+		{
+			name: "panic in decorator",
+			setup: func(c *digtest.Container) {
+				c.RequireProvide(func() string { return "" })
+				c.RequireDecorate(func(s string) string {
+					panic("great sadness")
+				})
+			},
+			invoke: func(s string) {},
+			wantErr: []string{
+				`could not build arguments for function "go.uber.org/dig_test".TestRecoverFromPanic.\S+`,
+				`failed to build string:`,
+				`panic: "great sadness" in func: "go.uber.org/dig_test".TestRecoverFromPanic.\S+`,
+			},
+		},
+		{
+			name:   "panic in invoke",
+			setup:  func(c *digtest.Container) {},
+			invoke: func() { panic("terrible woe") },
+			wantErr: []string{
+				`panic: "terrible woe" in func: "go.uber.org/dig_test".TestRecoverFromPanic.\S+`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			t.Run("without option", func(t *testing.T) {
+				c := digtest.New(t)
+				tt.setup(c)
+				assert.Panics(t, func() { c.Container.Invoke(tt.invoke) },
+					"expected panic without dig.RecoverFromPanics() option",
+				)
+			})
+
+			t.Run("with option", func(t *testing.T) {
+				c := digtest.New(t, dig.RecoverFromPanics())
+				tt.setup(c)
+				err := c.Container.Invoke(tt.invoke)
+				require.Error(t, err)
+				dig.AssertErrorMatches(t, err, tt.wantErr[0], tt.wantErr[1:]...)
+				var pe dig.PanicError
+				assert.True(t, errors.As(err, &pe), "expected error chain to contain a PanicError")
+				_, ok := dig.RootCause(err).(dig.PanicError)
+				assert.True(t, ok, "expected root cause to be a PanicError")
+			})
+		})
+	}
+}
+
 func TestEndToEndSuccess(t *testing.T) {
 	t.Parallel()
 

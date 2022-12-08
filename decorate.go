@@ -95,7 +95,7 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	return n, nil
 }
 
-func (n *decoratorNode) Call(s containerStore) error {
+func (n *decoratorNode) Call(s containerStore) (err error) {
 	if n.state == decoratorCalled {
 		return nil
 	}
@@ -107,6 +107,17 @@ func (n *decoratorNode) Call(s containerStore) error {
 			Func:   n.location,
 			Reason: err,
 		}
+	}
+
+	if n.s.recoverFromPanics {
+		defer func() {
+			if p := recover(); p != nil {
+				err = PanicError{
+					fn:    n.location,
+					Panic: p,
+				}
+			}
+		}()
 	}
 
 	args, err := n.params.BuildList(n.s)
