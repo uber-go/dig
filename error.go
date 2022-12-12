@@ -67,7 +67,7 @@ type digError interface {
 //
 //	var pe dig.PanicError
 //	var de dig.Error
-//	if errors.As(err, &pe) {
+//	if errors.As(rootCause, &pe) {
 //		// This is caused by a panic
 //	} else if errors.As(err, &de) {
 //		// This is a dig error
