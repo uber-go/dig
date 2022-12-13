@@ -53,8 +53,7 @@ func (k key) String() string {
 	return k.t.String()
 }
 
-// Option configures a Container. It's included for future functionality;
-// currently, there are no concrete implementations.
+// Option configures a Container.
 type Option interface {
 	applyOption(*Container)
 }
