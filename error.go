@@ -56,6 +56,55 @@ type digError interface {
 	fmt.Formatter
 }
 
+// A PanicError occurs when a panic occurs while running functions given to the container
+// with the [RecoverFromPanic] option being set. It contains the panic message from the
+// original panic. A PanicError does not wrap other errors, and it does not implement
+// dig.Error, meaning it will be returned from [RootCause]. With the [RecoverFromPanic]
+// option set, a panic can be distinguished from dig errors and errors from provided/
+// invoked/decorated functions like so:
+//
+//	rootCause := dig.RootCause(err)
+//
+//	var pe dig.PanicError
+//	var de dig.Error
+//	if errors.As(rootCause, &pe) {
+//		// This is caused by a panic
+//	} else if errors.As(err, &de) {
+//		// This is a dig error
+//	} else {
+//		// This is an error from one of my provided/invoked functions or decorators
+//	}
+//
+// Or, if only interested in distinguishing panics from errors:
+//
+//	var pe dig.PanicError
+//	if errors.As(err, &pe) {
+//		// This is caused by a panic
+//	} else {
+//		// This is an error
+//	}
+type PanicError struct {
+
+	// The function the panic occurred at
+	fn *digreflect.Func
+
+	// The panic that was returned from recover()
+	Panic any
+}
+
+// Format will format the PanicError, expanding the corresponding function if in +v mode.
+func (e PanicError) Format(w fmt.State, c rune) {
+	if w.Flag('+') && c == 'v' {
+		fmt.Fprintf(w, "panic: %q in func: %+v", e.Panic, e.fn)
+	} else {
+		fmt.Fprintf(w, "panic: %q in func: %v", e.Panic, e.fn)
+	}
+}
+
+func (e PanicError) Error() string {
+	return fmt.Sprint(e)
+}
+
 // formatError will call a dig.Error's writeMessage() method to print the error message
 // and then will automatically attempt to print errors wrapped underneath (which can create
 // a recursive effect if the wrapped error's Format() method then points back to this function).
@@ -96,8 +145,11 @@ func formatError(e digError, w fmt.State, v rune) {
 //	if errors.As(rootCause, &de) {
 //	    // Is a Dig error
 //	} else {
-//	    // Is an error thrown by one of my provided or invoked functions
+//	    // Is an error thrown by one of my provided/invoked/decorated functions
 //	}
+//
+// See [PanicError] for an example showing how to additionally detect
+// and handle panics in provided/invoked/decorated functions.
 func RootCause(err error) error {
 	var de Error
 	// Dig down to first non dig.Error, or bottom of chain

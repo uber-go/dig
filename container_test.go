@@ -61,4 +61,10 @@ func TestOptionStrings(t *testing.T) {
 		assert.Equal(t, "DryRun(true)", fmt.Sprint(DryRun(true)))
 		assert.Equal(t, "DryRun(false)", fmt.Sprint(DryRun(false)))
 	})
+
+	t.Run("RecoverFromPanics()", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, "RecoverFromPanics()", fmt.Sprint(RecoverFromPanics()))
+	})
 }
