@@ -2050,6 +2050,22 @@ func TestDryModeSuccess(t *testing.T) {
 		c.RequireProvide(provides)
 		c.RequireInvoke(invokes)
 	})
+	t.Run("does not call decorators", func(t *testing.T) {
+		type type1 struct{}
+		provides := func() *type1 {
+			t.Fatal("must not be called")
+			return &type1{}
+		}
+		decorates := func(*type1) *type1 {
+			t.Fatal("must not be called")
+			return &type1{}
+		}
+		invokes := func(*type1) {}
+		c := digtest.New(t, dig.DryRun(true))
+		c.RequireProvide(provides)
+		c.RequireDecorate(decorates)
+		c.RequireInvoke(invokes)
+	})
 }
 
 func TestProvideCycleFails(t *testing.T) {
