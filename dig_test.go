@@ -687,6 +687,74 @@ func TestEndToEndSuccess(t *testing.T) {
 		}))
 	})
 
+	t.Run("As with Group", func(t *testing.T) {
+		c := digtest.New(t)
+		strs := map[string]struct{}{
+			"foo": {},
+			"bar": {},
+		}
+		for s := range strs {
+			s := s
+			c.RequireProvide(func() *bytes.Buffer {
+				return bytes.NewBufferString(s)
+			}, dig.Group("readers"), dig.As(new(io.Reader)))
+		}
+		type in struct {
+			dig.In
+
+			Readers []io.Reader `group:"readers"`
+		}
+
+		c.RequireInvoke(func(got in) {
+			require.Len(t, got.Readers, 2)
+			for _, r := range got.Readers {
+				buf := make([]byte, 3)
+				n, err := r.Read(buf)
+				require.NoError(t, err)
+				require.Equal(t, 3, n)
+				s := string(buf)
+				_, ok := strs[s]
+				require.True(t, ok, fmt.Sprintf("%s should be in the map %v", s, strs))
+				delete(strs, s)
+			}
+		})
+	})
+
+	t.Run("multiple As with Group", func(t *testing.T) {
+		c := digtest.New(t)
+		strs := map[string]struct{}{
+			"foo": {},
+			"bar": {},
+		}
+		for s := range strs {
+			s := s
+			c.RequireProvide(func() *bytes.Buffer {
+				return bytes.NewBufferString(s)
+			}, dig.Group("buffs"), dig.As(new(io.Reader), new(io.Writer)))
+		}
+		type in struct {
+			dig.In
+
+			Readers []io.Reader `group:"buffs"`
+			Writers []io.Writer `group:"buffs"`
+		}
+
+		c.RequireInvoke(func(got in) {
+			require.Len(t, got.Readers, 2)
+			for _, r := range got.Readers {
+				buf := make([]byte, 3)
+				n, err := r.Read(buf)
+				require.NoError(t, err)
+				require.Equal(t, 3, n)
+				s := string(buf)
+				_, ok := strs[s]
+				require.True(t, ok, fmt.Sprintf("%s should be in the map %v", s, strs))
+				delete(strs, s)
+			}
+			require.Len(t, got.Writers, 2)
+		})
+	})
+
 	t.Run("As same interface", func(t *testing.T) {
 		c := digtest.New(t)
 		c.RequireProvide(func() io.Reader {
@@ -1494,7 +1562,6 @@ func TestGroups(t *testing.T) {
 // --- END OF END TO END TESTS
 
 func TestRecoverFromPanic(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		setup   func(*digtest.Container)
@@ -1542,7 +1609,6 @@ func TestRecoverFromPanic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			t.Run("without option", func(t *testing.T) {
 				c := digtest.New(t)
 				tt.setup(c)
@@ -1910,16 +1976,6 @@ func TestProvideIncompatibleOptions(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
 			`name:"bar" provided with group:"foo"`)
-	})
-
-	t.Run("group and As", func(t *testing.T) {
-		c := digtest.New(t)
-		err := c.Provide(func() *bytes.Buffer {
-			panic("this function must not be called")
-		}, dig.Group("foo"), dig.As(new(io.Reader)))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use dig.As with value groups: "+
-			`dig.As provided with group:"foo"`)
 	})
 }
 

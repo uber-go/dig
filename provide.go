@@ -51,10 +51,6 @@ func (o *provideOptions) Validate() error {
 			return newErrInvalidInput(
 				fmt.Sprintf("cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group), nil)
 		}
-		if len(o.As) > 0 {
-			return newErrInvalidInput(
-				fmt.Sprintf("cannot use dig.As with value groups: dig.As provided with group:%q", o.Group), nil)
-		}
 	}
 
 	// Names must be representable inside a backquoted string. The only
@@ -639,6 +635,11 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		// value there.
 		k := key{group: r.Group, t: r.Type}
 		cv.keyPaths[k] = path
+		for _, asType := range r.As {
+			k := key{group: r.Group, t: asType}
+			cv.keyPaths[k] = path
+		}
+
 	}
 
 	return cv
