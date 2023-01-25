@@ -762,6 +762,13 @@ func TestEndToEndSuccess(t *testing.T) {
 		}, dig.As(new(io.Reader)))
 	})
 
+	t.Run("As same interface with Group", func(t *testing.T) {
+		c := digtest.New(t)
+		c.RequireProvide(func() io.Reader {
+			panic("this function should not be called")
+		}, dig.As(new(io.Reader)), dig.Group("readers"))
+	})
+
 	t.Run("As different interface", func(t *testing.T) {
 		c := digtest.New(t)
 		c.RequireProvide(func() io.ReadCloser {
@@ -1887,6 +1894,7 @@ func TestProvideInvalidAs(t *testing.T) {
 		name        string
 		param       interface{}
 		expectedErr string
+		addlOption  dig.ProvideOption
 	}{
 		{
 			name:        "as param is not an type interface",
@@ -1918,6 +1926,17 @@ func TestProvideInvalidAs(t *testing.T) {
 			param:       func() *out { return &out{name: "example"} },
 			expectedErr: "invalid dig.As(func() *dig_test.out): argument must be a pointer to an interface",
 		},
+		{
+			name:        "as param is not implemented by provided type",
+			param:       new(io.ReadCloser),
+			expectedErr: "invalid dig.As: *bytes.Buffer does not implement io.ReadCloser",
+		},
+		{
+			name:        "as param is not implemented by provided type",
+			param:       new(io.ReadCloser),
+			expectedErr: "invalid dig.As: *bytes.Buffer does not implement io.ReadCloser",
+			addlOption:  dig.Group("readclosers"),
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -1925,13 +1944,25 @@ func TestProvideInvalidAs(t *testing.T) {
 			t.Parallel()
 
 			c := digtest.New(t)
-			err := c.Provide(
-				func() *bytes.Buffer {
-					var buf bytes.Buffer
-					return &buf
-				},
-				dig.As(tt.param),
-			)
+			var err error
+			if tt.addlOption == nil {
+				err = c.Provide(
+					func() *bytes.Buffer {
+						var buf bytes.Buffer
+						return &buf
+					},
+					dig.As(tt.param),
+				)
+			} else {
+				err = c.Provide(
+					func() *bytes.Buffer {
+						var buf bytes.Buffer
+						return &buf
+					},
+					dig.As(tt.param),
+					tt.addlOption,
+				)
+			}
 
 			require.Error(t, err, "provide must fail")
 			assert.Contains(t, err.Error(), tt.expectedErr)
