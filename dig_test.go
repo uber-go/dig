@@ -752,14 +752,16 @@ func TestEndToEndSuccess(t *testing.T) {
 	t.Run("As same interface", func(t *testing.T) {
 		c := digtest.New(t)
 		c.RequireProvide(func() io.Reader {
-			panic("this function should not be called")
+			t.Fatal("this function should not be called")
+			return nil
 		}, dig.As(new(io.Reader)))
 	})
 
 	t.Run("As same interface with Group", func(t *testing.T) {
 		c := digtest.New(t)
 		c.RequireProvide(func() io.Reader {
-			panic("this function should not be called")
+			t.Fatal("this function should not be called")
+			return nil
 		}, dig.As(new(io.Reader)), dig.Group("readers"))
 	})
 
@@ -989,7 +991,8 @@ func TestEndToEndSuccess(t *testing.T) {
 		})
 
 		c.RequireProvide(func() []*A {
-			panic("[]*A constructor must not be called.")
+			t.Fatal("[]*A constructor must not be called.")
+			return nil
 		})
 
 		c.RequireInvoke(func(a *A, as ...*A) {
@@ -1012,7 +1015,8 @@ func TestEndToEndSuccess(t *testing.T) {
 		})
 
 		c.RequireProvide(func() []*A {
-			panic("[]*A constructor must not be called.")
+			t.Fatal("[]*A constructor must not be called.")
+			return nil
 		})
 
 		var gaveB *B
@@ -1849,7 +1853,8 @@ func TestProvideInvalidName(t *testing.T) {
 
 	c := digtest.New(t)
 	err := c.Provide(func() io.Reader {
-		panic("this function must not be called")
+		t.Fatal("this function must not be called")
+		return nil
 	}, dig.Name("foo`bar"))
 	require.Error(t, err, "Provide must fail")
 	assert.Contains(t, err.Error(), "invalid dig.Name(\"foo`bar\"): names cannot contain backquotes")
@@ -1860,13 +1865,15 @@ func TestProvideInvalidGroup(t *testing.T) {
 
 	c := digtest.New(t)
 	err := c.Provide(func() io.Reader {
-		panic("this function must not be called")
+		t.Fatal("this function must not be called")
+		return nil
 	}, dig.Group("foo`bar"))
 	require.Error(t, err, "Provide must fail")
 	assert.Contains(t, err.Error(), "invalid dig.Group(\"foo`bar\"): group names cannot contain backquotes")
 
 	err = c.Provide(func() io.Reader {
-		panic("this function must not be called")
+		t.Fatal("this function must not be called")
+		return nil
 	}, dig.Group("foo,bar"))
 	require.Error(t, err, "Provide must fail")
 	assert.Contains(t, err.Error(), `cannot parse group "foo,bar": invalid option "bar"`)
@@ -1997,7 +2004,8 @@ func TestProvideIncompatibleOptions(t *testing.T) {
 	t.Run("group and name", func(t *testing.T) {
 		c := digtest.New(t)
 		err := c.Provide(func() io.Reader {
-			panic("this function must not be called")
+			t.Fatal("this function must not be called")
+			return nil
 		}, dig.Group("foo"), dig.Name("bar"))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
@@ -2770,7 +2778,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		c := digtest.New(t, dig.DryRun(dryRun))
 
 		c.RequireProvide(func(p param) *type3 {
-			panic("function must not be called")
+			t.Fatal("function must not be called")
+			return nil
 		})
 
 		err := c.Invoke(func(*type3) {
@@ -2798,11 +2807,13 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		c := digtest.New(t, dig.DryRun(dryRun))
 
 		c.RequireProvide(func() type2 {
-			panic("function must not be called")
+			t.Fatal("function must not be called")
+			return type2{}
 		})
 
 		c.RequireProvide(func(type1, *type2) type3 {
-			panic("function must not be called")
+			t.Fatal("function must not be called")
+			return type3{}
 		})
 
 		err := c.Invoke(func(type3) {
@@ -2858,7 +2869,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 		c := digtest.New(t, dig.DryRun(dryRun))
 		err := c.Provide(func(a args) *type1 {
-			panic("function must not be called")
+			t.Fatal("function must not be called")
+			return nil
 		})
 
 		require.Error(t, err, "expected provide error")
@@ -2887,7 +2899,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		// Container has a constructor for *dep, but that constructor has unmet
 		// dependencies.
 		c.RequireProvide(func(missing) *dep {
-			panic("constructor for *dep should not be called")
+			t.Fatal("constructor for *dep should not be called")
+			return nil
 		})
 
 		// Should still be able to invoke a function that takes params, since *dep
@@ -2918,13 +2931,14 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 		})
 
 		c.RequireProvide(func(*failed) *dep {
-			panic("constructor for *dep should not be called")
+			t.Fatal("constructor for *dep should not be called")
+			return nil
 		})
 
 		// Should still be able to invoke a function that takes params, since *dep
 		// is optional.
 		err := c.Invoke(func(p params) {
-			panic("shouldn't execute invoked function")
+			t.Fatal("shouldn't execute invoked function")
 		})
 		require.Error(t, err, "expected invoke error")
 		dig.AssertErrorMatches(t, err,
@@ -3282,7 +3296,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			return A{}, errors.New("great sadness")
 		})
 
-		err := c.Invoke(func(A) { panic("impossible") })
+		err := c.Invoke(func(A) { t.Fatal("invoke function should not be called") })
 
 		require.Error(t, err, "expected Invoke error")
 		dig.AssertErrorMatches(t, err,
@@ -3307,7 +3321,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			return B{}, nil
 		})
 
-		err := c.Invoke(func(B) { panic("impossible") })
+		err := c.Invoke(func(B) { t.Fatal("invoke function should not be called") })
 
 		require.Error(t, err, "expected Invoke error")
 		dig.AssertErrorMatches(t, err,
@@ -3337,7 +3351,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			A A
 		}
 
-		err := c.Invoke(func(params) { panic("impossible") })
+		err := c.Invoke(func(params) { t.Fatal("invoke function should not be called") })
 
 		require.Error(t, err, "expected Invoke error")
 		dig.AssertErrorMatches(t, err,
@@ -3370,7 +3384,7 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 			return B{}, nil
 		})
 
-		err := c.Invoke(func(B) { panic("impossible") })
+		err := c.Invoke(func(B) { t.Fatal("invoke function should not be called") })
 
 		require.Error(t, err, "expected Invoke error")
 		dig.AssertErrorMatches(t, err,

@@ -105,9 +105,7 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 				rg.Type = asTypes[0]
 				rg.As = asTypes[1:]
 			}
-
 		}
-
 		if g.Soft {
 			return nil, newErrInvalidInput(fmt.Sprintf(
 				"cannot use soft with result value groups: soft was used with group:%q", g.Name), nil)

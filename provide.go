@@ -639,7 +639,6 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 			k := key{group: r.Group, t: asType}
 			cv.keyPaths[k] = path
 		}
-
 	}
 
 	return cv

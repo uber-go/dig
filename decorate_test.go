@@ -160,9 +160,10 @@ func TestDecorateSuccess(t *testing.T) {
 
 		c := digtest.New(t)
 
-		c.RequireProvide(func() *someInt { return newSomeInt(0) }, dig.Group("values"), dig.As(new(myInt)))
-		c.RequireProvide(func() *someInt { return newSomeInt(1) }, dig.Group("values"), dig.As(new(myInt)))
-		c.RequireProvide(func() *someInt { return newSomeInt(2) }, dig.Group("values"), dig.As(new(myInt)))
+		for i := range make([]int, 3) {
+			i := i
+			c.RequireProvide(func() *someInt { return newSomeInt(i) }, dig.Group("values"), dig.As(new(myInt)))
+		}
 		c.Decorate(func(in A) B {
 			for _, v := range in.Values {
 				v.Increment()
