@@ -32,6 +32,27 @@ import (
 	"go.uber.org/dig/internal/digtest"
 )
 
+type myInt interface {
+	String() string
+	Increment()
+}
+type someInt int
+
+var _ myInt = (*someInt)(nil)
+
+func newSomeInt(i int) *someInt {
+	v := someInt(i)
+	return &v
+}
+
+func (i *someInt) String() string {
+	return fmt.Sprintf("%d", i)
+}
+
+func (i *someInt) Increment() {
+	*i += 1
+}
+
 func TestDecorateSuccess(t *testing.T) {
 	t.Run("simple decorate without names or groups", func(t *testing.T) {
 		t.Parallel()
@@ -121,6 +142,36 @@ func TestDecorateSuccess(t *testing.T) {
 		child.RequireInvoke(func(a *A, b B) {
 			assert.Equal(t, "A'", a.Name, "expected name to equal decorated name in child scope")
 			assert.ElementsMatch(t, []string{"val1'", "val2'", "val3'"}, b.Values)
+		})
+	})
+
+	t.Run("decorate grouped values provided as", func(t *testing.T) {
+		t.Parallel()
+
+		type A struct {
+			dig.In
+			Values []myInt `group:"values"`
+		}
+
+		type B struct {
+			dig.Out
+			Values []myInt `group:"values"`
+		}
+
+		c := digtest.New(t)
+
+		for i := range make([]int, 3) {
+			i := i
+			c.RequireProvide(func() *someInt { return newSomeInt(i) }, dig.Group("values"), dig.As(new(myInt)))
+		}
+		c.Decorate(func(in A) B {
+			for _, v := range in.Values {
+				v.Increment()
+			}
+			return B{Values: in.Values}
+		})
+		c.RequireInvoke(func(a A) {
+			assert.ElementsMatch(t, []myInt{newSomeInt(1), newSomeInt(2), newSomeInt(3)}, a.Values)
 		})
 	})
 

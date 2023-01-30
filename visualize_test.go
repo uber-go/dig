@@ -70,6 +70,7 @@ func TestDotGraph(t *testing.T) {
 	type4 := reflect.TypeOf(t4{})
 	type5 := reflect.TypeOf(t5{})
 	type6 := reflect.Indirect(reflect.ValueOf(new(io.Reader))).Type()
+	type7 := reflect.Indirect(reflect.ValueOf(new(io.Writer))).Type()
 
 	p1 := tparam(type1, "", "", false)
 	p2 := tparam(type2, "", "", false)
@@ -302,6 +303,30 @@ func TestDotGraph(t *testing.T) {
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
+	t.Run("value groups as", func(t *testing.T) {
+		c := digtest.New(t)
+		c.Provide(
+			func() *bytes.Buffer { return bytes.NewBufferString("foo") },
+			dig.As(new(io.Reader), new(io.Writer)),
+			dig.Group("buffs"),
+		)
+		c.Provide(
+			func() *bytes.Buffer { return bytes.NewBufferString("bar") },
+			dig.As(new(io.Reader), new(io.Writer)),
+			dig.Group("buffs"),
+		)
+		expected := []*dot.Ctor{
+			{
+				Results: []*dot.Result{tresult(type6, "", "buffs", 0), tresult(type7, "", "buffs", 0)},
+			},
+			{
+				Results: []*dot.Result{tresult(type6, "", "buffs", 1), tresult(type7, "", "buffs", 1)},
+			},
+		}
+		dg := c.CreateGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
+	})
+
 	t.Run("named values", func(t *testing.T) {
 		type in struct {
 			dig.In
@@ -518,7 +543,6 @@ func TestVisualize(t *testing.T) {
 		dig.VerifyVisualization(t, "error", c.Container, dig.VisualizeError(err))
 
 		t.Run("non-failing graph nodes are pruned", func(t *testing.T) {
-
 			t.Run("prune non-failing constructor result", func(t *testing.T) {
 				c := digtest.New(t)
 				c.Provide(func(in1) out1 { return out1{} })
