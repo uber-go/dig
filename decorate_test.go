@@ -38,6 +38,8 @@ type myInt interface {
 }
 type someInt int
 
+var _ myInt = (*someInt)(nil)
+
 func newSomeInt(i int) *someInt {
 	v := someInt(i)
 	return &v

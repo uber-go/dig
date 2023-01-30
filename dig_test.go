@@ -689,70 +689,64 @@ func TestEndToEndSuccess(t *testing.T) {
 
 	t.Run("As with Group", func(t *testing.T) {
 		c := digtest.New(t)
-		strs := map[string]struct{}{
-			"foo": {},
-			"bar": {},
-		}
-		for s := range strs {
+		expectedStrs := []string{"foo", "bar"}
+		for _, s := range expectedStrs {
 			s := s
 			c.RequireProvide(func() *bytes.Buffer {
 				return bytes.NewBufferString(s)
 			}, dig.Group("readers"), dig.As(new(io.Reader)))
 		}
+
 		type in struct {
 			dig.In
-
 			Readers []io.Reader `group:"readers"`
 		}
+
+		var actualStrs []string
 
 		c.RequireInvoke(func(got in) {
 			require.Len(t, got.Readers, 2)
 			for _, r := range got.Readers {
 				buf := make([]byte, 3)
-				n, err := r.Read(buf)
+				_, err := r.Read(buf)
 				require.NoError(t, err)
-				require.Equal(t, 3, n)
-				s := string(buf)
-				_, ok := strs[s]
-				require.True(t, ok, fmt.Sprintf("%s should be in the map %v", s, strs))
-				delete(strs, s)
+				actualStrs = append(actualStrs, string(buf))
 			}
 		})
+
+		assert.ElementsMatch(t, actualStrs, expectedStrs, "list of strings provided must match")
 	})
 
 	t.Run("multiple As with Group", func(t *testing.T) {
 		c := digtest.New(t)
-		strs := map[string]struct{}{
-			"foo": {},
-			"bar": {},
-		}
-		for s := range strs {
+		expectedStrs := []string{"foo", "bar"}
+		for _, s := range expectedStrs {
 			s := s
 			c.RequireProvide(func() *bytes.Buffer {
 				return bytes.NewBufferString(s)
 			}, dig.Group("buffs"), dig.As(new(io.Reader), new(io.Writer)))
 		}
+
 		type in struct {
 			dig.In
-
 			Readers []io.Reader `group:"buffs"`
 			Writers []io.Writer `group:"buffs"`
 		}
+
+		var actualStrs []string
 
 		c.RequireInvoke(func(got in) {
 			require.Len(t, got.Readers, 2)
 			for _, r := range got.Readers {
 				buf := make([]byte, 3)
-				n, err := r.Read(buf)
+				_, err := r.Read(buf)
 				require.NoError(t, err)
-				require.Equal(t, 3, n)
-				s := string(buf)
-				_, ok := strs[s]
-				require.True(t, ok, fmt.Sprintf("%s should be in the map %v", s, strs))
-				delete(strs, s)
+				actualStrs = append(actualStrs, string(buf))
 			}
 			require.Len(t, got.Writers, 2)
 		})
+
+		assert.ElementsMatch(t, actualStrs, expectedStrs, "list of strings provided must match")
 	})
 
 	t.Run("As same interface", func(t *testing.T) {
@@ -772,7 +766,8 @@ func TestEndToEndSuccess(t *testing.T) {
 	t.Run("As different interface", func(t *testing.T) {
 		c := digtest.New(t)
 		c.RequireProvide(func() io.ReadCloser {
-			panic("this function should not be called")
+			t.Fatal("this function should not be called")
+			return nil
 		}, dig.As(new(io.Reader), new(io.Closer)))
 	})
 
