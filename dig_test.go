@@ -1638,6 +1638,45 @@ func TestRecoverFromPanic(t *testing.T) {
 	}
 }
 
+func giveInt() int { return 5 }
+
+func decorateInt(i int) int { return i }
+
+type TestCallbackType struct {
+	F func(dig.CallbackInfo)
+}
+
+func (c TestCallbackType) Called(ci dig.CallbackInfo) {
+	c.F(ci)
+}
+
+func TestCallback(t *testing.T) {
+	var ctorCallbackCalled bool
+	var dcorCallbackCalled bool
+	callback := TestCallbackType{
+		F: func(ci dig.CallbackInfo) {
+			switch ci.Kind {
+			case dig.Provided:
+				assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
+				ctorCallbackCalled = true
+			case dig.Decorated:
+				assert.Equal(t, "go.uber.org/dig_test.decorateInt", ci.Name)
+				dcorCallbackCalled = true
+			default:
+				t.Fail()
+			}
+		},
+	}
+
+	c := digtest.New(t, dig.WithCallback(callback))
+	c.RequireProvide(giveInt)
+	c.RequireDecorate(decorateInt)
+	c.RequireInvoke(func(i int) {})
+
+	assert.True(t, ctorCallbackCalled, "Callback function was never called for provided constructor")
+	assert.True(t, dcorCallbackCalled, "Callback function was never called for provided decorator")
+}
+
 func TestProvideConstructorErrors(t *testing.T) {
 	t.Run("multiple-type constructor returns multiple objects of same type", func(t *testing.T) {
 		c := digtest.New(t)

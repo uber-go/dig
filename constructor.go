@@ -167,6 +167,14 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 		return errConstructorFailed{Func: n.location, Reason: err}
 	}
 
+	if callback := c.callback(); callback != nil {
+		callback.Called(CallbackInfo{
+			Func: n.ctor,
+			Name: fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+			Kind: Provided,
+		})
+	}
+
 	// Commit the result to the original container that this constructor
 	// was supplied to. The provided constructor is only used for a view of
 	// the rest of the graph to instantiate the dependencies of this

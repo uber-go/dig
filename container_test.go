@@ -67,4 +67,10 @@ func TestOptionStrings(t *testing.T) {
 
 		assert.Equal(t, "RecoverFromPanics()", fmt.Sprint(RecoverFromPanics()))
 	})
+
+	t.Run("WithCallback()", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, "WithCallback()", fmt.Sprint(WithCallback(nil)))
+	})
 }

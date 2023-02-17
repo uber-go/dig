@@ -132,6 +132,15 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 	if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
 		return err
 	}
+
+	if callback := s.callback(); callback != nil {
+		callback.Called(CallbackInfo{
+			Func: n.dcor,
+			Name: fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+			Kind: Decorated,
+		})
+	}
+
 	n.state = decoratorCalled
 	return nil
 }

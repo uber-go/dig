@@ -141,6 +141,10 @@ type containerStore interface {
 
 	// Returns invokerFn function to use when calling arguments.
 	invoker() invokerFn
+
+	// Returns a callback to use after calling ctors and dcors
+	// or nil if there is not one
+	callback() Callback
 }
 
 // New constructs a Container.
