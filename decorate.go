@@ -132,6 +132,7 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 	if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
 		return err
 	}
+	n.state = decoratorCalled
 
 	if callback := s.callback(); callback != nil {
 		callback.Called(CallbackInfo{
@@ -140,8 +141,6 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 			Kind: Decorated,
 		})
 	}
-
-	n.state = decoratorCalled
 	return nil
 }
 
