@@ -288,7 +288,7 @@ func findResultKeys(r resultList) ([]key, error) {
 			keys = append(keys, key{t: innerResult.Type.Elem(), group: innerResult.Group})
 		case resultObject:
 			for _, f := range innerResult.Fields {
-				q = append(q, f.Result)
+				q = append(q, f.Results...)
 			}
 		case resultList:
 			q = append(q, innerResult.Results...)

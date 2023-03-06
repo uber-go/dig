@@ -46,12 +46,6 @@ type provideOptions struct {
 }
 
 func (o *provideOptions) Validate() error {
-	if len(o.Group) > 0 {
-		if len(o.Name) > 0 {
-			return newErrInvalidInput(
-				fmt.Sprintf("cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group), nil)
-		}
-	}
 
 	// Names must be representable inside a backquoted string. The only
 	// limitation for raw string literals as per

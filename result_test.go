@@ -108,7 +108,7 @@ func TestNewResultErrors(t *testing.T) {
 	for _, tt := range tests {
 		give := reflect.TypeOf(tt.give)
 		t.Run(fmt.Sprint(give), func(t *testing.T) {
-			_, err := newResult(give, resultOptions{})
+			_, err := newResult(give, resultOptions{}, false)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.err)
 		})
@@ -139,12 +139,12 @@ func TestNewResultObject(t *testing.T) {
 				{
 					FieldName:  "Reader",
 					FieldIndex: 1,
-					Result:     resultSingle{Type: typeOfReader},
+					Results:    []result{resultSingle{Type: typeOfReader}},
 				},
 				{
 					FieldName:  "Writer",
 					FieldIndex: 2,
-					Result:     resultSingle{Type: typeOfWriter},
+					Results:    []result{resultSingle{Type: typeOfWriter}},
 				},
 			},
 		},
@@ -160,12 +160,12 @@ func TestNewResultObject(t *testing.T) {
 				{
 					FieldName:  "A",
 					FieldIndex: 1,
-					Result:     resultSingle{Name: "stream-a", Type: typeOfWriter},
+					Results:    []result{resultSingle{Name: "stream-a", Type: typeOfWriter}},
 				},
 				{
 					FieldName:  "B",
 					FieldIndex: 2,
-					Result:     resultSingle{Name: "stream-b", Type: typeOfWriter},
+					Results:    []result{resultSingle{Name: "stream-b", Type: typeOfWriter}},
 				},
 			},
 		},
@@ -180,7 +180,25 @@ func TestNewResultObject(t *testing.T) {
 				{
 					FieldName:  "Writer",
 					FieldIndex: 1,
-					Result:     resultGrouped{Group: "writers", Type: typeOfWriter},
+					Results:    []result{resultGrouped{Group: "writers", Type: typeOfWriter}},
+				},
+			},
+		},
+		{
+			desc: "group and name tag",
+			give: struct {
+				Out
+
+				Writer io.Writer `name:"writer1" group:"writers"`
+			}{},
+			wantFields: []resultObjectField{
+				{
+					FieldName:  "Writer",
+					FieldIndex: 1,
+					Results: []result{
+						resultGrouped{Group: "writers", Type: typeOfWriter},
+						resultSingle{Name: "writer1", Type: typeOfWriter},
+					},
 				},
 			},
 		},
@@ -228,16 +246,6 @@ func TestNewResultObjectErrors(t *testing.T) {
 				Nested struct{ In }
 			}{},
 			err: `bad field "Nested"`,
-		},
-		{
-			desc: "group with name should fail",
-			give: struct {
-				Out
-
-				Foo string `group:"foo" name:"bar"`
-			}{},
-			err: "cannot use named values with value groups: " +
-				`name:"bar" provided with group:"foo"`,
 		},
 		{
 			desc: "group marked as optional",
@@ -414,31 +422,31 @@ func TestWalkResult(t *testing.T) {
 					{
 						AnnotateWithField: &ro.Fields[0],
 						Return: fakeResultVisits{
-							{Visit: ro.Fields[0].Result},
+							{Visit: ro.Fields[0].Results[0]},
 						},
 					},
 					{
 						AnnotateWithField: &ro.Fields[1],
 						Return: fakeResultVisits{
-							{Visit: ro.Fields[1].Result},
+							{Visit: ro.Fields[1].Results[0]},
 						},
 					},
 					{
 						AnnotateWithField: &ro.Fields[2],
 						Return: fakeResultVisits{
 							{
-								Visit: ro.Fields[2].Result,
+								Visit: ro.Fields[2].Results[0],
 								Return: fakeResultVisits{
 									{
-										AnnotateWithField: &ro.Fields[2].Result.(resultObject).Fields[0],
+										AnnotateWithField: &ro.Fields[2].Results[0].(resultObject).Fields[0],
 										Return: fakeResultVisits{
-											{Visit: ro.Fields[2].Result.(resultObject).Fields[0].Result},
+											{Visit: ro.Fields[2].Results[0].(resultObject).Fields[0].Results[0]},
 										},
 									},
 									{
-										AnnotateWithField: &ro.Fields[2].Result.(resultObject).Fields[1],
+										AnnotateWithField: &ro.Fields[2].Results[0].(resultObject).Fields[1],
 										Return: fakeResultVisits{
-											{Visit: ro.Fields[2].Result.(resultObject).Fields[1].Result},
+											{Visit: ro.Fields[2].Results[0].(resultObject).Fields[1].Results[0]},
 										},
 									},
 								},
