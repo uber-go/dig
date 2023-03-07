@@ -1241,6 +1241,27 @@ func TestGroups(t *testing.T) {
 		})
 	})
 
+	t.Run("provide multiple with the same name and group but different type", func(t *testing.T) {
+		c := digtest.New(t)
+		type A struct{}
+		type B struct{}
+		type ret1 struct {
+			dig.Out
+			*A `name:"foo" group:"foos"`
+		}
+		type ret2 struct {
+			dig.Out
+			*B `name:"foo" group:"foos"`
+		}
+		c.RequireProvide(func() ret1 {
+			return ret1{A: &A{}}
+		})
+
+		c.RequireProvide(func() ret2 {
+			return ret2{B: &B{}}
+		})
+	})
+
 	t.Run("different types may be grouped", func(t *testing.T) {
 		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
 
@@ -1745,6 +1766,118 @@ func TestGroups(t *testing.T) {
 			assert.ElementsMatch(t, []string{"a"}, param.Value)
 		})
 	})
+	/* map tests */
+	t.Run("empty map received without provides", func(t *testing.T) {
+		c := digtest.New(t)
+
+		type in struct {
+			dig.In
+
+			Values map[string]int `group:"foo"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			require.Empty(t, i.Values)
+		})
+	})
+
+	t.Run("map value group using dig.Name and dig.Group", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+
+		c.RequireProvide(func() int {
+			return 1
+		}, dig.Name("value1"), dig.Group("val"))
+		c.RequireProvide(func() int {
+			return 2
+		}, dig.Name("value2"), dig.Group("val"))
+		c.RequireProvide(func() int {
+			return 3
+		}, dig.Name("value3"), dig.Group("val"))
+
+		type in struct {
+			dig.In
+
+			Value1   int            `name:"value1"`
+			Value2   int            `name:"value2"`
+			Value3   int            `name:"value3"`
+			Values   []int          `group:"val"`
+			ValueMap map[string]int `group:"val"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Values)
+			assert.Equal(t, i.ValueMap["value1"], 1)
+			assert.Equal(t, i.ValueMap["value2"], 2)
+			assert.Equal(t, i.ValueMap["value3"], 3)
+			assert.Equal(t, i.Value1, 1)
+			assert.Equal(t, i.Value2, 2)
+			assert.Equal(t, i.Value3, 3)
+		})
+	})
+	t.Run("values are provided, map and name and slice", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+		type out struct {
+			dig.Out
+
+			Value1 int `name:"value1" group:"val"`
+			Value2 int `name:"value2" group:"val"`
+			Value3 int `name:"value3" group:"val"`
+		}
+
+		c.RequireProvide(func() out {
+			return out{Value1: 1, Value2: 2, Value3: 3}
+		})
+
+		type in struct {
+			dig.In
+
+			Value1   int            `name:"value1"`
+			Value2   int            `name:"value2"`
+			Value3   int            `name:"value3"`
+			Values   []int          `group:"val"`
+			ValueMap map[string]int `group:"val"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Values)
+			assert.Equal(t, i.ValueMap["value1"], 1)
+			assert.Equal(t, i.ValueMap["value2"], 2)
+			assert.Equal(t, i.ValueMap["value3"], 3)
+			assert.Equal(t, i.Value1, 1)
+			assert.Equal(t, i.Value2, 2)
+			assert.Equal(t, i.Value3, 3)
+		})
+	})
+
+	t.Run("Every item used in a map must have a named key", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			dig.Out
+
+			Value1 int `name:"value1" group:"val"`
+			Value2 int `name:"value2" group:"val"`
+			Value3 int `group:"val"`
+		}
+
+		c.RequireProvide(func() out {
+			return out{Value1: 1, Value2: 2, Value3: 3}
+		})
+
+		type in struct {
+			dig.In
+
+			ValueMap map[string]int `group:"val"`
+		}
+		var called = false
+		err := c.Invoke(func(i in) { called = true })
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".TestGroups\S+`,
+			`dig_test.go:\d+`, // file:line
+			`every entry in a map value groups must have a name, group "val" is missing a name`)
+		assert.False(t, called, "shouldn't call invoked function when deps aren't available")
+	})
+
 }
 
 // --- END OF END TO END TESTS
@@ -2753,7 +2886,27 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		)
 	})
 
-	t.Run("provide multiple instances with the same name but different group", func(t *testing.T) {
+	t.Run("provide multiple instances with the same name and same group using options", func(t *testing.T) {
+		c := digtest.New(t, dig.DryRun(dryRun))
+		type A struct{}
+
+		c.RequireProvide(func() *A {
+			return &A{}
+		}, dig.Group("foos"), dig.Name("foo"))
+
+		err := c.Provide(func() *A {
+			return &A{}
+		}, dig.Group("foos"), dig.Name("foo"))
+		require.Error(t, err, "expected error on the second provide")
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
+			`dig_test.go:\d+`, // file:line
+			`cannot provide \*dig_test.A\[name="foo"\] from \[1\]:`,
+			`already provided by "go.uber.org/dig_test".testProvideFailures\S+`,
+		)
+	})
+
+	t.Run("provide multiple instances with the same name and type but different group", func(t *testing.T) {
 		c := digtest.New(t, dig.DryRun(dryRun))
 		type A struct{}
 		type ret1 struct {

@@ -87,7 +87,7 @@ func newResult(t reflect.Type, opts resultOptions, noGroup bool) (result, error)
 			return nil, newErrInvalidInput(
 				fmt.Sprintf("cannot parse group %q", opts.Group), err)
 		}
-		rg := resultGrouped{Type: t, Group: g.Name, Flatten: g.Flatten}
+		rg := resultGrouped{Type: t, Key: opts.Name, Group: g.Name, Flatten: g.Flatten}
 		if len(opts.As) > 0 {
 			var asTypes []reflect.Type
 			for _, as := range opts.As {

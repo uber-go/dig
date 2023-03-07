@@ -215,6 +215,64 @@ func TestDecorateSuccess(t *testing.T) {
 		}))
 	})
 
+	t.Run("map is treated as an ordinary dependency without group tag, named or unnamed, and passes through multiple scopes", func(t *testing.T) {
+		type params struct {
+			dig.In
+
+			Strings1 map[string]string
+			Strings2 map[string]string `name:"strings2"`
+		}
+
+		type childResult struct {
+			dig.Out
+
+			Strings1 map[string]string
+			Strings2 map[string]string `name:"strings2"`
+		}
+
+		type A map[string]string
+		type B map[string]string
+
+		parent := digtest.New(t)
+		parent.RequireProvide(func() map[string]string { return map[string]string{"key1": "val1", "key2": "val2"} })
+		parent.RequireProvide(func() map[string]string { return map[string]string{"key1": "val21", "key2": "val22"} }, dig.Name("strings2"))
+
+		parent.RequireProvide(func(p params) A { return A(p.Strings1) })
+		parent.RequireProvide(func(p params) B { return B(p.Strings2) })
+
+		child := parent.Scope("child")
+
+		parent.RequireDecorate(func(p params) childResult {
+			res := childResult{Strings1: make(map[string]string, len(p.Strings1))}
+			for k, s := range p.Strings1 {
+				res.Strings1[k] = strings.ToUpper(s)
+			}
+			res.Strings2 = p.Strings2
+			return res
+		})
+
+		child.RequireDecorate(func(p params) childResult {
+			res := childResult{Strings2: make(map[string]string, len(p.Strings2))}
+			for k, s := range p.Strings2 {
+				res.Strings2[k] = strings.ToUpper(s)
+			}
+			res.Strings1 = p.Strings1
+			res.Strings1["key3"] = "newval"
+			return res
+		})
+
+		require.NoError(t, child.Invoke(func(p params) {
+			require.Len(t, p.Strings1, 3)
+			assert.Equal(t, "VAL1", p.Strings1["key1"])
+			assert.Equal(t, "VAL2", p.Strings1["key2"])
+			assert.Equal(t, "newval", p.Strings1["key3"])
+			require.Len(t, p.Strings2, 2)
+			assert.Equal(t, "VAL21", p.Strings2["key1"])
+			assert.Equal(t, "VAL22", p.Strings2["key2"])
+
+		}))
+
+	})
 	t.Run("decorate values in soft group", func(t *testing.T) {
 		type params struct {
 			dig.In
@@ -391,6 +449,46 @@ func TestDecorateSuccess(t *testing.T) {
 
 		require.Equal(t, 1, len(info.Inputs))
 		assert.Equal(t, `[]string[group = "animals"]`, info.Inputs[0].String())
+	})
+
+	t.Run("decorate with map value groups", func(t *testing.T) {
+		type Params struct {
+			dig.In
+
+			Animals map[string]string `group:"animals"`
+		}
+
+		type Result struct {
+			dig.Out
+
+			Animals map[string]string `group:"animals"`
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "dog" }, dig.Name("animal1"), dig.Group("animals"))
+		c.RequireProvide(func() string { return "cat" }, dig.Name("animal2"), dig.Group("animals"))
+		c.RequireProvide(func() string { return "gopher" }, dig.Name("animal3"), dig.Group("animals"))
+
+		var info dig.DecorateInfo
+		c.RequireDecorate(func(p Params) Result {
+			animals := p.Animals
+			for k, v := range animals {
+				animals[k] = "good " + v
+			}
+			return Result{
+				Animals: animals,
+			}
+		}, dig.FillDecorateInfo(&info))
+
+		c.RequireInvoke(func(p Params) {
+			assert.Len(t, p.Animals, 3)
+			assert.Equal(t, "good dog", p.Animals["animal1"])
+			assert.Equal(t, "good cat", p.Animals["animal2"])
+			assert.Equal(t, "good gopher", p.Animals["animal3"])
+		})
+
+		require.Equal(t, 1, len(info.Inputs))
+		assert.Equal(t, `map[string]string[group = "animals"]`, info.Inputs[0].String())
 	})
 
 	t.Run("decorate with optional parameter", func(t *testing.T) {
@@ -918,6 +1016,7 @@ func TestMultipleDecorates(t *testing.T) {
 			assert.ElementsMatch(t, []int{2, 3, 4}, a.Values)
 		})
 	})
+
 }
 
 func TestFillDecorateInfoString(t *testing.T) {
