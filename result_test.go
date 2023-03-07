@@ -196,7 +196,7 @@ func TestNewResultObject(t *testing.T) {
 					FieldName:  "Writer",
 					FieldIndex: 1,
 					Results: []result{
-						resultGrouped{Group: "writers", Type: typeOfWriter},
+						resultGrouped{Group: "writers", Key: "writer1", Type: typeOfWriter},
 						resultSingle{Name: "writer1", Type: typeOfWriter},
 					},
 				},

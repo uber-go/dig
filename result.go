@@ -491,6 +491,9 @@ type resultGrouped struct {
 	// Name of the group as specified in the `group:".."` tag.
 	Group string
 
+	// Key if a name tag or option was provided, for populating maps
+	Key string
+
 	// Type of value produced.
 	Type reflect.Type
 
@@ -527,8 +530,10 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	if err != nil {
 		return resultGrouped{}, err
 	}
+	name := f.Tag.Get(_nameTag)
 	rg := resultGrouped{
 		Group:   g.Name,
+		Key:     name,
 		Flatten: g.Flatten,
 		Type:    f.Type,
 	}
@@ -553,18 +558,19 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 func (rt resultGrouped) Extract(cw containerWriter, decorated bool, v reflect.Value) {
 	// Decorated values are always flattened.
 	if !decorated && !rt.Flatten {
-		cw.submitGroupedValue(rt.Group, rt.Type, v)
+		cw.submitGroupedValue(rt.Group, rt.Key, rt.Type, v)
 		for _, asType := range rt.As {
-			cw.submitGroupedValue(rt.Group, asType, v)
+			cw.submitGroupedValue(rt.Group, rt.Key, asType, v)
 		}
 		return
 	}
 
 	if decorated {
-		cw.submitDecoratedGroupedValue(rt.Group, rt.Type, v)
+		cw.submitDecoratedGroupedValue(rt.Group, rt.Key, rt.Type, v)
 		return
 	}
+	// it's not possible to provide a key for the flattening case
 	for i := 0; i < v.Len(); i++ {
-		cw.submitGroupedValue(rt.Group, rt.Type, v.Index(i))
+		cw.submitGroupedValue(rt.Group, "", rt.Type, v.Index(i))
 	}
 }

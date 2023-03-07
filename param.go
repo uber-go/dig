@@ -627,6 +627,7 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 	}
 
 	// Check if we have decorated values
+	// qjeremy(how to handle this with maps?)
 	if decoratedItems, ok := pt.getDecoratedValues(c); ok {
 		return decoratedItems, nil
 	}
@@ -645,7 +646,10 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 	stores := c.storesToRoot()
 	result := reflect.MakeSlice(pt.Type, 0, itemCount)
 	for _, c := range stores {
-		result = reflect.Append(result, c.getValueGroup(pt.Group, pt.Type.Elem())...)
+		kgvs := c.getValueGroup(pt.Group, pt.Type.Elem())
+		for _, kgv := range kgvs {
+			result = reflect.Append(result, kgv.value)
+		}
 	}
 	return result, nil
 }

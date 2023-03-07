@@ -35,6 +35,11 @@ type ScopeOption interface {
 	noScopeOption() //yet
 }
 
+type keyedGroupValue struct {
+	key   string
+	value reflect.Value
+}
+
 // Scope is a scoped DAG of types and their dependencies.
 // A Scope may also have one or more child Scopes that inherit
 // from it.
@@ -61,10 +66,10 @@ type Scope struct {
 	values map[key]reflect.Value
 
 	// Values groups that generated directly in the Scope.
-	groups map[key][]reflect.Value
+	groups map[key][]keyedGroupValue
 
 	// Values groups that generated via decoraters in the Scope.
-	decoratedGroups map[key]reflect.Value
+	decoratedGroups map[key]keyedGroupValue
 
 	// Source of randomness.
 	rand *rand.Rand
@@ -98,8 +103,8 @@ func newScope() *Scope {
 		decorators:      make(map[key]*decoratorNode),
 		values:          make(map[key]reflect.Value),
 		decoratedValues: make(map[key]reflect.Value),
-		groups:          make(map[key][]reflect.Value),
-		decoratedGroups: make(map[key]reflect.Value),
+		groups:          make(map[key][]keyedGroupValue),
+		decoratedGroups: make(map[key]keyedGroupValue),
 		invokerFn:       defaultInvoker,
 		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
@@ -190,7 +195,7 @@ func (s *Scope) setDecoratedValue(name string, t reflect.Type, v reflect.Value) 
 	s.decoratedValues[key{name: name, t: t}] = v
 }
 
-func (s *Scope) getValueGroup(name string, t reflect.Type) []reflect.Value {
+func (s *Scope) getValueGroup(name string, t reflect.Type) []keyedGroupValue {
 	items := s.groups[key{group: name, t: t}]
 	// shuffle the list so users don't rely on the ordering of grouped values
 	return shuffledCopy(s.rand, items)
@@ -198,17 +203,17 @@ func (s *Scope) getValueGroup(name string, t reflect.Type) []reflect.Value {
 
 func (s *Scope) getDecoratedValueGroup(name string, t reflect.Type) (reflect.Value, bool) {
 	items, ok := s.decoratedGroups[key{group: name, t: t}]
-	return items, ok
+	return items.value, ok
 }
 
-func (s *Scope) submitGroupedValue(name string, t reflect.Type, v reflect.Value) {
+func (s *Scope) submitGroupedValue(name, mapKey string, t reflect.Type, v reflect.Value) {
 	k := key{group: name, t: t}
-	s.groups[k] = append(s.groups[k], v)
+	s.groups[k] = append(s.groups[k], keyedGroupValue{key: mapKey, value: v})
 }
 
-func (s *Scope) submitDecoratedGroupedValue(name string, t reflect.Type, v reflect.Value) {
+func (s *Scope) submitDecoratedGroupedValue(name, mapKey string, t reflect.Type, v reflect.Value) {
 	k := key{group: name, t: t}
-	s.decoratedGroups[k] = v
+	s.decoratedGroups[k] = keyedGroupValue{key: mapKey, value: v}
 }
 
 func (s *Scope) getValueProviders(name string, t reflect.Type) []provider {
@@ -310,9 +315,9 @@ func (s *Scope) String() string {
 	for k, v := range s.values {
 		fmt.Fprintln(b, "\t", k, "=>", v)
 	}
-	for k, vs := range s.groups {
-		for _, v := range vs {
-			fmt.Fprintln(b, "\t", k, "=>", v)
+	for k, kgvs := range s.groups {
+		for _, kgv := range kgvs {
+			fmt.Fprintln(b, "\t", k, "=>", kgv.value)
 		}
 	}
 	fmt.Fprintln(b, "}")
