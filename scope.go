@@ -90,9 +90,6 @@ type Scope struct {
 
 	// All the child scopes of this Scope.
 	childScopes []*Scope
-
-	// A callback function to call when constructors or decorators are run
-	callbackFunc Callback
 }
 
 func newScope() *Scope {
@@ -122,7 +119,6 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	child.invokerFn = s.invokerFn
 	child.deferAcyclicVerification = s.deferAcyclicVerification
 	child.recoverFromPanics = s.recoverFromPanics
-	child.callbackFunc = s.callbackFunc
 
 	// child copies the parent's graph nodes.
 	child.gh.nodes = append(child.gh.nodes, s.gh.nodes...)
@@ -322,9 +318,4 @@ func (s *Scope) String() string {
 	fmt.Fprintln(b, "}")
 
 	return b.String()
-}
-
-// Return the scope's callback if it has one, nil otherwise
-func (s *Scope) callback() Callback {
-	return s.callbackFunc
 }

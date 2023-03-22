@@ -1640,41 +1640,78 @@ func TestRecoverFromPanic(t *testing.T) {
 
 func giveInt() int { return 5 }
 
-func decorateInt(i int) int { return i }
-
-type TestCallbackType struct {
-	F func(dig.CallbackInfo)
-}
-
-func (c TestCallbackType) Called(ci dig.CallbackInfo) {
-	c.F(ci)
-}
-
 func TestCallback(t *testing.T) {
-	var ctorCallbackCalled bool
-	var dcorCallbackCalled bool
-	callback := TestCallbackType{
-		F: func(ci dig.CallbackInfo) {
-			switch ci.Kind {
-			case dig.Provided:
+
+	t.Run("no errors", func(t *testing.T) {
+		var (
+			provideCallbackCalled  bool
+			decorateCallbackCalled bool
+		)
+
+		c := digtest.New(t)
+		c.RequireProvide(
+			giveInt,
+			dig.WithCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
-				ctorCallbackCalled = true
-			case dig.Decorated:
-				assert.Equal(t, "go.uber.org/dig_test.decorateInt", ci.Name)
-				dcorCallbackCalled = true
-			default:
-				t.Fail()
-			}
-		},
-	}
+				assert.Nil(t, ci.Error)
+				provideCallbackCalled = true
+			}),
+		)
+		c.RequireDecorate(
+			func(a int) int { return a + 5 },
+			dig.WithCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.2", ci.Name)
+				assert.Nil(t, ci.Error)
+				decorateCallbackCalled = true
+			}),
+		)
 
-	c := digtest.New(t, dig.WithCallback(callback))
-	c.RequireProvide(giveInt)
-	c.RequireDecorate(decorateInt)
-	c.RequireInvoke(func(i int) {})
+		c.RequireInvoke(func(a int) {})
 
-	assert.True(t, ctorCallbackCalled, "Callback function was never called for provided constructor")
-	assert.True(t, dcorCallbackCalled, "Callback function was never called for provided decorator")
+		assert.True(t, provideCallbackCalled)
+		assert.True(t, decorateCallbackCalled)
+	})
+
+	t.Run("provide error", func(t *testing.T) {
+		var called bool
+
+		c := digtest.New(t)
+		c.RequireProvide(
+			func () (int, error) {
+				return 0, errors.New("terrible callback sadness")
+			},
+			dig.WithCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func2.1", ci.Name)
+				require.NotNil(t, ci.Error)
+				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
+				called = true
+			}),
+		)
+
+		c.Invoke(func(a int) {})
+		assert.True(t, called)
+	})
+
+	t.Run("decorate error", func(t *testing.T) {
+		var called bool
+
+		c := digtest.New(t)
+		c.RequireProvide(giveInt)
+		c.RequireDecorate(
+			func(a int) (int, error) {
+				return 0, errors.New("terrible callback sadness")
+			},
+			dig.WithCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func3.1", ci.Name)
+				require.NotNil(t, ci.Error)
+				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
+				called = true
+			}),
+		)
+
+		c.Invoke(func(a int) {})
+		assert.True(t, called)
+	})
 }
 
 func TestProvideConstructorErrors(t *testing.T) {

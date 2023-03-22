@@ -20,52 +20,26 @@
 
 package dig
 
-// CallbackFuncKind represents the kind of function called in a CallbackInfo.
-// Specifically, the function will be either Provided or Decorated.
-type CallbackFuncKind int
-
-const (
-	// Invalid should never be set in a [CallbackInfo]
-	Invalid = iota
-
-	// Provided represents a provided function
-	Provided
-
-	// Decorated represents a decorator
-	Decorated
-)
-
 // CallbackInfo contains information about a function called by Dig
 // and is passed to a Callback function registered with [WithCallback].
 type CallbackInfo struct {
 
-	// Func is the actual function called by Dig.
-	Func interface{}
-
-	// Name is the name of the function, including the package name:
+	// Name is the name of the function in the format:
 	// <package_name>.<function_name>
 	Name string
 
-	// Kind tells whether the function was a provided function
-	// or was given as a decorator. See [CallbackFuncKind].
-	Kind CallbackFuncKind
+	// Error contains the error returned by the [Callback]'s associated
+	// function, if there was one.
+	Error error
 }
 
-// Callback is an type containing a function to call when Dig calls
-// a provided function or decorator successfully.
-type Callback interface {
-
-	// Called gets called when Dig calls a provided function or
-	// decorator. A [CallbackInfo] is given as parameter, containing
-	// information about the function Dig called.
-	Called(CallbackInfo)
-}
+type Callback func(CallbackInfo)
 
 // WithCallback allows registering a callback function with Dig
 // to be called whenever a provided function or decorator of a container
 // is called successfully. [Callback] is a simple interface containing
 // the function to be called as a callback.
-func WithCallback(callback Callback) Option {
+func WithCallback(callback Callback) withCallbackOption {
 	return withCallbackOption{
 		callback: callback,
 	}
@@ -75,12 +49,14 @@ type withCallbackOption struct {
 	callback Callback
 }
 
-var _ Option = withCallbackOption{}
+var _ ProvideOption = withCallbackOption{}
 
-func (o withCallbackOption) String() string {
-	return "WithCallback()"
+func (o withCallbackOption) applyProvideOption(po *provideOptions) {
+	po.Callback = o.callback
 }
 
-func (o withCallbackOption) applyOption(c *Container) {
-	c.scope.callbackFunc = o.callback
+var _ DecorateOption = withCallbackOption{}
+
+func (o withCallbackOption) apply(do *decorateOptions) {
+	do.Callback = o.callback
 }
