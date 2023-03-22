@@ -20,8 +20,8 @@
 
 package dig
 
-// CallbackInfo contains information about a function called by Dig
-// and is passed to a Callback function registered with [WithCallback].
+// CallbackInfo contains information about a provided function or decorator
+// called by Dig, and is passed to a Callback registered with [WithCallback].
 type CallbackInfo struct {
 
 	// Name is the name of the function in the format:
@@ -33,12 +33,30 @@ type CallbackInfo struct {
 	Error error
 }
 
+// Callback is a function that can be registered with a provided function
+// or decorator with [WithCallback] to cause it to be called after the 
+// provided function or decorator is run.
 type Callback func(CallbackInfo)
 
-// WithCallback allows registering a callback function with Dig
-// to be called whenever a provided function or decorator of a container
-// is called successfully. [Callback] is a simple interface containing
-// the function to be called as a callback.
+// WithCallback returns an option that can be used with [(*Container).Provide]
+// or [(*Container).Decorate] to have Dig call the passed in [Callback]
+// after the corresponding constructor or decorator finishes running.
+//
+// For example, the following prints a simple message after "myFunc" and
+// "myDecorator" finish running:
+// 
+//	c := dig.New()
+//	myCallback := func(ci CallbackInfo) {
+//		var errorAdd string
+//		if ci.Error != nil {
+//			errorAdd = fmt.Sprintf("with error: %v", ci.Error)
+//		}
+//		fmt.Printf("%q finished%v", ci.Name, errorAdd)
+//	}
+//	c.Provide(myFunc, WithCallback(myCallback)),
+//	c.Decorate(myDecorator, WithCallback(myCallback)),
+//
+// See [CallbackInfo] for more info on the information passed to the [Callback].
 func WithCallback(callback Callback) withCallbackOption {
 	return withCallbackOption{
 		callback: callback,
