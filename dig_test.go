@@ -1677,7 +1677,7 @@ func TestCallback(t *testing.T) {
 
 		c := digtest.New(t)
 		c.RequireProvide(
-			func () (int, error) {
+			func() (int, error) {
 				return 0, errors.New("terrible callback sadness")
 			},
 			dig.WithCallback(func(ci dig.CallbackInfo) {

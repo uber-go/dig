@@ -21,7 +21,7 @@
 package dig
 
 // CallbackInfo contains information about a provided function or decorator
-// called by Dig, and is passed to a Callback registered with [WithCallback].
+// called by Dig, and is passed to a [Callback] registered with [WithCallback].
 type CallbackInfo struct {
 
 	// Name is the name of the function in the format:
@@ -34,7 +34,7 @@ type CallbackInfo struct {
 }
 
 // Callback is a function that can be registered with a provided function
-// or decorator with [WithCallback] to cause it to be called after the 
+// or decorator with [WithCallback] to cause it to be called after the
 // provided function or decorator is run.
 type Callback func(CallbackInfo)
 
@@ -44,7 +44,7 @@ type Callback func(CallbackInfo)
 //
 // For example, the following prints a simple message after "myFunc" and
 // "myDecorator" finish running:
-// 
+//
 //	c := dig.New()
 //	myCallback := func(ci CallbackInfo) {
 //		var errorAdd string

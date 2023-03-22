@@ -168,7 +168,7 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 
 	receiver := newStagingContainerWriter()
 	results := c.invoker()(reflect.ValueOf(n.ctor), args)
-	err = n.resultList.ExtractList(receiver, false /* decorating */, results);
+	err = n.resultList.ExtractList(receiver, false /* decorating */, results)
 
 	if n.callback != nil {
 		defer n.callback(CallbackInfo{
