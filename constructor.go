@@ -147,6 +147,24 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 		}
 	}
 
+	args, err := n.paramList.BuildList(c)
+	if err != nil {
+		return errArgumentsFailed{
+			Func:   n.location,
+			Reason: err,
+		}
+	}
+
+	if n.callback != nil {
+		// Wrap in separate func to include PanicErrors
+		defer func() {
+			n.callback(CallbackInfo{
+				Name:  fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+				Error: err,
+			})
+		}()
+	}
+
 	if n.s.recoverFromPanics {
 		defer func() {
 			if p := recover(); p != nil {
@@ -158,24 +176,9 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 		}()
 	}
 
-	args, err := n.paramList.BuildList(c)
-	if err != nil {
-		return errArgumentsFailed{
-			Func:   n.location,
-			Reason: err,
-		}
-	}
-
 	receiver := newStagingContainerWriter()
 	results := c.invoker()(reflect.ValueOf(n.ctor), args)
 	err = n.resultList.ExtractList(receiver, false /* decorating */, results)
-
-	if n.callback != nil {
-		defer n.callback(CallbackInfo{
-			Name:  fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
-			Error: err,
-		})
-	}
 
 	if err != nil {
 		return errConstructorFailed{Func: n.location, Reason: err}

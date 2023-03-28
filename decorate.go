@@ -113,6 +113,24 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 		}
 	}
 
+	args, err := n.params.BuildList(n.s)
+	if err != nil {
+		return errArgumentsFailed{
+			Func:   n.location,
+			Reason: err,
+		}
+	}
+
+	if n.callback != nil {
+		// Wrap in separate func to include PanicErrors
+		defer func() {
+			n.callback(CallbackInfo{
+				Name:  fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+				Error: err,
+			})
+		}()
+	}
+
 	if n.s.recoverFromPanics {
 		defer func() {
 			if p := recover(); p != nil {
@@ -124,23 +142,8 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 		}()
 	}
 
-	args, err := n.params.BuildList(n.s)
-	if err != nil {
-		return errArgumentsFailed{
-			Func:   n.location,
-			Reason: err,
-		}
-	}
-
 	results := s.invoker()(reflect.ValueOf(n.dcor), args)
 	err = n.results.ExtractList(n.s, true /* decorated */, results)
-
-	if n.callback != nil {
-		defer n.callback(CallbackInfo{
-			Name:  fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
-			Error: err,
-		})
-	}
 
 	if err != nil {
 		return err
