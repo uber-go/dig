@@ -3741,6 +3741,119 @@ func TestProvideInfoOption(t *testing.T) {
 	})
 }
 
+func TestInvokeInfoOption(t *testing.T) {
+	t.Parallel()
+
+	t.Run("one map type requested", func(t *testing.T) {
+		t.Parallel()
+
+		c := digtest.New(t)
+		c.RequireProvide(func() map[string]string {
+			return map[string]string{}
+		})
+
+		var info dig.InvokeInfo
+		c.RequireInvoke(func(m map[string]string) {
+			require.NotNil(t, m, "invoke got zero value map")
+		}, dig.FillInvokeInfo(&info))
+
+		assert.Equal(t, 1, len(info.ReqTypes))
+		assert.Equal(t, "map[string]string", info.ReqTypes[0].String())
+	})
+
+	t.Run("one map, one struct ptr type requested", func(t *testing.T) {
+		t.Parallel()
+
+		c := digtest.New(t)
+		type type1 struct{}
+		c.RequireProvide(func() (map[string]string, *type1) {
+			return map[string]string{}, &type1{}
+		})
+
+		var info dig.InvokeInfo
+		c.RequireInvoke(func(m map[string]string, typ1 *type1) {
+			require.NotNil(t, m, "invoke got zero value map")
+			require.NotNil(t, typ1, "invoke got nil struct")
+		}, dig.FillInvokeInfo(&info))
+
+		assert.Equal(t, 2, len(info.ReqTypes))
+		assert.Equal(t, "map[string]string", info.ReqTypes[0].String())
+		assert.Equal(t, "*dig_test.type1", info.ReqTypes[1].String())
+	})
+
+	t.Run("two invokes requesting types", func(t *testing.T) {
+		t.Parallel()
+
+		c := digtest.New(t)
+		type type1 struct{}
+		type type2 struct{}
+		c.RequireProvide(func() (*type1, *type2) {
+			return &type1{}, &type2{}
+		})
+
+		var info1 dig.InvokeInfo
+		c.RequireInvoke(func(typ1 *type1) {
+			require.NotNil(t, typ1, "invoke got nil struct")
+		}, dig.FillInvokeInfo(&info1))
+		assert.Equal(t, 1, len(info1.ReqTypes))
+		assert.Equal(t, "*dig_test.type1", info1.ReqTypes[0].String())
+
+		var info2 dig.InvokeInfo
+		c.RequireInvoke(func(typ2 *type2) {
+			require.NotNil(t, typ2, "invoke got nil struct")
+		}, dig.FillInvokeInfo(&info2))
+		assert.Equal(t, 1, len(info2.ReqTypes))
+		assert.Equal(t, "*dig_test.type2", info2.ReqTypes[0].String())
+	})
+
+	t.Run("invoke with param", func(t *testing.T) {
+		t.Parallel()
+
+		type params struct {
+			dig.In
+
+			Field1 string
+			Field2 int
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() (string, int) {
+			return "hello", 2023
+		})
+
+		var info dig.InvokeInfo
+		c.RequireInvoke(func(p params) {
+			require.Equal(t, params{Field1: "hello", Field2: 2023}, p)
+		}, dig.FillInvokeInfo(&info))
+		assert.Equal(t, 2, len(info.ReqTypes))
+		assert.Equal(t, "string", info.ReqTypes[0].String())
+		assert.Equal(t, "int", info.ReqTypes[1].String())
+	})
+
+	t.Run("invoke type with dependencies", func(t *testing.T) {
+		t.Parallel()
+
+		c := digtest.New(t)
+		type type1 struct{}
+		c.RequireProvide(func() string {
+			return "I am afraid of spiders"
+		})
+		c.RequireProvide(func(s string) *type1 {
+			if s == "I am afraid of spiders" {
+				return &type1{}
+			}
+			return nil
+		})
+
+		var info dig.InvokeInfo
+		c.RequireInvoke(func(typ1 *type1) {
+			require.NotNil(t, typ1, "invoke got nil struct")
+		}, dig.FillInvokeInfo(&info))
+		assert.Equal(t, 1, len(info.ReqTypes))
+		assert.Equal(t, "*dig_test.type1", info.ReqTypes[0].String())
+	})
+}
+
 func TestEndToEndSuccessWithAliases(t *testing.T) {
 	t.Run("pointer constructor", func(t *testing.T) {
 		type Buffer = *bytes.Buffer

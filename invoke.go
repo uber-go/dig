@@ -22,16 +22,41 @@ package dig
 
 import (
 	"fmt"
-	"reflect"
-
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/graph"
+	"reflect"
 )
 
-// An InvokeOption modifies the default behavior of Invoke. It's included for
-// future functionality; currently, there are no concrete implementations.
+// An InvokeOption modifies the default behavior of Invoke.
 type InvokeOption interface {
-	unimplemented()
+	applyInvokeOption(*invokeOptions)
+}
+
+type invokeOptions struct {
+	Info *InvokeInfo
+}
+
+// InvokeInfo provides information about an Invoke.
+type InvokeInfo struct {
+	ReqTypes []*Output
+}
+
+// FillInvokeInfo is an InvokeOption that writes info on the types requested
+// by the Invoke function into the specified InvokeInfo.
+func FillInvokeInfo(info *InvokeInfo) InvokeOption {
+	return fillInvokeInfoOption{info: info}
+}
+
+type fillInvokeInfoOption struct {
+	info *InvokeInfo
+}
+
+func (o fillInvokeInfoOption) String() string {
+	return fmt.Sprintf("FillInvokeInfo(%p)", o.info)
+}
+
+func (o fillInvokeInfoOption) applyInvokeOption(opts *invokeOptions) {
+	opts.Info = o.info
 }
 
 // Invoke runs the given function after instantiating its dependencies.
@@ -103,6 +128,25 @@ func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) (err error) {
 				}
 			}
 		}()
+	}
+
+	var options invokeOptions
+	for _, o := range opts {
+		o.applyInvokeOption(&options)
+	}
+
+	// Record info for the invoke if requested
+	if info := options.Info; info != nil {
+		params := pl.DotParam()
+
+		info.ReqTypes = make([]*Output, len(params))
+		for i, p := range params {
+			info.ReqTypes[i] = &Output{
+				t:     p.Type,
+				name:  p.Name,
+				group: p.Group,
+			}
+		}
 	}
 
 	returned := s.invokerFn(reflect.ValueOf(function), args)
