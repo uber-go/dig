@@ -3757,7 +3757,7 @@ func TestInvokeInfoOption(t *testing.T) {
 			require.NotNil(t, m, "invoke got zero value map")
 		}, dig.FillInvokeInfo(&info))
 
-		assert.Equal(t, 1, len(info.ReqTypes))
+		assert.Len(t, info.ReqTypes, 1)
 		assert.Equal(t, "map[string]string", info.ReqTypes[0].String())
 	})
 
@@ -3776,7 +3776,7 @@ func TestInvokeInfoOption(t *testing.T) {
 			require.NotNil(t, typ1, "invoke got nil struct")
 		}, dig.FillInvokeInfo(&info))
 
-		assert.Equal(t, 2, len(info.ReqTypes))
+		assert.Len(t, info.ReqTypes, 2)
 		assert.Equal(t, "map[string]string", info.ReqTypes[0].String())
 		assert.Equal(t, "*dig_test.type1", info.ReqTypes[1].String())
 	})
@@ -3795,14 +3795,14 @@ func TestInvokeInfoOption(t *testing.T) {
 		c.RequireInvoke(func(typ1 *type1) {
 			require.NotNil(t, typ1, "invoke got nil struct")
 		}, dig.FillInvokeInfo(&info1))
-		assert.Equal(t, 1, len(info1.ReqTypes))
+		assert.Len(t, info1.ReqTypes, 1)
 		assert.Equal(t, "*dig_test.type1", info1.ReqTypes[0].String())
 
 		var info2 dig.InvokeInfo
 		c.RequireInvoke(func(typ2 *type2) {
 			require.NotNil(t, typ2, "invoke got nil struct")
 		}, dig.FillInvokeInfo(&info2))
-		assert.Equal(t, 1, len(info2.ReqTypes))
+		assert.Len(t, info2.ReqTypes, 1)
 		assert.Equal(t, "*dig_test.type2", info2.ReqTypes[0].String())
 	})
 
@@ -3825,7 +3825,7 @@ func TestInvokeInfoOption(t *testing.T) {
 		c.RequireInvoke(func(p params) {
 			require.Equal(t, params{Field1: "hello", Field2: 2023}, p)
 		}, dig.FillInvokeInfo(&info))
-		assert.Equal(t, 2, len(info.ReqTypes))
+		assert.Len(t, info.ReqTypes, 2)
 		assert.Equal(t, "string", info.ReqTypes[0].String())
 		assert.Equal(t, "int", info.ReqTypes[1].String())
 	})
@@ -3849,7 +3849,7 @@ func TestInvokeInfoOption(t *testing.T) {
 		c.RequireInvoke(func(typ1 *type1) {
 			require.NotNil(t, typ1, "invoke got nil struct")
 		}, dig.FillInvokeInfo(&info))
-		assert.Equal(t, 1, len(info.ReqTypes))
+		assert.Len(t, info.ReqTypes, 1)
 		assert.Equal(t, "*dig_test.type1", info.ReqTypes[0].String())
 	})
 }
