@@ -43,6 +43,10 @@ type InvokeInfo struct {
 
 // FillInvokeInfo is an InvokeOption that writes info on the types requested
 // by the Invoke function into the specified InvokeInfo.
+// For example:
+//
+//	var info dig.InvokeInfo
+//	err := c.Invoke(..., dig.FillInvokeInfo(&info))
 func FillInvokeInfo(info *InvokeInfo) InvokeOption {
 	return fillInvokeInfoOption{info: info}
 }
