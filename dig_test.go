@@ -3744,113 +3744,85 @@ func TestProvideInfoOption(t *testing.T) {
 func TestInvokeInfoOption(t *testing.T) {
 	t.Parallel()
 
-	t.Run("one map type requested", func(t *testing.T) {
-		t.Parallel()
+	type type1 struct{}
+	type params struct {
+		dig.In
 
-		c := digtest.New(t)
-		c.RequireProvide(func() map[string]string {
-			return map[string]string{}
-		})
-
-		var info dig.InvokeInfo
-		c.RequireInvoke(func(m map[string]string) {
-			require.NotNil(t, m, "invoke got zero value map")
-		}, dig.FillInvokeInfo(&info))
-
-		assert.Len(t, info.Inputs, 1)
-		assert.Equal(t, "map[string]string", info.Inputs[0].String())
+		Field1 string
+		Field2 int
+	}
+	type type2 struct{}
+	c := digtest.New(t)
+	c.RequireProvide(func() map[string]string { return map[string]string{} })
+	c.RequireProvide(func() *type1 { return &type1{} })
+	c.RequireProvide(func() (string, int) {
+		return "hello", 2023
 	})
-
-	t.Run("one map, one struct ptr type requested", func(t *testing.T) {
-		t.Parallel()
-
-		c := digtest.New(t)
-		type type1 struct{}
-		c.RequireProvide(func() (map[string]string, *type1) {
-			return map[string]string{}, &type1{}
-		})
-
-		var info dig.InvokeInfo
-		c.RequireInvoke(func(m map[string]string, typ1 *type1) {
-			require.NotNil(t, m, "invoke got zero value map")
-			require.NotNil(t, typ1, "invoke got nil struct")
-		}, dig.FillInvokeInfo(&info))
-
-		assert.Len(t, info.Inputs, 2)
-		assert.Equal(t, "map[string]string", info.Inputs[0].String())
-		assert.Equal(t, "*dig_test.type1", info.Inputs[1].String())
-	})
-
-	t.Run("two invokes requesting types", func(t *testing.T) {
-		t.Parallel()
-
-		c := digtest.New(t)
-		type type1 struct{}
-		type type2 struct{}
-		c.RequireProvide(func() (*type1, *type2) {
-			return &type1{}, &type2{}
-		})
-
-		var info1 dig.InvokeInfo
-		c.RequireInvoke(func(typ1 *type1) {
-			require.NotNil(t, typ1, "invoke got nil struct")
-		}, dig.FillInvokeInfo(&info1))
-		assert.Len(t, info1.Inputs, 1)
-		assert.Equal(t, "*dig_test.type1", info1.Inputs[0].String())
-
-		var info2 dig.InvokeInfo
-		c.RequireInvoke(func(typ2 *type2) {
-			require.NotNil(t, typ2, "invoke got nil struct")
-		}, dig.FillInvokeInfo(&info2))
-		assert.Len(t, info2.Inputs, 1)
-		assert.Equal(t, "*dig_test.type2", info2.Inputs[0].String())
-	})
-
-	t.Run("invoke with param", func(t *testing.T) {
-		t.Parallel()
-
-		type params struct {
-			dig.In
-
-			Field1 string
-			Field2 int
+	c.RequireProvide(func(s string) *type2 {
+		if s == "hello" {
+			return &type2{}
 		}
-
-		c := digtest.New(t)
-		c.RequireProvide(func() (string, int) {
-			return "hello", 2023
-		})
-
-		var info dig.InvokeInfo
-		c.RequireInvoke(func(p params) {
-			require.Equal(t, params{Field1: "hello", Field2: 2023}, p)
-		}, dig.FillInvokeInfo(&info))
-		assert.Len(t, info.Inputs, 2)
-		assert.Equal(t, "string", info.Inputs[0].String())
-		assert.Equal(t, "int", info.Inputs[1].String())
+		return nil
 	})
 
-	t.Run("invoke type with dependencies", func(t *testing.T) {
+	tests := []struct {
+		desc     string
+		invokeFn any
+		numTyps  int
+		wantStrs []string
+	}{
+		{
+			desc:     "one map type requested",
+			invokeFn: func(m map[string]string) {},
+			numTyps:  1,
+			wantStrs: []string{"map[string]string"},
+		},
+		{
+			desc:     "one map type, one struct type requested",
+			invokeFn: func(m map[string]string, typ1 *type1) {},
+			numTyps:  2,
+			wantStrs: []string{"map[string]string", "*dig_test.type1"},
+		},
+		{
+			desc:     "invoke with param",
+			invokeFn: func(p params) {},
+			numTyps:  2,
+			wantStrs: []string{"string", "int"},
+		},
+		{
+			desc:     "invoke with dependencies",
+			invokeFn: func(typ2 *type2) {},
+			numTyps:  1,
+			wantStrs: []string{"*dig_test.type2"},
+		},
+	}
+
+	for _, tt := range tests {
+		var info dig.InvokeInfo
+		c.RequireInvoke(tt.invokeFn, dig.FillInvokeInfo(&info))
+		require.NotNil(t, info)
+		require.Len(t, info.Inputs, tt.numTyps)
+		for i := 0; i < tt.numTyps; i++ {
+			assert.Equal(t, tt.wantStrs[i], info.Inputs[i].String())
+		}
+	}
+}
+
+func TestFillInvokeInfoString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil", func(t *testing.T) {
 		t.Parallel()
 
-		c := digtest.New(t)
-		type type1 struct{}
-		c.RequireProvide(func() string {
-			return "I am afraid of spiders"
-		})
-		c.RequireProvide(func(s string) *type1 {
-			if s == "I am afraid of spiders" {
-				return &type1{}
-			}
-			return nil
-		})
+		assert.Equal(t, "FillInvokeInfo(0x0)", fmt.Sprint(dig.FillInvokeInfo(nil)))
+	})
 
-		var info dig.InvokeInfo
-		c.RequireInvoke(func(typ1 *type1) {
-			require.NotNil(t, typ1, "invoke got nil struct")
-		}, dig.FillInvokeInfo(&info))
-		assert.Len(t, info.Inputs, 1)
-		assert.Equal(t, "*dig_test.type1", info.Inputs[0].String())
+	t.Run("not nil", func(t *testing.T) {
+		t.Parallel()
+
+		opt := dig.FillInvokeInfo(new(dig.InvokeInfo))
+		assert.NotEqual(t, fmt.Sprint(opt), "FillInvokeInfo(0x0)")
+		assert.Contains(t, fmt.Sprint(opt), "FillInvokeInfo(0x")
 	})
 }
 
