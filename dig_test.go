@@ -3741,6 +3741,97 @@ func TestProvideInfoOption(t *testing.T) {
 	})
 }
 
+func TestInvokeInfoOption(t *testing.T) {
+	t.Parallel()
+
+	type type1 struct{}
+	type params struct {
+		dig.In
+
+		Field1 string
+		Field2 int
+	}
+	type type2 struct{}
+	c := digtest.New(t)
+	c.RequireProvide(func() map[string]string { return map[string]string{} })
+	c.RequireProvide(func() *type1 { return &type1{} })
+	c.RequireProvide(func() (string, int) {
+		return "hello", 2023
+	})
+	c.RequireProvide(func(s string) *type2 {
+		if s == "hello" {
+			return &type2{}
+		}
+		return nil
+	})
+
+	tests := []struct {
+		desc     string
+		invokeFn any
+		numTyps  int
+		wantStrs []string
+	}{
+		{
+			desc:     "one map type requested",
+			invokeFn: func(m map[string]string) {},
+			numTyps:  1,
+			wantStrs: []string{"map[string]string"},
+		},
+		{
+			desc:     "one map type, one struct type requested",
+			invokeFn: func(m map[string]string, typ1 *type1) {},
+			numTyps:  2,
+			wantStrs: []string{"map[string]string", "*dig_test.type1"},
+		},
+		{
+			desc:     "invoke with param",
+			invokeFn: func(p params) {},
+			numTyps:  2,
+			wantStrs: []string{"string", "int"},
+		},
+		{
+			desc:     "invoke with dependencies",
+			invokeFn: func(typ2 *type2) {},
+			numTyps:  1,
+			wantStrs: []string{"*dig_test.type2"},
+		},
+	}
+
+	for _, tt := range tests {
+		var info dig.InvokeInfo
+		c.RequireInvoke(tt.invokeFn, dig.FillInvokeInfo(&info))
+		require.NotNil(t, info)
+		require.Len(t, info.Inputs, tt.numTyps)
+		for i := 0; i < tt.numTyps; i++ {
+			assert.Equal(t, tt.wantStrs[i], info.Inputs[i].String())
+		}
+	}
+
+	t.Run("no error on nil InvokeInfo", func(t *testing.T) {
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "" })
+		c.RequireInvoke(func(s string) {}, dig.FillInvokeInfo(nil))
+	})
+}
+
+func TestFillInvokeInfoString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, "FillInvokeInfo(0x0)", fmt.Sprint(dig.FillInvokeInfo(nil)))
+	})
+
+	t.Run("not nil", func(t *testing.T) {
+		t.Parallel()
+
+		opt := dig.FillInvokeInfo(new(dig.InvokeInfo))
+		assert.NotEqual(t, fmt.Sprint(opt), "FillInvokeInfo(0x0)")
+		assert.Contains(t, fmt.Sprint(opt), "FillInvokeInfo(0x")
+	})
+}
+
 func TestEndToEndSuccessWithAliases(t *testing.T) {
 	t.Run("pointer constructor", func(t *testing.T) {
 		type Buffer = *bytes.Buffer
