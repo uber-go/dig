@@ -1682,7 +1682,6 @@ func TestCallback(t *testing.T) {
 			},
 			dig.WithCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func2.1", ci.Name)
-				require.Error(t, ci.Error)
 				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
 				called = true
 			}),
@@ -1703,7 +1702,6 @@ func TestCallback(t *testing.T) {
 			},
 			dig.WithCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func3.1", ci.Name)
-				require.Error(t, ci.Error)
 				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
 				called = true
 			}),
@@ -1721,9 +1719,9 @@ func TestCallback(t *testing.T) {
 			func() int { panic("unreal misfortune") },
 			dig.WithCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func4.1", ci.Name)
-				require.Error(t, ci.Error)
+				var pe dig.PanicError
+				assert.True(t, errors.As(ci.Error, &pe))
 				assert.ErrorContains(t, ci.Error, "panic: \"unreal misfortune\"")
-
 				called = true
 			}),
 		)
@@ -1741,7 +1739,8 @@ func TestCallback(t *testing.T) {
 			func(int) int { panic("unreal misfortune") },
 			dig.WithCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func5.1", ci.Name)
-				require.Error(t, ci.Error)
+				var pe dig.PanicError
+				assert.True(t, errors.As(ci.Error, &pe))
 				assert.ErrorContains(t, ci.Error, "panic: \"unreal misfortune\"")
 
 				called = true

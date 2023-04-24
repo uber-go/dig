@@ -57,23 +57,28 @@ type Callback func(CallbackInfo)
 //	c.Decorate(myDecorator, WithCallback(myCallback)),
 //
 // See [CallbackInfo] for more info on the information passed to the [Callback].
-func WithCallback(callback Callback) withCallbackOption {
+func WithCallback(callback Callback) ProvideDecorateOption {
 	return withCallbackOption{
 		callback: callback,
 	}
+}
+
+// ProvideDecorateOption is an option that implements both [ProvideOption]
+// and [DecorateOption].
+type ProvideDecorateOption interface {
+	ProvideOption
+	DecorateOption
 }
 
 type withCallbackOption struct {
 	callback Callback
 }
 
-var _ ProvideOption = withCallbackOption{}
+var _ ProvideDecorateOption = withCallbackOption{}
 
 func (o withCallbackOption) applyProvideOption(po *provideOptions) {
 	po.Callback = o.callback
 }
-
-var _ DecorateOption = withCallbackOption{}
 
 func (o withCallbackOption) apply(do *decorateOptions) {
 	do.Callback = o.callback
