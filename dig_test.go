@@ -3806,6 +3806,12 @@ func TestInvokeInfoOption(t *testing.T) {
 			assert.Equal(t, tt.wantStrs[i], info.Inputs[i].String())
 		}
 	}
+
+	t.Run("no error on nil InvokeInfo", func(t *testing.T) {
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "" })
+		c.RequireInvoke(func(s string) {}, dig.FillInvokeInfo(nil))
+	})
 }
 
 func TestFillInvokeInfoString(t *testing.T) {
