@@ -1638,6 +1638,120 @@ func TestRecoverFromPanic(t *testing.T) {
 	}
 }
 
+func giveInt() int { return 5 }
+
+func TestCallback(t *testing.T) {
+
+	t.Run("no errors", func(t *testing.T) {
+		var (
+			provideCallbackCalled  bool
+			decorateCallbackCalled bool
+		)
+
+		c := digtest.New(t)
+		c.RequireProvide(
+			giveInt,
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
+				assert.NoError(t, ci.Error)
+				provideCallbackCalled = true
+			}),
+		)
+		c.RequireDecorate(
+			func(a int) int { return a + 5 },
+			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.2", ci.Name)
+				assert.NoError(t, ci.Error)
+				decorateCallbackCalled = true
+			}),
+		)
+
+		c.RequireInvoke(func(a int) {})
+
+		assert.True(t, provideCallbackCalled)
+		assert.True(t, decorateCallbackCalled)
+	})
+
+	t.Run("provide error", func(t *testing.T) {
+		var called bool
+
+		c := digtest.New(t)
+		c.RequireProvide(
+			func() (int, error) {
+				return 0, errors.New("terrible callback sadness")
+			},
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func2.1", ci.Name)
+				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
+				called = true
+			}),
+		)
+
+		c.Invoke(func(a int) {})
+		assert.True(t, called)
+	})
+
+	t.Run("decorate error", func(t *testing.T) {
+		var called bool
+
+		c := digtest.New(t)
+		c.RequireProvide(giveInt)
+		c.RequireDecorate(
+			func(a int) (int, error) {
+				return 0, errors.New("terrible callback sadness")
+			},
+			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func3.1", ci.Name)
+				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
+				called = true
+			}),
+		)
+
+		c.Invoke(func(a int) {})
+		assert.True(t, called)
+	})
+
+	t.Run("panicky provide with RecoverFromPanics", func(t *testing.T) {
+		var called bool
+
+		c := digtest.New(t, dig.RecoverFromPanics())
+		c.RequireProvide(
+			func() int { panic("unreal misfortune") },
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func4.1", ci.Name)
+				var pe dig.PanicError
+				assert.True(t, errors.As(ci.Error, &pe))
+				assert.ErrorContains(t, ci.Error, "panic: \"unreal misfortune\"")
+				called = true
+			}),
+		)
+
+		c.Invoke(func(int) {})
+		assert.True(t, called)
+	})
+
+	t.Run("panicky decorate with RecoverFromPanics", func(t *testing.T) {
+		var called bool
+
+		c := digtest.New(t, dig.RecoverFromPanics())
+		c.RequireProvide(giveInt)
+		c.RequireDecorate(
+			func(int) int { panic("unreal misfortune") },
+			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func5.1", ci.Name)
+				var pe dig.PanicError
+				assert.True(t, errors.As(ci.Error, &pe))
+				assert.ErrorContains(t, ci.Error, "panic: \"unreal misfortune\"")
+
+				called = true
+			}),
+		)
+
+		c.Invoke(func(int) {})
+		assert.True(t, called)
+	})
+}
+
 func TestProvideConstructorErrors(t *testing.T) {
 	t.Run("multiple-type constructor returns multiple objects of same type", func(t *testing.T) {
 		c := digtest.New(t)
