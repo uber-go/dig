@@ -21,7 +21,8 @@
 package dig
 
 // CallbackInfo contains information about a provided function or decorator
-// called by Dig, and is passed to a [Callback] registered with [WithCallback].
+// called by Dig, and is passed to a [Callback] registered with
+// [WithProviderCallback] or [WithDecoratorCallback].
 type CallbackInfo struct {
 
 	// Name is the name of the function in the format:
@@ -29,7 +30,8 @@ type CallbackInfo struct {
 	Name string
 
 	// Error contains the error returned by the [Callback]'s associated
-	// function, if there was one.
+	// function, if any. When used in conjunction with [RecoverFromPanics],
+	// this will be set to a [PanicError] when the function panics.
 	Error error
 }
 
@@ -38,12 +40,11 @@ type CallbackInfo struct {
 // provided function or decorator is run.
 type Callback func(CallbackInfo)
 
-// WithCallback returns an option that can be used with [(*Container).Provide]
-// or [(*Container).Decorate] to have Dig call the passed in [Callback]
-// after the corresponding constructor or decorator finishes running.
+// WithProviderCallback returns a [ProvideOption] which has Dig call
+// the passed in [Callback] after the corresponding constructor finishes running.
 //
-// For example, the following prints a simple message after "myFunc" and
-// "myDecorator" finish running:
+// For example, the following prints a completion message
+// after "myConstructor" finishes, including the error if any:
 //
 //	c := dig.New()
 //	myCallback := func(ci CallbackInfo) {
@@ -53,28 +54,50 @@ type Callback func(CallbackInfo)
 //		}
 //		fmt.Printf("%q finished%v", ci.Name, errorAdd)
 //	}
-//	c.Provide(myFunc, WithCallback(myCallback)),
-//	c.Decorate(myDecorator, WithCallback(myCallback)),
+//	c.Provide(myConstructor, WithProviderCallback(myCallback)),
+//
+// Callbacks can also be specified for Decorators with [WithDecoratorCallback].
 //
 // See [CallbackInfo] for more info on the information passed to the [Callback].
-func WithCallback(callback Callback) ProvideDecorateOption {
+func WithProviderCallback(callback Callback) ProvideOption {
 	return withCallbackOption{
 		callback: callback,
 	}
 }
 
-// ProvideDecorateOption is an option that implements both [ProvideOption]
-// and [DecorateOption].
-type ProvideDecorateOption interface {
-	ProvideOption
-	DecorateOption
+// WithDecoratorCallback returns a [DecorateOption] which has Dig call
+// the passed in [Callback] after the corresponding decorator finishes running.
+//
+// For example, the following prints a completion message
+// after "myDecorator" finishes, including the error if any:
+//
+//	c := dig.New()
+//	myCallback := func(ci CallbackInfo) {
+//		var errorAdd string
+//		if ci.Error != nil {
+//			errorAdd = fmt.Sprintf("with error: %v", ci.Error)
+//		}
+//		fmt.Printf("%q finished%v", ci.Name, errorAdd)
+//	}
+//	c.Decorate(myDecorator, WithDecoratorCallback(myCallback)),
+//
+// Callbacks can also be specified for Constructors with [WithProviderCallback].
+//
+// See [CallbackInfo] for more info on the information passed to the [Callback].
+func WithDecoratorCallback(callback Callback) DecorateOption {
+	return withCallbackOption{
+		callback: callback,
+	}
 }
 
 type withCallbackOption struct {
 	callback Callback
 }
 
-var _ ProvideDecorateOption = withCallbackOption{}
+var (
+	_ ProvideOption  = withCallbackOption{}
+	_ DecorateOption = withCallbackOption{}
+)
 
 func (o withCallbackOption) applyProvideOption(po *provideOptions) {
 	po.Callback = o.callback

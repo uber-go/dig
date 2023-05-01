@@ -1651,7 +1651,7 @@ func TestCallback(t *testing.T) {
 		c := digtest.New(t)
 		c.RequireProvide(
 			giveInt,
-			dig.WithCallback(func(ci dig.CallbackInfo) {
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
 				assert.NoError(t, ci.Error)
 				provideCallbackCalled = true
@@ -1659,7 +1659,7 @@ func TestCallback(t *testing.T) {
 		)
 		c.RequireDecorate(
 			func(a int) int { return a + 5 },
-			dig.WithCallback(func(ci dig.CallbackInfo) {
+			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.2", ci.Name)
 				assert.NoError(t, ci.Error)
 				decorateCallbackCalled = true
@@ -1680,7 +1680,7 @@ func TestCallback(t *testing.T) {
 			func() (int, error) {
 				return 0, errors.New("terrible callback sadness")
 			},
-			dig.WithCallback(func(ci dig.CallbackInfo) {
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func2.1", ci.Name)
 				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
 				called = true
@@ -1700,7 +1700,7 @@ func TestCallback(t *testing.T) {
 			func(a int) (int, error) {
 				return 0, errors.New("terrible callback sadness")
 			},
-			dig.WithCallback(func(ci dig.CallbackInfo) {
+			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func3.1", ci.Name)
 				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
 				called = true
@@ -1717,7 +1717,7 @@ func TestCallback(t *testing.T) {
 		c := digtest.New(t, dig.RecoverFromPanics())
 		c.RequireProvide(
 			func() int { panic("unreal misfortune") },
-			dig.WithCallback(func(ci dig.CallbackInfo) {
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func4.1", ci.Name)
 				var pe dig.PanicError
 				assert.True(t, errors.As(ci.Error, &pe))
@@ -1737,7 +1737,7 @@ func TestCallback(t *testing.T) {
 		c.RequireProvide(giveInt)
 		c.RequireDecorate(
 			func(int) int { panic("unreal misfortune") },
-			dig.WithCallback(func(ci dig.CallbackInfo) {
+			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func5.1", ci.Name)
 				var pe dig.PanicError
 				assert.True(t, errors.As(ci.Error, &pe))
