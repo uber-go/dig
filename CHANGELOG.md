@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Add `FillInvokeInfo` Option and `InvokeInfo` struct to help
   extract the types requested by an `Invoke` statement.
 - To get visibility into constructor and decorator calls, introduce
-  `WithCallback` Option to provide callback functions.
+  `WithProviderCallback` and `WithDecoratorCallback` Options to provide callback functions.
 
 [1.17.0]: https://github.com/uber-go/dig/compare/v1.16.1...v1.17.0
 
