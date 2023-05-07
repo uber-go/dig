@@ -202,10 +202,45 @@ func TestNewResultObject(t *testing.T) {
 					FieldIndices: []int{1},
 					Result:       resultSingle{Name: "", Type: typeOfEmbed},
 				},
+			},
+		},
+		{
+			desc: "anonymous",
+			give: struct {
+				Out
+
+				Embed `extra-anonymous:"true"`
+			}{},
+			wantFields: []resultObjectField{
+				{
+					FieldName:    "Embed",
+					FieldIndices: []int{1},
+					Result:       resultSingle{Name: "", Type: typeOfEmbed},
+				},
 				{
 					FieldName:    "Writer",
 					FieldIndices: []int{1, 0},
 					Result:       resultSingle{Name: "", Type: typeOfWriter},
+				},
+			},
+		},
+		{
+			desc: "anonymous group",
+			give: struct {
+				Out
+
+				Embed `extra-anonymous:"true" group:"embed_group"`
+			}{},
+			wantFields: []resultObjectField{
+				{
+					FieldName:    "Embed",
+					FieldIndices: []int{1},
+					Result:       resultGrouped{Group: "embed_group", Type: typeOfEmbed},
+				},
+				{
+					FieldName:    "Writer",
+					FieldIndices: []int{1, 0},
+					Result:       resultGrouped{Group: "embed_group", Type: typeOfWriter},
 				},
 			},
 		},
