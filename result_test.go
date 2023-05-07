@@ -116,6 +116,11 @@ func TestNewResultErrors(t *testing.T) {
 }
 
 func TestNewResultObject(t *testing.T) {
+	type Embed struct {
+		Writer io.Writer
+	}
+
+	typeOfEmbed := reflect.TypeOf(&Embed{}).Elem()
 	typeOfReader := reflect.TypeOf((*io.Reader)(nil)).Elem()
 	typeOfWriter := reflect.TypeOf((*io.Writer)(nil)).Elem()
 
@@ -137,14 +142,14 @@ func TestNewResultObject(t *testing.T) {
 			}{},
 			wantFields: []resultObjectField{
 				{
-					FieldName:  "Reader",
-					FieldIndex: 1,
-					Result:     resultSingle{Type: typeOfReader},
+					FieldName:    "Reader",
+					FieldIndices: []int{1},
+					Result:       resultSingle{Type: typeOfReader},
 				},
 				{
-					FieldName:  "Writer",
-					FieldIndex: 2,
-					Result:     resultSingle{Type: typeOfWriter},
+					FieldName:    "Writer",
+					FieldIndices: []int{2},
+					Result:       resultSingle{Type: typeOfWriter},
 				},
 			},
 		},
@@ -158,14 +163,14 @@ func TestNewResultObject(t *testing.T) {
 			}{},
 			wantFields: []resultObjectField{
 				{
-					FieldName:  "A",
-					FieldIndex: 1,
-					Result:     resultSingle{Name: "stream-a", Type: typeOfWriter},
+					FieldName:    "A",
+					FieldIndices: []int{1},
+					Result:       resultSingle{Name: "stream-a", Type: typeOfWriter},
 				},
 				{
-					FieldName:  "B",
-					FieldIndex: 2,
-					Result:     resultSingle{Name: "stream-b", Type: typeOfWriter},
+					FieldName:    "B",
+					FieldIndices: []int{2},
+					Result:       resultSingle{Name: "stream-b", Type: typeOfWriter},
 				},
 			},
 		},
@@ -178,9 +183,29 @@ func TestNewResultObject(t *testing.T) {
 			}{},
 			wantFields: []resultObjectField{
 				{
-					FieldName:  "Writer",
-					FieldIndex: 1,
-					Result:     resultGrouped{Group: "writers", Type: typeOfWriter},
+					FieldName:    "Writer",
+					FieldIndices: []int{1},
+					Result:       resultGrouped{Group: "writers", Type: typeOfWriter},
+				},
+			},
+		},
+		{
+			desc: "anonymous",
+			give: struct {
+				Out
+
+				Embed
+			}{},
+			wantFields: []resultObjectField{
+				{
+					FieldName:    "Embed",
+					FieldIndices: []int{1},
+					Result:       resultSingle{Name: "", Type: typeOfEmbed},
+				},
+				{
+					FieldName:    "Writer",
+					FieldIndices: []int{1, 0},
+					Result:       resultSingle{Name: "", Type: typeOfWriter},
 				},
 			},
 		},
@@ -188,7 +213,7 @@ func TestNewResultObject(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			got, err := newResultObject(reflect.TypeOf(tt.give), tt.opts)
+			got, err := newResultObject(reflect.TypeOf(tt.give), tt.opts, false)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantFields, got.Fields)
 		})
@@ -302,7 +327,7 @@ func TestNewResultObjectErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			_, err := newResultObject(reflect.TypeOf(tt.give), tt.opts)
+			_, err := newResultObject(reflect.TypeOf(tt.give), tt.opts, false)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.err)
 		})
@@ -404,7 +429,7 @@ func TestWalkResult(t *testing.T) {
 			}
 		}{})
 
-		ro, err := newResultObject(typ, resultOptions{})
+		ro, err := newResultObject(typ, resultOptions{}, false)
 		require.NoError(t, err)
 
 		v := fakeResultVisits{
