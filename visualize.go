@@ -135,7 +135,13 @@ var _graphTmpl = template.Must(
 // Visualize parses the graph in Container c into DOT format and writes it to
 // io.Writer w.
 func Visualize(c *Container, w io.Writer, opts ...VisualizeOption) error {
-	dg := c.createGraph()
+	return VisualizeScope(c.scope, w, opts...)
+}
+
+// VisualizeScope parses the graph in Scope s into DOT format and writes it to
+// io.Writer w.
+func VisualizeScope(s *Scope, w io.Writer, opts ...VisualizeOption) error {
+	dg := s.createGraph()
 
 	var options visualizeOptions
 	for _, o := range opts {
