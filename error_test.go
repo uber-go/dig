@@ -347,7 +347,7 @@ func TestMissingTypeFormatting(t *testing.T) {
 			wantPlusV: "dig.type1 (did you mean to use one of *dig.type1, or dig.someInterface?)",
 		},
 		{
-			desc: "one suggestion for slices",
+			desc: "one suggestion for a slice of elements",
 			give: missingType{
 				Key: key{t: reflect.TypeOf([]type1{})},
 				suggestions: []key{
@@ -358,7 +358,7 @@ func TestMissingTypeFormatting(t *testing.T) {
 			wantPlusV: "[]dig.type1 (did you mean to use []*dig.type1?)",
 		},
 		{
-			desc: "one suggestion for arrays",
+			desc: "one suggestion for an array of elements",
 			give: missingType{
 				Key: key{t: reflect.TypeOf([4]type1{})},
 				suggestions: []key{
@@ -367,6 +367,28 @@ func TestMissingTypeFormatting(t *testing.T) {
 			},
 			wantV:     "[4]dig.type1 (did you mean [4]*dig.type1?)",
 			wantPlusV: "[4]dig.type1 (did you mean to use [4]*dig.type1?)",
+		},
+		{
+			desc: "one suggestion for a slice of pointers",
+			give: missingType{
+				Key: key{t: reflect.TypeOf([]*type1{})},
+				suggestions: []key{
+					{t: reflect.TypeOf([]type1{})},
+				},
+			},
+			wantV:     "[]*dig.type1 (did you mean []dig.type1?)",
+			wantPlusV: "[]*dig.type1 (did you mean to use []dig.type1?)",
+		},
+		{
+			desc: "one suggestion for an array of pointers",
+			give: missingType{
+				Key: key{t: reflect.TypeOf([4]*type1{})},
+				suggestions: []key{
+					{t: reflect.TypeOf([4]type1{})},
+				},
+			},
+			wantV:     "[4]*dig.type1 (did you mean [4]dig.type1?)",
+			wantPlusV: "[4]*dig.type1 (did you mean to use [4]dig.type1?)",
 		},
 	}
 
