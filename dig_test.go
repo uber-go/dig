@@ -37,6 +37,51 @@ import (
 	"go.uber.org/dig/internal/digtest"
 )
 
+func TestValueGroupValuesGetProperlyDecorated(t *testing.T) {
+	type Foo struct{}
+	type FooResults struct {
+		dig.Out
+
+		Foo Foo `group:"foos"`
+	}
+	type Bar struct{}
+	type UseBarAndFooParams struct {
+		dig.In
+
+		Foos []Foo `group:"foos"`
+		Bar  Bar
+	}
+
+	var FooCtrRun, BarCtrRun bool
+	c := digtest.New(t)
+	c.RequireProvide(func() string { return "base" })
+
+	child := c.Scope("child")
+	child.RequireDecorate(func(s string) string {
+		return s + "-decorated"
+	})
+	child.RequireProvide(func(s string) FooResults {
+		FooCtrRun = true
+		// Previously, this would have just been "base",
+		// because we weren't looking in the constructor's
+		// original scope for decorators to apply
+		// when the value is a value group value.
+		assert.Equal(t, "base-decorated", s)
+		return FooResults{
+			Foo: Foo{},
+		}
+	}, dig.Export(true))
+	child.RequireProvide(func(s string) Bar {
+		BarCtrRun = true
+		assert.Equal(t, "base-decorated", s)
+		return Bar{}
+	}, dig.Export(true))
+	child.RequireInvoke(func(UseBarAndFooParams) {})
+
+	assert.True(t, FooCtrRun)
+	assert.True(t, BarCtrRun)
+}
+
 func TestEndToEndSuccess(t *testing.T) {
 	t.Parallel()
 
