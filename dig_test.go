@@ -3300,6 +3300,11 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 			A `name:"hello"`
 		}
+		type outPointerA struct {
+			dig.Out
+
+			A *A `name:"hello"`
+		}
 
 		cases := []struct {
 			name        string
@@ -3337,6 +3342,190 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 				errContains: []string{
 					`missing type:`,
 					`\*dig_test.A\[name="hello"\] \(did you mean (to use )?dig_test.A\[name="hello"\]\?\)`,
+				},
+			},
+			{
+				name:    "named value missing, pointer present",
+				provide: func() outPointerA { return outPointerA{A: &A{}} },
+				invoke: func(struct {
+					dig.In
+
+					A `name:"hello"`
+				}) {
+				},
+				errContains: []string{
+					`missing type:`,
+					`dig_test.A\[name="hello"\] \(did you mean (to use )?\*dig_test.A\[name="hello"\]\?\)`,
+				},
+			},
+		}
+
+		for _, tc := range cases {
+			c := digtest.New(t, dig.DryRun(dryRun))
+			t.Run(tc.name, func(t *testing.T) {
+				c.RequireProvide(tc.provide)
+
+				err := c.Invoke(tc.invoke)
+				require.Error(t, err)
+
+				lines := append([]string{
+					`dig_test.go:\d+`, // file:line
+				}, tc.errContains...)
+				dig.AssertErrorMatches(t, err,
+					`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
+					lines...)
+			})
+		}
+	})
+
+	t.Run("requesting a slice of values or pointers when the other is present", func(t *testing.T) {
+		type A struct{}
+		type outA struct {
+			dig.Out
+
+			A []A `name:"hello"`
+		}
+		type outPointerA struct {
+			dig.Out
+
+			A []*A `name:"hello"`
+		}
+
+		cases := []struct {
+			name        string
+			provide     interface{}
+			invoke      interface{}
+			errContains []string
+		}{
+			{
+				name:    "value slice missing, pointer slice present",
+				provide: func() []*A { return []*A{{}} },
+				invoke:  func([]A) {},
+				errContains: []string{
+					`missing type:`,
+					`\[\]dig_test.A \(did you mean (to use )?\[\]\*dig_test.A\?\)`,
+				},
+			},
+			{
+				name:    "pointer slice missing, value slice present",
+				provide: func() []A { return []A{{}} },
+				invoke:  func([]*A) {},
+				errContains: []string{
+					`missing type:`,
+					`\[\]\*dig_test.A \(did you mean (to use )?\[\]dig_test.A\?\)`,
+				},
+			},
+			{
+				name:    "named pointer slice missing, value slice present",
+				provide: func() outA { return outA{A: []A{{}}} },
+				invoke: func(struct {
+					dig.In
+
+					A []*A `name:"hello"`
+				}) {
+				},
+				errContains: []string{
+					`missing type:`,
+					`\[\]\*dig_test.A\[name="hello"\] \(did you mean (to use )?\[\]dig_test.A\[name="hello"\]\?\)`,
+				},
+			},
+			{
+				name:    "named value slice missing, pointer slice present",
+				provide: func() outPointerA { return outPointerA{A: []*A{{}}} },
+				invoke: func(struct {
+					dig.In
+
+					A []A `name:"hello"`
+				}) {
+				},
+				errContains: []string{
+					`missing type:`,
+					`\[\]dig_test.A\[name="hello"\] \(did you mean (to use )?\[\]\*dig_test.A\[name="hello"\]\?\)`,
+				},
+			},
+		}
+
+		for _, tc := range cases {
+			c := digtest.New(t, dig.DryRun(dryRun))
+			t.Run(tc.name, func(t *testing.T) {
+				c.RequireProvide(tc.provide)
+
+				err := c.Invoke(tc.invoke)
+				require.Error(t, err)
+
+				lines := append([]string{
+					`dig_test.go:\d+`, // file:line
+				}, tc.errContains...)
+				dig.AssertErrorMatches(t, err,
+					`missing dependencies for function "go.uber.org/dig_test".testInvokeFailures.\S+`,
+					lines...)
+			})
+		}
+	})
+
+	t.Run("requesting an array of values or pointers when the other is present", func(t *testing.T) {
+		type A struct{}
+		type outA struct {
+			dig.Out
+
+			A [7]A `name:"hello"`
+		}
+		type outPointerA struct {
+			dig.Out
+
+			A [7]*A `name:"hello"`
+		}
+
+		cases := []struct {
+			name        string
+			provide     interface{}
+			invoke      interface{}
+			errContains []string
+		}{
+			{
+				name:    "value slice missing, pointer slice present",
+				provide: func() [7]*A { return [7]*A{{}} },
+				invoke:  func([7]A) {},
+				errContains: []string{
+					`missing type:`,
+					`\[7\]dig_test.A \(did you mean (to use )?\[7\]\*dig_test.A\?\)`,
+				},
+			},
+			{
+				name:    "pointer slice missing, value slice present",
+				provide: func() [7]A { return [7]A{{}} },
+				invoke:  func([7]*A) {},
+				errContains: []string{
+					`missing type:`,
+					`\[7\]\*dig_test.A \(did you mean (to use )?\[7\]dig_test.A\?\)`,
+				},
+			},
+			{
+				name:    "named pointer slice missing, value slice present",
+				provide: func() outA { return outA{A: [7]A{{}}} },
+				invoke: func(struct {
+					dig.In
+
+					A [7]*A `name:"hello"`
+				}) {
+				},
+				errContains: []string{
+					`missing type:`,
+					`\[7\]\*dig_test.A\[name="hello"\] \(did you mean (to use )?\[7\]dig_test.A\[name="hello"\]\?\)`,
+				},
+			},
+			{
+				name:    "named value slice missing, pointer slice present",
+				provide: func() outPointerA { return outPointerA{A: [7]*A{{}}} },
+				invoke: func(struct {
+					dig.In
+
+					A [7]A `name:"hello"`
+				}) {
+				},
+				errContains: []string{
+					`missing type:`,
+					`\[7\]dig_test.A\[name="hello"\] \(did you mean (to use )?\[7\]\*dig_test.A\[name="hello"\]\?\)`,
 				},
 			},
 		}
