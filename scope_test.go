@@ -397,3 +397,20 @@ func TestScopeValueGroups(t *testing.T) {
 		child.RequireInvoke(func(T1) {})
 	})
 }
+
+// This tests that a child scope correctly copies its parent's graph,
+// including information about the order of each node.
+// Otherwise, during cycle detection, constructor nodes might
+// return 0 as the order for all functions in the root scope,
+// causing cycle detection to detect cycles that don't exist.
+func TestFalsePositiveScopeCycleDetection(t *testing.T) {
+	t.Run("single provide", func(t *testing.T) {
+		root := digtest.New(t)
+		root.RequireProvide(func(val string) int { return 0 })
+		root.RequireProvide(func() string { return "sample" })
+		child := root.Scope("child")
+		// Cycle detection would error here because previous two provides
+		// would both have order 0 for child scope.
+		child.RequireProvide(func() float32 { return 0 })
+	})
+}
