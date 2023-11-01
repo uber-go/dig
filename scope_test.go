@@ -172,6 +172,21 @@ func TestScopedOperations(t *testing.T) {
 
 		child.RequireInvoke(func(T2) {})
 	})
+
+	t.Run("return existing scope if it already exists", func(t *testing.T) {
+		type A struct{}
+		type B struct{}
+
+		c := digtest.New(t)
+		s := c.Scope("child")
+		s.RequireProvide(func() *A { return &A{} })
+		s.RequireProvide(func() *B { return &B{} })
+
+		// Reuse the existing child scope.
+		s2 := c.Scope("child")
+		s2.RequireInvoke(func(*A) {})
+		s2.RequireInvoke(func(*B) {})
+	})
 }
 
 func TestScopeFailures(t *testing.T) {

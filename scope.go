@@ -107,12 +107,25 @@ func newScope() *Scope {
 	return s
 }
 
-// Scope creates a new Scope with the given name and options from current Scope.
+// Scope creates a new Scope with the given name and options from current Scope,
+// or returns an existing Scope with the same name.
 // Any constructors that the current Scope knows about, as well as any modifications
 // made to it in the future will be propagated to the child scope.
 // However, no modifications made to the child scope being created will be propagated
 // to the parent Scope.
 func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
+	// Check if a child scope with the same name already exists.
+	for _, s := range s.childScopes {
+		if s.name == name {
+			// in future, we may want to allow users to override options
+			for _, opt := range opts {
+				opt.noScopeOption()
+			}
+			return s
+		}
+	}
+
+	// otherwise, create a new child scope.
 	child := newScope()
 	child.name = name
 	child.parentScope = s
