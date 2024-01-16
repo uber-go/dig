@@ -174,11 +174,19 @@ func (c *Container) createGraph() *dot.Graph {
 func (s *Scope) createGraph() *dot.Graph {
 	dg := dot.NewGraph()
 
+	s.addNodes(dg)
+
+	return dg
+}
+
+func (s *Scope) addNodes(dg *dot.Graph) {
 	for _, n := range s.nodes {
 		dg.AddCtor(newDotCtor(n), n.paramList.DotParam(), n.resultList.DotResult())
 	}
 
-	return dg
+	for _, cs := range s.childScopes {
+		cs.addNodes(dg)
+	}
 }
 
 func newDotCtor(n *constructorNode) *dot.Ctor {
