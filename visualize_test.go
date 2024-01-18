@@ -116,7 +116,7 @@ func TestDotGraph(t *testing.T) {
 		assertCtorsEqual(t, expected, dg.Ctors)
 	})
 
-	t.Run("create graph with multple constructors", func(t *testing.T) {
+	t.Run("create graph with multiple constructors", func(t *testing.T) {
 		expected := []*dot.Ctor{
 			{
 				Params:  []*dot.Param{p1},
@@ -136,6 +136,62 @@ func TestDotGraph(t *testing.T) {
 		c.Provide(func(A t1) t2 { return t2{} })
 		c.Provide(func(A t1) t3 { return t3{} })
 		c.Provide(func(A t2) t4 { return t4{} })
+
+		dg := c.CreateGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
+	})
+
+	t.Run("create graph with scope", func(t *testing.T) {
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Param{p1},
+				Results: []*dot.Result{r2},
+			},
+			{
+				Params:  []*dot.Param{p1},
+				Results: []*dot.Result{r3},
+			},
+			{
+				Params:  []*dot.Param{p2},
+				Results: []*dot.Result{r4},
+			},
+		}
+
+		c := digtest.New(t)
+		c.Provide(func(A t1) t2 { return t2{} })
+
+		s := c.Scope("test")
+		s.Provide(func(A t1) t3 { return t3{} })
+		s.Provide(func(A t2) t4 { return t4{} })
+
+		dg := c.CreateGraph()
+		assertCtorsEqual(t, expected, dg.Ctors)
+	})
+
+	t.Run("create graph with child scope", func(t *testing.T) {
+		expected := []*dot.Ctor{
+			{
+				Params:  []*dot.Param{p1},
+				Results: []*dot.Result{r2},
+			},
+			{
+				Params:  []*dot.Param{p1},
+				Results: []*dot.Result{r3},
+			},
+			{
+				Params:  []*dot.Param{p2},
+				Results: []*dot.Result{r4},
+			},
+		}
+
+		c := digtest.New(t)
+		c.Provide(func(A t1) t2 { return t2{} })
+
+		s := c.Scope("parent_scope")
+		s.Provide(func(A t1) t3 { return t3{} })
+
+		cs := s.Scope("child_scope")
+		cs.Provide(func(A t2) t4 { return t4{} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
