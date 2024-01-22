@@ -449,6 +449,8 @@ func assertCtorEqual(t *testing.T, expected *dot.Ctor, ctor *dot.Ctor) {
 }
 
 func assertCtorsEqual(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
+	assert.Len(t, ctors, len(expected))
+
 	for i, c := range ctors {
 		assertCtorEqual(t, expected[i], c)
 	}
