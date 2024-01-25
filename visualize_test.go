@@ -30,6 +30,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/dig"
 	"go.uber.org/dig/internal/digtest"
 	"go.uber.org/dig/internal/dot"
@@ -449,7 +450,7 @@ func assertCtorEqual(t *testing.T, expected *dot.Ctor, ctor *dot.Ctor) {
 }
 
 func assertCtorsEqual(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
-	assert.Len(t, ctors, len(expected))
+	require.Len(t, ctors, len(expected))
 
 	for i, c := range ctors {
 		assertCtorEqual(t, expected[i], c)
