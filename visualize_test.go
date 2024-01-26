@@ -30,6 +30,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/dig"
 	"go.uber.org/dig/internal/digtest"
 	"go.uber.org/dig/internal/dot"
@@ -62,13 +63,14 @@ func TestDotGraph(t *testing.T) {
 	type t2 struct{}
 	type t3 struct{}
 	type t4 struct{}
-	type t5 strings.Reader
+	type t5 struct {
+		strings.Reader
+	}
 
 	type1 := reflect.TypeOf(t1{})
 	type2 := reflect.TypeOf(t2{})
 	type3 := reflect.TypeOf(t3{})
 	type4 := reflect.TypeOf(t4{})
-	type5 := reflect.TypeOf(t5{})
 	type6 := reflect.Indirect(reflect.ValueOf(new(io.Reader))).Type()
 	type7 := reflect.Indirect(reflect.ValueOf(new(io.Writer))).Type()
 
@@ -81,7 +83,6 @@ func TestDotGraph(t *testing.T) {
 	r2 := tresult(type2, "", "", 0)
 	r3 := tresult(type3, "", "", 0)
 	r4 := tresult(type4, "", "", 0)
-	r5 := tresult(type5, "", "", 0)
 	r6 := tresult(type6, "", "", 0)
 
 	t.Parallel()
@@ -95,7 +96,7 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(A t1) t2 { return t2{} })
+		c.RequireProvide(func(A t1) t2 { return t2{} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -105,12 +106,12 @@ func TestDotGraph(t *testing.T) {
 		expected := []*dot.Ctor{
 			{
 				Params:  []*dot.Param{p1},
-				Results: []*dot.Result{r5, r6},
+				Results: []*dot.Result{r6},
 			},
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(A t1) t5 { return t5{} }, dig.As(new(io.Reader)))
+		c.RequireProvide(func(A t1) *t5 { return &t5{} }, dig.As(new(io.Reader)))
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -133,9 +134,9 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(A t1) t2 { return t2{} })
-		c.Provide(func(A t1) t3 { return t3{} })
-		c.Provide(func(A t2) t4 { return t4{} })
+		c.RequireProvide(func(A t1) t2 { return t2{} })
+		c.RequireProvide(func(A t1) t3 { return t3{} })
+		c.RequireProvide(func(A t2) t4 { return t4{} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -158,7 +159,7 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(A t1) t2 { return t2{} })
+		c.RequireProvide(func(A t1) t2 { return t2{} })
 
 		s := c.Scope("test")
 		s.Provide(func(A t1) t3 { return t3{} })
@@ -185,7 +186,7 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(A t1) t2 { return t2{} })
+		c.RequireProvide(func(A t1) t2 { return t2{} })
 
 		s := c.Scope("parent_scope")
 		s.Provide(func(A t1) t3 { return t3{} })
@@ -206,7 +207,7 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(A t3, B t4) (t1, t2) { return t1{}, t2{} })
+		c.RequireProvide(func(A t3, B t4) (t1, t2) { return t1{}, t2{} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -235,7 +236,7 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(i in) out { return out{} })
+		c.RequireProvide(func(i in) out { return out{} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -266,7 +267,7 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(p in) t4 { return t4{} })
+		c.RequireProvide(func(p in) t4 { return t4{} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -301,7 +302,7 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(A t1) out { return out{} })
+		c.RequireProvide(func(A t1) out { return out{} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -351,9 +352,9 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(B t2) out1 { return out1{} })
-		c.Provide(func(B t4) out2 { return out2{} })
-		c.Provide(func(i in) t3 { return t3{} })
+		c.RequireProvide(func(B t2) out1 { return out1{} })
+		c.RequireProvide(func(B t4) out2 { return out2{} })
+		c.RequireProvide(func(i in) t3 { return t3{} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -361,12 +362,12 @@ func TestDotGraph(t *testing.T) {
 
 	t.Run("value groups as", func(t *testing.T) {
 		c := digtest.New(t)
-		c.Provide(
+		c.RequireProvide(
 			func() *bytes.Buffer { return bytes.NewBufferString("foo") },
 			dig.As(new(io.Reader), new(io.Writer)),
 			dig.Group("buffs"),
 		)
-		c.Provide(
+		c.RequireProvide(
 			func() *bytes.Buffer { return bytes.NewBufferString("bar") },
 			dig.As(new(io.Reader), new(io.Writer)),
 			dig.Group("buffs"),
@@ -408,7 +409,7 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(i in) out { return out{B: t2{}} })
+		c.RequireProvide(func(i in) out { return out{B: t2{}} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -435,7 +436,7 @@ func TestDotGraph(t *testing.T) {
 		}
 
 		c := digtest.New(t)
-		c.Provide(func(i in) t4 { return t4{} })
+		c.RequireProvide(func(i in) t4 { return t4{} })
 
 		dg := c.CreateGraph()
 		assertCtorsEqual(t, expected, dg.Ctors)
@@ -449,6 +450,7 @@ func assertCtorEqual(t *testing.T, expected *dot.Ctor, ctor *dot.Ctor) {
 }
 
 func assertCtorsEqual(t *testing.T, expected []*dot.Ctor, ctors []*dot.Ctor) {
+	require.Equal(t, len(expected), len(ctors))
 	for i, c := range ctors {
 		assertCtorEqual(t, expected[i], c)
 	}
@@ -470,8 +472,8 @@ func TestVisualize(t *testing.T) {
 	t.Run("simple graph", func(t *testing.T) {
 		c := digtest.New(t)
 
-		c.Provide(func() (t1, t2) { return t1{}, t2{} })
-		c.Provide(func(A t1, B t2) (t3, t4) { return t3{}, t4{} })
+		c.RequireProvide(func() (t1, t2) { return t1{}, t2{} })
+		c.RequireProvide(func(A t1, B t2) (t3, t4) { return t3{}, t4{} })
 		dig.VerifyVisualization(t, "simple", c.Container)
 	})
 
@@ -495,8 +497,8 @@ func TestVisualize(t *testing.T) {
 			A t3 `name:"foo"`
 		}
 
-		c.Provide(func(in) out1 { return out1{} })
-		c.Provide(func() out2 { return out2{} })
+		c.RequireProvide(func(in) out1 { return out1{} })
+		c.RequireProvide(func() out2 { return out2{} })
 		dig.VerifyVisualization(t, "named", c.Container)
 	})
 
@@ -521,8 +523,8 @@ func TestVisualize(t *testing.T) {
 			A t1 `optional:"true"`
 		}
 
-		c.Provide(func() t1 { return t1{} })
-		c.Provide(func(in) t2 { return t2{} })
+		c.RequireProvide(func() t1 { return t1{} })
+		c.RequireProvide(func(in) t2 { return t2{} })
 		dig.VerifyVisualization(t, "optional", c.Container)
 	})
 
@@ -547,9 +549,9 @@ func TestVisualize(t *testing.T) {
 			A t3 `group:"foo"`
 		}
 
-		c.Provide(func() out1 { return out1{} })
-		c.Provide(func() out2 { return out2{} })
-		c.Provide(func(in) t2 { return t2{} })
+		c.RequireProvide(func() out1 { return out1{} })
+		c.RequireProvide(func() out2 { return out2{} })
+		c.RequireProvide(func(in) t2 { return t2{} })
 
 		dig.VerifyVisualization(t, "grouped", c.Container)
 	})
@@ -590,10 +592,10 @@ func TestVisualize(t *testing.T) {
 			B t2 `group:"g2"`
 		}
 
-		c.Provide(func(in1) out1 { return out1{} })
-		c.Provide(func(in2) t4 { return t4{} })
-		c.Provide(func() out2 { return out2{} })
-		c.Provide(func() (out3, error) { return out3{}, errors.New("great sadness") })
+		c.RequireProvide(func(in1) out1 { return out1{} })
+		c.RequireProvide(func(in2) t4 { return t4{} })
+		c.RequireProvide(func() out2 { return out2{} })
+		c.RequireProvide(func() (out3, error) { return out3{}, errors.New("great sadness") })
 		err := c.Invoke(func(t4 t4) {})
 
 		dig.VerifyVisualization(t, "error", c.Container, dig.VisualizeError(err))
@@ -601,10 +603,10 @@ func TestVisualize(t *testing.T) {
 		t.Run("non-failing graph nodes are pruned", func(t *testing.T) {
 			t.Run("prune non-failing constructor result", func(t *testing.T) {
 				c := digtest.New(t)
-				c.Provide(func(in1) out1 { return out1{} })
-				c.Provide(func(in2) t4 { return t4{} })
-				c.Provide(func() (out2, error) { return out2{}, errors.New("great sadness") })
-				c.Provide(func() out3 { return out3{} })
+				c.RequireProvide(func(in1) out1 { return out1{} })
+				c.RequireProvide(func(in2) t4 { return t4{} })
+				c.RequireProvide(func() (out2, error) { return out2{}, errors.New("great sadness") })
+				c.RequireProvide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) {})
 
 				dig.VerifyVisualization(t, "prune_constructor_result", c.Container, dig.VisualizeError(err))
@@ -612,10 +614,10 @@ func TestVisualize(t *testing.T) {
 
 			t.Run("if only the root node fails all node except for the root should be pruned", func(t *testing.T) {
 				c := digtest.New(t)
-				c.Provide(func(in1) out1 { return out1{} })
-				c.Provide(func(in2) (t4, error) { return t4{}, errors.New("great sadness") })
-				c.Provide(func() out2 { return out2{} })
-				c.Provide(func() out3 { return out3{} })
+				c.RequireProvide(func(in1) out1 { return out1{} })
+				c.RequireProvide(func(in2) (t4, error) { return t4{}, errors.New("great sadness") })
+				c.RequireProvide(func() out2 { return out2{} })
+				c.RequireProvide(func() out3 { return out3{} })
 				err := c.Invoke(func(t4 t4) {})
 
 				dig.VerifyVisualization(t, "prune_non_root_nodes", c.Container, dig.VisualizeError(err))
@@ -626,7 +628,7 @@ func TestVisualize(t *testing.T) {
 	t.Run("missing types", func(t *testing.T) {
 		c := digtest.New(t)
 
-		c.Provide(func(A t1, B t2, C t3) t4 { return t4{} })
+		c.RequireProvide(func(A t1, B t2, C t3) t4 { return t4{} })
 		err := c.Invoke(func(t4 t4) {})
 
 		dig.VerifyVisualization(t, "missing", c.Container, dig.VisualizeError(err))
