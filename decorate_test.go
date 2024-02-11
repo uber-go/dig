@@ -50,7 +50,7 @@ func (i *someInt) String() string {
 }
 
 func (i *someInt) Increment() {
-	*i += 1
+	*i++
 }
 
 func TestDecorateSuccess(t *testing.T) {

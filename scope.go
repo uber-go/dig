@@ -32,7 +32,7 @@ import (
 // A ScopeOption modifies the default behavior of Scope; currently,
 // there are no implementations.
 type ScopeOption interface {
-	noScopeOption() //yet
+	noScopeOption() // yet
 }
 
 // Scope is a scoped DAG of types and their dependencies.

@@ -22,9 +22,10 @@ package dig
 
 import (
 	"fmt"
+	"reflect"
+
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/graph"
-	"reflect"
 )
 
 // An InvokeOption modifies the default behavior of Invoke.

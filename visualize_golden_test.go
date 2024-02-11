@@ -40,7 +40,7 @@ func VerifyVisualization(t *testing.T, testname string, c *Container, opts ...Vi
 	dotFile := filepath.Join("testdata", testname+".dot")
 
 	if *generate {
-		err := os.WriteFile(dotFile, b.Bytes(), 0644)
+		err := os.WriteFile(dotFile, b.Bytes(), 0o644)
 		require.NoError(t, err)
 		return
 	}

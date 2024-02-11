@@ -217,7 +217,6 @@ func (e MyNonDigError) Error() string {
 }
 
 func TestRootCauseEndToEnd(t *testing.T) {
-
 	tests := []struct {
 		desc                    string
 		setup                   func(c *Container)

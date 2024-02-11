@@ -68,7 +68,6 @@ func TestParamObjectSuccess(t *testing.T) {
 		require.True(t, ok, "T1 must be a paramSingle")
 		assert.Empty(t, t1.Name)
 		assert.False(t, t1.Optional)
-
 	})
 
 	t.Run("optional field", func(t *testing.T) {
@@ -78,7 +77,6 @@ func TestParamObjectSuccess(t *testing.T) {
 		require.True(t, ok, "T2 must be a paramSingle")
 		assert.Empty(t, t2.Name)
 		assert.True(t, t2.Optional)
-
 	})
 
 	t.Run("named value", func(t *testing.T) {
