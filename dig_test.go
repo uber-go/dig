@@ -1676,7 +1676,7 @@ func TestRecoverFromPanic(t *testing.T) {
 				dig.AssertErrorMatches(t, err, tt.wantErr[0], tt.wantErr[1:]...)
 				var pe dig.PanicError
 				assert.True(t, errors.As(err, &pe), "expected error chain to contain a PanicError")
-				_, ok := dig.RootCause(err).(dig.PanicError)
+				_, ok := dig.RootCause(err).(dig.PanicError) //nolint:errorlint // want dig.PanicError
 				assert.True(t, ok, "expected root cause to be a PanicError")
 			})
 		})
@@ -1686,7 +1686,6 @@ func TestRecoverFromPanic(t *testing.T) {
 func giveInt() int { return 5 }
 
 func TestCallback(t *testing.T) {
-
 	t.Run("no errors", func(t *testing.T) {
 		var (
 			provideCallbackCalled  bool

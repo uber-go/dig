@@ -21,6 +21,7 @@
 package dig
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -291,7 +292,7 @@ func (ps paramSingle) Build(c containerStore) (reflect.Value, error) {
 
 		// If we're missing dependencies but the parameter itself is optional,
 		// we can just move on.
-		if _, ok := err.(errMissingDependencies); ok && ps.Optional {
+		if errors.As(err, new(errMissingDependencies)) && ps.Optional {
 			return reflect.Zero(ps.Type), nil
 		}
 

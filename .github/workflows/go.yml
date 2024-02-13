@@ -14,36 +14,22 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    name: Test (Go ${{ matrix.go }})
     strategy:
       matrix:
         go: ["1.20.x", "1.21.x"]
-        include:
-        - go: 1.21.x
-          latest: true
 
     steps:
     - name: Setup Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go }}
 
     - name: Checkout code
-      uses: actions/checkout@v2
-
-    - name: Load cached dependencies
-      uses: actions/cache@v1
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+      uses: actions/checkout@v4
 
     - name: Download Dependencies
-      run: make install
-
-    - name: Lint
-      if: matrix.latest
-      run: make lint
+      run: go mod download
 
     - name: Test
       run: make cover
@@ -51,5 +37,25 @@ jobs:
     - name: Upload coverage to codecov.io
       uses: codecov/codecov-action@v1
 
-    - name: Benchmark
-      run: make bench
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.21.x
+        cache: false  # managed by golangci-lint
+
+    - uses: golangci/golangci-lint-action@v3
+      name: Install golangci-lint
+      with:
+        version: latest
+        args: --version  # make lint will run the linter
+
+    - run: make lint
+      name: Lint

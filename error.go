@@ -84,7 +84,6 @@ type digError interface {
 //		// This is an error
 //	}
 type PanicError struct {
-
 	// The function the panic occurred at
 	fn *digreflect.Func
 
@@ -473,7 +472,6 @@ func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 func (e errMissingTypes) Error() string { return fmt.Sprint(e) }
 
 func (e errMissingTypes) writeMessage(w io.Writer, v string) {
-
 	multiline := v == "%+v"
 
 	if len(e) == 1 {

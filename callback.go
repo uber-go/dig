@@ -24,7 +24,6 @@ package dig
 // called by Dig, and is passed to a [Callback] registered with
 // [WithProviderCallback] or [WithDecoratorCallback].
 type CallbackInfo struct {
-
 	// Name is the name of the function in the format:
 	// <package_name>.<function_name>
 	Name string

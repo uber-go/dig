@@ -27,9 +27,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type t1 struct{}
-type t2 struct{}
-type t3 struct{}
+type (
+	t1 struct{}
+	t2 struct{}
+	t3 struct{}
+)
 
 func TestNewGroup(t *testing.T) {
 	type1 := reflect.TypeOf(t1{})
