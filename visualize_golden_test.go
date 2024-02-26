@@ -36,20 +36,21 @@ var generate = flag.Bool("generate", false, "generates output to testdata/ if se
 func VerifyVisualization(t *testing.T, testname string, c *Container, opts ...VisualizeOption) {
 	var b bytes.Buffer
 	require.NoError(t, Visualize(c, &b, opts...))
+	got := b.Bytes()
+	got = bytes.ReplaceAll(got, []byte("\r\n"), []byte("\n")) // normalize line endings
 
 	dotFile := filepath.Join("testdata", testname+".dot")
 
 	if *generate {
-		err := os.WriteFile(dotFile, b.Bytes(), 0o644)
+		err := os.WriteFile(dotFile, got, 0o644)
 		require.NoError(t, err)
 		return
 	}
 
-	wantBytes, err := os.ReadFile(dotFile)
+	want, err := os.ReadFile(dotFile)
 	require.NoError(t, err)
+	want = bytes.ReplaceAll(want, []byte("\r\n"), []byte("\n")) // normalize line endings
 
-	got := b.String()
-	want := string(wantBytes)
-	assert.Equal(t, want, got,
+	assert.Equal(t, string(want), string(got),
 		"Output did not match. Make sure you updated the testdata by running 'go test -generate'")
 }
