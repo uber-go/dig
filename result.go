@@ -23,9 +23,14 @@ package dig
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"go.uber.org/dig/internal/digerror"
 	"go.uber.org/dig/internal/dot"
+)
+
+const (
+	_extraAnonymous = "extra-anonymous"
 )
 
 // The result interface represents a result produced by a constructor.
@@ -74,7 +79,7 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 	case isError(t):
 		return nil, newErrInvalidInput("cannot return an error here, return it from the constructor instead", nil)
 	case IsOut(t):
-		return newResultObject(t, opts)
+		return newResultObject(t, opts, false)
 	case embedsType(t, _outPtrType):
 		return nil, newErrInvalidInput(fmt.Sprintf(
 			"cannot build a result object by embedding *dig.Out, embed dig.Out instead: %v embeds *dig.Out", t), nil)
@@ -353,7 +358,7 @@ func (ro resultObject) DotResult() []*dot.Result {
 	return types
 }
 
-func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
+func newResultObject(t reflect.Type, opts resultOptions, anonymous bool) (resultObject, error) {
 	ro := resultObject{Type: t}
 	if len(opts.Name) > 0 {
 		return ro, newErrInvalidInput(fmt.Sprintf(
@@ -372,19 +377,66 @@ func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 			continue
 		}
 
+		if anonymous && !f.IsExported() {
+			continue
+		}
+
 		rof, err := newResultObjectField(i, f, opts)
 		if err != nil {
 			return ro, newErrInvalidInput(fmt.Sprintf("bad field %q of %v", f.Name, t), err)
 		}
 
 		ro.Fields = append(ro.Fields, rof)
+
+		if !f.Anonymous || f.Tag.Get(_extraAnonymous) != "true" {
+			continue
+		}
+		if err = extraAnonymous(&ro, &f, &rof, opts); err != nil {
+			return ro, err
+		}
 	}
 	return ro, nil
 }
 
+func extraAnonymous(ro *resultObject, f *reflect.StructField, rof *resultObjectField, opts resultOptions) error {
+	ft := f.Type
+	if ft.Kind() == reflect.Pointer {
+		ft = ft.Elem()
+	}
+	subRo, err := newResultObject(ft, opts, true)
+	if err != nil {
+		return err
+	}
+
+	for _, subField := range subRo.Fields {
+		subField.FieldIndices = append(rof.FieldIndices, subField.FieldIndices...)
+		switch rofResult := rof.Result.(type) {
+		case resultGrouped:
+			switch subResult := subField.Result.(type) {
+			case resultGrouped:
+				subResult.Group = strings.Join([]string{rofResult.Group, subResult.Group}, ",")
+			case resultSingle:
+				subField.Result = resultGrouped{
+					Group:   rofResult.Group,
+					Flatten: rofResult.Flatten,
+					Type:    subResult.Type,
+				}
+			}
+		}
+
+		ro.Fields = append(ro.Fields, subField)
+	}
+
+	return nil
+}
+
 func (ro resultObject) Extract(cw containerWriter, decorated bool, v reflect.Value) {
 	for _, f := range ro.Fields {
-		f.Result.Extract(cw, decorated, v.Field(f.FieldIndex))
+		var rv reflect.Value = v
+		for _, fieldIndex := range f.FieldIndices {
+			rv = rv.Field(fieldIndex)
+		}
+		f.Result.Extract(cw, decorated, rv)
 	}
 }
 
@@ -397,7 +449,7 @@ type resultObjectField struct {
 	//
 	// We need to track this separately because not all fields of the struct
 	// map to results.
-	FieldIndex int
+	FieldIndices []int
 
 	// Result produced by this field.
 	Result result
@@ -411,8 +463,8 @@ func (rof resultObjectField) DotResult() []*dot.Result {
 // f at index i.
 func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (resultObjectField, error) {
 	rof := resultObjectField{
-		FieldName:  f.Name,
-		FieldIndex: idx,
+		FieldName:    f.Name,
+		FieldIndices: []int{idx},
 	}
 
 	var r result
