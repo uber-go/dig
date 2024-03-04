@@ -231,6 +231,50 @@ func (o dryRunOption) applyOption(c *Container) {
 	}
 }
 
+// ProvidedInfo contains information on a constructed value
+// and is passed to a [ProvidedCallback] registered with
+// [WithProvidedCallback].
+type ProvidedInfo struct {
+	// Name is the name of the constructed value set with [Name]
+	// or the name of the group set with [Group].
+	Name string
+
+	// Type is the type of the constructed value.
+	Type reflect.Type
+
+	// Value is the concrete value that was constructed.
+	Value reflect.Value
+}
+
+// ProvidedCallback is a function that can be registered
+// on the container with [WithProvidedCallback],
+// and will be called every time a new value is constructed.
+type ProvidedCallback func(ProvidedInfo)
+
+// WithProvidedCallback returns an [Option] which has Dig call
+// the passed in [ProvidedCallback] each time a new value
+// is constructed.
+//
+// See [ProvidedInfo] for more info on the information passed
+// to the [ProvidedCallback].
+func WithProvidedCallback(callback ProvidedCallback) Option {
+	return withProvidedCallback{
+		callback: callback,
+	}
+}
+
+type withProvidedCallback struct {
+	callback ProvidedCallback
+}
+
+func (withProvidedCallback) String() string {
+	return "WithProvidedCallback()"
+}
+
+func (o withProvidedCallback) applyOption(c *Container) {
+	c.scope.callback = o.callback
+}
+
 // invokerFn specifies how the container calls user-supplied functions.
 type invokerFn func(fn reflect.Value, args []reflect.Value) (results []reflect.Value)
 

@@ -192,6 +192,27 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 	// the rest of the graph to instantiate the dependencies of this
 	// container.
 	receiver.Commit(n.s)
+
+	if n.s.callback != nil {
+		for k, v := range receiver.values {
+			n.s.callback(ProvidedInfo{
+				Name:  k.name,
+				Type:  k.t,
+				Value: v,
+			})
+		}
+
+		for k, vs := range receiver.groups {
+			for _, v := range vs {
+				n.s.callback(ProvidedInfo{
+					Name:  k.group,
+					Type:  k.t,
+					Value: v,
+				})
+			}
+		}
+	}
+
 	n.called = true
 	return nil
 }

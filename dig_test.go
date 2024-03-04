@@ -1685,6 +1685,137 @@ func TestRecoverFromPanic(t *testing.T) {
 
 func giveInt() int { return 5 }
 
+type providedInterface interface {
+	Start()
+}
+
+type providedStruct struct{}
+
+func (providedStruct) Start() {}
+
+func TestProvidedCallback(t *testing.T) {
+	t.Run("works with primitives", func(t *testing.T) {
+		var providedCallbackCalled bool
+
+		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
+			assert.Equal(t, "", pi.Name)
+			assert.Equal(t, reflect.TypeOf(5), pi.Type)
+			assert.True(t, pi.Value.CanInt())
+			assert.EqualValues(t, 5, pi.Value.Int())
+			providedCallbackCalled = true
+		}))
+
+		c.RequireProvide(giveInt)
+
+		c.RequireInvoke(func(a int) {
+			assert.Equal(t, 5, a)
+		})
+
+		assert.True(t, providedCallbackCalled)
+	})
+
+	t.Run("works with named values", func(t *testing.T) {
+		var providedCallbackCalled bool
+
+		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
+			assert.Equal(t, "test", pi.Name)
+			assert.Equal(t, reflect.TypeOf(5), pi.Type)
+			assert.True(t, pi.Value.CanInt())
+			assert.EqualValues(t, 5, pi.Value.Int())
+			providedCallbackCalled = true
+		}))
+
+		c.RequireProvide(giveInt, dig.Name("test"))
+
+		type params struct {
+			dig.In
+
+			Value int `name:"test"`
+		}
+
+		c.RequireInvoke(func(a params) {
+			assert.Equal(t, 5, a.Value)
+		})
+
+		assert.True(t, providedCallbackCalled)
+	})
+
+	t.Run("works with scopes", func(t *testing.T) {
+		var providedCallbackCalled bool
+
+		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
+			assert.Equal(t, "", pi.Name)
+			assert.Equal(t, reflect.TypeOf(5), pi.Type)
+			assert.True(t, pi.Value.CanInt())
+			assert.EqualValues(t, 5, pi.Value.Int())
+			providedCallbackCalled = true
+		}))
+
+		s := c.Scope("test")
+
+		s.RequireProvide(giveInt)
+
+		s.RequireInvoke(func(a int) {
+			assert.Equal(t, 5, a)
+		})
+
+		assert.True(t, providedCallbackCalled)
+	})
+
+	t.Run("works with value groups", func(t *testing.T) {
+		var providedCallbackCalledTimes int
+
+		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
+			assert.Equal(t, "test", pi.Name)
+			assert.Equal(t, reflect.TypeOf(5), pi.Type)
+			assert.True(t, pi.Value.CanInt())
+			assert.True(t, pi.Value.Int() == 5 || pi.Value.Int() == 6)
+			providedCallbackCalledTimes++
+		}))
+
+		c.RequireProvide(giveInt, dig.Group("test"))
+		c.RequireProvide(func() int { return 6 }, dig.Group("test"))
+
+		type params struct {
+			dig.In
+
+			Value []int `group:"test"`
+		}
+
+		c.RequireInvoke(func(a params) {
+			assert.ElementsMatch(t, []int{5, 6}, a.Value)
+		})
+
+		assert.Equal(t, 2, providedCallbackCalledTimes)
+	})
+
+	t.Run("works with interfaces", func(t *testing.T) {
+		var providedCallbackCalled bool
+
+		var gave providedInterface
+
+		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
+			assert.Equal(t, "", pi.Name)
+			assert.Equal(t, reflect.TypeOf(&gave).Elem(), pi.Type)
+			assert.True(t, pi.Value.CanInterface())
+			_, ok := pi.Value.Interface().(providedInterface)
+			assert.True(t, ok)
+			providedCallbackCalled = true
+		}))
+
+		c.RequireProvide(func() providedInterface {
+			gave = &providedStruct{}
+			return gave
+		})
+
+		c.RequireInvoke(func(got providedInterface) {
+			assert.Equal(t, gave, got)
+		})
+
+		assert.True(t, providedCallbackCalled)
+	})
+}
+
 func TestCallback(t *testing.T) {
 	t.Run("no errors", func(t *testing.T) {
 		var (
