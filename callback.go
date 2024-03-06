@@ -35,7 +35,8 @@ type CallbackInfo struct {
 	// this will be set to a [PanicError] when the function panics.
 	Error error
 
-	// TODO
+	// Values contains all values constructed by the [Callback]'s
+	// associated function.
 	Values []reflect.Value
 }
 
