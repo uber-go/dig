@@ -259,6 +259,16 @@ func (rl resultList) ExtractList(cw containerWriter, decorated bool, values []re
 	return nil
 }
 
+func (rl resultList) GetValues(values []reflect.Value) []reflect.Value {
+	result := make([]reflect.Value, 0)
+	for i, v := range values {
+		if resultIdx := rl.resultIndexes[i]; resultIdx >= 0 {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
 // resultSingle is an explicit value produced by a constructor, optionally
 // with a name.
 //

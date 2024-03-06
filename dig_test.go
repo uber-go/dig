@@ -1695,14 +1695,15 @@ func (providedStruct) Start() {}
 
 func TestProvidedCallback(t *testing.T) {
 	t.Run("works with primitives", func(t *testing.T) {
-		var providedCallbackCalled bool
+		var containerCallbackCalled bool
 
-		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
-			assert.Equal(t, "", pi.Name)
-			assert.Equal(t, reflect.TypeOf(5), pi.Type)
-			assert.True(t, pi.Value.CanInt())
-			assert.EqualValues(t, 5, pi.Value.Int())
-			providedCallbackCalled = true
+		c := digtest.New(t, dig.WithContainerCallback(func(ci dig.CallbackInfo) {
+			assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 1)
+			assert.True(t, ci.Values[0].CanInt())
+			assert.EqualValues(t, 5, ci.Values[0].Int())
+			containerCallbackCalled = true
 		}))
 
 		c.RequireProvide(giveInt)
@@ -1711,44 +1712,19 @@ func TestProvidedCallback(t *testing.T) {
 			assert.Equal(t, 5, a)
 		})
 
-		assert.True(t, providedCallbackCalled)
-	})
-
-	t.Run("works with named values", func(t *testing.T) {
-		var providedCallbackCalled bool
-
-		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
-			assert.Equal(t, "test", pi.Name)
-			assert.Equal(t, reflect.TypeOf(5), pi.Type)
-			assert.True(t, pi.Value.CanInt())
-			assert.EqualValues(t, 5, pi.Value.Int())
-			providedCallbackCalled = true
-		}))
-
-		c.RequireProvide(giveInt, dig.Name("test"))
-
-		type params struct {
-			dig.In
-
-			Value int `name:"test"`
-		}
-
-		c.RequireInvoke(func(a params) {
-			assert.Equal(t, 5, a.Value)
-		})
-
-		assert.True(t, providedCallbackCalled)
+		assert.True(t, containerCallbackCalled)
 	})
 
 	t.Run("works with scopes", func(t *testing.T) {
-		var providedCallbackCalled bool
+		var containerCallbackCalled bool
 
-		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
-			assert.Equal(t, "", pi.Name)
-			assert.Equal(t, reflect.TypeOf(5), pi.Type)
-			assert.True(t, pi.Value.CanInt())
-			assert.EqualValues(t, 5, pi.Value.Int())
-			providedCallbackCalled = true
+		c := digtest.New(t, dig.WithContainerCallback(func(ci dig.CallbackInfo) {
+			assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 1)
+			assert.True(t, ci.Values[0].CanInt())
+			assert.EqualValues(t, 5, ci.Values[0].Int())
+			containerCallbackCalled = true
 		}))
 
 		s := c.Scope("test")
@@ -1759,18 +1735,19 @@ func TestProvidedCallback(t *testing.T) {
 			assert.Equal(t, 5, a)
 		})
 
-		assert.True(t, providedCallbackCalled)
+		assert.True(t, containerCallbackCalled)
 	})
 
 	t.Run("works with value groups", func(t *testing.T) {
-		var providedCallbackCalledTimes int
+		var containerCallbackCalledTimes int
 
-		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
-			assert.Equal(t, "test", pi.Name)
-			assert.Equal(t, reflect.TypeOf(5), pi.Type)
-			assert.True(t, pi.Value.CanInt())
-			assert.True(t, pi.Value.Int() == 5 || pi.Value.Int() == 6)
-			providedCallbackCalledTimes++
+		c := digtest.New(t, dig.WithContainerCallback(func(ci dig.CallbackInfo) {
+			assert.NotEmpty(t, ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 1)
+			assert.True(t, ci.Values[0].CanInt())
+			assert.True(t, ci.Values[0].Int() == 5 || ci.Values[0].Int() == 6)
+			containerCallbackCalledTimes++
 		}))
 
 		c.RequireProvide(giveInt, dig.Group("test"))
@@ -1786,21 +1763,22 @@ func TestProvidedCallback(t *testing.T) {
 			assert.ElementsMatch(t, []int{5, 6}, a.Value)
 		})
 
-		assert.Equal(t, 2, providedCallbackCalledTimes)
+		assert.Equal(t, 2, containerCallbackCalledTimes)
 	})
 
 	t.Run("works with interfaces", func(t *testing.T) {
-		var providedCallbackCalled bool
+		var containerCallbackCalled bool
 
 		var gave providedInterface
 
-		c := digtest.New(t, dig.WithProvidedCallback(func(pi dig.ProvidedInfo) {
-			assert.Equal(t, "", pi.Name)
-			assert.Equal(t, reflect.TypeOf(&gave).Elem(), pi.Type)
-			assert.True(t, pi.Value.CanInterface())
-			_, ok := pi.Value.Interface().(providedInterface)
+		c := digtest.New(t, dig.WithContainerCallback(func(ci dig.CallbackInfo) {
+			assert.NotEmpty(t, ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 1)
+			assert.True(t, ci.Values[0].CanInterface())
+			_, ok := ci.Values[0].Interface().(providedInterface)
 			assert.True(t, ok)
-			providedCallbackCalled = true
+			containerCallbackCalled = true
 		}))
 
 		c.RequireProvide(func() providedInterface {
@@ -1812,31 +1790,129 @@ func TestProvidedCallback(t *testing.T) {
 			assert.Equal(t, gave, got)
 		})
 
-		assert.True(t, providedCallbackCalled)
+		assert.True(t, containerCallbackCalled)
+	})
+
+	t.Run("works with provider returning multiple values", func(t *testing.T) {
+		var containerCallbackCalled bool
+
+		c := digtest.New(t, dig.WithContainerCallback(func(ci dig.CallbackInfo) {
+			assert.NotEmpty(t, ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 2)
+			assert.EqualValues(t, "five", ci.Values[0].String())
+			assert.EqualValues(t, 5, ci.Values[1].Int())
+			containerCallbackCalled = true
+		}))
+
+		c.RequireProvide(func() (string, int) {
+			return "five", 5
+		})
+
+		c.RequireInvoke(func(s string, i int) {
+			assert.Equal(t, "five", s)
+			assert.Equal(t, 5, i)
+		})
+
+		assert.True(t, containerCallbackCalled)
+	})
+
+	t.Run("does not receive error with providers that can fail", func(t *testing.T) {
+		var containerCallbackCalled bool
+
+		c := digtest.New(t, dig.WithContainerCallback(func(ci dig.CallbackInfo) {
+			assert.NotEmpty(t, ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 2)
+			assert.EqualValues(t, "five", ci.Values[0].String())
+			assert.EqualValues(t, 5, ci.Values[1].Int())
+			containerCallbackCalled = true
+		}))
+
+		c.RequireProvide(func() (string, int, error) {
+			return "five", 5, nil
+		})
+
+		c.RequireInvoke(func(s string, i int) {
+			assert.Equal(t, "five", s)
+			assert.Equal(t, 5, i)
+		})
+
+		assert.True(t, containerCallbackCalled)
+	})
+
+	t.Run("callback not invoked on provider error", func(t *testing.T) {
+		var containerCallbackCalled bool
+
+		c := digtest.New(t, dig.WithContainerCallback(func(ci dig.CallbackInfo) {
+			containerCallbackCalled = true
+		}))
+
+		c.RequireProvide(func() (string, int, error) {
+			return "", 0, fmt.Errorf("failed")
+		})
+
+		err := c.Invoke(func(_ string, _ int) {})
+
+		assert.NotNil(t, err)
+
+		assert.False(t, containerCallbackCalled)
+	})
+
+	t.Run("values are passed in the correct order", func(t *testing.T) {
+	})
+
+	t.Run("values with the As option are passed as the original type", func(t *testing.T) {
+	})
+
+	t.Run("object values are passed as objects", func(t *testing.T) {
 	})
 }
 
 func TestCallback(t *testing.T) {
 	t.Run("no errors", func(t *testing.T) {
 		var (
-			provideCallbackCalled  bool
-			decorateCallbackCalled bool
+			provideCallbackCalled        bool
+			decorateCallbackCalled       bool
+			containerCallbackCalledTimes int
 		)
 
-		c := digtest.New(t)
+		c := digtest.New(t, dig.WithContainerCallback(func(ci dig.CallbackInfo) {
+			containerCallbackCalledTimes++
+			switch containerCallbackCalledTimes {
+			case 1:
+				assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
+				assert.NoError(t, ci.Error)
+				assert.Len(t, ci.Values, 1)
+				assert.True(t, ci.Values[0].CanInt())
+				assert.EqualValues(t, 5, ci.Values[0].Int())
+			case 2:
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.3", ci.Name)
+				assert.NoError(t, ci.Error)
+				assert.Len(t, ci.Values, 1)
+				assert.True(t, ci.Values[0].CanInt())
+				assert.EqualValues(t, 10, ci.Values[0].Int())
+			}
+		}))
 		c.RequireProvide(
 			giveInt,
 			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
 				assert.NoError(t, ci.Error)
+				assert.Len(t, ci.Values, 1)
+				assert.True(t, ci.Values[0].CanInt())
+				assert.EqualValues(t, 5, ci.Values[0].Int())
 				provideCallbackCalled = true
 			}),
 		)
 		c.RequireDecorate(
 			func(a int) int { return a + 5 },
 			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
-				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.2", ci.Name)
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.3", ci.Name)
 				assert.NoError(t, ci.Error)
+				assert.Len(t, ci.Values, 1)
+				assert.True(t, ci.Values[0].CanInt())
+				assert.EqualValues(t, 10, ci.Values[0].Int())
 				decorateCallbackCalled = true
 			}),
 		)
@@ -1845,6 +1921,7 @@ func TestCallback(t *testing.T) {
 
 		assert.True(t, provideCallbackCalled)
 		assert.True(t, decorateCallbackCalled)
+		assert.Equal(t, 2, containerCallbackCalledTimes)
 	})
 
 	t.Run("provide error", func(t *testing.T) {
@@ -1858,6 +1935,7 @@ func TestCallback(t *testing.T) {
 			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func2.1", ci.Name)
 				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
+				assert.Nil(t, ci.Values)
 				called = true
 			}),
 		)
@@ -1878,6 +1956,7 @@ func TestCallback(t *testing.T) {
 			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func3.1", ci.Name)
 				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
+				assert.Nil(t, ci.Values)
 				called = true
 			}),
 		)
@@ -1897,6 +1976,7 @@ func TestCallback(t *testing.T) {
 				var pe dig.PanicError
 				assert.True(t, errors.As(ci.Error, &pe))
 				assert.ErrorContains(t, ci.Error, "panic: \"unreal misfortune\"")
+				assert.Nil(t, ci.Values)
 				called = true
 			}),
 		)
@@ -1917,6 +1997,7 @@ func TestCallback(t *testing.T) {
 				var pe dig.PanicError
 				assert.True(t, errors.As(ci.Error, &pe))
 				assert.ErrorContains(t, ci.Error, "panic: \"unreal misfortune\"")
+				assert.Nil(t, ci.Values)
 
 				called = true
 			}),

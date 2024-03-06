@@ -92,7 +92,7 @@ type Scope struct {
 	childScopes []*Scope
 
 	// Callback to execute for each value that is constructed
-	callback ProvidedCallback
+	callback Callback
 }
 
 func newScope() *Scope {

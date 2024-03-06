@@ -160,12 +160,15 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 		}
 	}
 
+	var values []reflect.Value
+
 	if n.callback != nil {
 		// Wrap in separate func to include PanicErrors
 		defer func() {
 			n.callback(CallbackInfo{
-				Name:  fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
-				Error: err,
+				Name:   fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+				Error:  err,
+				Values: values,
 			})
 		}()
 	}
@@ -193,24 +196,14 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 	// container.
 	receiver.Commit(n.s)
 
-	if n.s.callback != nil {
-		for k, v := range receiver.values {
-			n.s.callback(ProvidedInfo{
-				Name:  k.name,
-				Type:  k.t,
-				Value: v,
-			})
-		}
+	values = n.resultList.GetValues(results)
 
-		for k, vs := range receiver.groups {
-			for _, v := range vs {
-				n.s.callback(ProvidedInfo{
-					Name:  k.group,
-					Type:  k.t,
-					Value: v,
-				})
-			}
-		}
+	if n.s.callback != nil {
+		n.s.callback(CallbackInfo{
+			Name:   fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+			Error:  err,
+			Values: values,
+		})
 	}
 
 	n.called = true

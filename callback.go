@@ -20,6 +20,8 @@
 
 package dig
 
+import "reflect"
+
 // CallbackInfo contains information about a provided function or decorator
 // called by Dig, and is passed to a [Callback] registered with
 // [WithProviderCallback] or [WithDecoratorCallback].
@@ -32,6 +34,9 @@ type CallbackInfo struct {
 	// function, if any. When used in conjunction with [RecoverFromPanics],
 	// this will be set to a [PanicError] when the function panics.
 	Error error
+
+	// TODO
+	Values []reflect.Value
 }
 
 // Callback is a function that can be registered with a provided function
@@ -89,6 +94,18 @@ func WithDecoratorCallback(callback Callback) DecorateOption {
 	}
 }
 
+// WithContainerCallback returns an [Option] which has Dig call
+// the passed in [Callback] each time a new value
+// is constructed.
+//
+// See [CallbackInfo] for more info on the information passed
+// to the [Callback].
+func WithContainerCallback(callback Callback) Option {
+	return withCallbackOption{
+		callback: callback,
+	}
+}
+
 type withCallbackOption struct {
 	callback Callback
 }
@@ -96,6 +113,7 @@ type withCallbackOption struct {
 var (
 	_ ProvideOption  = withCallbackOption{}
 	_ DecorateOption = withCallbackOption{}
+	_ Option         = withCallbackOption{}
 )
 
 func (o withCallbackOption) applyProvideOption(po *provideOptions) {
@@ -104,4 +122,8 @@ func (o withCallbackOption) applyProvideOption(po *provideOptions) {
 
 func (o withCallbackOption) apply(do *decorateOptions) {
 	do.Callback = o.callback
+}
+
+func (o withCallbackOption) applyOption(c *Container) {
+	c.scope.callback = o.callback
 }
