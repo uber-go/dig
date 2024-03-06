@@ -45,6 +45,7 @@ type result interface {
 	// This MAY panic if the result does not consume a single value.
 	Extract(containerWriter, bool, reflect.Value)
 
+	// GetValues returns all values contained in a result.
 	GetValues(reflect.Value) []reflect.Value
 
 	// DotResult returns a slice of dot.Result(s).
