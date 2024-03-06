@@ -196,7 +196,7 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 	// container.
 	receiver.Commit(n.s)
 
-	values = n.resultList.GetValues(results)
+	values = n.resultList.Values(results)
 
 	if n.s.callback != nil {
 		n.s.callback(CallbackInfo{

@@ -1859,13 +1859,35 @@ func TestProvidedCallback(t *testing.T) {
 		assert.False(t, containerCallbackCalled)
 	})
 
-	t.Run("values are passed in the correct order", func(t *testing.T) {
-	})
+	t.Run("object values are exploded into single values", func(t *testing.T) {
+		var containerCallbackCalled bool
 
-	t.Run("values with the As option are passed as the original type", func(t *testing.T) {
-	})
+		c := digtest.New(t, dig.WithContainerCallback(func(ci dig.CallbackInfo) {
+			assert.NotEmpty(t, ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 2)
+			assert.EqualValues(t, "five", ci.Values[0].String())
+			assert.EqualValues(t, 5, ci.Values[1].Int())
+			containerCallbackCalled = true
+		}))
 
-	t.Run("object values are passed as objects", func(t *testing.T) {
+		type out struct {
+			dig.Out
+
+			String string
+			Int    int
+		}
+
+		c.RequireProvide(func() (out, error) {
+			return out{String: "five", Int: 5}, nil
+		})
+
+		c.RequireInvoke(func(s string, i int) {
+			assert.Equal(t, "five", s)
+			assert.Equal(t, 5, i)
+		})
+
+		assert.True(t, containerCallbackCalled)
 	})
 }
 

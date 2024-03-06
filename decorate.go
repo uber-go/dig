@@ -149,7 +149,7 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 	if err = n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
 		return err
 	}
-	values = n.results.GetValues(results)
+	values = n.results.Values(results)
 
 	if n.s.callback != nil {
 		n.s.callback(CallbackInfo{
