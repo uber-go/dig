@@ -198,14 +198,6 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 
 	values = n.resultList.Values(results)
 
-	if n.s.callback != nil {
-		n.s.callback(CallbackInfo{
-			Name:   fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
-			Error:  err,
-			Values: values,
-		})
-	}
-
 	n.called = true
 	return nil
 }

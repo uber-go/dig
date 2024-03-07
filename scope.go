@@ -90,9 +90,6 @@ type Scope struct {
 
 	// All the child scopes of this Scope.
 	childScopes []*Scope
-
-	// Callback to execute for each value that is constructed
-	callback Callback
 }
 
 func newScope() *Scope {
@@ -122,7 +119,6 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	child.invokerFn = s.invokerFn
 	child.deferAcyclicVerification = s.deferAcyclicVerification
 	child.recoverFromPanics = s.recoverFromPanics
-	child.callback = s.callback
 
 	// child copies the parent's graph nodes.
 	for _, node := range s.gh.nodes {

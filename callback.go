@@ -95,18 +95,6 @@ func WithDecoratorCallback(callback Callback) DecorateOption {
 	}
 }
 
-// WithContainerCallback returns an [Option] which has Dig call
-// the passed in [Callback] each time a new value
-// is constructed.
-//
-// See [CallbackInfo] for more info on the information passed
-// to the [Callback].
-func WithContainerCallback(callback Callback) Option {
-	return withCallbackOption{
-		callback: callback,
-	}
-}
-
 type withCallbackOption struct {
 	callback Callback
 }
@@ -114,7 +102,6 @@ type withCallbackOption struct {
 var (
 	_ ProvideOption  = withCallbackOption{}
 	_ DecorateOption = withCallbackOption{}
-	_ Option         = withCallbackOption{}
 )
 
 func (o withCallbackOption) applyProvideOption(po *provideOptions) {
@@ -123,8 +110,4 @@ func (o withCallbackOption) applyProvideOption(po *provideOptions) {
 
 func (o withCallbackOption) apply(do *decorateOptions) {
 	do.Callback = o.callback
-}
-
-func (o withCallbackOption) applyOption(c *Container) {
-	c.scope.callback = o.callback
 }

@@ -151,14 +151,6 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 	}
 	values = n.results.Values(results)
 
-	if n.s.callback != nil {
-		n.s.callback(CallbackInfo{
-			Name:   fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
-			Error:  err,
-			Values: values,
-		})
-	}
-
 	n.state = decoratorCalled
 	return nil
 }
