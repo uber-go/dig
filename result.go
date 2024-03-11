@@ -411,9 +411,9 @@ func (ro resultObject) Extract(cw containerWriter, decorated bool, v reflect.Val
 }
 
 func (ro resultObject) GetValues(v reflect.Value) []reflect.Value {
-	res := make([]reflect.Value, 0)
-	for _, f := range ro.Fields {
-		res = append(res, v.Field(f.FieldIndex))
+	res := make([]reflect.Value, len(ro.Fields))
+	for i, f := range ro.Fields {
+		res[i] = v.Field(f.FieldIndex)
 	}
 	return res
 }
