@@ -36,7 +36,8 @@ type CallbackInfo struct {
 	Error error
 
 	// Values contains all values constructed by the [Callback]'s
-	// associated function.
+	// associated function. These are the actual values inside the container:
+	// modifying them may result in undefined behaviour.
 	Values []reflect.Value
 }
 
