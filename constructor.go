@@ -160,12 +160,15 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 		}
 	}
 
+	var values []reflect.Value
+
 	if n.callback != nil {
 		// Wrap in separate func to include PanicErrors
 		defer func() {
 			n.callback(CallbackInfo{
-				Name:  fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
-				Error: err,
+				Name:   fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+				Error:  err,
+				Values: values,
 			})
 		}()
 	}
@@ -192,6 +195,9 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 	// the rest of the graph to instantiate the dependencies of this
 	// container.
 	receiver.Commit(n.s)
+
+	values = n.resultList.Values(results)
+
 	n.called = true
 	return nil
 }

@@ -20,6 +20,8 @@
 
 package dig
 
+import "reflect"
+
 // CallbackInfo contains information about a provided function or decorator
 // called by Dig, and is passed to a [Callback] registered with
 // [WithProviderCallback] or [WithDecoratorCallback].
@@ -32,6 +34,11 @@ type CallbackInfo struct {
 	// function, if any. When used in conjunction with [RecoverFromPanics],
 	// this will be set to a [PanicError] when the function panics.
 	Error error
+
+	// Values contains all values constructed by the [Callback]'s
+	// associated function. These are the actual values inside the container:
+	// modifying them may result in undefined behaviour.
+	Values []reflect.Value
 }
 
 // Callback is a function that can be registered with a provided function

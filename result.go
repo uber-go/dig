@@ -45,6 +45,9 @@ type result interface {
 	// This MAY panic if the result does not consume a single value.
 	Extract(containerWriter, bool, reflect.Value)
 
+	// GetValues returns all values contained in a result.
+	GetValues(reflect.Value) []reflect.Value
+
 	// DotResult returns a slice of dot.Result(s).
 	DotResult() []*dot.Result
 }
@@ -259,6 +262,21 @@ func (rl resultList) ExtractList(cw containerWriter, decorated bool, values []re
 	return nil
 }
 
+func (rl resultList) GetValues(values reflect.Value) []reflect.Value {
+	digerror.BugPanicf("resultList.GetValues() must never be called")
+	panic("") // Unreachable, as BugPanicf above will panic.
+}
+
+func (rl resultList) Values(values []reflect.Value) []reflect.Value {
+	result := make([]reflect.Value, 0)
+	for i, v := range values {
+		if resultIdx := rl.resultIndexes[i]; resultIdx >= 0 {
+			result = append(result, rl.Results[resultIdx].GetValues(v)...)
+		}
+	}
+	return result
+}
+
 // resultSingle is an explicit value produced by a constructor, optionally
 // with a name.
 //
@@ -336,6 +354,10 @@ func (rs resultSingle) Extract(cw containerWriter, decorated bool, v reflect.Val
 	}
 }
 
+func (rs resultSingle) GetValues(v reflect.Value) []reflect.Value {
+	return []reflect.Value{v}
+}
+
 // resultObject is a dig.Out struct where each field is another result.
 //
 // This object is not added to the graph. Its fields are interpreted as
@@ -386,6 +408,14 @@ func (ro resultObject) Extract(cw containerWriter, decorated bool, v reflect.Val
 	for _, f := range ro.Fields {
 		f.Result.Extract(cw, decorated, v.Field(f.FieldIndex))
 	}
+}
+
+func (ro resultObject) GetValues(v reflect.Value) []reflect.Value {
+	res := make([]reflect.Value, len(ro.Fields))
+	for i, f := range ro.Fields {
+		res[i] = v.Field(f.FieldIndex)
+	}
+	return res
 }
 
 // resultObjectField is a single field inside a dig.Out struct.
@@ -532,4 +562,8 @@ func (rt resultGrouped) Extract(cw containerWriter, decorated bool, v reflect.Va
 	for i := 0; i < v.Len(); i++ {
 		cw.submitGroupedValue(rt.Group, rt.Type, v.Index(i))
 	}
+}
+
+func (rt resultGrouped) GetValues(v reflect.Value) []reflect.Value {
+	return []reflect.Value{v}
 }

@@ -121,12 +121,15 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 		}
 	}
 
+	var values []reflect.Value
+
 	if n.callback != nil {
 		// Wrap in separate func to include PanicErrors
 		defer func() {
 			n.callback(CallbackInfo{
-				Name:  fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
-				Error: err,
+				Name:   fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+				Error:  err,
+				Values: values,
 			})
 		}()
 	}
@@ -146,6 +149,8 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 	if err = n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
 		return err
 	}
+	values = n.results.Values(results)
+
 	n.state = decoratorCalled
 	return nil
 }

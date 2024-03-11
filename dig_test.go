@@ -1685,6 +1685,14 @@ func TestRecoverFromPanic(t *testing.T) {
 
 func giveInt() int { return 5 }
 
+type providedInterface interface {
+	Start()
+}
+
+type providedStruct struct{}
+
+func (providedStruct) Start() {}
+
 func TestCallback(t *testing.T) {
 	t.Run("no errors", func(t *testing.T) {
 		var (
@@ -1698,6 +1706,9 @@ func TestCallback(t *testing.T) {
 			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
 				assert.NoError(t, ci.Error)
+				assert.Len(t, ci.Values, 1)
+				assert.True(t, ci.Values[0].CanInt())
+				assert.EqualValues(t, 5, ci.Values[0].Int())
 				provideCallbackCalled = true
 			}),
 		)
@@ -1706,6 +1717,9 @@ func TestCallback(t *testing.T) {
 			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.2", ci.Name)
 				assert.NoError(t, ci.Error)
+				assert.Len(t, ci.Values, 1)
+				assert.True(t, ci.Values[0].CanInt())
+				assert.EqualValues(t, 10, ci.Values[0].Int())
 				decorateCallbackCalled = true
 			}),
 		)
@@ -1727,6 +1741,7 @@ func TestCallback(t *testing.T) {
 			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func2.1", ci.Name)
 				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
+				assert.Nil(t, ci.Values)
 				called = true
 			}),
 		)
@@ -1747,6 +1762,7 @@ func TestCallback(t *testing.T) {
 			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func3.1", ci.Name)
 				assert.ErrorContains(t, ci.Error, "terrible callback sadness")
+				assert.Nil(t, ci.Values)
 				called = true
 			}),
 		)
@@ -1766,6 +1782,7 @@ func TestCallback(t *testing.T) {
 				var pe dig.PanicError
 				assert.True(t, errors.As(ci.Error, &pe))
 				assert.ErrorContains(t, ci.Error, "panic: \"unreal misfortune\"")
+				assert.Nil(t, ci.Values)
 				called = true
 			}),
 		)
@@ -1786,6 +1803,7 @@ func TestCallback(t *testing.T) {
 				var pe dig.PanicError
 				assert.True(t, errors.As(ci.Error, &pe))
 				assert.ErrorContains(t, ci.Error, "panic: \"unreal misfortune\"")
+				assert.Nil(t, ci.Values)
 
 				called = true
 			}),
@@ -1793,6 +1811,179 @@ func TestCallback(t *testing.T) {
 
 		c.Invoke(func(int) {})
 		assert.True(t, called)
+	})
+	t.Run("callback receives primitives", func(t *testing.T) {
+		var providerCallbackCalled bool
+
+		c := digtest.New(t)
+
+		c.RequireProvide(giveInt, dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+			assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 1)
+			assert.True(t, ci.Values[0].CanInt())
+			assert.EqualValues(t, 5, ci.Values[0].Int())
+			providerCallbackCalled = true
+		}))
+
+		c.RequireInvoke(func(a int) {
+			assert.Equal(t, 5, a)
+		})
+
+		assert.True(t, providerCallbackCalled)
+	})
+
+	t.Run("callback works with value groups", func(t *testing.T) {
+		var providerCallbackCalledTimes int
+
+		c := digtest.New(t)
+
+		c.RequireProvide(giveInt, dig.Group("test"), dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+			assert.NotEmpty(t, ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 1)
+			assert.True(t, ci.Values[0].CanInt())
+			assert.EqualValues(t, 5, ci.Values[0].Int())
+			providerCallbackCalledTimes++
+		}))
+		c.RequireProvide(func() int { return 6 }, dig.Group("test"), dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+			assert.NotEmpty(t, ci.Name)
+			assert.Nil(t, ci.Error)
+			assert.Len(t, ci.Values, 1)
+			assert.True(t, ci.Values[0].CanInt())
+			assert.EqualValues(t, 6, ci.Values[0].Int())
+			providerCallbackCalledTimes++
+		}))
+
+		type params struct {
+			dig.In
+
+			Value []int `group:"test"`
+		}
+
+		c.RequireInvoke(func(a params) {
+			assert.ElementsMatch(t, []int{5, 6}, a.Value)
+		})
+
+		assert.Equal(t, 2, providerCallbackCalledTimes)
+	})
+
+	t.Run("callback works with interfaces", func(t *testing.T) {
+		var providerCallbackCalled bool
+
+		var gave providedInterface
+
+		c := digtest.New(t)
+
+		c.RequireProvide(
+			func() providedInterface {
+				gave = &providedStruct{}
+				return gave
+			},
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+				assert.NotEmpty(t, ci.Name)
+				assert.Nil(t, ci.Error)
+				assert.Len(t, ci.Values, 1)
+				assert.True(t, ci.Values[0].CanInterface())
+				_, ok := ci.Values[0].Interface().(providedInterface)
+				assert.True(t, ok)
+				providerCallbackCalled = true
+			}),
+		)
+
+		c.RequireInvoke(func(got providedInterface) {
+			assert.Equal(t, gave, got)
+		})
+
+		assert.True(t, providerCallbackCalled)
+	})
+
+	t.Run("callback works with provider returning multiple values", func(t *testing.T) {
+		var providerCallbackCalled bool
+
+		c := digtest.New(t)
+
+		c.RequireProvide(
+			func() (string, int) {
+				return "five", 5
+			},
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+				assert.NotEmpty(t, ci.Name)
+				assert.Nil(t, ci.Error)
+				assert.Len(t, ci.Values, 2)
+				assert.EqualValues(t, "five", ci.Values[0].String())
+				assert.EqualValues(t, 5, ci.Values[1].Int())
+				providerCallbackCalled = true
+			}),
+		)
+
+		c.RequireInvoke(func(s string, i int) {
+			assert.Equal(t, "five", s)
+			assert.Equal(t, 5, i)
+		})
+
+		assert.True(t, providerCallbackCalled)
+	})
+
+	t.Run("callback does not receive nil error value with providers that can fail", func(t *testing.T) {
+		var providerCallbackCalled bool
+
+		c := digtest.New(t)
+
+		c.RequireProvide(
+			func() (string, int, error) {
+				return "five", 5, nil
+			},
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+				assert.NotEmpty(t, ci.Name)
+				assert.Nil(t, ci.Error)
+				assert.Len(t, ci.Values, 2)
+				assert.EqualValues(t, "five", ci.Values[0].String())
+				assert.EqualValues(t, 5, ci.Values[1].Int())
+				providerCallbackCalled = true
+			}),
+		)
+
+		c.RequireInvoke(func(s string, i int) {
+			assert.Equal(t, "five", s)
+			assert.Equal(t, 5, i)
+		})
+
+		assert.True(t, providerCallbackCalled)
+	})
+
+	t.Run("object values are exploded into single values", func(t *testing.T) {
+		var containerCallbackCalled bool
+
+		c := digtest.New(t)
+
+		type out struct {
+			dig.Out
+
+			String string
+			Int    int
+		}
+
+		c.RequireProvide(
+			func() (out, error) {
+				return out{String: "five", Int: 5}, nil
+			},
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+				assert.NotEmpty(t, ci.Name)
+				assert.Nil(t, ci.Error)
+				assert.Len(t, ci.Values, 2)
+				assert.EqualValues(t, "five", ci.Values[0].String())
+				assert.EqualValues(t, 5, ci.Values[1].Int())
+				containerCallbackCalled = true
+			}),
+		)
+
+		c.RequireInvoke(func(s string, i int) {
+			assert.Equal(t, "five", s)
+			assert.Equal(t, 5, i)
+		})
+
+		assert.True(t, containerCallbackCalled)
 	})
 }
 
