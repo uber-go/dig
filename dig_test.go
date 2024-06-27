@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/dig"
+	"go.uber.org/dig/internal/digclock"
 	"go.uber.org/dig/internal/digtest"
 )
 
@@ -1786,6 +1787,55 @@ func TestCallback(t *testing.T) {
 				var pe dig.PanicError
 				assert.True(t, errors.As(ci.Error, &pe))
 				assert.ErrorContains(t, ci.Error, "panic: \"unreal misfortune\"")
+
+				called = true
+			}),
+		)
+
+		c.Invoke(func(int) {})
+		assert.True(t, called)
+	})
+}
+
+func TestCallbackRuntime(t *testing.T) {
+	t.Run("provided ctor runtime", func(t *testing.T) {
+		var called bool
+
+		mockClock := digclock.NewMock()
+		c := digtest.New(t, dig.SetClock(mockClock))
+		c.RequireProvide(
+			func() int {
+				mockClock.Add(1 * time.Millisecond)
+				return 5
+			},
+			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallbackRuntime.func1.1", ci.Name)
+				assert.NoError(t, ci.Error)
+				assert.Equal(t, ci.Runtime, 1*time.Millisecond)
+
+				called = true
+			}),
+		)
+
+		c.Invoke(func(int) {})
+		assert.True(t, called)
+	})
+
+	t.Run("decorator runtime", func(t *testing.T) {
+		var called bool
+
+		mockClock := digclock.NewMock()
+		c := digtest.New(t, dig.SetClock(mockClock))
+		c.RequireProvide(giveInt)
+		c.RequireDecorate(
+			func(int) int {
+				mockClock.Add(1 * time.Millisecond)
+				return 10
+			},
+			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallbackRuntime.func2.1", ci.Name)
+				assert.NoError(t, ci.Error)
+				assert.Equal(t, ci.Runtime, 1*time.Millisecond)
 
 				called = true
 			}),
