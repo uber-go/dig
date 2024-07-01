@@ -35,7 +35,7 @@ type CallbackInfo struct {
 	// this will be set to a [PanicError] when the function panics.
 	Error error
 
-	// Runtime contains the duration of time it took for the associated
+	// Runtime contains the duration it took for the associated
 	// function to run.
 	Runtime time.Duration
 }

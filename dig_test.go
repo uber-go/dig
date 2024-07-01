@@ -1798,7 +1798,7 @@ func TestCallback(t *testing.T) {
 }
 
 func TestCallbackRuntime(t *testing.T) {
-	t.Run("provided ctor runtime", func(t *testing.T) {
+	t.Run("constructor runtime", func(t *testing.T) {
 		var called bool
 
 		mockClock := digclock.NewMock()

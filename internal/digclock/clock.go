@@ -25,7 +25,6 @@ import (
 )
 
 // Clock defines how dig accesses time.
-// We keep the interface pretty minimal.
 type Clock interface {
 	Now() time.Time
 	Since(time.Time) time.Duration
@@ -48,7 +47,7 @@ func (systemClock) Since(t time.Time) time.Duration {
 // It implements standard time operations, but allows
 // the user to control the passage of time.
 //
-// Use the [Add] method to progress time.
+// Use the [Mock.Add] method to progress time.
 //
 // Note that this implementation is not safe for concurrent use.
 type Mock struct {
