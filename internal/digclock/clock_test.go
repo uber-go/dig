@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Uber Technologies, Inc.
+// Copyright (c) 2024 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,18 +18,36 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package dig
+package digclock
 
 import (
-	"math/rand"
+	"testing"
+	"time"
 
-	"go.uber.org/dig/internal/digclock"
+	"github.com/stretchr/testify/assert"
 )
 
-func SetRand(r *rand.Rand) Option {
-	return setRand(r)
+func TestSystemClock(t *testing.T) {
+	clock := System
+	testClock(t, clock, func(d time.Duration) { time.Sleep(d) })
 }
 
-func SetClock(c digclock.Clock) Option {
-	return setClock(c)
+func TestMockClock(t *testing.T) {
+	clock := NewMock()
+	testClock(t, clock, clock.Add)
+}
+
+func testClock(t *testing.T, clock Clock, advance func(d time.Duration)) {
+	now := clock.Now()
+	assert.False(t, now.IsZero())
+
+	t.Run("Since", func(t *testing.T) {
+		advance(1 * time.Millisecond)
+		assert.NotZero(t, clock.Since(now), "time must have advanced")
+	})
+}
+
+func TestMock_AddNegative(t *testing.T) {
+	clock := NewMock()
+	assert.Panics(t, func() { clock.Add(-1) })
 }

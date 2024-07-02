@@ -20,6 +20,8 @@
 
 package dig
 
+import "time"
+
 // CallbackInfo contains information about a provided function or decorator
 // called by Dig, and is passed to a [Callback] registered with
 // [WithProviderCallback] or [WithDecoratorCallback].
@@ -32,6 +34,10 @@ type CallbackInfo struct {
 	// function, if any. When used in conjunction with [RecoverFromPanics],
 	// this will be set to a [PanicError] when the function panics.
 	Error error
+
+	// Runtime contains the duration it took for the associated
+	// function to run.
+	Runtime time.Duration
 }
 
 // Callback is a function that can be registered with a provided function

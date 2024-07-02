@@ -25,6 +25,7 @@ import (
 	"math/rand"
 	"reflect"
 
+	"go.uber.org/dig/internal/digclock"
 	"go.uber.org/dig/internal/dot"
 )
 
@@ -141,6 +142,9 @@ type containerStore interface {
 
 	// Returns invokerFn function to use when calling arguments.
 	invoker() invokerFn
+
+	// Returns a clock to use
+	clock() digclock.Clock
 }
 
 // New constructs a Container.
@@ -209,6 +213,21 @@ func (o setRandOption) String() string {
 
 func (o setRandOption) applyOption(c *Container) {
 	c.scope.rand = o.r
+}
+
+// Changes the source of time for the container.
+func setClock(c digclock.Clock) Option {
+	return setClockOption{c: c}
+}
+
+type setClockOption struct{ c digclock.Clock }
+
+func (o setClockOption) String() string {
+	return fmt.Sprintf("setClock(%v)", o.c)
+}
+
+func (o setClockOption) applyOption(c *Container) {
+	c.scope.clockSrc = o.c
 }
 
 // DryRun is an Option which, when set to true, disables invocation of functions supplied to

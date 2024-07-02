@@ -27,6 +27,8 @@ import (
 	"reflect"
 	"sort"
 	"time"
+
+	"go.uber.org/dig/internal/digclock"
 )
 
 // A ScopeOption modifies the default behavior of Scope; currently,
@@ -90,6 +92,9 @@ type Scope struct {
 
 	// All the child scopes of this Scope.
 	childScopes []*Scope
+
+	// clockSrc stores the source of time. Defaults to system clock.
+	clockSrc digclock.Clock
 }
 
 func newScope() *Scope {
@@ -102,6 +107,7 @@ func newScope() *Scope {
 		decoratedGroups: make(map[key]reflect.Value),
 		invokerFn:       defaultInvoker,
 		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
+		clockSrc:        digclock.System,
 	}
 	s.gh = newGraphHolder(s)
 	return s
@@ -117,6 +123,7 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	child.name = name
 	child.parentScope = s
 	child.invokerFn = s.invokerFn
+	child.clockSrc = s.clockSrc
 	child.deferAcyclicVerification = s.deferAcyclicVerification
 	child.recoverFromPanics = s.recoverFromPanics
 
@@ -265,6 +272,10 @@ func (s *Scope) getAllProviders(k key) []provider {
 
 func (s *Scope) invoker() invokerFn {
 	return s.invokerFn
+}
+
+func (s *Scope) clock() digclock.Clock {
+	return s.clockSrc
 }
 
 // adds a new graphNode to this Scope and all of its descendent

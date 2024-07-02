@@ -161,11 +161,13 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 	}
 
 	if n.callback != nil {
+		start := c.clock().Now()
 		// Wrap in separate func to include PanicErrors
 		defer func() {
 			n.callback(CallbackInfo{
-				Name:  fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
-				Error: err,
+				Name:    fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+				Error:   err,
+				Runtime: c.clock().Since(start),
 			})
 		}()
 	}
