@@ -186,7 +186,7 @@ func (e errInvalidInput) Error() string { return fmt.Sprint(e) }
 func (e errInvalidInput) Unwrap() error { return e.Cause }
 
 func (e errInvalidInput) writeMessage(w io.Writer, _ string) {
-	fmt.Fprintf(w, e.Message)
+	fmt.Fprint(w, e.Message)
 }
 
 func (e errInvalidInput) Format(w fmt.State, c rune) {
