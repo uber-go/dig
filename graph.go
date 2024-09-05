@@ -28,7 +28,7 @@ type graphNode struct {
 }
 
 // graphHolder is the dependency graph of the container.
-// It saves constructorNodes and paramGroupedSlice (value groups)
+// It saves constructorNodes and paramGroupedCollection (value groups)
 // as nodes in the graph.
 // It implements the graph interface defined by internal/graph.
 // It has 1-1 correspondence with the Scope whose graph it represents.
@@ -68,7 +68,7 @@ func (gh *graphHolder) EdgesFrom(u int) []int {
 		for _, param := range w.paramList.Params {
 			orders = append(orders, getParamOrder(gh, param)...)
 		}
-	case *paramGroupedSlice:
+	case *paramGroupedCollection:
 		providers := gh.s.getAllGroupProviders(w.Group, w.Type.Elem())
 		for _, provider := range providers {
 			orders = append(orders, provider.Order(gh.s))
