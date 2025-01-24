@@ -449,14 +449,17 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	// we start making changes to it as we may need to
 	// undo them upon encountering errors.
 	allScopes := s.appendSubscopes(nil)
-	for _, s := range allScopes {
-		s := s
-		s.gh.Snapshot()
-		defer func() {
-			if err != nil {
-				s.gh.Rollback()
+
+	defer func(allSc []*Scope) {
+		if err != nil {
+			for _, sc := range allSc {
+				sc.gh.Rollback()
 			}
-		}()
+		}
+	}(allScopes)
+
+	for _, sc := range allScopes {
+		sc.gh.Snapshot()
 	}
 
 	n, err := newConstructorNode(
