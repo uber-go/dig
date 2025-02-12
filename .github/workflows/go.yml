@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "windows-latest"]
-        go: ["1.22.x", "1.23.x"]
+        go: ["1.23.x", "1.24.x"]
 
     steps:
     - name: Setup Go
@@ -49,7 +49,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.24.x
         cache: false  # managed by golangci-lint
 
     - uses: golangci/golangci-lint-action@v3
