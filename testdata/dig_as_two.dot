@@ -1,16 +1,10 @@
 digraph {
 	rankdir=RL;
 	graph [compound=true];
-	
-		subgraph cluster_0 {
-			label = "go.uber.org/dig_test";
-			constructor_0 [shape=plaintext label="TestVisualize.func4.1"];
-			
-			"io.Reader" [label=<io.Reader>];
-			"io.Writer" [label=<io.Writer>];
-			
-		}
-		
-		
-	
+	subgraph cluster_0 {
+		label = "go.uber.org/dig_test";
+		constructor_0 [shape=plaintext label="TestVisualize.func4.1"];
+		"io.Reader" [label=<io.Reader>];
+		"io.Writer" [label=<io.Writer>];
+	}
 }
