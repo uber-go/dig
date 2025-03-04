@@ -82,12 +82,12 @@ type containerWriter interface {
 	setDecoratedValue(name string, t reflect.Type, v reflect.Value)
 
 	// submitGroupedValue submits a value to the value group with the provided
-	// name.
-	submitGroupedValue(name string, t reflect.Type, v reflect.Value)
+	// name and optional map key.
+	submitGroupedValue(name, mapKey string, t reflect.Type, v reflect.Value)
 
 	// submitDecoratedGroupedValue submits a decorated value to the value group
-	// with the provided name.
-	submitDecoratedGroupedValue(name string, t reflect.Type, v reflect.Value)
+	// with the provided name and optional map key.
+	submitDecoratedGroupedValue(name, mapKey string, t reflect.Type, v reflect.Value)
 }
 
 // containerStore provides access to the Container's underlying data store.
@@ -109,7 +109,7 @@ type containerStore interface {
 	// Retrieves all values for the provided group and type.
 	//
 	// The order in which the values are returned is undefined.
-	getValueGroup(name string, t reflect.Type) []reflect.Value
+	getValueGroup(name string, t reflect.Type) []keyedGroupValue
 
 	// Retrieves all decorated values for the provided group and type, if any.
 	getDecoratedValueGroup(name string, t reflect.Type) (reflect.Value, bool)
@@ -292,8 +292,8 @@ func (bs byTypeName) Swap(i int, j int) {
 	bs[i], bs[j] = bs[j], bs[i]
 }
 
-func shuffledCopy(rand *rand.Rand, items []reflect.Value) []reflect.Value {
-	newItems := make([]reflect.Value, len(items))
+func shuffledCopy(rand *rand.Rand, items []keyedGroupValue) []keyedGroupValue {
+	newItems := make([]keyedGroupValue, len(items))
 	for i, j := range rand.Perm(len(items)) {
 		newItems[i] = items[j]
 	}

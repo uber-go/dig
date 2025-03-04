@@ -177,21 +177,31 @@ func TestParamObjectFailure(t *testing.T) {
 	})
 }
 
-func TestParamGroupSliceErrors(t *testing.T) {
+func TestParamGroupCollectionErrors(t *testing.T) {
 	tests := []struct {
 		desc    string
 		shape   interface{}
 		wantErr string
 	}{
 		{
-			desc: "non-slice type are disallowed",
+			desc: "non-slice or string-keyed map type are disallowed (slice)",
 			shape: struct {
 				In
 
 				Foo string `group:"foo"`
 			}{},
-			wantErr: "value groups may be consumed as slices only: " +
-				`field "Foo" (string) is not a slice`,
+			wantErr: "value groups may be consumed as slices or string-keyed maps only: " +
+				`field "Foo" (string) is not a slice or string-keyed map`,
+		},
+		{
+			desc: "non-slice or string-keyed map type are disallowed (string-keyed map)",
+			shape: struct {
+				In
+
+				Foo map[int]int `group:"foo"`
+			}{},
+			wantErr: "value groups may be consumed as slices or string-keyed maps only: " +
+				`field "Foo" (map[int]int) is not a slice or string-keyed map`,
 		},
 		{
 			desc: "cannot provide name for a group",
