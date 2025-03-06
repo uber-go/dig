@@ -123,7 +123,7 @@ func newParamList(ctype reflect.Type, c containerStore) (paramList, error) {
 
 	pl := paramList{
 		ctype:  ctype,
-		Params: make([]param, 0, numArgs),
+		Params: make([]param, numArgs),
 	}
 
 	for i := 0; i < numArgs; i++ {
@@ -131,7 +131,7 @@ func newParamList(ctype reflect.Type, c containerStore) (paramList, error) {
 		if err != nil {
 			return pl, newErrInvalidInput(fmt.Sprintf("bad argument %d", i+1), err)
 		}
-		pl.Params = append(pl.Params, p)
+		pl.Params[i] = p
 	}
 
 	return pl, nil
