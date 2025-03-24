@@ -68,8 +68,16 @@ type decoratorNode struct {
 
 	// Callback for this decorator, if there is one.
 	callback Callback
+
+	// BeforeCallback for this decorator, if there is one
+	beforeCallback BeforeCallback
 }
 
+// newDecoratorNode creates a new decorator node for the given decorator function, scope, and decoration options.
+// 
+// It uses reflection to extract type information and a unique identifier from the decorator function, constructs the necessary
+// parameter and result lists, and initializes the node with any specified callbacks, including a pre-execution callback if provided.
+// An error is returned if initialization of the parameter or result lists fails.
 func newDecoratorNode(dcor interface{}, s *Scope, opts decorateOptions) (*decoratorNode, error) {
 	dval := reflect.ValueOf(dcor)
 	dtype := dval.Type()
@@ -86,15 +94,16 @@ func newDecoratorNode(dcor interface{}, s *Scope, opts decorateOptions) (*decora
 	}
 
 	n := &decoratorNode{
-		dcor:     dcor,
-		dtype:    dtype,
-		id:       dot.CtorID(dptr),
-		location: digreflect.InspectFunc(dcor),
-		orders:   make(map[*Scope]int),
-		params:   pl,
-		results:  rl,
-		s:        s,
-		callback: opts.Callback,
+		dcor:           dcor,
+		dtype:          dtype,
+		id:             dot.CtorID(dptr),
+		location:       digreflect.InspectFunc(dcor),
+		orders:         make(map[*Scope]int),
+		params:         pl,
+		results:        rl,
+		s:              s,
+		callback:       opts.Callback,
+		beforeCallback: opts.BeforeCallback,
 	}
 	return n, nil
 }
@@ -119,6 +128,11 @@ func (n *decoratorNode) Call(s containerStore) (err error) {
 			Func:   n.location,
 			Reason: err,
 		}
+	}
+	if n.beforeCallback != nil {
+		n.beforeCallback(BeforeCallbackInfo{
+			Name: fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+		})
 	}
 
 	if n.callback != nil {
@@ -162,8 +176,9 @@ type DecorateOption interface {
 }
 
 type decorateOptions struct {
-	Info     *DecorateInfo
-	Callback Callback
+	Info           *DecorateInfo
+	Callback       Callback
+	BeforeCallback BeforeCallback
 }
 
 // FillDecorateInfo is a DecorateOption that writes info on what Dig was

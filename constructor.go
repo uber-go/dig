@@ -66,18 +66,23 @@ type constructorNode struct {
 
 	// Callback for this provided function, if there is one.
 	callback Callback
+
+	// BeforeCallback for this provided function, if there is one.
+	beforeCallback BeforeCallback
 }
 
 type constructorOptions struct {
 	// If specified, all values produced by this constructor have the provided name
 	// belong to the specified value group or implement any of the interfaces.
-	ResultName  string
-	ResultGroup string
-	ResultAs    []interface{}
-	Location    *digreflect.Func
-	Callback    Callback
+	ResultName     string
+	ResultGroup    string
+	ResultAs       []interface{}
+	Location       *digreflect.Func
+	Callback       Callback
+	BeforeCallback BeforeCallback
 }
 
+// newConstructorNode creates a new constructor node for the dependency injection graph. It uses reflection to inspect the provided constructor function, initializing its parameter and result lists with the given options (such as result naming, grouping, and type assertions). If no location is provided in the options, the constructor’s location is automatically determined. The new node is associated with both the current and original scopes and is configured with callbacks—including an optional pre-callback—to be executed during dependency resolution. An error is returned if the initialization of the parameter or result lists fails.
 func newConstructorNode(ctor interface{}, s *Scope, origS *Scope, opts constructorOptions) (*constructorNode, error) {
 	cval := reflect.ValueOf(ctor)
 	ctype := cval.Type()
@@ -106,16 +111,17 @@ func newConstructorNode(ctor interface{}, s *Scope, origS *Scope, opts construct
 	}
 
 	n := &constructorNode{
-		ctor:       ctor,
-		ctype:      ctype,
-		location:   location,
-		id:         dot.CtorID(cptr),
-		paramList:  params,
-		resultList: results,
-		orders:     make(map[*Scope]int),
-		s:          s,
-		origS:      origS,
-		callback:   opts.Callback,
+		ctor:           ctor,
+		ctype:          ctype,
+		location:       location,
+		id:             dot.CtorID(cptr),
+		paramList:      params,
+		resultList:     results,
+		orders:         make(map[*Scope]int),
+		s:              s,
+		origS:          origS,
+		callback:       opts.Callback,
+		beforeCallback: opts.BeforeCallback,
 	}
 	s.newGraphNode(n, n.orders)
 	return n, nil
@@ -158,6 +164,12 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 			Func:   n.location,
 			Reason: err,
 		}
+	}
+
+	if n.beforeCallback != nil {
+		n.beforeCallback(BeforeCallbackInfo{
+			Name: fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+		})
 	}
 
 	if n.callback != nil {
