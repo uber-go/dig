@@ -33,6 +33,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.uber.org/dig"
 	"go.uber.org/dig/internal/digclock"
 	"go.uber.org/dig/internal/digtest"
@@ -1689,13 +1690,19 @@ func giveInt() int { return 5 }
 func TestCallback(t *testing.T) {
 	t.Run("no errors", func(t *testing.T) {
 		var (
-			provideCallbackCalled  bool
-			decorateCallbackCalled bool
+			provideBeforeCallbackCalled  bool
+			decorateBeforeCallbackCalled bool
+			provideCallbackCalled        bool
+			decorateCallbackCalled       bool
 		)
 
 		c := digtest.New(t)
 		c.RequireProvide(
 			giveInt,
+			dig.WithProviderBeforeCallback(func(bci dig.BeforeCallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.giveInt", bci.Name)
+				provideBeforeCallbackCalled = true
+			}),
 			dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 				assert.Equal(t, "go.uber.org/dig_test.giveInt", ci.Name)
 				assert.NoError(t, ci.Error)
@@ -1704,8 +1711,12 @@ func TestCallback(t *testing.T) {
 		)
 		c.RequireDecorate(
 			func(a int) int { return a + 5 },
+			dig.WithDecoratorBeforeCallback(func(bci dig.BeforeCallbackInfo) {
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.3", bci.Name)
+				decorateBeforeCallbackCalled = true
+			}),
 			dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
-				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.2", ci.Name)
+				assert.Equal(t, "go.uber.org/dig_test.TestCallback.func1.3", ci.Name)
 				assert.NoError(t, ci.Error)
 				decorateCallbackCalled = true
 			}),
@@ -1713,8 +1724,10 @@ func TestCallback(t *testing.T) {
 
 		c.RequireInvoke(func(a int) {})
 
-		assert.True(t, provideCallbackCalled)
-		assert.True(t, decorateCallbackCalled)
+		assert.True(t, provideCallbackCalled, "missing provide callback")
+		assert.True(t, decorateCallbackCalled, "missing decorate callback")
+		assert.True(t, provideBeforeCallbackCalled, "missing provide before-callback")
+		assert.True(t, decorateBeforeCallbackCalled, "missing decorate before-callback")
 	})
 
 	t.Run("provide error", func(t *testing.T) {
@@ -1732,7 +1745,7 @@ func TestCallback(t *testing.T) {
 			}),
 		)
 
-		c.Invoke(func(a int) {})
+		assert.Error(t, c.Invoke(func(a int) {}))
 		assert.True(t, called)
 	})
 
@@ -1752,7 +1765,7 @@ func TestCallback(t *testing.T) {
 			}),
 		)
 
-		c.Invoke(func(a int) {})
+		assert.Error(t, c.Invoke(func(a int) {}))
 		assert.True(t, called)
 	})
 
@@ -1771,7 +1784,7 @@ func TestCallback(t *testing.T) {
 			}),
 		)
 
-		c.Invoke(func(int) {})
+		assert.Error(t, c.Invoke(func(int) {}))
 		assert.True(t, called)
 	})
 
