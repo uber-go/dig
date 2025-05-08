@@ -1,7 +1,5 @@
 digraph {
 	rankdir=RL;
 	graph [compound=true];
-	
 	"dig_test.t1" [color=red];
-	
 }
