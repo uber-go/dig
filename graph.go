@@ -61,6 +61,8 @@ func (gh *graphHolder) Order() int { return len(gh.nodes) }
 //
 // For value group nodes, it retrieves the group providers from the container
 // and reports their orders.
+//
+// Some change.
 func (gh *graphHolder) EdgesFrom(u int) []int {
 	var orders []int
 	switch w := gh.Lookup(u).(type) {
