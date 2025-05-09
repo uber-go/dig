@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## Unreleased
 - No changes yet.
 
+## [1.18.2] - 2025-05-08
+### Fixed
+- The exported Version string incorrectly containing "-dev".
+
+## [1.18.1] - 2025-03-03
+### Changed
+- Dot graph generation's internal implementation was changed so that
+  Go linker can successfully perform dead code elimination for Go apps
+  that use Dig.
+
+Thanks to @pgimalac for their contribution to this releaase.
+
+[1.18.1]: https://github.com/uber-go/dig/compare/v1.18.0...v1.18.1
+
 ## [1.18.0] - 2024-08-07
 ### Added
 - Child scope constructors are now visualized via `Visualize`
