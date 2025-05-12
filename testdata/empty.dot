@@ -1,6 +1,4 @@
 digraph {
 	rankdir=RL;
 	graph [compound=true];
-	
-	
 }

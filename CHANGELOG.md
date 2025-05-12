@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## Unreleased
 - No changes yet.
 
+## [1.18.2] - 2025-05-08
+### Fixed
+- The exported Version string incorrectly containing "-dev".
+
 ## [1.18.1] - 2025-03-03
 ### Changed
 - Dot graph generation's internal implementation was changed so that

@@ -116,7 +116,6 @@ func visualizeGraph(w io.Writer, dg *dot.Graph) {
 	for _, g := range dg.Groups {
 		visualizeGroup(w, g)
 	}
-	w.Write([]byte("\t\n"))
 	for idx, c := range dg.Ctors {
 		visualizeCtor(w, idx, c)
 	}
@@ -126,46 +125,40 @@ func visualizeGraph(w io.Writer, dg *dot.Graph) {
 	for _, f := range dg.Failed.RootCauses {
 		fmt.Fprintf(w, "\t%s [color=red];\n", strconv.Quote(f.String()))
 	}
-	w.Write([]byte("\t\n}"))
+	w.Write([]byte("}"))
 }
 
 func visualizeGroup(w io.Writer, g *dot.Group) {
 	fmt.Fprintf(w, "\t%s [%s];\n", strconv.Quote(g.String()), g.Attributes())
 	for _, r := range g.Results {
-		fmt.Fprintf(w, "\t\t%s -> %s;\n", strconv.Quote(g.String()), strconv.Quote(r.String()))
+		fmt.Fprintf(w, "\t%s -> %s;\n", strconv.Quote(g.String()), strconv.Quote(r.String()))
 	}
-	w.Write([]byte("\t\t\n"))
 }
 
 func visualizeCtor(w io.Writer, index int, c *dot.Ctor) {
-	fmt.Fprintf(w, "\t\tsubgraph cluster_%d {\n", index)
-	w.Write([]byte("\t\t\t"))
+	fmt.Fprintf(w, "\tsubgraph cluster_%d {\n", index)
 	if c.Package != "" {
-		fmt.Fprintf(w, "label = %s;", strconv.Quote(c.Package))
+		fmt.Fprintf(w, "\t\tlabel = %s;\n", strconv.Quote(c.Package))
 	}
-	w.Write([]byte("\n"))
-	fmt.Fprintf(w, "\t\t\tconstructor_%d [shape=plaintext label=%s];\n", index, strconv.Quote(c.Name))
+	fmt.Fprintf(w, "\t\tconstructor_%d [shape=plaintext label=%s];\n", index, strconv.Quote(c.Name))
 
-	w.Write([]byte("\t\t\t"))
 	if c.ErrorType != 0 {
-		fmt.Fprintf(w, "color=%s;", c.ErrorType.Color())
+		fmt.Fprintf(w, "\t\tcolor=%s;\n", c.ErrorType.Color())
 	}
-	w.Write([]byte("\n"))
 	for _, r := range c.Results {
-		fmt.Fprintf(w, "\t\t\t%s [%s];\n", strconv.Quote(r.String()), r.Attributes())
+		fmt.Fprintf(w, "\t\t%s [%s];\n", strconv.Quote(r.String()), r.Attributes())
 	}
-	fmt.Fprintf(w, "\t\t\t\n\t\t}\n\t\t\n")
+	fmt.Fprintf(w, "\t}\n")
 	for _, p := range c.Params {
 		var optionalStyle string
 		if p.Optional {
 			optionalStyle = " style=dashed"
 		}
 
-		fmt.Fprintf(w, "\t\t\tconstructor_%d -> %s [ltail=cluster_%d%s];\n\t\t\n", index, strconv.Quote(p.String()), index, optionalStyle)
+		fmt.Fprintf(w, "\tconstructor_%d -> %s [ltail=cluster_%d%s];\n", index, strconv.Quote(p.String()), index, optionalStyle)
 	}
-	w.Write([]byte("\t\t\n"))
 	for _, p := range c.GroupParams {
-		fmt.Fprintf(w, "\t\t\tconstructor_%d -> %s [ltail=cluster_%d];\n\t\t\n", index, strconv.Quote(p.String()), index)
+		fmt.Fprintf(w, "\tconstructor_%d -> %s [ltail=cluster_%d];\n", index, strconv.Quote(p.String()), index)
 	}
 }
 
