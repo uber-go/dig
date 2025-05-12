@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Uber Technologies, Inc.
+// Copyright (c) 2025 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,8 +30,8 @@ type BeforeCallbackInfo struct {
 }
 
 // BeforeCallback is a function that can be registered with a provided function
-// or decorator with [WithCallback] to cause it to be called before the
-// provided function or decorator is run.
+// using [WithProviderBeforeCallback] or decorator using [WithDecoratorBeforeCallback]
+// to cause it to be called before the provided function or decorator is run.
 type BeforeCallback func(bci BeforeCallbackInfo)
 
 // WithProviderBeforeCallback returns a [ProvideOption] which has Dig call

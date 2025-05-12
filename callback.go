@@ -41,8 +41,8 @@ type CallbackInfo struct {
 }
 
 // Callback is a function that can be registered with a provided function
-// or decorator with [WithCallback] to cause it to be called after the
-// provided function or decorator is run.
+// or decorator with [WithProviderCallback] or decorator with [WithDecoratorCallback]
+// to cause it to be called after the provided function or decorator is run.
 type Callback func(CallbackInfo)
 
 // WithProviderCallback returns a [ProvideOption] which has Dig call
