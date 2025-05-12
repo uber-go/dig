@@ -28,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.uber.org/dig"
 	"go.uber.org/dig/internal/digtest"
 )
@@ -164,7 +165,7 @@ func TestDecorateSuccess(t *testing.T) {
 			i := i
 			c.RequireProvide(func() *someInt { return newSomeInt(i) }, dig.Group("values"), dig.As(new(myInt)))
 		}
-		c.Decorate(func(in A) B {
+		c.RequireDecorate(func(in A) B {
 			for _, v := range in.Values {
 				v.Increment()
 			}
