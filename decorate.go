@@ -309,13 +309,15 @@ func findResultKeys(r resultList) ([]key, error) {
 		case resultSingle:
 			keys = append(keys, key{t: innerResult.Type, name: innerResult.Name})
 		case resultGrouped:
-			if innerResult.Type.Kind() != reflect.Slice {
+			isMap := innerResult.Type.Kind() == reflect.Map && innerResult.Type.Key().Kind() == reflect.String
+			isSlice := innerResult.Type.Kind() == reflect.Slice
+			if !isMap && !isSlice {
 				return nil, newErrInvalidInput("decorating a value group requires decorating the entire value group, not a single value", nil)
 			}
 			keys = append(keys, key{t: innerResult.Type.Elem(), group: innerResult.Group})
 		case resultObject:
 			for _, f := range innerResult.Fields {
-				q = append(q, f.Result)
+				q = append(q, f.Results...)
 			}
 		case resultList:
 			q = append(q, innerResult.Results...)

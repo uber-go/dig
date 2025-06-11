@@ -39,10 +39,12 @@ import (
 //	paramSingle   An explicitly requested type.
 //	paramObject   dig.In struct where each field in the struct can be another
 //	              param.
-//	paramGroupedSlice
-//	              A slice consuming a value group. This will receive all
+//	paramGroupedCollection
+//	              A slice or map consuming a value group. This will receive all
 //	              values produced with a `group:".."` tag with the same name
-//	              as a slice.
+//	              as a slice or map. For a map, every value produced with the
+//                same group name MUST have a name which will form the map key.
+
 type param interface {
 	fmt.Stringer
 
@@ -60,7 +62,7 @@ var (
 	_ param = paramSingle{}
 	_ param = paramObject{}
 	_ param = paramList{}
-	_ param = paramGroupedSlice{}
+	_ param = paramGroupedCollection{}
 )
 
 // newParam builds a param from the given type. If the provided type is a
@@ -343,7 +345,7 @@ func getParamOrder(gh *graphHolder, param param) []int {
 		for _, provider := range providers {
 			orders = append(orders, provider.Order(gh.s))
 		}
-	case paramGroupedSlice:
+	case paramGroupedCollection:
 		// value group parameters have nodes of their own.
 		// We can directly return that here.
 		orders = append(orders, p.orders[gh.s])
@@ -402,7 +404,7 @@ func (po paramObject) Build(c containerStore) (reflect.Value, error) {
 	var softGroupsQueue []paramObjectField
 	var fields []paramObjectField
 	for _, f := range po.Fields {
-		if p, ok := f.Param.(paramGroupedSlice); ok && p.Soft {
+		if p, ok := f.Param.(paramGroupedCollection); ok && p.Soft {
 			softGroupsQueue = append(softGroupsQueue, f)
 			continue
 		}
@@ -452,7 +454,7 @@ func newParamObjectField(idx int, f reflect.StructField, c containerStore) (para
 
 	case f.Tag.Get(_groupTag) != "":
 		var err error
-		p, err = newParamGroupedSlice(f, c)
+		p, err = newParamGroupedCollection(f, c)
 		if err != nil {
 			return pof, err
 		}
@@ -489,13 +491,13 @@ func (pof paramObjectField) Build(c containerStore) (reflect.Value, error) {
 	return v, nil
 }
 
-// paramGroupedSlice is a param which produces a slice of values with the same
+// paramGroupedCollection is a param which produces a slice or map of values with the same
 // group name.
-type paramGroupedSlice struct {
+type paramGroupedCollection struct {
 	// Name of the group as specified in the `group:".."` tag.
 	Group string
 
-	// Type of the slice.
+	// Type of the map or slice.
 	Type reflect.Type
 
 	// Soft is used to denote a soft dependency between this param and its
@@ -503,15 +505,17 @@ type paramGroupedSlice struct {
 	// provide another value requested in the graph
 	Soft bool
 
+	isMap  bool
 	orders map[*Scope]int
 }
 
-func (pt paramGroupedSlice) String() string {
+func (pt paramGroupedCollection) String() string {
 	// io.Reader[group="foo"] refers to a group of io.Readers called 'foo'
 	return fmt.Sprintf("%v[group=%q]", pt.Type.Elem(), pt.Group)
+	// JQTODO, different string for map
 }
 
-func (pt paramGroupedSlice) DotParam() []*dot.Param {
+func (pt paramGroupedCollection) DotParam() []*dot.Param {
 	return []*dot.Param{
 		{
 			Node: &dot.Node{
@@ -522,18 +526,21 @@ func (pt paramGroupedSlice) DotParam() []*dot.Param {
 	}
 }
 
-// newParamGroupedSlice builds a paramGroupedSlice from the provided type with
+// newParamGroupedCollection builds a paramGroupedCollection from the provided type with
 // the given name.
 //
-// The type MUST be a slice type.
-func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGroupedSlice, error) {
+// The type MUST be a slice or map[string]T type.
+func newParamGroupedCollection(f reflect.StructField, c containerStore) (paramGroupedCollection, error) {
 	g, err := parseGroupString(f.Tag.Get(_groupTag))
 	if err != nil {
-		return paramGroupedSlice{}, err
+		return paramGroupedCollection{}, err
 	}
-	pg := paramGroupedSlice{
+	isMap := f.Type.Kind() == reflect.Map && f.Type.Key().Kind() == reflect.String
+	isSlice := f.Type.Kind() == reflect.Slice
+	pg := paramGroupedCollection{
 		Group:  g.Name,
 		Type:   f.Type,
+		isMap:  isMap,
 		orders: make(map[*Scope]int),
 		Soft:   g.Soft,
 	}
@@ -541,9 +548,9 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 	name := f.Tag.Get(_nameTag)
 	optional, _ := isFieldOptional(f)
 	switch {
-	case f.Type.Kind() != reflect.Slice:
+	case !isMap && !isSlice:
 		return pg, newErrInvalidInput(
-			fmt.Sprintf("value groups may be consumed as slices only: field %q (%v) is not a slice", f.Name, f.Type), nil)
+			fmt.Sprintf("value groups may be consumed as slices or string-keyed maps only: field %q (%v) is not a slice or string-keyed map", f.Name, f.Type), nil)
 	case g.Flatten:
 		return pg, newErrInvalidInput(
 			fmt.Sprintf("cannot use flatten in parameter value groups: field %q (%v) specifies flatten", f.Name, f.Type), nil)
@@ -561,7 +568,7 @@ func newParamGroupedSlice(f reflect.StructField, c containerStore) (paramGrouped
 // any of the parent Scopes. In the case where there are multiple scopes that
 // are decorating the same type, the closest scope in effect will be replacing
 // any decorated value groups provided in further scopes.
-func (pt paramGroupedSlice) getDecoratedValues(c containerStore) (reflect.Value, bool) {
+func (pt paramGroupedCollection) getDecoratedValues(c containerStore) (reflect.Value, bool) {
 	for _, c := range c.storesToRoot() {
 		if items, ok := c.getDecoratedValueGroup(pt.Group, pt.Type); ok {
 			return items, true
@@ -576,7 +583,7 @@ func (pt paramGroupedSlice) getDecoratedValues(c containerStore) (reflect.Value,
 // The order in which the decorators are invoked is from the top level scope to
 // the current scope, to account for decorators that decorate values that were
 // already decorated.
-func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
+func (pt paramGroupedCollection) callGroupDecorators(c containerStore) error {
 	stores := c.storesToRoot()
 	for i := len(stores) - 1; i >= 0; i-- {
 		c := stores[i]
@@ -601,7 +608,7 @@ func (pt paramGroupedSlice) callGroupDecorators(c containerStore) error {
 // search the given container and its parent for matching group providers and
 // call them to commit values. If an error is encountered, return the number
 // of providers called and a non-nil error from the first provided.
-func (pt paramGroupedSlice) callGroupProviders(c containerStore) (int, error) {
+func (pt paramGroupedCollection) callGroupProviders(c containerStore) (int, error) {
 	itemCount := 0
 	for _, c := range c.storesToRoot() {
 		providers := c.getGroupProviders(pt.Group, pt.Type.Elem())
@@ -619,7 +626,7 @@ func (pt paramGroupedSlice) callGroupProviders(c containerStore) (int, error) {
 	return itemCount, nil
 }
 
-func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
+func (pt paramGroupedCollection) Build(c containerStore) (reflect.Value, error) {
 	// do not call this if we are already inside a decorator since
 	// it will result in an infinite recursion. (i.e. decorate -> params.BuildList() -> Decorate -> params.BuildList...)
 	// this is safe since a value can be decorated at most once in a given scope.
@@ -628,6 +635,7 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 	}
 
 	// Check if we have decorated values
+	// qjeremy(how to handle this with maps?)
 	if decoratedItems, ok := pt.getDecoratedValues(c); ok {
 		return decoratedItems, nil
 	}
@@ -644,9 +652,28 @@ func (pt paramGroupedSlice) Build(c containerStore) (reflect.Value, error) {
 	}
 
 	stores := c.storesToRoot()
+	if pt.isMap {
+		result := reflect.MakeMapWithSize(pt.Type, itemCount)
+		for _, c := range stores {
+			kgvs := c.getValueGroup(pt.Group, pt.Type.Elem())
+			for _, kgv := range kgvs {
+				if kgv.key == "" {
+					return _noValue, newErrInvalidInput(
+						fmt.Sprintf("every entry in a map value groups must have a name, group \"%v\" is missing a name", pt.Group),
+						nil,
+					)
+				}
+				result.SetMapIndex(reflect.ValueOf(kgv.key), kgv.value)
+			}
+		}
+		return result, nil
+	}
 	result := reflect.MakeSlice(pt.Type, 0, itemCount)
 	for _, c := range stores {
-		result = reflect.Append(result, c.getValueGroup(pt.Group, pt.Type.Elem())...)
+		kgvs := c.getValueGroup(pt.Group, pt.Type.Elem())
+		for _, kgv := range kgvs {
+			result = reflect.Append(result, kgv.value)
+		}
 	}
 	return result, nil
 }

@@ -796,6 +796,53 @@ func TestEndToEndSuccess(t *testing.T) {
 		assert.ElementsMatch(t, actualStrs, expectedStrs, "list of strings provided must match")
 	})
 
+	t.Run("multiple As with Group and Name", func(t *testing.T) {
+		c := digtest.New(t)
+		expectedNames := []string{"inst1", "inst2"}
+		expectedStrs := []string{"foo", "bar"}
+		for i, s := range expectedStrs {
+			s := s
+			c.RequireProvide(func() *bytes.Buffer {
+				return bytes.NewBufferString(s)
+			}, dig.Group("buffs"), dig.Name(expectedNames[i]),
+				dig.As(new(io.Reader), new(io.Writer)))
+		}
+
+		type in struct {
+			dig.In
+
+			Reader1 io.Reader   `name:"inst1"`
+			Reader2 io.Reader   `name:"inst2"`
+			Readers []io.Reader `group:"buffs"`
+			Writers []io.Writer `group:"buffs"`
+		}
+
+		var actualStrs []string
+		var actualStrsName []string
+
+		c.RequireInvoke(func(got in) {
+			require.Len(t, got.Readers, 2)
+			buf := make([]byte, 3)
+			for i, r := range got.Readers {
+				_, err := r.Read(buf)
+				require.NoError(t, err)
+				actualStrs = append(actualStrs, string(buf))
+				// put the text back
+				got.Writers[i].Write(buf)
+			}
+			_, err := got.Reader1.Read(buf)
+			require.NoError(t, err)
+			actualStrsName = append(actualStrsName, string(buf))
+			_, err = got.Reader2.Read(buf)
+			require.NoError(t, err)
+			actualStrsName = append(actualStrsName, string(buf))
+			require.Len(t, got.Writers, 2)
+		})
+
+		assert.ElementsMatch(t, actualStrs, expectedStrs, "list of strings provided must match")
+		assert.ElementsMatch(t, actualStrsName, expectedStrs, "names: list of strings provided must match")
+	})
+
 	t.Run("As same interface", func(t *testing.T) {
 		c := digtest.New(t)
 		c.RequireProvide(func() io.Reader {
@@ -1145,6 +1192,48 @@ func TestGroups(t *testing.T) {
 		})
 	})
 
+	t.Run("values are provided; coexist with name", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			dig.Out
+
+			Value int `group:"val"`
+		}
+
+		type out2 struct {
+			dig.Out
+
+			Value int `name:"inst1" group:"val"`
+		}
+
+		provide := func(i int) {
+			c.RequireProvide(func() out {
+				return out{Value: i}
+			})
+		}
+
+		provide(1)
+		provide(2)
+		provide(3)
+
+		c.RequireProvide(func() out2 {
+			return out2{Value: 4}
+		})
+
+		type in struct {
+			dig.In
+
+			SingleValue int   `name:"inst1"`
+			Values      []int `group:"val"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			assert.Equal(t, []int{1, 2, 3, 4}, i.Values)
+			assert.Equal(t, 4, i.SingleValue)
+		})
+	})
+
 	t.Run("groups are provided via option", func(t *testing.T) {
 		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
 
@@ -1166,6 +1255,57 @@ func TestGroups(t *testing.T) {
 
 		c.RequireInvoke(func(i in) {
 			assert.Equal(t, []int{2, 3, 1}, i.Values)
+		})
+	})
+
+	t.Run("groups are provided via option; coexist with name", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+
+		provide := func(i int) {
+			c.RequireProvide(func() int {
+				return i
+			}, dig.Group("val"))
+		}
+
+		provide(1)
+		provide(2)
+		provide(3)
+
+		c.RequireProvide(func() int {
+			return 4
+		}, dig.Group("val"), dig.Name("inst1"))
+
+		type in struct {
+			dig.In
+
+			SingleValue int   `name:"inst1"`
+			Values      []int `group:"val"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			assert.Equal(t, []int{1, 2, 3, 4}, i.Values)
+			assert.Equal(t, 4, i.SingleValue)
+		})
+	})
+
+	t.Run("provide multiple with the same name and group but different type", func(t *testing.T) {
+		c := digtest.New(t)
+		type A struct{}
+		type B struct{}
+		type ret1 struct {
+			dig.Out
+			*A `name:"foo" group:"foos"`
+		}
+		type ret2 struct {
+			dig.Out
+			*B `name:"foo" group:"foos"`
+		}
+		c.RequireProvide(func() ret1 {
+			return ret1{A: &A{}}
+		})
+
+		c.RequireProvide(func() ret2 {
+			return ret2{B: &B{}}
 		})
 	})
 
@@ -1476,6 +1616,44 @@ func TestGroups(t *testing.T) {
 		})
 	})
 
+	t.Run("flatten collects slices but also handles name", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+
+		type out1 struct {
+			dig.Out
+
+			Value []int `name:"foo1" group:"val,flatten"`
+		}
+
+		type out2 struct {
+			dig.Out
+
+			Value []int `name:"foo2" group:"val,flatten"`
+		}
+
+		c.RequireProvide(func() out1 {
+			return out1{Value: []int{1, 2}}
+		})
+
+		c.RequireProvide(func() out2 {
+			return out2{Value: []int{3, 4}}
+		})
+
+		type in struct {
+			dig.In
+
+			NotFlattenedSlice1 []int `name:"foo1"`
+			NotFlattenedSlice2 []int `name:"foo2"`
+			Values             []int `group:"val"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 4, 1}, i.Values)
+			assert.Equal(t, []int{1, 2}, i.NotFlattenedSlice1)
+			assert.Equal(t, []int{3, 4}, i.NotFlattenedSlice2)
+		})
+	})
+
 	t.Run("flatten via option", func(t *testing.T) {
 		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
 		c.RequireProvide(func() []int {
@@ -1490,6 +1668,31 @@ func TestGroups(t *testing.T) {
 
 		c.RequireInvoke(func(i in) {
 			assert.Equal(t, []int{2, 3, 1}, i.Values)
+		})
+	})
+
+	t.Run("flatten via option also handles name", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+		c.RequireProvide(func() []int {
+			return []int{1, 2}
+		}, dig.Group("val,flatten"), dig.Name("foo1"))
+
+		c.RequireProvide(func() []int {
+			return []int{3}
+		}, dig.Group("val,flatten"), dig.Name("foo2"))
+
+		type in struct {
+			dig.In
+
+			NotFlattenedSlice1 []int `name:"foo1"`
+			NotFlattenedSlice2 []int `name:"foo2"`
+			Values             []int `group:"val"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Values)
+			assert.Equal(t, []int{1, 2}, i.NotFlattenedSlice1)
+			assert.Equal(t, []int{3}, i.NotFlattenedSlice2)
 		})
 	})
 
@@ -1610,6 +1813,118 @@ func TestGroups(t *testing.T) {
 			assert.ElementsMatch(t, []string{"a"}, param.Value)
 		})
 	})
+	/* map tests */
+	t.Run("empty map received without provides", func(t *testing.T) {
+		c := digtest.New(t)
+
+		type in struct {
+			dig.In
+
+			Values map[string]int `group:"foo"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			require.Empty(t, i.Values)
+		})
+	})
+
+	t.Run("map value group using dig.Name and dig.Group", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+
+		c.RequireProvide(func() int {
+			return 1
+		}, dig.Name("value1"), dig.Group("val"))
+		c.RequireProvide(func() int {
+			return 2
+		}, dig.Name("value2"), dig.Group("val"))
+		c.RequireProvide(func() int {
+			return 3
+		}, dig.Name("value3"), dig.Group("val"))
+
+		type in struct {
+			dig.In
+
+			Value1   int            `name:"value1"`
+			Value2   int            `name:"value2"`
+			Value3   int            `name:"value3"`
+			Values   []int          `group:"val"`
+			ValueMap map[string]int `group:"val"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Values)
+			assert.Equal(t, i.ValueMap["value1"], 1)
+			assert.Equal(t, i.ValueMap["value2"], 2)
+			assert.Equal(t, i.ValueMap["value3"], 3)
+			assert.Equal(t, i.Value1, 1)
+			assert.Equal(t, i.Value2, 2)
+			assert.Equal(t, i.Value3, 3)
+		})
+	})
+	t.Run("values are provided, map and name and slice", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+		type out struct {
+			dig.Out
+
+			Value1 int `name:"value1" group:"val"`
+			Value2 int `name:"value2" group:"val"`
+			Value3 int `name:"value3" group:"val"`
+		}
+
+		c.RequireProvide(func() out {
+			return out{Value1: 1, Value2: 2, Value3: 3}
+		})
+
+		type in struct {
+			dig.In
+
+			Value1   int            `name:"value1"`
+			Value2   int            `name:"value2"`
+			Value3   int            `name:"value3"`
+			Values   []int          `group:"val"`
+			ValueMap map[string]int `group:"val"`
+		}
+
+		c.RequireInvoke(func(i in) {
+			assert.Equal(t, []int{2, 3, 1}, i.Values)
+			assert.Equal(t, i.ValueMap["value1"], 1)
+			assert.Equal(t, i.ValueMap["value2"], 2)
+			assert.Equal(t, i.ValueMap["value3"], 3)
+			assert.Equal(t, i.Value1, 1)
+			assert.Equal(t, i.Value2, 2)
+			assert.Equal(t, i.Value3, 3)
+		})
+	})
+
+	t.Run("Every item used in a map must have a named key", func(t *testing.T) {
+		c := digtest.New(t, dig.SetRand(rand.New(rand.NewSource(0))))
+
+		type out struct {
+			dig.Out
+
+			Value1 int `name:"value1" group:"val"`
+			Value2 int `name:"value2" group:"val"`
+			Value3 int `group:"val"`
+		}
+
+		c.RequireProvide(func() out {
+			return out{Value1: 1, Value2: 2, Value3: 3}
+		})
+
+		type in struct {
+			dig.In
+
+			ValueMap map[string]int `group:"val"`
+		}
+		var called = false
+		err := c.Invoke(func(i in) { called = true })
+		dig.AssertErrorMatches(t, err,
+			`could not build arguments for function "go.uber.org/dig_test".TestGroups\S+`,
+			`dig_test.go:\d+`, // file:line
+			`every entry in a map value groups must have a name, group "val" is missing a name`)
+		assert.False(t, called, "shouldn't call invoked function when deps aren't available")
+	})
+
 }
 
 // --- END OF END TO END TESTS
@@ -2219,21 +2534,6 @@ func TestAsExpectingOriginalType(t *testing.T) {
 	})
 }
 
-func TestProvideIncompatibleOptions(t *testing.T) {
-	t.Parallel()
-
-	t.Run("group and name", func(t *testing.T) {
-		c := digtest.New(t)
-		err := c.Provide(func() io.Reader {
-			t.Fatal("this function must not be called")
-			return nil
-		}, dig.Group("foo"), dig.Name("bar"))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use named values with value groups: "+
-			`name:"bar" provided with group:"foo"`)
-	})
-}
-
 type testStruct struct{}
 
 func (testStruct) TestMethod(x int) float64 { return float64(x) }
@@ -2763,6 +3063,80 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 		type ret2 struct {
 			dig.Out
 			*A `name:"foo"`
+		}
+		c.RequireProvide(func() ret1 {
+			return ret1{A: &A{}}
+		})
+
+		err := c.Provide(func() ret2 {
+			return ret2{A: &A{}}
+		})
+		require.Error(t, err, "expected error on the second provide")
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
+			`dig_test.go:\d+`, // file:line
+			`cannot provide \*dig_test.A\[name="foo"\] from \[0\].A:`,
+			`already provided by "go.uber.org/dig_test".testProvideFailures\S+`,
+		)
+	})
+
+	t.Run("provide multiple instances with the same name and same group", func(t *testing.T) {
+		c := digtest.New(t, dig.DryRun(dryRun))
+		type A struct{}
+		type ret1 struct {
+			dig.Out
+			*A `name:"foo" group:"foos"`
+		}
+		type ret2 struct {
+			dig.Out
+			*A `name:"foo" group:"foos"`
+		}
+		c.RequireProvide(func() ret1 {
+			return ret1{A: &A{}}
+		})
+
+		err := c.Provide(func() ret2 {
+			return ret2{A: &A{}}
+		})
+		require.Error(t, err, "expected error on the second provide")
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
+			`dig_test.go:\d+`, // file:line
+			`cannot provide \*dig_test.A\[name="foo"\] from \[0\].A:`,
+			`already provided by "go.uber.org/dig_test".testProvideFailures\S+`,
+		)
+	})
+
+	t.Run("provide multiple instances with the same name and same group using options", func(t *testing.T) {
+		c := digtest.New(t, dig.DryRun(dryRun))
+		type A struct{}
+
+		c.RequireProvide(func() *A {
+			return &A{}
+		}, dig.Group("foos"), dig.Name("foo"))
+
+		err := c.Provide(func() *A {
+			return &A{}
+		}, dig.Group("foos"), dig.Name("foo"))
+		require.Error(t, err, "expected error on the second provide")
+		dig.AssertErrorMatches(t, err,
+			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
+			`dig_test.go:\d+`, // file:line
+			`cannot provide \*dig_test.A\[name="foo"\] from \[1\]:`,
+			`already provided by "go.uber.org/dig_test".testProvideFailures\S+`,
+		)
+	})
+
+	t.Run("provide multiple instances with the same name and type but different group", func(t *testing.T) {
+		c := digtest.New(t, dig.DryRun(dryRun))
+		type A struct{}
+		type ret1 struct {
+			dig.Out
+			*A `name:"foo" group:"foos"`
+		}
+		type ret2 struct {
+			dig.Out
+			*A `name:"foo" group:"foosss"`
 		}
 		c.RequireProvide(func() ret1 {
 			return ret1{A: &A{}}

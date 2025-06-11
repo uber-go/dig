@@ -66,7 +66,7 @@ type resultOptions struct {
 }
 
 // newResult builds a result from the given type.
-func newResult(t reflect.Type, opts resultOptions) (result, error) {
+func newResult(t reflect.Type, opts resultOptions, noGroup bool) (result, error) {
 	switch {
 	case IsIn(t) || (t.Kind() == reflect.Ptr && IsIn(t.Elem())) || embedsType(t, _inPtrType):
 		return nil, newErrInvalidInput(fmt.Sprintf(
@@ -81,13 +81,13 @@ func newResult(t reflect.Type, opts resultOptions) (result, error) {
 	case t.Kind() == reflect.Ptr && IsOut(t.Elem()):
 		return nil, newErrInvalidInput(fmt.Sprintf(
 			"cannot return a pointer to a result object, use a value instead: %v is a pointer to a struct that embeds dig.Out", t), nil)
-	case len(opts.Group) > 0:
+	case len(opts.Group) > 0 && !noGroup:
 		g, err := parseGroupString(opts.Group)
 		if err != nil {
 			return nil, newErrInvalidInput(
 				fmt.Sprintf("cannot parse group %q", opts.Group), err)
 		}
-		rg := resultGrouped{Type: t, Group: g.Name, Flatten: g.Flatten}
+		rg := resultGrouped{Type: t, Key: opts.Name, Group: g.Name, Flatten: g.Flatten}
 		if len(opts.As) > 0 {
 			var asTypes []reflect.Type
 			for _, as := range opts.As {
@@ -176,7 +176,9 @@ func walkResult(r result, v resultVisitor) {
 		w := v
 		for _, f := range res.Fields {
 			if v := w.AnnotateWithField(f); v != nil {
-				walkResult(f.Result, v)
+				for _, r := range f.Results {
+					walkResult(r, v)
+				}
 			}
 		}
 	case resultList:
@@ -200,7 +202,7 @@ type resultList struct {
 	// For each item at index i returned by the constructor, resultIndexes[i]
 	// is the index in .Results for the corresponding result object.
 	// resultIndexes[i] is -1 for errors returned by constructors.
-	resultIndexes []int
+	resultIndexes [][]int
 }
 
 func (rl resultList) DotResult() []*dot.Result {
@@ -216,25 +218,45 @@ func newResultList(ctype reflect.Type, opts resultOptions) (resultList, error) {
 	rl := resultList{
 		ctype:         ctype,
 		Results:       make([]result, 0, numOut),
-		resultIndexes: make([]int, numOut),
+		resultIndexes: make([][]int, numOut),
 	}
 
 	resultIdx := 0
 	for i := 0; i < numOut; i++ {
 		t := ctype.Out(i)
 		if isError(t) {
-			rl.resultIndexes[i] = -1
+			rl.resultIndexes[i] = append(rl.resultIndexes[i], -1)
 			continue
 		}
 
-		r, err := newResult(t, opts)
-		if err != nil {
-			return rl, newErrInvalidInput(fmt.Sprintf("bad result %d", i+1), err)
+		addResult := func(nogroup bool) error {
+			r, err := newResult(t, opts, nogroup)
+			if err != nil {
+				return newErrInvalidInput(fmt.Sprintf("bad result %d", i+1), err)
+			}
+
+			rl.Results = append(rl.Results, r)
+			rl.resultIndexes[i] = append(rl.resultIndexes[i], resultIdx)
+			resultIdx++
+			return nil
 		}
 
-		rl.Results = append(rl.Results, r)
-		rl.resultIndexes[i] = resultIdx
-		resultIdx++
+		// special case, its added as a group and a name using options alone
+		if len(opts.Name) > 0 && len(opts.Group) > 0 && !IsOut(t) {
+			// add as a group
+			if err := addResult(false); err != nil {
+				return rl, err
+			}
+			// add as single
+			err := addResult(true)
+			return rl, err
+		}
+
+		// add as normal
+		if err := addResult(false); err != nil {
+			return rl, err
+		}
+
 	}
 
 	return rl, nil
@@ -246,8 +268,14 @@ func (resultList) Extract(containerWriter, bool, reflect.Value) {
 
 func (rl resultList) ExtractList(cw containerWriter, decorated bool, values []reflect.Value) error {
 	for i, v := range values {
-		if resultIdx := rl.resultIndexes[i]; resultIdx >= 0 {
-			rl.Results[resultIdx].Extract(cw, decorated, v)
+		isNonErrorResult := false
+		for _, resultIdx := range rl.resultIndexes[i] {
+			if resultIdx >= 0 {
+				rl.Results[resultIdx].Extract(cw, decorated, v)
+				isNonErrorResult = true
+			}
+		}
+		if isNonErrorResult {
 			continue
 		}
 
@@ -384,7 +412,9 @@ func newResultObject(t reflect.Type, opts resultOptions) (resultObject, error) {
 
 func (ro resultObject) Extract(cw containerWriter, decorated bool, v reflect.Value) {
 	for _, f := range ro.Fields {
-		f.Result.Extract(cw, decorated, v.Field(f.FieldIndex))
+		for _, r := range f.Results {
+			r.Extract(cw, decorated, v.Field(f.FieldIndex))
+		}
 	}
 }
 
@@ -399,12 +429,16 @@ type resultObjectField struct {
 	// map to results.
 	FieldIndex int
 
-	// Result produced by this field.
-	Result result
+	// Results produced by this field.
+	Results []result
 }
 
 func (rof resultObjectField) DotResult() []*dot.Result {
-	return rof.Result.DotResult()
+	results := make([]*dot.Result, 0, len(rof.Results))
+	for _, r := range rof.Results {
+		results = append(results, r.DotResult()...)
+	}
+	return results
 }
 
 // newResultObjectField(i, f, opts) builds a resultObjectField from the field
@@ -414,7 +448,11 @@ func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (r
 		FieldName:  f.Name,
 		FieldIndex: idx,
 	}
-
+	name := f.Tag.Get(_nameTag)
+	if len(name) > 0 {
+		// can modify in-place because options are passed-by-value.
+		opts.Name = name
+	}
 	var r result
 	switch {
 	case f.PkgPath != "":
@@ -427,20 +465,21 @@ func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (r
 		if err != nil {
 			return rof, err
 		}
+		rof.Results = append(rof.Results, r)
+		if len(name) == 0 {
+			break
+		}
+		fallthrough
 
 	default:
 		var err error
-		if name := f.Tag.Get(_nameTag); len(name) > 0 {
-			// can modify in-place because options are passed-by-value.
-			opts.Name = name
-		}
-		r, err = newResult(f.Type, opts)
+		r, err = newResult(f.Type, opts, false)
 		if err != nil {
 			return rof, err
 		}
+		rof.Results = append(rof.Results, r)
 	}
 
-	rof.Result = r
 	return rof, nil
 }
 
@@ -451,6 +490,9 @@ func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (r
 type resultGrouped struct {
 	// Name of the group as specified in the `group:".."` tag.
 	Group string
+
+	// Key if a name tag or option was provided, for populating maps
+	Key string
 
 	// Type of value produced.
 	Type reflect.Type
@@ -488,12 +530,13 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	if err != nil {
 		return resultGrouped{}, err
 	}
+	name := f.Tag.Get(_nameTag)
 	rg := resultGrouped{
 		Group:   g.Name,
+		Key:     name,
 		Flatten: g.Flatten,
 		Type:    f.Type,
 	}
-	name := f.Tag.Get(_nameTag)
 	optional, _ := isFieldOptional(f)
 	switch {
 	case g.Flatten && f.Type.Kind() != reflect.Slice:
@@ -502,9 +545,6 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 	case g.Soft:
 		return rg, newErrInvalidInput(fmt.Sprintf(
 			"cannot use soft with result value groups: soft was used with group %q", rg.Group), nil)
-	case name != "":
-		return rg, newErrInvalidInput(fmt.Sprintf(
-			"cannot use named values with value groups: name:%q provided with group:%q", name, rg.Group), nil)
 	case optional:
 		return rg, newErrInvalidInput("value groups cannot be optional", nil)
 	}
@@ -518,18 +558,19 @@ func newResultGrouped(f reflect.StructField) (resultGrouped, error) {
 func (rt resultGrouped) Extract(cw containerWriter, decorated bool, v reflect.Value) {
 	// Decorated values are always flattened.
 	if !decorated && !rt.Flatten {
-		cw.submitGroupedValue(rt.Group, rt.Type, v)
+		cw.submitGroupedValue(rt.Group, rt.Key, rt.Type, v)
 		for _, asType := range rt.As {
-			cw.submitGroupedValue(rt.Group, asType, v)
+			cw.submitGroupedValue(rt.Group, rt.Key, asType, v)
 		}
 		return
 	}
 
 	if decorated {
-		cw.submitDecoratedGroupedValue(rt.Group, rt.Type, v)
+		cw.submitDecoratedGroupedValue(rt.Group, rt.Key, rt.Type, v)
 		return
 	}
+	// it's not possible to provide a key for the flattening case
 	for i := 0; i < v.Len(); i++ {
-		cw.submitGroupedValue(rt.Group, rt.Type, v.Index(i))
+		cw.submitGroupedValue(rt.Group, "", rt.Type, v.Index(i))
 	}
 }

@@ -213,7 +213,7 @@ func (n *constructorNode) Call(c containerStore) (err error) {
 // would be made to a containerWriter and defers them until Commit is called.
 type stagingContainerWriter struct {
 	values map[key]reflect.Value
-	groups map[key][]reflect.Value
+	groups map[key][]keyedGroupValue
 }
 
 var _ containerWriter = (*stagingContainerWriter)(nil)
@@ -221,7 +221,7 @@ var _ containerWriter = (*stagingContainerWriter)(nil)
 func newStagingContainerWriter() *stagingContainerWriter {
 	return &stagingContainerWriter{
 		values: make(map[key]reflect.Value),
-		groups: make(map[key][]reflect.Value),
+		groups: make(map[key][]keyedGroupValue),
 	}
 }
 
@@ -233,12 +233,12 @@ func (sr *stagingContainerWriter) setDecoratedValue(_ string, _ reflect.Type, _ 
 	digerror.BugPanicf("stagingContainerWriter.setDecoratedValue must never be called")
 }
 
-func (sr *stagingContainerWriter) submitGroupedValue(group string, t reflect.Type, v reflect.Value) {
+func (sr *stagingContainerWriter) submitGroupedValue(group, mapKey string, t reflect.Type, v reflect.Value) {
 	k := key{t: t, group: group}
-	sr.groups[k] = append(sr.groups[k], v)
+	sr.groups[k] = append(sr.groups[k], keyedGroupValue{key: mapKey, value: v})
 }
 
-func (sr *stagingContainerWriter) submitDecoratedGroupedValue(_ string, _ reflect.Type, _ reflect.Value) {
+func (sr *stagingContainerWriter) submitDecoratedGroupedValue(_, _ string, _ reflect.Type, _ reflect.Value) {
 	digerror.BugPanicf("stagingContainerWriter.submitDecoratedGroupedValue must never be called")
 }
 
@@ -248,9 +248,9 @@ func (sr *stagingContainerWriter) Commit(cw containerWriter) {
 		cw.setValue(k.name, k.t, v)
 	}
 
-	for k, vs := range sr.groups {
-		for _, v := range vs {
-			cw.submitGroupedValue(k.group, k.t, v)
+	for k, kgvs := range sr.groups {
+		for _, kgv := range kgvs {
+			cw.submitGroupedValue(k.group, kgv.key, k.t, kgv.value)
 		}
 	}
 }
