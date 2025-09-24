@@ -83,7 +83,9 @@ func newDecoratorNode(dcor interface{}, s *Scope, opts decorateOptions) (*decora
 		return nil, err
 	}
 
-	rl, err := newResultList(dtype, resultOptions{})
+	rl, err := newResultList(dtype, resultOptions{
+		Name: opts.Name,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -171,9 +173,41 @@ type DecorateOption interface {
 }
 
 type decorateOptions struct {
+	Name           string
 	Info           *DecorateInfo
 	Callback       Callback
 	BeforeCallback BeforeCallback
+}
+
+// Name is a ProvideOption that specifies that all values produced by a
+// constructor should have the given name. See also the package documentation
+// about Named Values.
+//
+// Given,
+//
+//	func NewReadOnlyConnection(...) (*Connection, error)
+//	func NewReadWriteConnection(...) (*Connection, error)
+//
+// The following will provide two connections to the container: one under the
+// name "ro" and the other under the name "rw".
+//
+//	c.Provide(NewReadOnlyConnection, dig.Name("ro"))
+//	c.Provide(NewReadWriteConnection, dig.Name("rw"))
+//
+// This option cannot be provided for constructors which produce result
+// objects.
+func DecorateName(name string) DecorateOption {
+	return decorateNameOption(name)
+}
+
+type decorateNameOption string
+
+func (o decorateNameOption) String() string {
+	return fmt.Sprintf("DecorateName(%q)", string(o))
+}
+
+func (o decorateNameOption) apply(opt *decorateOptions) {
+	opt.Name = string(o)
 }
 
 // FillDecorateInfo is a DecorateOption that writes info on what Dig was
