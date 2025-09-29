@@ -5,7 +5,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- No changes yet.
+### Added
+- Support for consuming named value groups as `map[string]T` in addition to `[]T`.
+  Named value groups can now be consumed as maps where names become keys, enabling
+  both direct named access and map-based access to the same providers.
+- Simultaneous `dig.Name()` and `dig.Group()` support, removing previous mutual
+  exclusivity to enable named value group patterns.
+- Comprehensive validation for slice decorators with named value groups, preventing
+  incompatible patterns and providing clear guidance for correct usage.
+- Soft value groups support with map consumption, maintaining consistent behavior
+  with slice consumption patterns.
 
 ## [1.19.0] - 2025-05-13
 

@@ -345,4 +345,73 @@
 //	  Handler []int `group:"server"`         // [][]int from dig.In
 //	  Handler []int `group:"server,flatten"` // []int from dig.In
 //	}
+//
+// # Map Value Groups
+//
+// Added in Dig 1.20.
+//
+// For named value groups, dig supports consuming values as maps in addition
+// to slices. This allows accessing individual values by their names while
+// still providing the convenience of working with the entire collection.
+//
+// To use map value groups, values must be provided with both a name and a
+// group. This can be done by combining dig.Name() with dig.Group():
+//
+//	c.Provide(func() int { return 42 }, dig.Name("answer"), dig.Group("numbers"))
+//	c.Provide(func() int { return 100 }, dig.Name("perfect"), dig.Group("numbers"))
+//
+// Or by using result struct tags:
+//
+//	type NumberResult struct {
+//	  dig.Out
+//
+//	  Answer  int `name:"answer" group:"numbers"`
+//	  Perfect int `name:"perfect" group:"numbers"`
+//	}
+//
+// Named value groups can be consumed as maps where the names become keys:
+//
+//	type Params struct {
+//	  dig.In
+//
+//	  NumberMap   map[string]int `group:"numbers"`     // {"answer": 42, "perfect": 100}
+//	  NumberSlice []int          `group:"numbers"`     // [42, 100] (order unspecified)
+//	  Answer      int            `name:"answer"`       // 42
+//	}
+//
+// Map value groups provide the same flexibility as slice value groups:
+// values can be consumed individually by name, as a slice for iteration,
+// or as a map for direct key-based access.
+//
+// Note that only string-keyed maps (map[string]T) are supported, and all
+// values in a map value group must have names.
+//
+// # Decorator Compatibility
+//
+// Slice decorators (func([]T) []T) cannot be used with named value groups
+// because they lose the key information needed to reconstruct maps.
+// Attempting to use slice decorators with named value groups will fail with:
+// "cannot use slice decoration for value group: group contains named values,
+// use map[string]T decorator instead".
+//
+// This is not a breaking change because named value groups are a new feature -
+// previously, dig.Name() and dig.Group() were mutually exclusive.
+//
+// Use map decorators for named value groups:
+//
+//	type MapDecorator struct {
+//	  dig.In
+//	  Numbers map[string]int `group:"numbers"`
+//	}
+//
+//	type MapResult struct {
+//	  dig.Out
+//	  Numbers map[string]int `group:"numbers"`
+//	}
+//
+//	func DecorateNumbers(p MapDecorator) MapResult {
+//	  // Modify the map and return
+//	  return MapResult{Numbers: modifiedMap}
+//	}
+//
 package dig // import "go.uber.org/dig"
