@@ -81,6 +81,30 @@ func TestDecorateSuccess(t *testing.T) {
 		assert.Equal(t, "*dig_test.A", info.Outputs[0].String())
 	})
 
+	t.Run("simple decorate with name", func(t *testing.T) {
+		t.Parallel()
+		type A struct {
+			name string
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() *A { return &A{name: "A"} }, dig.Name("a"))
+
+		type B struct {
+			dig.In
+			A *A `name:"a"`
+		}
+
+		c.RequireInvoke(func(b B) {
+			assert.Equal(t, "A", b.A.name, "expected name to not be decorated yet.")
+		})
+
+		c.RequireDecorate(func(b B) *A { return &A{name: b.A.name + "'"} }, dig.DecorateName("a"))
+		c.RequireInvoke(func(b B) {
+			assert.Equal(t, "A'", b.A.name, "expected name to equal decorated name.")
+		})
+	})
+
 	t.Run("simple decorate a provider from child scope", func(t *testing.T) {
 		t.Parallel()
 		type A struct {
