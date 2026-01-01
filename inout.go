@@ -158,6 +158,89 @@ func embedsType(i interface{}, e reflect.Type) bool {
 	return false
 }
 
+// AsIn marks struct as In by creating reflect.StructOf.
+func AsIn(i any) any {
+	t, ok := inType(i)
+	if !ok {
+		return nil
+	}
+
+	embeddingType := reflect.TypeOf(embeddingIn(t))
+	fnType := reflect.FuncOf([]reflect.Type{embeddingType}, []reflect.Type{t}, false)
+
+	fn := reflect.MakeFunc(fnType, func(args []reflect.Value) []reflect.Value {
+		in := args[0]
+		out := reflect.New(t).Elem()
+
+		outIndex := 0
+		for inIndex := 0; inIndex < in.NumField(); inIndex++ {
+			if in.Field(inIndex).Type() == _inType {
+				continue
+			}
+
+			out.Field(outIndex).Set(in.Field(inIndex))
+			outIndex++
+		}
+
+		return []reflect.Value{out}
+	})
+
+	return fn.Interface()
+}
+
+func embeddingIn(t reflect.Type) any {
+	return embedding(t, "In", _inType)
+}
+
+func embedding(i any, name string, _type reflect.Type) any {
+	t, ok := inType(i)
+	if !ok {
+		return nil
+	}
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	if t.Kind() != reflect.Struct {
+		return nil
+	}
+
+	// Build fields: start with embedded In
+	fields := make([]reflect.StructField, 0, t.NumField()+1)
+	fields = append(fields, reflect.StructField{
+		Name:      name,
+		Type:      _type,
+		Anonymous: true,
+	})
+
+	// Add all original fields
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		fields = append(fields, reflect.StructField{
+			Name: f.Name,
+			Type: f.Type,
+			Tag:  f.Tag,
+		})
+	}
+
+	newType := reflect.StructOf(fields)
+	return reflect.New(newType).Elem().Interface()
+}
+
+func inType(i any) (reflect.Type, bool) {
+	if i == nil {
+		return nil, false
+	}
+
+	t, ok := i.(reflect.Type)
+	if !ok {
+		t = reflect.TypeOf(i)
+	}
+
+	return t, true
+}
+
 // Checks if a field of an In struct is optional.
 func isFieldOptional(f reflect.StructField) (bool, error) {
 	tag := f.Tag.Get(_optionalTag)

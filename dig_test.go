@@ -264,39 +264,63 @@ func TestEndToEndSuccess(t *testing.T) {
 	})
 
 	t.Run("param recurse", func(t *testing.T) {
-		type anotherParam struct {
+		type anotherParamEmbedded struct {
 			dig.In
 
 			Buffer *bytes.Buffer
 		}
 
-		type someParam struct {
-			dig.In
+		type anotherParam struct {
+			Reader *bytes.Reader
+		}
 
-			Buffer  *bytes.Buffer
-			Another anotherParam
+		type someParam struct {
+			Buffer          *bytes.Buffer
+			Reader          *bytes.Reader
+			AnotherEmbedded anotherParamEmbedded
+			Another         anotherParam
 		}
 
 		var (
-			buff   *bytes.Buffer
-			called bool
+			buff         *bytes.Buffer
+			reader       *bytes.Reader
+			calledBuffer bool
+			calledReader bool
 		)
 
 		c := digtest.New(t)
 		c.RequireProvide(func() *bytes.Buffer {
-			require.False(t, called, "constructor must be called exactly once")
-			called = true
+			require.False(t, calledBuffer, "constructor must be calledBuffer exactly once")
+			calledBuffer = true
 			buff = new(bytes.Buffer)
 			return buff
 		})
 
+		c.RequireProvide(func() *bytes.Reader {
+			require.False(t, calledReader, "constructor must be calledBuffer exactly once")
+			calledReader = true
+			reader = new(bytes.Reader)
+			return reader
+		})
+
+		c.RequireProvide(dig.AsIn(someParam{}))
+		c.RequireProvide(dig.AsIn(reflect.TypeOf(anotherParam{})))
+
 		c.RequireInvoke(func(p someParam) {
-			require.True(t, called, "constructor must be called first")
+			require.True(t, calledReader, "constructor must be calledBuffer first")
+			require.True(t, calledReader, "constructor must be calledReader first")
 
-			require.NotNil(t, p.Buffer, "someParam.Buffer must not be nil")
-			require.NotNil(t, p.Another.Buffer, "anotherParam.Buffer must not be nil")
+			require.NotNil(t, p.Buffer, "someParam.Reader must not be nil")
+			require.NotNil(t, p.Reader, "someParam.Reader must not be nil")
 
-			require.True(t, p.Buffer == p.Another.Buffer, "buffers fields must match")
+			require.NotNil(t, p.Another.Reader, "anotherParam.Reader must not be nil")
+			require.True(t, p.Reader == p.Another.Reader, "readers fields must match")
+
+			require.True(t, p.Reader == reader, "buffer must match constructor's return value")
+
+			require.NotNil(t, p.AnotherEmbedded.Buffer, "anotherParamEmbedded.Reader must not be nil")
+			require.True(t, p.Buffer == p.AnotherEmbedded.Buffer, "buffers fields must match")
+
 			require.True(t, p.Buffer == buff, "buffer must match constructor's return value")
 		})
 	})
@@ -638,6 +662,13 @@ func TestEndToEndSuccess(t *testing.T) {
 			A1 A `name:"first"`  // should come from ret1 through ret2
 			A2 A `name:"second"` // should come from ret2
 		}
+
+		type paramAsIn struct {
+			A1 A `name:"first"`  // should come from ret1 through ret2
+			A2 A `name:"second"` // should come from ret2
+		}
+		c.RequireProvide(dig.AsIn(paramAsIn{}))
+
 		c.RequireProvide(func() Ret2 {
 			return Ret2{
 				Ret1: Ret1{
@@ -648,6 +679,11 @@ func TestEndToEndSuccess(t *testing.T) {
 		})
 
 		c.RequireInvoke(func(p param) {
+			assert.Equal(t, 1, p.A1.idx)
+			assert.Equal(t, 2, p.A2.idx)
+		})
+
+		c.RequireInvoke(func(p paramAsIn) {
 			assert.Equal(t, 1, p.A1.idx)
 			assert.Equal(t, 2, p.A2.idx)
 		})
@@ -709,7 +745,7 @@ func TestEndToEndSuccess(t *testing.T) {
 
 		require.Error(t, c.Invoke(func(*bytes.Buffer) {
 			t.Fatalf("must not be called")
-		}), "must not have a *bytes.Buffer in the container")
+		}), "must not have a *bytes.Reader in the container")
 	})
 
 	t.Run("As with Name", func(t *testing.T) {
