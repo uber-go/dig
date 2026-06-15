@@ -280,7 +280,7 @@ func (s *Scope) clock() digclock.Clock {
 
 // adds a new graphNode to this Scope and all of its descendent
 // scope.
-func (s *Scope) newGraphNode(wrapped interface{}, orders map[*Scope]int) {
+func (s *Scope) newGraphNode(wrapped any, orders map[*Scope]int) {
 	orders[s] = s.gh.NewNode(wrapped)
 	for _, cs := range s.childScopes {
 		cs.newGraphNode(wrapped, orders)

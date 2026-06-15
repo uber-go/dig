@@ -1618,7 +1618,7 @@ func TestRecoverFromPanic(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func(*digtest.Container)
-		invoke  interface{}
+		invoke  any
 		wantErr []string
 	}{
 		{
@@ -1885,7 +1885,7 @@ func TestProvideConstructorErrors(t *testing.T) {
 
 		tests := []struct {
 			desc        string
-			constructor interface{}
+			constructor any
 			msg         string
 		}{
 			{
@@ -2005,7 +2005,7 @@ func TestCantProvideObjects(t *testing.T) {
 
 	var writer io.Writer = &bytes.Buffer{}
 	tests := []struct {
-		object   interface{}
+		object   any
 		typeDesc string
 	}{
 		{&bytes.Buffer{}, "pointer"},
@@ -2115,7 +2115,7 @@ func TestProvideInvalidAs(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		param       interface{}
+		param       any
 		expectedErr string
 		addlOption  dig.ProvideOption
 	}{
@@ -2261,7 +2261,7 @@ func TestCantProvideUntypedNil(t *testing.T) {
 func TestCantProvideErrorLikeType(t *testing.T) {
 	t.Parallel()
 
-	tests := []interface{}{
+	tests := []any{
 		func() *os.PathError { return &os.PathError{} },
 		func() error { return &os.PathError{} },
 		func() (*os.PathError, error) { return &os.PathError{}, nil },
@@ -2314,7 +2314,7 @@ func TestCantProvideParameterObjects(t *testing.T) {
 func TestProvideKnownTypesFails(t *testing.T) {
 	t.Parallel()
 
-	provideArgs := []interface{}{
+	provideArgs := []any{
 		func() *bytes.Buffer { return nil },
 		func() (*bytes.Buffer, error) { return nil, nil },
 	}
@@ -2648,7 +2648,7 @@ func TestTypeCheckingEquality(t *testing.T) {
 		B
 	}
 	tests := []struct {
-		item  interface{}
+		item  any
 		isIn  bool
 		isOut bool
 	}{
@@ -2743,7 +2743,7 @@ func testProvideFailures(t *testing.T, dryRun bool) {
 				A2: A{idx: 2},
 				A3: A{idx: 3},
 			}
-		}, dig.As(new(interface{})))
+		}, dig.As(new(any)))
 		require.Error(t, err, "provide must return error")
 		dig.AssertErrorMatches(t, err,
 			`cannot provide function "go.uber.org/dig_test".testProvideFailures\S+`,
@@ -3370,8 +3370,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 		cases := []struct {
 			name        string
-			provide     interface{}
-			invoke      interface{}
+			provide     any
+			invoke      any
 			errContains []string
 		}{
 			{
@@ -3455,8 +3455,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 		cases := []struct {
 			name        string
-			provide     interface{}
-			invoke      interface{}
+			provide     any
+			invoke      any
 			errContains []string
 		}{
 			{
@@ -3540,8 +3540,8 @@ func testInvokeFailures(t *testing.T, dryRun bool) {
 
 		cases := []struct {
 			name        string
-			provide     interface{}
-			invoke      interface{}
+			provide     any
+			invoke      any
 			errContains []string
 		}{
 			{

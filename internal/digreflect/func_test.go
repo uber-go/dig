@@ -49,7 +49,7 @@ func TestInspectFunc(t *testing.T) {
 
 	tests := []struct {
 		desc        string
-		give        interface{}
+		give        any
 		wantName    string
 		wantPackage string
 

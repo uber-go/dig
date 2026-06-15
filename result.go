@@ -62,7 +62,7 @@ type resultOptions struct {
 	// For Result Objects, name:".." tags on fields override this.
 	Name  string
 	Group string
-	As    []interface{}
+	As    []any
 }
 
 // newResult builds a result from the given type.

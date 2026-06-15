@@ -94,7 +94,7 @@ func isError(t reflect.Type) bool {
 //
 // See the documentation for dig.In for a comprehensive list of supported
 // tags.
-func IsIn(o interface{}) bool {
+func IsIn(o any) bool {
 	return embedsType(o, _inType)
 }
 
@@ -108,12 +108,12 @@ func IsIn(o interface{}) bool {
 //
 // See the documentation for dig.Out for a comprehensive list of supported
 // tags.
-func IsOut(o interface{}) bool {
+func IsOut(o any) bool {
 	return embedsType(o, _outType)
 }
 
 // Returns true if t embeds e or if any of the types embedded by t embed e.
-func embedsType(i interface{}, e reflect.Type) bool {
+func embedsType(i any, e reflect.Type) bool {
 	// TODO: this function doesn't consider e being a pointer.
 	// given `type A foo { *In }`, this function would return false for
 	// embedding dig.In, which makes for some extra error checking in places

@@ -180,7 +180,7 @@ func TestParamObjectFailure(t *testing.T) {
 func TestParamGroupSliceErrors(t *testing.T) {
 	tests := []struct {
 		desc    string
-		shape   interface{}
+		shape   any
 		wantErr string
 	}{
 		{

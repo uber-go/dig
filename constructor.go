@@ -36,7 +36,7 @@ import (
 // For the Provide path, we verify that constructorNodes produce at least one value,
 // otherwise the function will never be called.
 type constructorNode struct {
-	ctor  interface{}
+	ctor  any
 	ctype reflect.Type
 
 	// Location where this function was defined.
@@ -76,13 +76,13 @@ type constructorOptions struct {
 	// belong to the specified value group or implement any of the interfaces.
 	ResultName     string
 	ResultGroup    string
-	ResultAs       []interface{}
+	ResultAs       []any
 	Location       *digreflect.Func
 	Callback       Callback
 	BeforeCallback BeforeCallback
 }
 
-func newConstructorNode(ctor interface{}, s *Scope, origS *Scope, opts constructorOptions) (*constructorNode, error) {
+func newConstructorNode(ctor any, s *Scope, origS *Scope, opts constructorOptions) (*constructorNode, error) {
 	cval := reflect.ValueOf(ctor)
 	ctype := cval.Type()
 	cptr := cval.Pointer()

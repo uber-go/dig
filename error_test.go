@@ -220,7 +220,7 @@ func TestRootCauseEndToEnd(t *testing.T) {
 	tests := []struct {
 		desc                    string
 		setup                   func(c *Container)
-		invoke                  interface{}
+		invoke                  any
 		wantAsDigError          bool
 		wantRootCauseMessage    string
 		wantRootCauseAsDigError bool

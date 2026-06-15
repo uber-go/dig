@@ -79,7 +79,7 @@ func (o fillInvokeInfoOption) applyInvokeOption(opts *invokeOptions) {
 // If the [RecoverFromPanics] option was given to the container and a panic
 // occurs when invoking, a [PanicError] with the panic contained will be
 // returned. See [PanicError] for more info.
-func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
+func (c *Container) Invoke(function any, opts ...InvokeOption) error {
 	return c.scope.Invoke(function, opts...)
 }
 
@@ -91,7 +91,7 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 //
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
-func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) (err error) {
+func (s *Scope) Invoke(function any, opts ...InvokeOption) (err error) {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
 		return newErrInvalidInput("can't invoke an untyped nil", nil)
