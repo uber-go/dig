@@ -40,7 +40,7 @@ type provideOptions struct {
 	Name           string
 	Group          string
 	Info           *ProvideInfo
-	As             []interface{}
+	As             []any
 	Location       *digreflect.Func
 	Exported       bool
 	Callback       Callback
@@ -259,11 +259,11 @@ func (o fillProvideInfoOption) applyProvideOption(opts *provideOptions) {
 //
 // This option cannot be provided for constructors which produce result
 // objects.
-func As(i ...interface{}) ProvideOption {
+func As(i ...any) ProvideOption {
 	return provideAsOption(i)
 }
 
-type provideAsOption []interface{}
+type provideAsOption []any
 
 func (o provideAsOption) String() string {
 	buf := bytes.NewBufferString("As(")
@@ -380,7 +380,7 @@ type provider interface {
 //
 // Provide accepts argument types or dig.In structs as dependencies, and
 // separate return values or dig.Out structs for results.
-func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) error {
+func (c *Container) Provide(constructor any, opts ...ProvideOption) error {
 	return c.scope.Provide(constructor, opts...)
 }
 
@@ -403,7 +403,7 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 // Scopes that are descendents, but not ancestors of this Scope.
 // To provide a constructor to all the Scopes available, provide it to
 // Container, which is the root Scope.
-func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
+func (s *Scope) Provide(constructor any, opts ...ProvideOption) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {
 		return newErrInvalidInput("can't provide an untyped nil", nil)
@@ -437,7 +437,7 @@ func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 	return nil
 }
 
-func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
+func (s *Scope) provide(ctor any, opts provideOptions) (err error) {
 	// If Export option is provided to the constructor, this should be injected to the
 	// root-level Scope (Container) to allow it to propagate to all other Scopes.
 	origScope := s

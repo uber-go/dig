@@ -65,7 +65,7 @@ func New(t testing.TB, opts ...dig.Option) *Container {
 
 // RequireProvide provides the given function to the container,
 // halting the test if it fails.
-func (c *Container) RequireProvide(f interface{}, opts ...dig.ProvideOption) {
+func (c *Container) RequireProvide(f any, opts ...dig.ProvideOption) {
 	c.t.Helper()
 
 	require.NoError(c.t, c.Provide(f, opts...), "failed to provide")
@@ -73,7 +73,7 @@ func (c *Container) RequireProvide(f interface{}, opts ...dig.ProvideOption) {
 
 // RequireProvide provides the given function to the scope,
 // halting the test if it fails.
-func (s *Scope) RequireProvide(f interface{}, opts ...dig.ProvideOption) {
+func (s *Scope) RequireProvide(f any, opts ...dig.ProvideOption) {
 	s.t.Helper()
 
 	require.NoError(s.t, s.Provide(f, opts...), "failed to provide")
@@ -81,7 +81,7 @@ func (s *Scope) RequireProvide(f interface{}, opts ...dig.ProvideOption) {
 
 // RequireInvoke invokes the given function to the container,
 // halting the test if it fails.
-func (c *Container) RequireInvoke(f interface{}, opts ...dig.InvokeOption) {
+func (c *Container) RequireInvoke(f any, opts ...dig.InvokeOption) {
 	c.t.Helper()
 
 	require.NoError(c.t, c.Invoke(f, opts...), "failed to invoke")
@@ -89,7 +89,7 @@ func (c *Container) RequireInvoke(f interface{}, opts ...dig.InvokeOption) {
 
 // RequireInvoke invokes the given function to the scope,
 // halting the test if it fails.
-func (s *Scope) RequireInvoke(f interface{}, opts ...dig.InvokeOption) {
+func (s *Scope) RequireInvoke(f any, opts ...dig.InvokeOption) {
 	s.t.Helper()
 
 	require.NoError(s.t, s.Invoke(f, opts...), "failed to invoke")
@@ -97,7 +97,7 @@ func (s *Scope) RequireInvoke(f interface{}, opts ...dig.InvokeOption) {
 
 // RequireDecorate decorates the scope using the given function,
 // halting the test if it fails.
-func (c *Container) RequireDecorate(f interface{}, opts ...dig.DecorateOption) {
+func (c *Container) RequireDecorate(f any, opts ...dig.DecorateOption) {
 	c.t.Helper()
 
 	require.NoError(c.t, c.Decorate(f, opts...), "failed to decorate")
@@ -105,7 +105,7 @@ func (c *Container) RequireDecorate(f interface{}, opts ...dig.DecorateOption) {
 
 // RequireDecorate decorates the scope using the given function,
 // halting the test if it fails.
-func (s *Scope) RequireDecorate(f interface{}, opts ...dig.DecorateOption) {
+func (s *Scope) RequireDecorate(f any, opts ...dig.DecorateOption) {
 	s.t.Helper()
 
 	require.NoError(s.t, s.Decorate(f, opts...), "failed to decorate")

@@ -24,7 +24,7 @@ import "go.uber.org/dig/internal/graph"
 
 // graphNode is a single node in the dependency graph.
 type graphNode struct {
-	Wrapped interface{}
+	Wrapped any
 }
 
 // graphHolder is the dependency graph of the container.
@@ -78,7 +78,7 @@ func (gh *graphHolder) EdgesFrom(u int) []int {
 }
 
 // NewNode adds a new value to the graph and returns its order.
-func (gh *graphHolder) NewNode(wrapped interface{}) int {
+func (gh *graphHolder) NewNode(wrapped any) int {
 	order := len(gh.nodes)
 	gh.nodes = append(gh.nodes, &graphNode{
 		Wrapped: wrapped,
@@ -88,7 +88,7 @@ func (gh *graphHolder) NewNode(wrapped interface{}) int {
 
 // Lookup retrieves the value for the node with the given order.
 // Lookup panics if i is invalid.
-func (gh *graphHolder) Lookup(i int) interface{} {
+func (gh *graphHolder) Lookup(i int) any {
 	return gh.nodes[i].Wrapped
 }
 

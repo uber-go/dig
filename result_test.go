@@ -33,7 +33,7 @@ import (
 func TestNewResultListErrors(t *testing.T) {
 	tests := []struct {
 		desc      string
-		give      interface{}
+		give      any
 		wantError string
 	}{
 		{
@@ -84,7 +84,7 @@ func TestNewResultErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		give interface{}
+		give any
 		err  string
 	}{
 		{
@@ -121,7 +121,7 @@ func TestNewResultObject(t *testing.T) {
 
 	tests := []struct {
 		desc string
-		give interface{}
+		give any
 		opts resultOptions
 
 		wantFields []resultObjectField
@@ -198,7 +198,7 @@ func TestNewResultObject(t *testing.T) {
 func TestNewResultObjectErrors(t *testing.T) {
 	tests := []struct {
 		desc string
-		give interface{}
+		give any
 		opts resultOptions
 		err  string
 	}{

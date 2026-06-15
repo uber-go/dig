@@ -43,7 +43,7 @@ type decorator interface {
 }
 
 type decoratorNode struct {
-	dcor  interface{}
+	dcor  any
 	dtype reflect.Type
 
 	id dot.CtorID
@@ -73,7 +73,7 @@ type decoratorNode struct {
 	beforeCallback BeforeCallback
 }
 
-func newDecoratorNode(dcor interface{}, s *Scope, opts decorateOptions) (*decoratorNode, error) {
+func newDecoratorNode(dcor any, s *Scope, opts decorateOptions) (*decoratorNode, error) {
 	dval := reflect.ValueOf(dcor)
 	dtype := dval.Type()
 	dptr := dval.Pointer()
@@ -203,7 +203,7 @@ type DecorateInfo struct {
 // Decorate provides a decorator for a type that has already been provided in the Container.
 // Decorations at this level affect all scopes of the container.
 // See Scope.Decorate for information on how to use this method.
-func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) error {
+func (c *Container) Decorate(decorator any, opts ...DecorateOption) error {
 	return c.scope.Decorate(decorator, opts...)
 }
 
@@ -244,7 +244,7 @@ func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) erro
 // Decorating a Scope affects all the child scopes of this Scope.
 //
 // Similar to a provider, the decorator function gets called *at most once*.
-func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
+func (s *Scope) Decorate(decorator any, opts ...DecorateOption) error {
 	var options decorateOptions
 	for _, opt := range opts {
 		opt.apply(&options)

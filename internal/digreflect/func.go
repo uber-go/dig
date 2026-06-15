@@ -64,7 +64,7 @@ func (f *Func) Format(w fmt.State, c rune) {
 
 // InspectFunc inspects and returns runtime information about the given
 // function.
-func InspectFunc(function interface{}) *Func {
+func InspectFunc(function any) *Func {
 	fptr := reflect.ValueOf(function).Pointer()
 	return InspectFuncPC(fptr)
 }
