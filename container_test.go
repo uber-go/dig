@@ -23,6 +23,7 @@ package dig
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,3 +69,13 @@ func TestOptionStrings(t *testing.T) {
 		assert.Equal(t, "RecoverFromPanics()", fmt.Sprint(RecoverFromPanics()))
 	})
 }
+
+func TestKeyString(t *testing.T) {
+	t.Parallel()
+
+	intType := reflect.TypeOf(0)
+	assert.Equal(t, "int", key{t: intType}.String())
+	assert.Equal(t, `int[name="myname"]`, key{t: intType, name: "myname"}.String())
+	assert.Equal(t, `int[group="mygroup"]`, key{t: intType, group: "mygroup"}.String())
+}
+
