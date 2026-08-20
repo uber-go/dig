@@ -137,7 +137,7 @@
 // changing the function to accept that struct instead. This is referred to as
 // a parameter object.
 //
-// Dig has first class support for parameter objects: any struct embedding
+// Dig has first-class support for parameter objects: any struct embedding
 // dig.In gets treated as a parameter object. The following is equivalent to
 // the constructor above.
 //
@@ -192,7 +192,7 @@
 // Dig supports declaring dependencies as optional by adding an
 // `optional:"true"` tag to fields of a dig.In struct.
 //
-// Fields in a dig.In structs that have the `optional:"true"` tag are treated
+// Fields in a dig.In struct that have the `optional:"true"` tag are treated
 // as optional by Dig.
 //
 //	type UserGatewayParams struct {
