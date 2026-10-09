@@ -89,9 +89,15 @@ func (o *provideOptions) Validate() error {
 	return nil
 }
 
-// Name is a ProvideOption that specifies that all values produced by a
-// constructor should have the given name. See also the package documentation
-// about Named Values.
+// NameOption modifies the behavior of Provide and Decorate with a value name.
+type NameOption interface {
+	ProvideOption
+	DecorateOption
+}
+
+// Name is a ProvideOption and DecorateOption that specifies that all values
+// produced by a constructor or decorator should have the given name. See also
+// the package documentation about Named Values.
 //
 // Given,
 //
@@ -104,19 +110,35 @@ func (o *provideOptions) Validate() error {
 //	c.Provide(NewReadOnlyConnection, dig.Name("ro"))
 //	c.Provide(NewReadWriteConnection, dig.Name("rw"))
 //
-// This option cannot be provided for constructors which produce result
-// objects.
-func Name(name string) ProvideOption {
-	return provideNameOption(name)
+// The following will decorate the "ro" connection:
+//
+//	c.Decorate(func(conn *Connection) *Connection {
+//	  return wrap(conn)
+//	}, dig.Name("ro"))
+//
+// This option cannot be provided for constructors or decorators which produce
+// result objects.
+func Name(name string) NameOption {
+	return nameOption(name)
 }
 
-type provideNameOption string
+type nameOption string
 
-func (o provideNameOption) String() string {
+var (
+	_ NameOption     = nameOption("")
+	_ ProvideOption  = nameOption("")
+	_ DecorateOption = nameOption("")
+)
+
+func (o nameOption) String() string {
 	return fmt.Sprintf("Name(%q)", string(o))
 }
 
-func (o provideNameOption) applyProvideOption(opt *provideOptions) {
+func (o nameOption) applyProvideOption(opt *provideOptions) {
+	opt.Name = string(o)
+}
+
+func (o nameOption) apply(opt *decorateOptions) {
 	opt.Name = string(o)
 }
 

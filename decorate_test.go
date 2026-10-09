@@ -582,6 +582,196 @@ func TestDecorateSuccess(t *testing.T) {
 			assert.Equal(t, 42, i.Int)
 		})
 	})
+
+	t.Run("decorate named type", func(t *testing.T) {
+		t.Parallel()
+		type Connection struct {
+			name string
+		}
+		type In struct {
+			dig.In
+
+			RO *Connection `name:"ro"`
+			RW *Connection `name:"rw"`
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() *Connection { return &Connection{name: "ro"} }, dig.Name("ro"))
+		c.RequireProvide(func() *Connection { return &Connection{name: "rw"} }, dig.Name("rw"))
+
+		var info dig.DecorateInfo
+		c.RequireDecorate(func(conn *Connection) *Connection {
+			return &Connection{name: conn.name + " decorated"}
+		}, dig.Name("ro"), dig.FillDecorateInfo(&info))
+
+		c.RequireInvoke(func(in In) {
+			assert.Equal(t, "ro decorated", in.RO.name)
+			assert.Equal(t, "rw", in.RW.name)
+		})
+
+		require.Equal(t, 1, len(info.Inputs))
+		require.Equal(t, 1, len(info.Outputs))
+		assert.Equal(t, `*dig_test.Connection[name = "ro"]`, info.Inputs[0].String())
+		assert.Equal(t, `*dig_test.Connection[name = "ro"]`, info.Outputs[0].String())
+	})
+
+	t.Run("decorate named type with zero arguments", func(t *testing.T) {
+		t.Parallel()
+		type Connection struct {
+			name string
+		}
+		type In struct {
+			dig.In
+
+			RO *Connection `name:"ro"`
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() *Connection { return &Connection{name: "original"} }, dig.Name("ro"))
+		c.RequireDecorate(func() *Connection {
+			return &Connection{name: "mock"}
+		}, dig.Name("ro"))
+
+		c.RequireInvoke(func(in In) {
+			assert.Equal(t, "mock", in.RO.name)
+		})
+	})
+
+	t.Run("decorate named type with additional dependency", func(t *testing.T) {
+		t.Parallel()
+		type Connection struct {
+			name string
+		}
+		type Config struct {
+			prefix string
+		}
+		type In struct {
+			dig.In
+
+			RO *Connection `name:"ro"`
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() *Config { return &Config{prefix: "wrapped: "} })
+		c.RequireProvide(func() *Connection { return &Connection{name: "ro"} }, dig.Name("ro"))
+
+		c.RequireDecorate(func(conn *Connection, cfg *Config) *Connection {
+			return &Connection{name: cfg.prefix + conn.name}
+		}, dig.Name("ro"))
+
+		c.RequireInvoke(func(in In) {
+			assert.Equal(t, "wrapped: ro", in.RO.name)
+		})
+	})
+
+	t.Run("decorate named type returning error", func(t *testing.T) {
+		t.Parallel()
+		type Connection struct {
+			name string
+		}
+		type In struct {
+			dig.In
+
+			RO *Connection `name:"ro"`
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() *Connection { return &Connection{name: "ro"} }, dig.Name("ro"))
+
+		c.RequireDecorate(func(conn *Connection) (*Connection, error) {
+			return &Connection{name: conn.name + " decorated"}, nil
+		}, dig.Name("ro"))
+
+		c.RequireInvoke(func(in In) {
+			assert.Equal(t, "ro decorated", in.RO.name)
+		})
+	})
+
+	t.Run("decorate named type with In struct", func(t *testing.T) {
+		t.Parallel()
+		type Connection struct {
+			name string
+		}
+		type Param struct {
+			dig.In
+
+			Conn *Connection `name:"ro"`
+		}
+		type In struct {
+			dig.In
+
+			RO *Connection `name:"ro"`
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() *Connection { return &Connection{name: "ro"} }, dig.Name("ro"))
+
+		c.RequireDecorate(func(p Param) *Connection {
+			return &Connection{name: p.Conn.name + " decorated"}
+		}, dig.Name("ro"))
+
+		c.RequireInvoke(func(in In) {
+			assert.Equal(t, "ro decorated", in.RO.name)
+		})
+	})
+
+	t.Run("decorate named type in child scope", func(t *testing.T) {
+		t.Parallel()
+		type Connection struct {
+			name string
+		}
+		type In struct {
+			dig.In
+
+			RO *Connection `name:"ro"`
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() *Connection { return &Connection{name: "ro"} }, dig.Name("ro"))
+
+		child := c.Scope("child")
+		child.RequireDecorate(func(conn *Connection) *Connection {
+			return &Connection{name: conn.name + " child"}
+		}, dig.Name("ro"))
+
+		c.RequireInvoke(func(in In) {
+			assert.Equal(t, "ro", in.RO.name)
+		})
+		child.RequireInvoke(func(in In) {
+			assert.Equal(t, "ro child", in.RO.name)
+		})
+	})
+
+	t.Run("decorate named type chaining in parent and child scopes", func(t *testing.T) {
+		t.Parallel()
+		type Connection struct {
+			name string
+		}
+		type In struct {
+			dig.In
+
+			RO *Connection `name:"ro"`
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() *Connection { return &Connection{name: "base"} }, dig.Name("ro"))
+
+		c.RequireDecorate(func(conn *Connection) *Connection {
+			return &Connection{name: conn.name + " -> parent"}
+		}, dig.Name("ro"))
+
+		child := c.Scope("child")
+		child.RequireDecorate(func(conn *Connection) *Connection {
+			return &Connection{name: conn.name + " -> child"}
+		}, dig.Name("ro"))
+
+		c.RequireInvoke(func(in In) {
+			assert.Equal(t, "base -> parent", in.RO.name)
+		})
+		child.RequireInvoke(func(in In) {
+			assert.Equal(t, "base -> parent -> child", in.RO.name)
+		})
+	})
 }
 
 func TestDecorateFailure(t *testing.T) {
@@ -790,6 +980,75 @@ func TestDecorateFailure(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "decorating a value group requires decorating the entire value group")
 	})
+
+	t.Run("decorate named type with invalid name", func(t *testing.T) {
+		t.Parallel()
+
+		c := digtest.New(t)
+		type A struct{}
+
+		err := c.Decorate(func(a *A) *A { return a }, dig.Name("bad`name"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid dig.Name(\"bad`name\"): names cannot contain backquotes")
+	})
+
+	t.Run("decorate named type using result object", func(t *testing.T) {
+		t.Parallel()
+
+		c := digtest.New(t)
+		type A struct{}
+		type Out struct {
+			dig.Out
+
+			Value *A
+		}
+
+		err := c.Decorate(func() Out { return Out{Value: &A{}} }, dig.Name("foo"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot specify a name for result objects: dig_test.Out embeds dig.Out")
+	})
+
+	t.Run("decorate named type twice", func(t *testing.T) {
+		t.Parallel()
+
+		c := digtest.New(t)
+		type Connection struct {
+			name string
+		}
+
+		c.RequireProvide(func() *Connection { return &Connection{name: "ro"} }, dig.Name("ro"))
+		c.RequireDecorate(func(conn *Connection) *Connection {
+			return &Connection{name: conn.name + " 1"}
+		}, dig.Name("ro"))
+
+		err := c.Decorate(func(conn *Connection) *Connection {
+			return &Connection{name: conn.name + " 2"}
+		}, dig.Name("ro"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "*dig_test.Connection[name=\"ro\"] already decorated")
+	})
+
+	t.Run("decorate named type that wasn't provided", func(t *testing.T) {
+		t.Parallel()
+
+		c := digtest.New(t)
+		type Connection struct {
+			name string
+		}
+		type In struct {
+			dig.In
+
+			RO *Connection `name:"ro"`
+		}
+
+		c.RequireDecorate(func(conn *Connection) *Connection {
+			return &Connection{name: conn.name + " decorated"}
+		}, dig.Name("ro"))
+
+		err := c.Invoke(func(in In) {})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "missing type: *dig_test.Connection[name=\"ro\"]")
+	})
 }
 
 func TestMultipleDecorates(t *testing.T) {
@@ -938,3 +1197,28 @@ func TestFillDecorateInfoString(t *testing.T) {
 		assert.Contains(t, fmt.Sprint(opt), "FillDecorateInfo(0x")
 	})
 }
+
+func TestDecorateOptionStrings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		desc string
+		give dig.DecorateOption
+		want string
+	}{
+		{
+			desc: "Name",
+			give: dig.Name("foo"),
+			want: `Name("foo")`,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.desc, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, fmt.Sprint(tt.give))
+		})
+	}
+}
+

@@ -23,6 +23,7 @@ package dig
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/dot"
@@ -83,9 +84,30 @@ func newDecoratorNode(dcor interface{}, s *Scope, opts decorateOptions) (*decora
 		return nil, err
 	}
 
-	rl, err := newResultList(dtype, resultOptions{})
+	rl, err := newResultList(dtype, resultOptions{
+		Name: opts.Name,
+	})
 	if err != nil {
 		return nil, err
+	}
+
+	if opts.Name != "" {
+		resKeys, err := findResultKeys(rl)
+		if err != nil {
+			return nil, err
+		}
+		resTypes := make(map[reflect.Type]struct{}, len(resKeys))
+		for _, k := range resKeys {
+			resTypes[k.t] = struct{}{}
+		}
+		for i, p := range pl.Params {
+			if ps, ok := p.(paramSingle); ok && ps.Name == "" {
+				if _, ok := resTypes[ps.Type]; ok {
+					ps.Name = opts.Name
+					pl.Params[i] = ps
+				}
+			}
+		}
 	}
 
 	n := &decoratorNode{
@@ -171,9 +193,18 @@ type DecorateOption interface {
 }
 
 type decorateOptions struct {
+	Name           string
 	Info           *DecorateInfo
 	Callback       Callback
 	BeforeCallback BeforeCallback
+}
+
+func (o *decorateOptions) Validate() error {
+	if strings.ContainsRune(o.Name, '`') {
+		return newErrInvalidInput(
+			fmt.Sprintf("invalid dig.Name(%q): names cannot contain backquotes", o.Name), nil)
+	}
+	return nil
 }
 
 // FillDecorateInfo is a DecorateOption that writes info on what Dig was
@@ -248,6 +279,9 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 	var options decorateOptions
 	for _, opt := range opts {
 		opt.apply(&options)
+	}
+	if err := options.Validate(); err != nil {
+		return err
 	}
 
 	dn, err := newDecoratorNode(decorator, s, options)
