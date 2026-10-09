@@ -173,3 +173,20 @@ func isFieldOptional(f reflect.StructField) (bool, error) {
 
 	return optional, err
 }
+
+func hasExportedFields(t reflect.Type) bool {
+	if t.Kind() != reflect.Struct {
+		return false
+	}
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.Type == _inType || f.Type == _outType {
+			continue
+		}
+		if f.PkgPath == "" {
+			return true
+		}
+	}
+	return false
+}
+

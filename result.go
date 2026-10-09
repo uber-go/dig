@@ -407,6 +407,19 @@ func (rof resultObjectField) DotResult() []*dot.Result {
 	return rof.Result.DotResult()
 }
 
+func isEmbeddedResultObject(f reflect.StructField) bool {
+	if !f.Anonymous || f.Type.Kind() != reflect.Struct {
+		return false
+	}
+	if IsOut(f.Type) {
+		return true
+	}
+	if f.Tag.Get(_nameTag) != "" || f.Tag.Get(_groupTag) != "" {
+		return false
+	}
+	return hasExportedFields(f.Type)
+}
+
 // newResultObjectField(i, f, opts) builds a resultObjectField from the field
 // f at index i.
 func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (resultObjectField, error) {
@@ -422,6 +435,10 @@ func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (r
 			fmt.Sprintf("unexported fields not allowed in dig.Out, did you mean to export %q (%v)?", f.Name, f.Type), nil)
 
 	case f.Tag.Get(_groupTag) != "":
+		if IsOut(f.Type) {
+			return rof, newErrInvalidInput(fmt.Sprintf(
+				"cannot specify a group for result objects: %v embeds dig.Out", f.Type), nil)
+		}
 		var err error
 		r, err = newResultGrouped(f)
 		if err != nil {
@@ -434,7 +451,18 @@ func newResultObjectField(idx int, f reflect.StructField, opts resultOptions) (r
 			// can modify in-place because options are passed-by-value.
 			opts.Name = name
 		}
-		r, err = newResult(f.Type, opts)
+		switch {
+		case IsIn(f.Type) || (f.Type.Kind() == reflect.Ptr && IsIn(f.Type.Elem())) || embedsType(f.Type, _inPtrType):
+			return rof, newErrInvalidInput(fmt.Sprintf(
+				"cannot provide parameter objects: %v embeds a dig.In", f.Type), nil)
+		case embedsType(f.Type, _outPtrType):
+			return rof, newErrInvalidInput(fmt.Sprintf(
+				"cannot build a result object by embedding *dig.Out, embed dig.Out instead: %v embeds *dig.Out", f.Type), nil)
+		case isEmbeddedResultObject(f):
+			r, err = newResultObject(f.Type, opts)
+		default:
+			r, err = newResult(f.Type, opts)
+		}
 		if err != nil {
 			return rof, err
 		}

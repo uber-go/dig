@@ -358,10 +358,14 @@ func getParamOrder(gh *graphHolder, param param) []int {
 // newParamObject builds an paramObject from the provided type. The type MUST
 // be a dig.In struct.
 func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
+	return newParamObjectWithOpts(t, c, false)
+}
+
+func newParamObjectWithOpts(t reflect.Type, c containerStore, parentIgnoreUnexported bool) (paramObject, error) {
 	po := paramObject{Type: t}
 
 	// Check if the In type supports ignoring unexported fields.
-	var ignoreUnexported bool
+	var ignoreUnexported = parentIgnoreUnexported
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		if f.Type == _inType {
@@ -369,6 +373,9 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 			ignoreUnexported, err = isIgnoreUnexportedSet(f)
 			if err != nil {
 				return po, err
+			}
+			if parentIgnoreUnexported {
+				ignoreUnexported = true
 			}
 			break
 		}
@@ -384,7 +391,7 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 			// Skip over an unexported field if it is allowed.
 			continue
 		}
-		pof, err := newParamObjectField(i, f, c)
+		pof, err := newParamObjectField(i, f, c, ignoreUnexported)
 		if err != nil {
 			return po, newErrInvalidInput(
 				fmt.Sprintf("bad field %q of %v", f.Name, t), err)
@@ -392,6 +399,33 @@ func newParamObject(t reflect.Type, c containerStore) (paramObject, error) {
 		po.Fields = append(po.Fields, pof)
 	}
 	return po, nil
+}
+
+func isEmbeddedParamObject(f reflect.StructField) bool {
+	if !f.Anonymous || f.Type.Kind() != reflect.Struct {
+		return false
+	}
+	if IsIn(f.Type) {
+		return true
+	}
+	if f.Tag.Get(_nameTag) != "" || f.Tag.Get(_optionalTag) != "" || f.Tag.Get(_groupTag) != "" {
+		return false
+	}
+	return hasExportedFields(f.Type)
+}
+
+func isOrContainsSoftGroup(p param) bool {
+	switch p := p.(type) {
+	case paramGroupedSlice:
+		return p.Soft
+	case paramObject:
+		for _, f := range p.Fields {
+			if isOrContainsSoftGroup(f.Param) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (po paramObject) Build(c containerStore) (reflect.Value, error) {
@@ -402,7 +436,7 @@ func (po paramObject) Build(c containerStore) (reflect.Value, error) {
 	var softGroupsQueue []paramObjectField
 	var fields []paramObjectField
 	for _, f := range po.Fields {
-		if p, ok := f.Param.(paramGroupedSlice); ok && p.Soft {
+		if isOrContainsSoftGroup(f.Param) {
 			softGroupsQueue = append(softGroupsQueue, f)
 			continue
 		}
@@ -438,7 +472,7 @@ func (pof paramObjectField) DotParam() []*dot.Param {
 	return pof.Param.DotParam()
 }
 
-func newParamObjectField(idx int, f reflect.StructField, c containerStore) (paramObjectField, error) {
+func newParamObjectField(idx int, f reflect.StructField, c containerStore, ignoreUnexported bool) (paramObjectField, error) {
 	pof := paramObjectField{
 		FieldName:  f.Name,
 		FieldIndex: idx,
@@ -459,7 +493,18 @@ func newParamObjectField(idx int, f reflect.StructField, c containerStore) (para
 
 	default:
 		var err error
-		p, err = newParam(f.Type, c)
+		switch {
+		case IsOut(f.Type) || (f.Type.Kind() == reflect.Ptr && IsOut(f.Type.Elem())) || embedsType(f.Type, _outPtrType):
+			return pof, newErrInvalidInput(fmt.Sprintf(
+				"cannot depend on result objects: %v embeds a dig.Out", f.Type), nil)
+		case embedsType(f.Type, _inPtrType):
+			return pof, newErrInvalidInput(fmt.Sprintf(
+				"cannot build a parameter object by embedding *dig.In, embed dig.In instead: %v embeds *dig.In", f.Type), nil)
+		case isEmbeddedParamObject(f):
+			p, err = newParamObjectWithOpts(f.Type, c, ignoreUnexported)
+		default:
+			p, err = newParam(f.Type, c)
+		}
 		if err != nil {
 			return pof, err
 		}

@@ -4341,3 +4341,467 @@ func TestEndToEndSuccessWithAliases(t *testing.T) {
 		})
 	})
 }
+
+func TestEmbeddedInOut(t *testing.T) {
+	t.Run("param object embedding struct without dig.In", func(t *testing.T) {
+		type SorterParams struct {
+			ASorter string
+			BSorter int
+		}
+		type AParams struct {
+			dig.In
+			SorterParams
+			AFilter bool
+		}
+		type BParams struct {
+			dig.In
+			SorterParams
+			BFilter float64
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "sorted" })
+		c.RequireProvide(func() int { return 100 })
+		c.RequireProvide(func() bool { return true })
+		c.RequireProvide(func() float64 { return 3.14 })
+
+		c.RequireInvoke(func(p AParams) {
+			assert.Equal(t, "sorted", p.ASorter)
+			assert.Equal(t, 100, p.BSorter)
+			assert.True(t, p.AFilter)
+		})
+		c.RequireInvoke(func(p BParams) {
+			assert.Equal(t, "sorted", p.ASorter)
+			assert.Equal(t, 100, p.BSorter)
+			assert.Equal(t, 3.14, p.BFilter)
+		})
+	})
+
+	t.Run("param object embedding struct with dig.In", func(t *testing.T) {
+		type SorterParams struct {
+			dig.In
+			ASorter string
+			BSorter int
+		}
+		type AParams struct {
+			dig.In
+			SorterParams
+			AFilter bool
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "sorted" })
+		c.RequireProvide(func() int { return 100 })
+		c.RequireProvide(func() bool { return true })
+
+		c.RequireInvoke(func(p AParams) {
+			assert.Equal(t, "sorted", p.ASorter)
+			assert.Equal(t, 100, p.BSorter)
+			assert.True(t, p.AFilter)
+		})
+	})
+
+	t.Run("outer param struct without dig.In embedding inner with dig.In", func(t *testing.T) {
+		type SorterParams struct {
+			dig.In
+			ASorter string
+		}
+		type AParams struct {
+			SorterParams
+			AFilter int
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "sorted" })
+		c.RequireProvide(func() int { return 100 })
+
+		c.RequireInvoke(func(p AParams) {
+			assert.Equal(t, "sorted", p.ASorter)
+			assert.Equal(t, 100, p.AFilter)
+		})
+	})
+
+	t.Run("result object embedding struct without dig.Out", func(t *testing.T) {
+		type SorterResults struct {
+			ASorter string
+			BSorter float64
+		}
+		type AResults struct {
+			dig.Out
+			SorterResults
+			AFilter int
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() AResults {
+			return AResults{
+				SorterResults: SorterResults{ASorter: "sorted", BSorter: 2.71},
+				AFilter:       42,
+			}
+		})
+
+		c.RequireInvoke(func(s string, f float64, i int) {
+			assert.Equal(t, "sorted", s)
+			assert.Equal(t, 2.71, f)
+			assert.Equal(t, 42, i)
+		})
+	})
+
+	t.Run("result object embedding struct with dig.Out", func(t *testing.T) {
+		type SorterResults struct {
+			dig.Out
+			ASorter string
+			BSorter float64
+		}
+		type AResults struct {
+			dig.Out
+			SorterResults
+			AFilter int
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() AResults {
+			return AResults{
+				SorterResults: SorterResults{ASorter: "sorted", BSorter: 2.71},
+				AFilter:       42,
+			}
+		})
+
+		c.RequireInvoke(func(s string, f float64, i int) {
+			assert.Equal(t, "sorted", s)
+			assert.Equal(t, 2.71, f)
+			assert.Equal(t, 42, i)
+		})
+	})
+
+	t.Run("outer result struct without dig.Out embedding inner with dig.Out", func(t *testing.T) {
+		type SorterResults struct {
+			dig.Out
+			ASorter string
+		}
+		type AResults struct {
+			SorterResults
+			AFilter int
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() AResults {
+			return AResults{
+				SorterResults: SorterResults{ASorter: "sorted"},
+				AFilter:       42,
+			}
+		})
+
+		c.RequireInvoke(func(s string, i int) {
+			assert.Equal(t, "sorted", s)
+			assert.Equal(t, 42, i)
+		})
+	})
+
+	t.Run("multi-level nested embedding for dig.In", func(t *testing.T) {
+		type Level1 struct {
+			A string
+		}
+		type Level2 struct {
+			Level1
+			B int
+		}
+		type Level3 struct {
+			dig.In
+			Level2
+			C bool
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "deep" })
+		c.RequireProvide(func() int { return 99 })
+		c.RequireProvide(func() bool { return true })
+
+		c.RequireInvoke(func(p Level3) {
+			assert.Equal(t, "deep", p.A)
+			assert.Equal(t, 99, p.B)
+			assert.True(t, p.C)
+		})
+	})
+
+	t.Run("multi-level nested embedding for dig.Out", func(t *testing.T) {
+		type Level1 struct {
+			A string
+		}
+		type Level2 struct {
+			Level1
+			B int
+		}
+		type Level3 struct {
+			dig.Out
+			Level2
+			C bool
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() Level3 {
+			return Level3{
+				Level2: Level2{
+					Level1: Level1{A: "deep"},
+					B:      99,
+				},
+				C: true,
+			}
+		})
+
+		c.RequireInvoke(func(s string, i int, b bool) {
+			assert.Equal(t, "deep", s)
+			assert.Equal(t, 99, i)
+			assert.True(t, b)
+		})
+	})
+
+	t.Run("embedded dig.In with tags on inner fields", func(t *testing.T) {
+		type Inner struct {
+			A string   `name:"special"`
+			B string   `optional:"true"`
+			C []int    `group:"nums"`
+		}
+		type Outer struct {
+			dig.In
+			Inner
+			D bool
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "named-val" }, dig.Name("special"))
+		c.RequireProvide(func() int { return 1 }, dig.Group("nums"))
+		c.RequireProvide(func() int { return 2 }, dig.Group("nums"))
+		c.RequireProvide(func() bool { return true })
+
+		c.RequireInvoke(func(p Outer) {
+			assert.Equal(t, "named-val", p.A)
+			assert.Empty(t, p.B)
+			assert.ElementsMatch(t, []int{1, 2}, p.C)
+			assert.True(t, p.D)
+		})
+	})
+
+	t.Run("embedded dig.Out with tags on inner fields", func(t *testing.T) {
+		type Inner struct {
+			A string `name:"special"`
+			B int    `group:"nums"`
+		}
+		type Outer struct {
+			dig.Out
+			Inner
+			C bool
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() Outer {
+			return Outer{
+				Inner: Inner{A: "named-res", B: 42},
+				C:     true,
+			}
+		})
+
+		type In struct {
+			dig.In
+			A string `name:"special"`
+			B []int  `group:"nums"`
+			C bool
+		}
+
+		c.RequireInvoke(func(p In) {
+			assert.Equal(t, "named-res", p.A)
+			assert.Equal(t, []int{42}, p.B)
+			assert.True(t, p.C)
+		})
+	})
+
+	t.Run("unexported fields in embedded struct in dig.In error", func(t *testing.T) {
+		type Inner struct {
+			Exported   string
+			unexported int
+		}
+		type Outer struct {
+			dig.In
+			Inner
+		}
+
+		_ = Inner{}.unexported
+
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "test" })
+		err := c.Invoke(func(p Outer) {})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `bad field "Inner" of dig_test.Outer`)
+		assert.Contains(t, err.Error(), `unexported fields not allowed in dig.In`)
+	})
+
+	t.Run("unexported fields in embedded struct ignored when parent has ignore-unexported", func(t *testing.T) {
+		type Inner struct {
+			Exported   string
+			unexported int
+		}
+		type Outer struct {
+			dig.In `ignore-unexported:"true"`
+			Inner
+		}
+
+		_ = Inner{}.unexported
+
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "test" })
+		c.RequireInvoke(func(p Outer) {
+			assert.Equal(t, "test", p.Exported)
+		})
+	})
+
+	t.Run("unexported fields in embedded struct ignored when inner has ignore-unexported", func(t *testing.T) {
+		type Inner struct {
+			dig.In `ignore-unexported:"true"`
+			Exported   string
+			unexported int
+		}
+		type Outer struct {
+			dig.In
+			Inner
+		}
+
+		_ = Inner{}.unexported
+
+		c := digtest.New(t)
+		c.RequireProvide(func() string { return "test" })
+		c.RequireInvoke(func(p Outer) {
+			assert.Equal(t, "test", p.Exported)
+		})
+	})
+
+	t.Run("unexported fields in embedded struct in dig.Out error", func(t *testing.T) {
+		type Inner struct {
+			Exported   string
+			unexported int
+		}
+		type Outer struct {
+			dig.Out
+			Inner
+		}
+
+		_ = Inner{}.unexported
+
+		c := digtest.New(t)
+		err := c.Provide(func() Outer {
+			return Outer{Inner: Inner{Exported: "test", unexported: 1}}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `bad field "Inner" of dig_test.Outer`)
+		assert.Contains(t, err.Error(), `unexported fields not allowed in dig.Out`)
+	})
+
+	t.Run("embedded struct in dig.In embeds dig.Out error", func(t *testing.T) {
+		type Inner struct {
+			dig.Out
+			A string
+		}
+		type Outer struct {
+			dig.In
+			Inner
+		}
+
+		c := digtest.New(t)
+		err := c.Invoke(func(p Outer) {})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot depend on result objects")
+		assert.Contains(t, err.Error(), "embeds a dig.Out")
+	})
+
+	t.Run("embedded struct in dig.Out embeds dig.In error", func(t *testing.T) {
+		type Inner struct {
+			dig.In
+			A string
+		}
+		type Outer struct {
+			dig.Out
+			Inner
+		}
+
+		c := digtest.New(t)
+		err := c.Provide(func() Outer { return Outer{} })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot provide parameter objects")
+		assert.Contains(t, err.Error(), "embeds a dig.In")
+	})
+
+	t.Run("embedded struct in dig.In embeds pointer to dig.In error", func(t *testing.T) {
+		type Inner struct {
+			*dig.In
+			A string
+		}
+		type Outer struct {
+			dig.In
+			Inner
+		}
+
+		c := digtest.New(t)
+		err := c.Invoke(func(p Outer) {})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot build a parameter object by embedding *dig.In")
+	})
+
+	t.Run("embedded struct in dig.Out embeds pointer to dig.Out error", func(t *testing.T) {
+		type Inner struct {
+			*dig.Out
+			A string
+		}
+		type Outer struct {
+			dig.Out
+			Inner
+		}
+
+		c := digtest.New(t)
+		err := c.Provide(func() Outer { return Outer{} })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot build a result object by embedding *dig.Out")
+	})
+
+	t.Run("soft value group inside embedded struct in dig.In", func(t *testing.T) {
+		type Inner struct {
+			Values []string `group:"soft_vals,soft"`
+		}
+		type Outer struct {
+			dig.In
+			Inner
+			Dep int
+		}
+
+		c := digtest.New(t)
+		c.RequireProvide(func() int { return 42 })
+
+		c.RequireInvoke(func(p Outer) {
+			assert.Empty(t, p.Values)
+			assert.Equal(t, 42, p.Dep)
+		})
+	})
+
+	t.Run("tags on embedded struct in dig.Out error", func(t *testing.T) {
+		type Inner struct {
+			dig.Out
+			A string
+		}
+		type OutWithName struct {
+			dig.Out
+			Inner `name:"foo"`
+		}
+		type OutWithGroup struct {
+			dig.Out
+			Inner `group:"foo"`
+		}
+
+		c := digtest.New(t)
+		err := c.Provide(func() OutWithName { return OutWithName{} })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot specify a name for result objects")
+
+		err = c.Provide(func() OutWithGroup { return OutWithGroup{} })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot specify a group for result objects")
+	})
+}
+
